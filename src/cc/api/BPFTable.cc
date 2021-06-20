@@ -688,26 +688,27 @@ StatusTuple BPFXskmapTable::remove_value(const int& index) {
       return StatusTuple(-1, "Error removing value: %s", std::strerror(errno));
     return StatusTuple::OK();
 }
-
-BPFMapInMapTable::BPFMapInMapTable(const TableDesc& desc)
-    : BPFTableBase<int, int>(desc) {
+template <class KeyType>
+BPFMapInMapTable<KeyType>::BPFMapInMapTable(const TableDesc& desc)
+    : BPFTableBase<KeyType, int>(desc) {
     if(desc.type != BPF_MAP_TYPE_ARRAY_OF_MAPS &&
        desc.type != BPF_MAP_TYPE_HASH_OF_MAPS)
       throw std::invalid_argument("Table '" + desc.name +
                                   "' is not a map-in-map table");
 }
-
-StatusTuple BPFMapInMapTable::update_value(const int& index,
-                                           const int& inner_map_fd) {
-    if (!this->update(const_cast<int*>(&index), const_cast<int*>(&inner_map_fd)))
-      return StatusTuple(-1, "Error updating value: %s", std::strerror(errno));
-    return StatusTuple::OK();
+template <class KeyType>
+StatusTuple BPFMapInMapTable<KeyType>::update_value(const KeyType& key,
+                                                    const int& inner_map_fd) {
+  if (!this->update(const_cast<KeyType*>(&key), const_cast<int*>(&inner_map_fd)))
+    return StatusTuple(-1, "Error updating value: %s", std::strerror(errno));
+  return StatusTuple::OK();
 }
 
-StatusTuple BPFMapInMapTable::remove_value(const int& index) {
-    if (!this->remove(const_cast<int*>(&index)))
-      return StatusTuple(-1, "Error removing value: %s", std::strerror(errno));
-    return StatusTuple::OK();
+template <class KeyType>
+StatusTuple BPFMapInMapTable<KeyType>::remove_value(const KeyType& index) {
+  if (!this->remove(const_cast<KeyType*>(&index)))
+    return StatusTuple(-1, "Error removing value: %s", std::strerror(errno));
+  return StatusTuple::OK();
 }
 
 BPFSockmapTable::BPFSockmapTable(const TableDesc& desc)

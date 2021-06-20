@@ -479,12 +479,13 @@ public:
   StatusTuple remove_value(const int& index);
 };
 
-class BPFMapInMapTable : public BPFTableBase<int, int> {
+template <class KeyType>
+class BPFMapInMapTable : public BPFTableBase<KeyType, int> {
 public:
   BPFMapInMapTable(const TableDesc& desc);
 
-  StatusTuple update_value(const int& index, const int& inner_map_fd);
-  StatusTuple remove_value(const int& index);
+  StatusTuple update_value(const KeyType& key, const int& inner_map_fd);
+  StatusTuple remove_value(const KeyType& key);
 };
 
 class BPFSockmapTable : public BPFTableBase<int, int> {

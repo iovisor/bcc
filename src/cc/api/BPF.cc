@@ -832,12 +832,12 @@ BPFStackBuildIdTable BPF::get_stackbuildid_table(const std::string &name, bool u
     return BPFStackBuildIdTable(it->second, use_debug_file, check_debug_file_crc, get_bsymcache());
   return BPFStackBuildIdTable({}, use_debug_file, check_debug_file_crc, get_bsymcache());
 }
-
-BPFMapInMapTable BPF::get_map_in_map_table(const std::string& name) {
+template <class KeyType>
+BPFMapInMapTable<KeyType> BPF::get_map_in_map_table(const std::string& name) {
   TableStorage::iterator it;
   if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
-    return BPFMapInMapTable(it->second);
-  return BPFMapInMapTable({});
+    return BPFMapInMapTable<KeyType>(it->second);
+  return BPFMapInMapTable<KeyType>({});
 }
 
 BPFSockmapTable BPF::get_sockmap_table(const std::string& name) {
