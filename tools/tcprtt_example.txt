@@ -47,50 +47,103 @@ and remote address 192.168.122.100 and remote port 80.
 
 Tracing at server side, show each clients with its own histogram.
 For example, run tcprtt on a storage node to show initiators' rtt histogram:
-# ./tcprtt -i 1 -m --lport 3260 --byraddr
+# ./tcprtt -i 1 --lport 3260 --byraddr -e
 Tracing TCP RTT... Hit Ctrl-C to end.
 
-Remote Address:  = 10.131.90.16
-     msecs               : count     distribution
+
+Remote Addres = 10.194.87.206 [AVG 170]
+     usecs               : count     distribution
          0 -> 1          : 0        |                                        |
          2 -> 3          : 0        |                                        |
          4 -> 7          : 0        |                                        |
-         8 -> 15         : 2        |****************************************|
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 31       |                                        |
+        64 -> 127        : 5150     |*******************                     |
+       128 -> 255        : 10327    |****************************************|
+       256 -> 511        : 1014     |***                                     |
+       512 -> 1023       : 10       |                                        |
+      1024 -> 2047       : 7        |                                        |
+      2048 -> 4095       : 14       |                                        |
+      4096 -> 8191       : 10       |                                        |
 
-Remote Address:  = 10.131.90.13
-     msecs               : count     distribution
+Remote Addres = 10.194.87.197 [AVG 4293]
+     usecs               : count     distribution
          0 -> 1          : 0        |                                        |
          2 -> 3          : 0        |                                        |
-         4 -> 7          : 4        |**************************              |
-         8 -> 15         : 6        |****************************************|
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 3        |********                                |
+      2048 -> 4095       : 12       |**********************************      |
+      4096 -> 8191       : 14       |****************************************|
 
-Remote Address:  = 10.131.89.153
-     msecs               : count     distribution
-         0 -> 1          : 120      |****************************************|
-         2 -> 3          : 31       |**********                              |
-         4 -> 7          : 32       |**********                              |
-
-Remote Address:  = 10.131.89.150
-     msecs               : count     distribution
-         0 -> 1          : 12       |****************************************|
-         2 -> 3          : 12       |****************************************|
-         4 -> 7          : 9        |******************************          |
-         8 -> 15         : 3        |**********                              |
-
-Remote Address:  = 10.131.89.148
-     msecs               : count     distribution
+Remote Addres = 10.194.88.148 [AVG 6215]
+     usecs               : count     distribution
          0 -> 1          : 0        |                                        |
          2 -> 3          : 0        |                                        |
-         4 -> 7          : 4        |****************************************|
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 0        |                                        |
+      4096 -> 8191       : 2        |****************************************|
+
+Remote Addres = 10.194.87.90 [AVG 2188]
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 15       |*********                               |
+       512 -> 1023       : 30       |******************                      |
+      1024 -> 2047       : 50       |******************************          |
+      2048 -> 4095       : 65       |****************************************|
+      4096 -> 8191       : 22       |*************                           |
 
 ....
+
+
+Use -e(--extension) to show extension RTT:
+# ./tcprtt -i 1 -e
+
+All Addresses = ******* [AVG 324]
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 5360     |********                                |
+       128 -> 255        : 23834    |****************************************|
+       256 -> 511        : 11276    |******************                      |
+       512 -> 1023       : 700      |*                                       |
+      1024 -> 2047       : 434      |                                        |
+      2048 -> 4095       : 356      |                                        |
+      4096 -> 8191       : 328      |                                        |
+      8192 -> 16383      : 91       |                                        |
 
 
 Full USAGE:
 
 # ./tcprtt -h
-usage: tcprtt.py [-h] [-i INTERVAL] [-d DURATION] [-T] [-m] [-p LPORT]
-                 [-P RPORT] [-a LADDR] [-A RADDR] [-b] [-B] [-D]
+usage: tcprtt [-h] [-i INTERVAL] [-d DURATION] [-T] [-m] [-p LPORT]
+              [-P RPORT] [-a LADDR] [-A RADDR] [-b] [-B] [-e] [-D]
 
 Summarize TCP RTT as a histogram
 
@@ -112,6 +165,7 @@ optional arguments:
                         filter for remote address
   -b, --byladdr         show sockets histogram by local address
   -B, --byraddr         show sockets histogram by remote address
+  -e, --extension       show extension summary(average)
   -D, --debug           print BPF program before starting (for debugging
                         purposes)
 
@@ -126,3 +180,4 @@ examples:
     ./tcprtt -b         # show sockets histogram by local address
     ./tcprtt -B         # show sockets histogram by remote address
     ./tcprtt -D         # show debug bpf text
+    ./tcprtt -e         # show extension summary(average)
