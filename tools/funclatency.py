@@ -143,10 +143,8 @@ int trace_func_return(struct pt_regs *ctx)
 
     u32 lat = 0;
     u32 cnt = 1;
-    u64 *sum = avg.lookup(&lat);
-    if (sum) lock_xadd(sum, delta);
-    u64 *cnts = avg.lookup(&cnt);
-    if (cnts) lock_xadd(cnts, 1);
+    avg.atomic_increment(lat, delta);
+    avg.atomic_increment(cnt);
 
     FACTOR
 
