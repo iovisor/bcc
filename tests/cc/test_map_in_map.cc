@@ -30,7 +30,7 @@ TEST_CASE("test hash of maps", "[hash_of_maps]") {
       BPF_ARRAY(ex1, int, 1024);
       BPF_ARRAY(ex2, int, 1024);
       BPF_ARRAY(ex3, u64, 1024);
-      BPF_HASH_OF_MAPS(maps_hash, "ex1", int, 10);
+      BPF_HASH_OF_MAPS(maps_hash, int, "ex1", 10);
 
       int syscall__getuid(void *ctx) {
          int key = 0, data, *val, cntl_val;
@@ -177,14 +177,14 @@ TEST_CASE("test hash of maps using custom key", "[hash_of_maps_custom_key]") {
     res = bpf.attach_kprobe(getuid_fnname, "syscall__getuid");
     REQUIRE(res.code() == 0);
 
-    struct custom_key hash_key = {1, 0};
+    struct custom_key hash_key = {1, 1};
 
     res = t.update_value(hash_key, ex1_fd);
-    REQUIRE(res.code() != 0);
+    REQUIRE(res.code() == 0);
 
-    struct custom_key hash_key2 = {1, 1};
+    struct custom_key hash_key2 = {1, 2};
     res = t.update_value(hash_key2, ex2_fd);
-    REQUIRE(res.code() != 0);
+    REQUIRE(res.code() == 0);
 
     int key = 0, value = 0, value2 = 0;
 
