@@ -1165,7 +1165,7 @@ BPF_ARRAY_OF_MAPS(maps_array, "ex1", 10);
 
 ### 15. BPF_HASH_OF_MAPS
 
-Syntax: ```BPF_HASH_OF_MAPS(name, inner_map_name, size)```
+Syntax: ```BPF_HASH_OF_MAPS(name, key_type, inner_map_name, size)```
 
 This creates a hash map with a map-in-map type (BPF_MAP_TYPE_HASH_OF_MAPS) map named ```name``` with ```size``` entries. The inner map meta data is provided by map ```inner_map_name``` and can be most of array or hash maps except ```BPF_MAP_TYPE_PROG_ARRAY```, ```BPF_MAP_TYPE_CGROUP_STORAGE``` and ```BPF_MAP_TYPE_PERCPU_CGROUP_STORAGE```.
 
@@ -1173,7 +1173,7 @@ For example:
 ```C
 BPF_ARRAY(ex1, int, 1024);
 BPF_ARRAY(ex2, int, 1024);
-BPF_HASH_OF_MAPS(maps_hash, "ex1", 10);
+BPF_HASH_OF_MAPS(maps_hash, struct custom_key, "ex1", 10);
 ```
 
 ### 16. BPF_STACK
