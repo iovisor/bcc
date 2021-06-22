@@ -384,8 +384,17 @@ struct _name##_table_t _name = { .max_entries = (_max_entries) }
 #define BPF_ARRAY_OF_MAPS(_name, _inner_map_name, _max_entries) \
   BPF_TABLE("array_of_maps$" _inner_map_name, int, int, _name, _max_entries)
 
-#define BPF_HASH_OF_MAPS(_name, _inner_map_name, _max_entries) \
-  BPF_TABLE("hash_of_maps$" _inner_map_name, int, int, _name, _max_entries)
+#define BPF_HASH_OF_MAPS2(_name, _inner_map_name) \
+  BPF_TABLE("hash_of_maps$" _inner_map_name, int, int, _name, 10240)
+#define BPF_HASH_OF_MAPS3(_name, _key_type, _inner_map_name) \
+  BPF_TABLE("hash_of_maps$" _inner_map_name, _key_type, int, _name, 10240)
+#define BPF_HASH_OF_MAPS4(_name, _key_type, _inner_map_name, _max_entries) \
+  BPF_TABLE("hash_of_maps$" _inner_map_name, _key_type, int, _name, _max_entries)
+
+#define BPF_HASH_OF_MAPSX(_name, _2, _3, _4, NAME, ...) NAME
+
+#define BPF_HASH_OF_MAPS(...) \
+  BPF_HASH_OF_MAPSX(__VA_ARGS__, BPF_HASH_OF_MAPS4, BPF_HASH_OF_MAPS3, BPF_HASH_OF_MAPS2)(__VA_ARGS__)
 
 #define BPF_SK_STORAGE(_name, _leaf_type) \
 struct _name##_table_t { \

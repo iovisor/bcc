@@ -211,8 +211,13 @@ class BPF {
   BPFStackBuildIdTable get_stackbuildid_table(const std::string &name,
                                               bool use_debug_file = true,
                                               bool check_debug_file_crc = true);
-
-  BPFMapInMapTable get_map_in_map_table(const std::string& name);
+  template <class KeyType>
+  BPFMapInMapTable<KeyType> get_map_in_map_table(const std::string& name){
+      TableStorage::iterator it;
+      if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
+        return BPFMapInMapTable<KeyType>(it->second);
+      return BPFMapInMapTable<KeyType>({});
+  }
 
   bool add_module(std::string module);
 
