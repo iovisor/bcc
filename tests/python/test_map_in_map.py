@@ -157,7 +157,7 @@ class TestUDST(TestCase):
 
         cntl_map[0] = ct.c_int(1)
         os.getuid()
-        assert(ex1_map[ct.c_int(0)] >= 1)
+        assert(ex1_map[ct.c_int(0)].value >= 1)
 
         try:
           ex2_map[ct.c_int(0)]
@@ -167,7 +167,7 @@ class TestUDST(TestCase):
 
         cntl_map[0] = ct.c_int(2)
         os.getuid()
-        assert(ex2_map[ct.c_int(0)] >= 1)
+        assert(ex2_map[ct.c_int(0)].value >= 1)
 
         b.detach_kprobe(event=syscall_fnname)
         del hash_maps[CustomKey(1, 1)]
