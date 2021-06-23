@@ -215,7 +215,7 @@ print("Tracing TCP RTT... Hit Ctrl-C to end.")
 def print_section(addr):
     addrstr = "*******"
     if (addr):
-        addrstr = inet_ntop(AF_INET, struct.pack("I", addr)).encode()
+        addrstr = inet_ntop(AF_INET, struct.pack("I", addr))
 
     avglat = ""
     if args.extension:
