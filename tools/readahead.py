@@ -95,7 +95,7 @@ int entry_mark_page_accessed(struct pt_regs *ctx) {
 """
 
 b = BPF(text=program)
-ra_event="__do_page_cache_readahead"
+ra_event = "__do_page_cache_readahead"
 if kernel_version_ge(5, 10):
     ra_event = "do_page_cache_ra"
 b.attach_kprobe(event=ra_event, fn_name="entry__do_page_cache_readahead")
