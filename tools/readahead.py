@@ -20,7 +20,7 @@ import argparse
 
 # arguments
 examples = """examples:
-    ./readahead -d 20       # monitor for 10 seconds and generate stats
+    ./readahead -d 20       # monitor for 20 seconds and generate stats
 """
 
 parser = argparse.ArgumentParser(
