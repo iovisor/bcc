@@ -20,7 +20,7 @@ import argparse
 
 # arguments
 examples = """examples:
-    ./readahead -d 20       # monitor for 10 seconds and generate stats 
+    ./readahead -d 20       # monitor for 20 seconds and generate stats
 """
 
 parser = argparse.ArgumentParser(
@@ -95,15 +95,19 @@ int entry_mark_page_accessed(struct pt_regs *ctx) {
 """
 
 b = BPF(text=program)
-b.attach_kprobe(event="__do_page_cache_readahead", fn_name="entry__do_page_cache_readahead")
-b.attach_kretprobe(event="__do_page_cache_readahead", fn_name="exit__do_page_cache_readahead")
+if BPF.get_kprobe_functions(b"__do_page_cache_readahead"):
+    ra_event = "__do_page_cache_readahead"
+else:
+    ra_event = "do_page_cache_ra"
+b.attach_kprobe(event=ra_event, fn_name="entry__do_page_cache_readahead")
+b.attach_kretprobe(event=ra_event, fn_name="exit__do_page_cache_readahead")
 b.attach_kretprobe(event="__page_cache_alloc", fn_name="exit__page_cache_alloc")
 b.attach_kprobe(event="mark_page_accessed", fn_name="entry_mark_page_accessed")
 
 # header
 print("Tracing... Hit Ctrl-C to end.")
 
-# print 
+# print
 def print_stats():
     print()
     print("Read-ahead unused pages: %d" % (b["pages"][ct.c_ulong(0)].value))

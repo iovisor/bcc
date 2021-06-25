@@ -2,20 +2,20 @@ Demonstration of readahead, the Linux eBPF/bcc version
 
 Read-ahead mechanism is used by operation sytems to optimize sequential operations
 by reading ahead some pages to avoid more expensive filesystem operations. This tool
-shows the performance of the read-ahead caching on the system under a given load to 
+shows the performance of the read-ahead caching on the system under a given load to
 investigate any caching issues. It shows a count for unused pages in the cache and
 also prints a histogram showing how long they have remianed there.
 
 Usage Scenario
 ==============
 
-Consider that you are developing a React Native application which performs aggressive 
+Consider that you are developing a React Native application which performs aggressive
 reads while re-encoding a video in local-storage. Usually such an app would be multi-
-layered and have transitional library dependencies. The actual read may be performed 
-by some unknown native library which may or may not be using hints to the OS, such as  
-madvise(p, LEN, MADV_SEQUENTIAL). If high IOPS is observed in such an app, running 
-readahead may pin the issue much faster in this case as the developer digs deeper 
-into what may be causing this. 
+layered and have transitional library dependencies. The actual read may be performed
+by some unknown native library which may or may not be using hints to the OS, such as
+madvise(p, LEN, MADV_SEQUENTIAL). If high IOPS is observed in such an app, running
+readahead may pin the issue much faster in this case as the developer digs deeper
+into what may be causing this.
 
 An example where such an issue can surface is: https://github.com/boltdb/bolt/issues/691
 
@@ -40,7 +40,7 @@ Histogram of read-ahead used page age (ms):
       2048 -> 4095       : 439      |****                                    |
       4096 -> 8191       : 188      |*                                       |
 
-In the example above, we recorded system-wide stats for 30 seconds. We can observe that 
+In the example above, we recorded system-wide stats for 30 seconds. We can observe that
 while most of the pages stayed in the readahead cache for quite less time, after 30
 seconds 6765 pages still remained in the cache, yet unaccessed.
 
@@ -49,12 +49,12 @@ Note on Kprobes Usage
 
 This tool uses Kprobes on the following kernel functions:
 
-__do_page_cache_readahead()
+__do_page_cache_readahead()/do_page_cache_ra() (After kernel version 5.10 (include), __do_page_cache_readahead was renamed to do_page_cache_ra)
 __page_cache_alloc()
 mark_page_accessed()
 
-Since the tool uses Kprobes, depending on your linux kernel's compilation, these 
-functions may be inlined and hence not available for Kprobes. To see whether you have 
+Since the tool uses Kprobes, depending on your linux kernel's compilation, these
+functions may be inlined and hence not available for Kprobes. To see whether you have
 the functions available, check vmlinux source and binary to confirm whether inlining is
 happening or not. You can also check /proc/kallsyms on the host and verify if the target
 functions are present there before using this tool.
