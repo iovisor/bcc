@@ -49,7 +49,7 @@ Note on Kprobes Usage
 
 This tool uses Kprobes on the following kernel functions:
 
-__do_page_cache_readahead()/do_page_cache_ra() (After kernel version 5.10 (include), __do_page_cache_readahead was renamed to /do_page_cache_ra)
+__do_page_cache_readahead()/do_page_cache_ra() (After kernel version 5.10 (include), __do_page_cache_readahead was renamed to do_page_cache_ra)
 __page_cache_alloc()
 mark_page_accessed()
 
