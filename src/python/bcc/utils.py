@@ -21,11 +21,6 @@ import distutils.version
 
 from .libbcc import lib
 
-def kernel_version_ge(major, minor):
-    # True if running kernel is >= X.Y
-    version = distutils.version.LooseVersion(os.uname()[2]).version
-    return (version[0], version[1]) >= (major, minor)
-
 def _read_cpu_range(path):
     cpus = []
     with open(path, 'r') as f:
