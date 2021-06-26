@@ -16,8 +16,6 @@ import sys
 import traceback
 import warnings
 import re
-import os
-import distutils.version
 
 from .libbcc import lib
 
