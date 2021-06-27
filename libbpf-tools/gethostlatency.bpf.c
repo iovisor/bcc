@@ -1,21 +1,21 @@
-// SPDX-License-Identifier: GPL-2.0
-// Copyright (c) 2021 Hengqi Chen
+/* SPDX-License-Identifier: GPL-2.0 */
+/* Copyright (c) 2021 Hengqi Chen */
 #include <vmlinux.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_tracing.h>
 #include "gethostlatency.h"
 
-#define MAX_ENTRIES 10240
+#define MAX_ENTRIES	10240
 
-const volatile pid_t targ_tgid = 0;
+const volatile pid_t target_pid = 0;
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, MAX_ENTRIES);
 	__type(key, __u32);
-	__type(value, struct val_t);
-} start SEC(".maps");
+	__type(value, struct event);
+} starts SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
@@ -23,47 +23,42 @@ struct {
 	__uint(value_size, sizeof(__u32));
 } events SEC(".maps");
 
-static __always_inline
-int probe_entry(struct pt_regs *ctx) {
+static int probe_entry(struct pt_regs *ctx)
+{
 	if (!PT_REGS_PARM1(ctx))
 		return 0;
 
-	struct val_t val = {};
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 pid = pid_tgid >> 32;
 	__u32 tid = (__u32)pid_tgid;
+	struct event event = {};
 
-	if (targ_tgid && targ_tgid != pid)
+	if (target_pid && target_pid != pid)
 		return 0;
 
-	if (bpf_get_current_comm(&val.comm, sizeof(val.comm)) == 0) {
-		bpf_probe_read_user(&val.host, sizeof(val.host),
-					   (void *)PT_REGS_PARM1(ctx));
-		val.pid = pid;
-		val.time = bpf_ktime_get_ns();
-		bpf_map_update_elem(&start, &tid, &val, BPF_ANY);
-	}
-
+	event.time = bpf_ktime_get_ns();
+	event.pid = pid;
+	bpf_get_current_comm(&event.comm, sizeof(event.comm));
+	bpf_probe_read_user(&event.host, sizeof(event.host), (void *)PT_REGS_PARM1(ctx));
+	bpf_map_update_elem(&starts, &tid, &event, BPF_ANY);
 	return 0;
 }
 
-static __always_inline
-int probe_return(struct pt_regs *ctx) {
-	struct val_t *valp;
+static int probe_return(struct pt_regs *ctx)
+{
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 pid = pid_tgid >> 32;
 	__u32 tid = (__u32)pid_tgid;
-	__u64 now = bpf_ktime_get_ns();
+	struct event *eventp;
 
-	valp = bpf_map_lookup_elem(&start, &tid);
-	if (!valp)
+	eventp = bpf_map_lookup_elem(&starts, &tid);
+	if (!eventp)
 		return 0;
 
-	// update time from timestamp to delta
-	valp->time = now - valp->time;
-	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, valp,
-			sizeof(*valp));
-	bpf_map_delete_elem(&start, &tid);
+	/* update time from timestamp to delta */
+	eventp->time = bpf_ktime_get_ns() - eventp->time;
+	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, eventp, sizeof(*eventp));
+	bpf_map_delete_elem(&starts, &tid);
 	return 0;
 }
 
