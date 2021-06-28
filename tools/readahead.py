@@ -69,9 +69,7 @@ int exit__page_cache_alloc(struct pt_regs *ctx) {
     if (f != NULL && *f == 1) {
         ts = bpf_ktime_get_ns();
         birth.update(&retval, &ts);
-
-        u64 *count = pages.lookup(&zero);
-        if (count) (*count)++; // increment read ahead pages count
+        pages.atomic_increment(zero);
     }
     return 0;
 }
@@ -83,11 +81,8 @@ int entry_mark_page_accessed(struct pt_regs *ctx) {
     u64 *bts = birth.lookup(&arg0);
     if (bts != NULL) {
         delta = bpf_ktime_get_ns() - *bts;
-        dist.increment(bpf_log2l(delta/1000000));
-
-        u64 *count = pages.lookup(&zero);
-        if (count) (*count)--; // decrement read ahead pages count
-
+        dist.atomic_increment(bpf_log2l(delta/1000000));
+        pages.atomic_increment(zero, -1);
         birth.delete(&arg0); // remove the entry from hashmap
     }
     return 0;

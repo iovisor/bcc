@@ -33,7 +33,7 @@ int do_entry(struct pt_regs *ctx) {
     backlog_key_t key = {};
     key.backlog = sk->sk_max_ack_backlog;
     key.slot = bpf_log2l(sk->sk_ack_backlog);
-    dist.increment(key);
+    dist.atomic_increment(key);
 
     return 0;
 };

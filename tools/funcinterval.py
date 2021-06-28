@@ -99,7 +99,7 @@ int trace_func_entry(struct pt_regs *ctx)
     FACTOR
 
     // store as histogram
-    dist.increment(bpf_log2l(delta));
+    dist.atomic_increment(bpf_log2l(delta));
 
 out:
     start.update(&index, &ts);

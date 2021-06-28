@@ -236,12 +236,12 @@ elif args.pidnss:
         'BPF_HISTOGRAM(dist, pidns_key_t);')
     bpf_text = bpf_text.replace('STORE', 'pidns_key_t key = ' +
         '{.id = prev->nsproxy->pid_ns_for_children->ns.inum, ' +
-        '.slot = bpf_log2l(delta)}; dist.increment(key);')
+        '.slot = bpf_log2l(delta)}; dist.atomic_increment(key);')
 else:
     section = ""
     bpf_text = bpf_text.replace('STORAGE', 'BPF_HISTOGRAM(dist);')
     bpf_text = bpf_text.replace('STORE',
-        'dist.increment(bpf_log2l(delta));')
+        'dist.atomic_increment(bpf_log2l(delta));')
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:

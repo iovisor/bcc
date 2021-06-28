@@ -142,7 +142,7 @@ static int wakeup(ARG0, struct task_struct *p) {
     bpf_probe_read_kernel(&key.target, sizeof(key.target), p->comm);
     bpf_get_current_comm(&key.waker, sizeof(key.waker));
 
-    counts.increment(key, delta);
+    counts.atomic_increment(key, delta);
     return 0;
 }
 """
