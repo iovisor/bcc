@@ -73,6 +73,14 @@ Time process 181 only:
 Time the interval of mm_vmscan_direct_reclaim_begin tracepoint:
 #
 .B funcinterval t:vmscan:mm_vmscan_direct_reclaim_begin
+.TP
+Time the interval of c:malloc used by top every 3 seconds:
+#
+.B funcinterval -p `pidof -s top` -i 3 c:malloc
+.TP
+Time /usr/local/bin/python main function:
+#
+.B funcinterval /usr/local/bin/python:main
 .SH FIELDS
 .TP
 necs
