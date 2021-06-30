@@ -60,15 +60,6 @@ if(NOT CMAKE_USE_LIBBPF_PACKAGE)
   set(libbpf_uapi libbpf/include/uapi/linux/)
 endif()
 
-add_library(bpf-static STATIC libbpf.c perf_reader.c ${libbpf_sources})
-set_target_properties(bpf-static PROPERTIES OUTPUT_NAME bcc_bpf)
-add_library(bpf-shared SHARED libbpf.c perf_reader.c ${libbpf_sources})
-set_target_properties(bpf-shared PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0)
-set_target_properties(bpf-shared PROPERTIES OUTPUT_NAME bcc_bpf)
-if(CMAKE_USE_LIBBPF_PACKAGE AND LIBBPF_FOUND)
-  target_link_libraries(bpf-shared ${LIBBPF_LIBRARIES})
-endif()
-
 set(bcc_common_sources bcc_common.cc bpf_module.cc bcc_btf.cc exported_files.cc)
 if (${LLVM_PACKAGE_VERSION} VERSION_EQUAL 6 OR ${LLVM_PACKAGE_VERSION} VERSION_GREATER 6)
   set(bcc_common_sources ${bcc_common_sources} bcc_debug.cc)
@@ -109,6 +100,15 @@ add_library(bcc-static STATIC
 set_target_properties(bcc-static PROPERTIES OUTPUT_NAME bcc)
 set(bcc-lua-static
   ${bcc_common_sources} ${bcc_table_sources} ${bcc_sym_sources} ${bcc_util_sources})
+
+add_library(bpf-static STATIC libbpf.c perf_reader.c ${libbpf_sources})
+set_target_properties(bpf-static PROPERTIES OUTPUT_NAME bcc_bpf)
+add_library(bpf-shared SHARED libbpf.c perf_reader.c ${libbpf_sources})
+set_target_properties(bpf-shared PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0)
+set_target_properties(bpf-shared PROPERTIES OUTPUT_NAME bcc_bpf)
+if(CMAKE_USE_LIBBPF_PACKAGE AND LIBBPF_FOUND)
+  target_link_libraries(bpf-shared ${LIBBPF_LIBRARIES})
+endif()
 
 include(clang_libs)
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${clang_lib_exclude_flags}")
