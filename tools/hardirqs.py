@@ -86,7 +86,7 @@ TRACEPOINT_PROBE(irq, irq_handler_entry)
 {
     irq_key_t key = {.slot = 0 /* ignore */};
     TP_DATA_LOC_READ_CONST(&key.name, name, sizeof(key.name));
-    dist.increment(key);
+    dist.atomic_increment(key);
     return 0;
 }
 """
@@ -139,12 +139,12 @@ if args.dist:
     bpf_text = bpf_text.replace('STORE',
         'irq_key_t key = {.slot = bpf_log2l(delta / %d)};' % factor +
         'bpf_probe_read_kernel(&key.name, sizeof(key.name), name);' +
-        'dist.increment(key);')
+        'dist.atomic_increment(key);')
 else:
     bpf_text = bpf_text.replace('STORE',
         'irq_key_t key = {.slot = 0 /* ignore */};' +
         'bpf_probe_read_kernel(&key.name, sizeof(key.name), name);' +
-        'dist.increment(key, delta);')
+        'dist.atomic_increment(key, delta);')
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:

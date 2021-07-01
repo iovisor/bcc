@@ -132,18 +132,18 @@ if args.disks:
     disk_key_t key = {.slot = bpf_log2l(delta)};
     void *__tmp = (void *)req->rq_disk->disk_name;
     bpf_probe_read(&key.disk, sizeof(key.disk), __tmp);
-    dist.increment(key);
+    dist.atomic_increment(key);
     """
 elif args.flags:
     storage_str += "BPF_HISTOGRAM(dist, flag_key_t);"
     store_str += """
     flag_key_t key = {.slot = bpf_log2l(delta)};
     key.flags = req->cmd_flags;
-    dist.increment(key);
+    dist.atomic_increment(key);
     """
 else:
     storage_str += "BPF_HISTOGRAM(dist);"
-    store_str += "dist.increment(bpf_log2l(delta));"
+    store_str += "dist.atomic_increment(bpf_log2l(delta));"
 
 if args.extension:
     storage_str += "BPF_ARRAY(extension, ext_val_t, 1);"
@@ -254,7 +254,7 @@ while (1):
     else:
         if args.timestamp:
             print("%-8s\n" % strftime("%H:%M:%S"), end="")
-            
+
         if args.flags:
             dist.print_log2_hist(label, "flags", flags_print)
         else:

@@ -119,11 +119,11 @@ TRACEPOINT_PROBE(irq, softirq_exit)
 if args.dist:
     bpf_text = bpf_text.replace('STORE',
         'key.vec = vec; key.slot = bpf_log2l(delta / %d); ' % factor +
-        'dist.increment(key);')
+        'dist.atomic_increment(key);')
 else:
     bpf_text = bpf_text.replace('STORE',
         'key.vec = valp->vec; ' +
-        'dist.increment(key, delta);')
+        'dist.atomic_increment(key, delta);')
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:

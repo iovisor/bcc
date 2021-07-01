@@ -334,10 +334,11 @@ u64 __time = bpf_ktime_get_ns();
 
         def _generate_hash_update(self):
                 if self.type == "hist":
-                        return "%s.increment(bpf_log2l(__key));" % \
+                        return "%s.atomic_increment(bpf_log2l(__key));" % \
                                 self.probe_hash_name
                 else:
-                        return "%s.increment(__key);" % self.probe_hash_name
+                        return "%s.atomic_increment(__key);" % \
+                                self.probe_hash_name
 
         def _generate_pid_filter(self):
                 # Kernel probes need to explicitly filter pid, because the

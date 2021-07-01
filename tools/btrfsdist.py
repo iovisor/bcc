@@ -144,7 +144,7 @@ static int trace_return(struct pt_regs *ctx, const char *op)
     // store as histogram
     dist_key_t key = {.slot = bpf_log2l(delta)};
     __builtin_memcpy(&key.op, op, sizeof(key.op));
-    dist.increment(key);
+    dist.atomic_increment(key);
 
     start.delete(&tid);
     return 0;

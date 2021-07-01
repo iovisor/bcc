@@ -123,7 +123,7 @@ int trace_tcp_rcv(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb)
 
     STORE_HIST
     key.slot = bpf_log2l(srtt);
-    hist_srtt.increment(key);
+    hist_srtt.atomic_increment(key);
 
     STORE_LATENCY
 
