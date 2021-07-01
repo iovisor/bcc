@@ -39,7 +39,7 @@ const char *argp_program_version = "execsnoop 0.1";
 const char *argp_program_bug_address =
 	"https://github.com/iovisor/bcc/tree/master/libbpf-tools";
 const char argp_program_doc[] =
-"Trace open family syscalls\n"
+"Trace exec syscalls\n"
 "\n"
 "USAGE: execsnoop [-h] [-T] [-t] [-x] [-u UID] [-q] [-n NAME] [-l LINE] [-U]\n"
 "                 [--max-args MAX_ARGS]\n"
@@ -56,16 +56,16 @@ const char argp_program_doc[] =
 "   ./execsnoop -l tpkg   # only print command where arguments contains \"tpkg\"";
 
 static const struct argp_option opts[] = {
-	{ "time", 'T', NULL, 0, "include time column on output (HH:MM:SS)"},
-	{ "timestamp", 't', NULL, 0, "include timestamp on output"},
-	{ "fails", 'x', NULL, 0, "include failed exec()s"},
-	{ "uid", 'u', "UID", 0, "trace this UID only"},
-	{ "quote", 'q', NULL, 0, "Add quotemarks (\") around arguments"},
-	{ "name", 'n', "NAME", 0, "only print commands matching this name, any arg"},
-	{ "line", 'l', "LINE", 0, "only print commands where arg contains this line"},
-	{ "print-uid", 'U', NULL, 0, "print UID column"},
+	{ "time", 'T', NULL, 0, "include time column on output (HH:MM:SS)" },
+	{ "timestamp", 't', NULL, 0, "include timestamp on output" },
+	{ "fails", 'x', NULL, 0, "include failed exec()s" },
+	{ "uid", 'u', "UID", 0, "trace this UID only" },
+	{ "quote", 'q', NULL, 0, "Add quotemarks (\") around arguments" },
+	{ "name", 'n', "NAME", 0, "only print commands matching this name, any arg" },
+	{ "line", 'l', "LINE", 0, "only print commands where arg contains this line" },
+	{ "print-uid", 'U', NULL, 0, "print UID column" },
 	{ "max-args", MAX_ARGS_KEY, "MAX_ARGS", 0,
-		"maximum number of arguments parsed and displayed, defaults to 20"},
+		"maximum number of arguments parsed and displayed, defaults to 20" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
@@ -129,8 +129,8 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	return 0;
 }
 
-int libbpf_print_fn(enum libbpf_print_level level,
-		    const char *format, va_list args)
+static int libbpf_print_fn(enum libbpf_print_level level,
+			   const char *format, va_list args)
 {
 	if (level == LIBBPF_DEBUG && !env.verbose)
 		return 0;
@@ -209,7 +209,7 @@ static void print_args(const struct event *e, bool quote)
 	}
 }
 
-void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
+static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	const struct event *e = data;
 	time_t t;
@@ -243,7 +243,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	putchar('\n');
 }
 
-void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
+static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 {
 	fprintf(stderr, "Lost %llu events on CPU #%d!\n", lost_cnt, cpu);
 }
