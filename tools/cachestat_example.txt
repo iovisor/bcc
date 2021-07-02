@@ -72,7 +72,7 @@ This output shows a 1 Gbyte file being created and added to the page cache:
        0        0    96505    0.00%            8       1233
        0        0        0    0.00%            8       1233
 
-Note the high rate of DIRTIES, and the CACHED_MD size increases by 1024 Mbytes.
+Note the high rate of DIRTIES, and the CACHED_MB size increases by 1024 Mbytes.
 
 
 USAGE message:
