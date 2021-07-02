@@ -154,7 +154,7 @@ Arguments are specified on the function declaration: kprobe__*kernel_function_na
 For example:
 
 ```C
-int kprobe__tcp_v4_connect(struct pt_regs *ctx, struct sock *sk)
+int kprobe__tcp_v4_connect(struct pt_regs *ctx, struct sock *sk) {
     [...]
 }
 ```
