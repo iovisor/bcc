@@ -88,6 +88,10 @@ jobs:
           else
             echo "Custom docker credentials not, skipping"
           fi
+      env:
+        DOCKER_IMAGE: ${{ secrets.DOCKER_IMAGE }}
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
     - name: Build container image and publish to registry
       id: publish-registry
