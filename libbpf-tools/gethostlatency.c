@@ -26,6 +26,7 @@
 
 static volatile sig_atomic_t exiting = 0;
 static pid_t target_pid = 0;
+static const char *libc_path = NULL;
 
 const char *argp_program_version = "gethostlatency 0.1";
 const char *argp_program_bug_address =
@@ -33,7 +34,7 @@ const char *argp_program_bug_address =
 const char argp_program_doc[] =
 "Show latency for getaddrinfo/gethostbyname[2] calls.\n"
 "\n"
-"USAGE: gethostlatency [-h] [-p PID]\n"
+"USAGE: gethostlatency [-h] [-p PID] [-l LIBC]\n"
 "\n"
 "EXAMPLES:\n"
 "    gethostlatency             # time getaddrinfo/gethostbyname[2] calls\n"
@@ -41,6 +42,7 @@ const char argp_program_doc[] =
 
 static const struct argp_option opts[] = {
 	{ "pid", 'p', "PID", 0, "Process ID to trace" },
+	{ "libc", 'l', "LIBC", 0, "Specify which libc.so to use" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
@@ -58,6 +60,13 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			argp_usage(state);
 		}
 		target_pid = pid;
+		break;
+	case 'l':
+		libc_path = strdup(arg);
+		if (access(libc_path, F_OK)) {
+			warn("Invalid libc: %s\n", arg);
+			argp_usage(state);
+		}
 		break;
 	case 'h':
 		argp_state_help(state, stderr, ARGP_HELP_STD_HELP);
@@ -98,6 +107,11 @@ static int get_libc_path(char *path)
 	char buf[PATH_MAX] = {};
 	char *filename;
 	float version;
+
+	if (libc_path) {
+		memcpy(path, libc_path, strlen(libc_path));
+		return 0;
+	}
 
 	f = fopen("/proc/self/maps", "r");
 	if (!f)
