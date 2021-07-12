@@ -156,10 +156,7 @@ class ProcSyms : SymbolCache {
   ProcStat procstat_;
   bcc_symbol_option symbol_option_;
 
-  static int _add_load_sections(uint64_t v_addr, uint64_t mem_sz,
-                                uint64_t file_offset, void *payload);
   static int _add_module(mod_info *, int, void *);
-  void load_exe();
   void load_modules();
 
 public:
