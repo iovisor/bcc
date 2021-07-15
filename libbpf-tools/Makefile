@@ -28,6 +28,7 @@ APPS = \
 	drsnoop \
 	execsnoop \
 	filelife \
+	filetop \
 	fsdist \
 	fsslower \
 	funclatency \
