@@ -18,7 +18,6 @@ from __future__ import print_function
 from bcc import BPF
 from time import sleep, strftime
 import argparse
-import signal
 from subprocess import call
 
 # arguments
@@ -51,10 +50,6 @@ clear = not int(args.noclear)
 # linux stats
 loadavg = "/proc/loadavg"
 diskstats = "/proc/diskstats"
-
-# signal handler
-def signal_ignore(signal_value, frame):
-    print()
 
 # load BPF program
 bpf_text = """

@@ -20,7 +20,6 @@ from bcc import BPF
 from bcc.utils import printb
 from time import sleep, strftime
 import argparse
-import signal
 from subprocess import call
 
 # arguments
@@ -53,10 +52,6 @@ debug = 0
 
 # linux stats
 loadavg = "/proc/loadavg"
-
-# signal handler
-def signal_ignore(signal, frame):
-    print()
 
 # define BPF program
 bpf_text = """
