@@ -60,6 +60,9 @@ const char *calling_conv_regs_arm64[] = {"regs[0]", "regs[1]", "regs[2]",
 const char *calling_conv_regs_mips[] = {"regs[4]", "regs[5]", "regs[6]",
                                        "regs[7]", "regs[8]", "regs[9]"};
 
+const char *calling_conv_regs_loongarch[] = {"regs[4]", "regs[5]", "regs[6]",
+                                             "regs[7]", "regs[8]", "regs[9]"};
+
 void *get_call_conv_cb(bcc_arch_t arch, bool for_syscall)
 {
   const char **ret;
@@ -77,6 +80,9 @@ void *get_call_conv_cb(bcc_arch_t arch, bool for_syscall)
       break;
     case BCC_ARCH_MIPS:
       ret = calling_conv_regs_mips;
+      break;
+    case BCC_ARCH_LOONGARCH:
+      ret = calling_conv_regs_loongarch;
       break;
     default:
       if (for_syscall)

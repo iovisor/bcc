@@ -156,6 +156,9 @@ private:
     REG_SI,
     REG_DI,
     REG_BP,
+#ifdef REG_SP
+#undef REG_SP
+#endif
     REG_SP,
     REG_8,
     REG_9,
