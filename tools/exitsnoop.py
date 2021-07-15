@@ -115,7 +115,7 @@ def _embedded_c(args):
     BPF_STATIC_ASSERT(sizeof(struct data_t) == CTYPES_SIZEOF_DATA);
     BPF_PERF_OUTPUT(events);
 
-    TRACEPOINT_PROBE(sched, sched_process_exit)
+    int TRACEPOINT_PROBE(sched, sched_process_exit)
     {
         struct task_struct *task = (typeof(task))bpf_get_current_task();
         if (FILTER_PID || FILTER_EXIT_CODE) { return 0; }

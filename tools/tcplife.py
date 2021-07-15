@@ -238,7 +238,7 @@ int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
 """
 
 bpf_text_tracepoint = """
-TRACEPOINT_PROBE(sock, inet_sock_set_state)
+int TRACEPOINT_PROBE(sock, inet_sock_set_state)
 {
     if (args->protocol != IPPROTO_TCP)
         return 0;

@@ -15,7 +15,7 @@ struct event {
     int mode;
 };
 
-TRACEPOINT_PROBE(syscalls, sys_enter_openat) {
+int TRACEPOINT_PROBE(syscalls, sys_enter_openat) {
     int zero = 0;
 
     struct event event = {};

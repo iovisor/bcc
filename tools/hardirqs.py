@@ -82,7 +82,7 @@ BPF_HISTOGRAM(dist, irq_key_t);
 """
 
 bpf_text_count = """
-TRACEPOINT_PROBE(irq, irq_handler_entry)
+int TRACEPOINT_PROBE(irq, irq_handler_entry)
 {
     irq_key_t key = {.slot = 0 /* ignore */};
     TP_DATA_LOC_READ_CONST(&key.name, name, sizeof(key.name));
@@ -92,7 +92,7 @@ TRACEPOINT_PROBE(irq, irq_handler_entry)
 """
 
 bpf_text_time = """
-TRACEPOINT_PROBE(irq, irq_handler_entry)
+int TRACEPOINT_PROBE(irq, irq_handler_entry)
 {
     u32 tid = bpf_get_current_pid_tgid();
     u64 ts = bpf_ktime_get_ns();
@@ -104,7 +104,7 @@ TRACEPOINT_PROBE(irq, irq_handler_entry)
     return 0;
 }
 
-TRACEPOINT_PROBE(irq, irq_handler_exit)
+int TRACEPOINT_PROBE(irq, irq_handler_exit)
 {
     u64 *tsp, delta;
     irq_name_t *namep;

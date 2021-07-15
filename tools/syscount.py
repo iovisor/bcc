@@ -88,7 +88,7 @@ BPF_HASH(data, u32, u64);
 #endif
 
 #ifdef LATENCY
-TRACEPOINT_PROBE(raw_syscalls, sys_enter) {
+int TRACEPOINT_PROBE(raw_syscalls, sys_enter) {
     u64 pid_tgid = bpf_get_current_pid_tgid();
 
 #ifdef FILTER_PID
@@ -102,7 +102,7 @@ TRACEPOINT_PROBE(raw_syscalls, sys_enter) {
 }
 #endif
 
-TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
+int TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
     u64 pid_tgid = bpf_get_current_pid_tgid();
 
 #ifdef FILTER_PID

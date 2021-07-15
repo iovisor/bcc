@@ -202,7 +202,7 @@ int trace_return(struct pt_regs *ctx) {
 #endif  // NOLANG
 
 #ifdef SYSCALLS
-TRACEPOINT_PROBE(raw_syscalls, sys_enter) {
+int TRACEPOINT_PROBE(raw_syscalls, sys_enter) {
     u64 pid = bpf_get_current_pid_tgid();
     u64 *valp, id = args->id, val = 0;
     PID_FILTER
@@ -222,7 +222,7 @@ TRACEPOINT_PROBE(raw_syscalls, sys_enter) {
 }
 
 #ifdef LATENCY
-TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
+int TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
     struct syscall_entry_t *e;
     struct info_t *info, zero = {};
     u64 pid = bpf_get_current_pid_tgid(), id;

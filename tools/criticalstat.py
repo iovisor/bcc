@@ -117,7 +117,7 @@ BPF_PERF_OUTPUT(events);
  * such cases, we avoid recording those critical sections since they
  * are not worth while to record and just add noise.
  */
-TRACEPOINT_PROBE(power, cpu_idle)
+int TRACEPOINT_PROBE(power, cpu_idle)
 {
     int idx = 0;
     u64 val;
@@ -171,7 +171,7 @@ static void reset_state(void)
     sts.update(&idx, &s);
 }
 
-TRACEPOINT_PROBE(preemptirq, TYPE_disable)
+int TRACEPOINT_PROBE(preemptirq, TYPE_disable)
 {
     int idx = 0;
     struct start_data s;
@@ -195,7 +195,7 @@ TRACEPOINT_PROBE(preemptirq, TYPE_disable)
     return 0;
 }
 
-TRACEPOINT_PROBE(preemptirq, TYPE_enable)
+int TRACEPOINT_PROBE(preemptirq, TYPE_enable)
 {
     int idx = 0;
     u64 start_ts, end_ts, diff;

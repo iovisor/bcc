@@ -333,60 +333,60 @@ int pvalloc_exit(struct pt_regs *ctx) {
 
 bpf_source_kernel = """
 
-TRACEPOINT_PROBE(kmem, kmalloc) {
+int TRACEPOINT_PROBE(kmem, kmalloc) {
         if (WORKAROUND_MISSING_FREE)
             gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
         gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
         return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
 }
 
-TRACEPOINT_PROBE(kmem, kmalloc_node) {
+int TRACEPOINT_PROBE(kmem, kmalloc_node) {
         if (WORKAROUND_MISSING_FREE)
             gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
         gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
         return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
 }
 
-TRACEPOINT_PROBE(kmem, kfree) {
+int TRACEPOINT_PROBE(kmem, kfree) {
         return gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
 }
 
-TRACEPOINT_PROBE(kmem, kmem_cache_alloc) {
+int TRACEPOINT_PROBE(kmem, kmem_cache_alloc) {
         if (WORKAROUND_MISSING_FREE)
             gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
         gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
         return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
 }
 
-TRACEPOINT_PROBE(kmem, kmem_cache_alloc_node) {
+int TRACEPOINT_PROBE(kmem, kmem_cache_alloc_node) {
         if (WORKAROUND_MISSING_FREE)
             gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
         gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
         return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
 }
 
-TRACEPOINT_PROBE(kmem, kmem_cache_free) {
+int TRACEPOINT_PROBE(kmem, kmem_cache_free) {
         return gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
 }
 
-TRACEPOINT_PROBE(kmem, mm_page_alloc) {
+int TRACEPOINT_PROBE(kmem, mm_page_alloc) {
         gen_alloc_enter((struct pt_regs *)args, PAGE_SIZE << args->order);
         return gen_alloc_exit2((struct pt_regs *)args, args->pfn);
 }
 
-TRACEPOINT_PROBE(kmem, mm_page_free) {
+int TRACEPOINT_PROBE(kmem, mm_page_free) {
         return gen_free_enter((struct pt_regs *)args, (void *)args->pfn);
 }
 """
 
 bpf_source_percpu = """
 
-TRACEPOINT_PROBE(percpu, percpu_alloc_percpu) {
+int TRACEPOINT_PROBE(percpu, percpu_alloc_percpu) {
         gen_alloc_enter((struct pt_regs *)args, args->size);
         return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
 }
 
-TRACEPOINT_PROBE(percpu, percpu_free_percpu) {
+int TRACEPOINT_PROBE(percpu, percpu_free_percpu) {
         return gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
 }
 """

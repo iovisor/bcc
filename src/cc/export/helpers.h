@@ -1260,10 +1260,10 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 #define lock_xadd(ptr, val) ((void)__sync_fetch_and_add(ptr, val))
 
 #define TRACEPOINT_PROBE(category, event) \
-int tracepoint__##category##__##event(struct tracepoint__##category##__##event *args)
+tracepoint__##category##__##event(struct tracepoint__##category##__##event *args)
 
 #define RAW_TRACEPOINT_PROBE(event) \
-int raw_tracepoint__##event(struct bpf_raw_tracepoint_args *ctx)
+raw_tracepoint__##event(struct bpf_raw_tracepoint_args *ctx)
 
 /* BPF_PROG macro allows to define trampoline function,
  * borrowed from kernel bpf selftest code.

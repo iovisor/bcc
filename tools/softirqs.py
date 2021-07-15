@@ -73,7 +73,7 @@ BPF_HASH(start, entry_key_t, account_val_t);
 BPF_HASH(iptr, u32);
 BPF_HISTOGRAM(dist, irq_key_t);
 
-TRACEPOINT_PROBE(irq, softirq_entry)
+int TRACEPOINT_PROBE(irq, softirq_entry)
 {
     account_val_t val = {};
     entry_key_t key = {};
@@ -88,7 +88,7 @@ TRACEPOINT_PROBE(irq, softirq_entry)
     return 0;
 }
 
-TRACEPOINT_PROBE(irq, softirq_exit)
+int TRACEPOINT_PROBE(irq, softirq_exit)
 {
     u64 delta;
     u32 vec;

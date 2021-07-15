@@ -353,7 +353,7 @@ u64 __time = bpf_ktime_get_ns();
                 probe_text = """
 DATA_DECL
                 """ + (
-                    "TRACEPOINT_PROBE(%s, %s)" %
+                    "int TRACEPOINT_PROBE(%s, %s)" %
                     (self.tp_category, self.tp_event)
                     if self.probe_type == "t"
                     else "int PROBENAME(struct pt_regs *ctx SIGNATURE)") + """

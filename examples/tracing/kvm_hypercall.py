@@ -22,7 +22,7 @@ b = BPF(text="""
 #define EXIT_REASON 18
 BPF_HASH(start, u8, u8);
 
-TRACEPOINT_PROBE(kvm, kvm_exit) {
+int TRACEPOINT_PROBE(kvm, kvm_exit) {
     u8 e = EXIT_REASON;
     u8 one = 1;
     if (args->exit_reason == EXIT_REASON) {
@@ -32,7 +32,7 @@ TRACEPOINT_PROBE(kvm, kvm_exit) {
     return 0;
 }
 
-TRACEPOINT_PROBE(kvm, kvm_entry) {
+int TRACEPOINT_PROBE(kvm, kvm_entry) {
     u8 e = EXIT_REASON;
     u8 zero = 0;
     u8 *s = start.lookup(&e);
@@ -43,7 +43,7 @@ TRACEPOINT_PROBE(kvm, kvm_entry) {
     return 0;
 }
 
-TRACEPOINT_PROBE(kvm, kvm_hypercall) {
+int TRACEPOINT_PROBE(kvm, kvm_hypercall) {
     u8 e = EXIT_REASON;
     u8 zero = 0;
     u8 *s = start.lookup(&e);

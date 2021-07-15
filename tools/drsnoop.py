@@ -115,7 +115,7 @@ struct data_t {
 BPF_HASH(start, u64, struct val_t);
 BPF_PERF_OUTPUT(events);
 
-TRACEPOINT_PROBE(vmscan, mm_vmscan_direct_reclaim_begin) {
+int TRACEPOINT_PROBE(vmscan, mm_vmscan_direct_reclaim_begin) {
     struct val_t val = {};
     u64 id = bpf_get_current_pid_tgid();
     u32 pid = id >> 32; // PID is higher part
@@ -134,7 +134,7 @@ TRACEPOINT_PROBE(vmscan, mm_vmscan_direct_reclaim_begin) {
     return 0;
 }
 
-TRACEPOINT_PROBE(vmscan, mm_vmscan_direct_reclaim_end) {
+int TRACEPOINT_PROBE(vmscan, mm_vmscan_direct_reclaim_end) {
     u64 id = bpf_get_current_pid_tgid();
     struct val_t *valp;
     struct data_t data = {};

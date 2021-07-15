@@ -260,11 +260,11 @@ except Exception as e:
 try:
     if BPF.support_raw_tracepoint_in_module():
         # Let's firstly try raw_tracepoint_in_module
-        func_entry = "RAW_TRACEPOINT_PROBE(kvm_exit)"
+        func_entry = "int RAW_TRACEPOINT_PROBE(kvm_exit)"
         get_er = "ctx->args[0]"
     else:
         # If raw_tp_in_module is not supported, fall back to regular tp
-        func_entry = "TRACEPOINT_PROBE(kvm, kvm_exit)"
+        func_entry = "int TRACEPOINT_PROBE(kvm, kvm_exit)"
         get_er = "args->exit_reason"
 except Exception as e:
     raise Exception("Failed to catch kvm exit reasons due to: %s" % e)

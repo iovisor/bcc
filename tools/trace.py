@@ -502,7 +502,7 @@ BPF_PERF_OUTPUT(%s);
                         data_fields += self._generate_field_assign(i)
 
                 if self.probe_type == "t":
-                        heading = "TRACEPOINT_PROBE(%s, %s)" % \
+                        heading = "int TRACEPOINT_PROBE(%s, %s)" % \
                                   (self.tp_category, self.tp_event)
                         ctx_name = "args"
                 else:

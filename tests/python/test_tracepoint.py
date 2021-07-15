@@ -25,7 +25,7 @@ class TestTracepoint(unittest.TestCase):
     def test_tracepoint(self):
         text = """
         BPF_HASH(switches, u32, u64);
-        TRACEPOINT_PROBE(sched, sched_switch) {
+        int TRACEPOINT_PROBE(sched, sched_switch) {
             u64 val = 0;
             u32 pid = args->next_pid;
             u64 *existing = switches.lookup_or_init(&pid, &val);
@@ -48,7 +48,7 @@ class TestTracepointDataLoc(unittest.TestCase):
             char filename[64];
         };
         BPF_HASH(execs, u32, struct value_t);
-        TRACEPOINT_PROBE(sched, sched_process_exec) {
+        int TRACEPOINT_PROBE(sched, sched_process_exec) {
             struct value_t val = {0};
             char fn[64];
             u32 pid = args->pid;

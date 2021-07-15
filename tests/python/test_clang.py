@@ -1029,7 +1029,7 @@ BPF_HASH(table1, struct key_t, struct value_t);
     def test_probe_read_tracepoint_context(self):
         text = """
 #include <linux/netdevice.h>
-TRACEPOINT_PROBE(skb, kfree_skb) {
+int TRACEPOINT_PROBE(skb, kfree_skb) {
     struct sk_buff *skb = (struct sk_buff *)args->skbaddr;
     return skb->protocol;
 }
@@ -1270,7 +1270,7 @@ struct test {
     u32 b;
 } __packed;
 BPF_TABLE("hash", u32, struct test, testing, 2);
-TRACEPOINT_PROBE(kmem, kmalloc) {
+int TRACEPOINT_PROBE(kmem, kmalloc) {
     u32 key = 0;
     struct test info, *entry;
     entry = testing.lookup(&key);

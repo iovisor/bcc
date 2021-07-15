@@ -202,7 +202,7 @@ static inline void fill_compact_info(struct val_t *valp,
     valp->order = order;
 }
 
-RAW_TRACEPOINT_PROBE(mm_compaction_suitable)
+int RAW_TRACEPOINT_PROBE(mm_compaction_suitable)
 {
     // TP_PROTO(struct zone *zone, int order, int ret)
     struct zone *zone = (struct zone *)ctx->args[0];
@@ -236,7 +236,7 @@ RAW_TRACEPOINT_PROBE(mm_compaction_suitable)
     return 0;
 }
 
-RAW_TRACEPOINT_PROBE(mm_compaction_begin)
+int RAW_TRACEPOINT_PROBE(mm_compaction_begin)
 {
     // TP_PROTO(unsigned long zone_start, unsigned long migrate_pfn,
     //          unsigned long free_pfn, unsigned long zone_end, bool sync)
@@ -254,7 +254,7 @@ RAW_TRACEPOINT_PROBE(mm_compaction_begin)
     return 0;
 }
 
-RAW_TRACEPOINT_PROBE(mm_compaction_end)
+int RAW_TRACEPOINT_PROBE(mm_compaction_end)
 {
     // TP_PROTO(unsigned long zone_start, unsigned long migrate_pfn,
     //          unsigned long free_pfn, unsigned long zone_end, bool sync,

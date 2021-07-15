@@ -148,21 +148,21 @@ int trace_run(struct pt_regs *ctx, struct task_struct *prev)
 """
 
 bpf_text_raw_tp = """
-RAW_TRACEPOINT_PROBE(sched_wakeup)
+int RAW_TRACEPOINT_PROBE(sched_wakeup)
 {
     // TP_PROTO(struct task_struct *p)
     struct task_struct *p = (struct task_struct *)ctx->args[0];
     return trace_enqueue(p->tgid, p->pid);
 }
 
-RAW_TRACEPOINT_PROBE(sched_wakeup_new)
+int RAW_TRACEPOINT_PROBE(sched_wakeup_new)
 {
     // TP_PROTO(struct task_struct *p)
     struct task_struct *p = (struct task_struct *)ctx->args[0];
     return trace_enqueue(p->tgid, p->pid);
 }
 
-RAW_TRACEPOINT_PROBE(sched_switch)
+int RAW_TRACEPOINT_PROBE(sched_switch)
 {
     // TP_PROTO(bool preempt, struct task_struct *prev, struct task_struct *next)
     struct task_struct *prev = (struct task_struct *)ctx->args[1];

@@ -74,7 +74,7 @@ static void updata_data(struct queue_data *data, u64 len){
     }
 }
 
-TRACEPOINT_PROBE(net, net_dev_start_xmit){
+int TRACEPOINT_PROBE(net, net_dev_start_xmit){
     /* read device name */
     struct sk_buff* skb = (struct sk_buff*)args->skbaddr;
     if(!name_filter(skb)){
@@ -94,7 +94,7 @@ TRACEPOINT_PROBE(net, net_dev_start_xmit){
     return 0;
 }
 
-TRACEPOINT_PROBE(net, netif_receive_skb){
+int TRACEPOINT_PROBE(net, netif_receive_skb){
     struct sk_buff skb;
 
     bpf_probe_read(&skb, sizeof(skb), args->skbaddr);

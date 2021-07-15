@@ -136,7 +136,7 @@ int trace_tlp(struct pt_regs *ctx, struct sock *sk)
 """
 
 bpf_text_tracepoint = """
-TRACEPOINT_PROBE(tcp, tcp_retransmit_skb)
+int TRACEPOINT_PROBE(tcp, tcp_retransmit_skb)
 {
     u32 pid = bpf_get_current_pid_tgid() >> 32;
     const struct sock *skp = (const struct sock *)args->skaddr;
