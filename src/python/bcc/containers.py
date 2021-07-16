@@ -51,7 +51,10 @@ def _mntns_filter_func_writer(mntnsmap):
     * more likely to change.
     */
     struct mnt_namespace {
+    // This field was removed in https://github.com/torvalds/linux/commit/1a7b8969e664d6af328f00fe6eb7aabd61a71d13
+    #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 11, 0)
         atomic_t count;
+    #endif
         struct ns_common ns;
     };
 
