@@ -270,6 +270,14 @@ static struct bpf_helper helpers[] = {
   {"check_mtu", "5.12"},
   {"for_each_map_elem", "5.13"},
   {"snprintf", "5.13"},
+  {"sys_bpf", "5.14"},
+  {"btf_find_by_name_kind", "5.14"},
+  {"sys_close", "5.14"},
+  {"timer_init", "5.15"},
+  {"timer_set_callback", "5.15"},
+  {"timer_start", "5.15"},
+  {"timer_cancel", "5.15"},
+  {"get_func_ip", "5.15"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)

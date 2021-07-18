@@ -882,6 +882,23 @@ static long (*bpf_snprintf)(char *str, __u32 str_size, const char *fmt,
                             __u64 *data, __u32 data_len) =
   (void *)BPF_FUNC_snprintf;
 
+static long (*bpf_sys_bpf)(__u32 cmd, void *attr, __u32 attr_size) =
+  (void *)BPF_FUNC_sys_bpf;
+static long (*bpf_btf_find_by_name_kind)(char *name, int name_sz, __u32 kind, int flags) =
+  (void *)BPF_FUNC_btf_find_by_name_kind;
+static long (*bpf_sys_close)(__u32 fd) = (void *)BPF_FUNC_sys_close;
+
+struct bpf_timer;
+static long (*bpf_timer_init)(struct bpf_timer *timer, void *map, __u64 flags) =
+  (void *)BPF_FUNC_timer_init;
+static long (*bpf_timer_set_callback)(struct bpf_timer *timer, void *callback_fn) =
+  (void *)BPF_FUNC_timer_set_callback;
+static long (*bpf_timer_start)(struct bpf_timer *timer, __u64 nsecs, __u64 flags) =
+  (void *)BPF_FUNC_timer_start;
+static long (*bpf_timer_cancel)(struct bpf_timer *timer) = (void *)BPF_FUNC_timer_cancel;
+
+static __u64 (*bpf_get_func_ip)(void *ctx) = (void *)BPF_FUNC_get_func_ip;
+
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
  */
