@@ -28,7 +28,7 @@
 
 from __future__ import print_function, absolute_import, unicode_literals
 from bcc import BPF, DEBUG_SOURCE
-from bcc.containers import filter_by_containers
+from bcc.containers import filter_by_containers, ContainersMap, print_container_info
 from bcc.utils import printb
 import argparse
 import re
@@ -88,6 +88,8 @@ parser.add_argument("--cgroupmap",
     help="trace cgroups in this BPF map only")
 parser.add_argument("--mntnsmap",
     help="trace mount namespaces in this BPF map only")
+parser.add_argument("--containersmap",
+    help="print additional information about the containers where the events are executed")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 parser.add_argument("--debug-source", action="store_true",
@@ -120,6 +122,9 @@ struct ipv4_bind_data_t {
     u8 socket_options;
     u8 protocol;
     char task[TASK_COMM_LEN];
+#ifdef PRINT_CONTAINER_INFO
+    u64 mntnsid;
+#endif
 };
 BPF_PERF_OUTPUT(ipv4_bind_events);
 
@@ -136,6 +141,9 @@ struct ipv6_bind_data_t {
     u8 socket_options;
     u8 protocol;
     char task[TASK_COMM_LEN];
+#ifdef PRINT_CONTAINER_INFO
+    u64 mntnsid;
+#endif
 };
 BPF_PERF_OUTPUT(ipv6_bind_events);
 
@@ -303,6 +311,9 @@ struct_init = {
                data4.bound_dev_if = skp->__sk_common.skc_bound_dev_if;
                data4.socket_options = opts.data;
                data4.protocol = protocol;
+#ifdef PRINT_CONTAINER_INFO
+               data4.mntnsid = get_mntns_id();
+#endif
                bpf_get_current_comm(&data4.task, sizeof(data4.task));
                ipv4_bind_events.perf_submit(ctx, &data4, sizeof(data4));"""
     },
@@ -325,6 +336,9 @@ struct_init = {
                data6.socket_options = opts.data;
                data6.protocol = protocol;
                bpf_get_current_comm(&data6.task, sizeof(data6.task));
+#ifdef PRINT_CONTAINER_INFO
+               data6.mntnsid = get_mntns_id();
+#endif
                ipv6_bind_events.perf_submit(ctx, &data6, sizeof(data6));"""
     },
 }
@@ -350,6 +364,8 @@ if args.uid:
         'if (uid != %s) { return 0; }' % args.uid)
 if args.errors:
     bpf_text = bpf_text.replace('FILTER_ERRORS', 'ignore_errors = 0;')
+if args.containersmap:
+    bpf_text = print_container_info() + bpf_text
 bpf_text = filter_by_containers(args) + bpf_text
 bpf_text = bpf_text.replace('FILTER_PID', '')
 bpf_text = bpf_text.replace('FILTER_PORT', '')
@@ -402,11 +418,16 @@ def opts2str(bitfield):
         bit *= 2
     return str_options.encode()
 
+if args.containersmap:
+    containers_map = ContainersMap(args.containersmap)
 
 # process events
 def print_ipv4_bind_event(cpu, data, size):
     event = b["ipv4_bind_events"].event(data)
     global start_ts
+    if args.containersmap:
+        container = containers_map.get_container(event.mntnsid)
+        printb("%-16s %-16s %-16s %-16s" % (container.NodeName, container.Namespace, container.PodName, container.ContainerName), nl="")
     if args.timestamp:
         if start_ts == 0:
             start_ts = event.ts_us
@@ -427,6 +448,9 @@ def print_ipv4_bind_event(cpu, data, size):
 def print_ipv6_bind_event(cpu, data, size):
     event = b["ipv6_bind_events"].event(data)
     global start_ts
+    if args.containersmap:
+        container = containers_map.get_container(event.mntnsid)
+        printb("%-16s %-16s %-16s %-16s" % (container.NodeName, container.Namespace, container.PodName, container.ContainerName), nl="")
     if args.timestamp:
         if start_ts == 0:
             start_ts = event.ts_us
@@ -483,6 +507,8 @@ if args.count:
 # read events
 else:
     # header
+    if args.containersmap:
+        print("%-16s %-16s %-16s %-16s" % ("NODE", "NAMESPACE", "PODNAME", "CONTAINERNAME"), end="")
     if args.timestamp:
         print("%-9s " % ("TIME(s)"), end="")
     if args.print_uid:
