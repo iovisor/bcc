@@ -12,33 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-def _cgroup_filter_func_writer(cgroupmap):
-    if not cgroupmap:
-        return """
-        static inline int _cgroup_filter() {
-            return 0;
-        }
-        """
+from bcc.libbcc import lib
+import ctypes as ct
+import os
 
-    text = """
-    BPF_TABLE_PINNED("hash", u64, u64, cgroupset, 1024, "CGROUP_PATH");
+get_mntns_id_text = """
+    #ifndef __GET_MTN_NS_ID
+    #define __GET_MTN_NS_ID
 
-    static inline int _cgroup_filter() {
-        u64 cgroupid = bpf_get_current_cgroup_id();
-        return cgroupset.lookup(&cgroupid) == NULL;
-    }
-    """
-
-    return text.replace('CGROUP_PATH', cgroupmap)
-
-def _mntns_filter_func_writer(mntnsmap):
-    if not mntnsmap:
-        return """
-        static inline int _mntns_filter() {
-            return 0;
-        }
-        """
-    text = """
     #include <linux/nsproxy.h>
     #include <linux/mount.h>
     #include <linux/ns_common.h>
@@ -72,14 +53,11 @@ def _mntns_filter_func_writer(mntnsmap):
      */
     #define MNT_NAMESPACE_DEFINED
 
-    BPF_TABLE_PINNED("hash", u64, u32, mount_ns_set, 1024, "MOUNT_NS_PATH");
-
-    static inline int _mntns_filter() {
+    static inline u64 get_mntns_id() {
         struct task_struct *current_task;
         struct nsproxy *nsproxy;
         struct mnt_namespace *mnt_ns;
         unsigned int inum;
-        u64 ns_id;
 
         current_task = (struct task_struct *)bpf_get_current_task();
 
@@ -92,8 +70,42 @@ def _mntns_filter_func_writer(mntnsmap):
         if (bpf_probe_read_kernel(&inum, sizeof(inum), &mnt_ns->ns.inum))
             return 0;
 
-        ns_id =  (u64) inum;
+        return (u64) inum;
+    }
+    #endif // __GET_MTN_NS_ID
+    """
 
+def _cgroup_filter_func_writer(cgroupmap):
+    if not cgroupmap:
+        return """
+        static inline int _cgroup_filter() {
+            return 0;
+        }
+        """
+
+    text = """
+    BPF_TABLE_PINNED("hash", u64, u64, cgroupset, 1024, "CGROUP_PATH");
+
+    static inline int _cgroup_filter() {
+        u64 cgroupid = bpf_get_current_cgroup_id();
+        return cgroupset.lookup(&cgroupid) == NULL;
+    }
+    """
+
+    return text.replace('CGROUP_PATH', cgroupmap)
+
+def _mntns_filter_func_writer(mntnsmap):
+    if not mntnsmap:
+        return """
+        static inline int _mntns_filter() {
+            return 0;
+        }
+        """
+    text = get_mntns_id_text + """
+    BPF_TABLE_PINNED("hash", u64, u32, mount_ns_set, 1024, "MOUNT_NS_PATH");
+
+    static inline int _mntns_filter() {
+        u64 ns_id = get_mntns_id();
         return mount_ns_set.lookup(&ns_id) == NULL;
     }
     """
@@ -111,3 +123,53 @@ def filter_by_containers(args):
     mntnsmap_text = _mntns_filter_func_writer(args.mntnsmap)
 
     return cgroupmap_text + mntnsmap_text + filter_by_containers_text
+
+def print_container_info():
+    return """
+    #define PRINT_CONTAINER_INFO
+    """ + get_mntns_id_text
+
+# keep synchronized with definition in gadget tracer manager
+BUFFER_SIZE = 256
+
+class ContainerC(ct.Structure):
+    _fields_ = [
+        ("ContainerID", ct.c_char*BUFFER_SIZE ),
+        ("KubernetesNamespace", ct.c_char*BUFFER_SIZE),
+        ("KubernetesPod", ct.c_char*BUFFER_SIZE),
+        ("KubernetesContainer", ct.c_char*BUFFER_SIZE),
+    ]
+
+
+# get node name set by InspektorGadget to include in the output
+node_name = os.getenv("NODE_NAME", "<>")
+
+class Container:
+    def __init__(self):
+        self.Namespace = "<>"
+        self.PodName = "<>"
+        self.ContainerName = "<>"
+        self.NodeName = node_name
+
+class ContainersMap:
+    def __init__(self, map_path):
+        map_fd = lib.bpf_obj_get(map_path)
+        if int(map_fd) == -1:
+            raise Exception("error opening map")
+        self.map_fd = map_fd
+
+    # Get the details of the container from the containers map.
+    def get_container(self, mntnsid):
+        key = ct.c_ulonglong(mntnsid)
+        containerC = ContainerC()
+        container = Container()
+
+        ret = lib.bpf_lookup_elem(self.map_fd, ct.byref(key), ct.byref(containerC))
+        if int(ret) != 0:
+            return container
+
+        container.Namespace = containerC.KubernetesNamespace
+        container.PodName = containerC.KubernetesPod
+        container.ContainerName = containerC.KubernetesContainer
+
+        return container
