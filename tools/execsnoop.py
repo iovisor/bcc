@@ -19,7 +19,7 @@
 
 from __future__ import print_function
 from bcc import BPF
-from bcc.containers import filter_by_containers
+from bcc.containers import filter_by_containers, ContainersMap, print_container_info
 from bcc.utils import ArgString, printb
 import bcc.utils as utils
 import argparse
@@ -75,6 +75,8 @@ parser.add_argument("--cgroupmap",
     help="trace cgroups in this BPF map only")
 parser.add_argument("--mntnsmap",
     help="trace mount namespaces in this BPF map only")
+parser.add_argument("--containersmap",
+    help="print additional information about the containers where the events are executed")
 parser.add_argument("-u", "--uid", type=parse_uid, metavar='USER',
     help="trace this UID only")
 parser.add_argument("-q", "--quote", action="store_true",
@@ -115,6 +117,9 @@ struct data_t {
     enum event_type type;
     char argv[ARGSIZE];
     int retval;
+#ifdef PRINT_CONTAINER_INFO
+    u64 mntnsid;
+#endif
 };
 
 BPF_PERF_OUTPUT(events);
@@ -205,6 +210,9 @@ int do_ret_sys_execve(struct pt_regs *ctx)
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
     data.type = EVENT_RET;
     data.retval = PT_REGS_RC(ctx);
+#ifdef PRINT_CONTAINER_INFO
+    data.mntnsid = get_mntns_id();
+#endif
     events.perf_submit(ctx, &data, sizeof(data));
 
     return 0;
@@ -218,7 +226,12 @@ if args.uid:
         'if (uid != %s) { return 0; }' % args.uid)
 else:
     bpf_text = bpf_text.replace('UID_FILTER', '')
+
+if args.containersmap:
+    bpf_text = print_container_info() + bpf_text
+
 bpf_text = filter_by_containers(args) + bpf_text
+
 if args.ebpf:
     print(bpf_text)
     exit()
@@ -230,6 +243,8 @@ b.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
 b.attach_kretprobe(event=execve_fnname, fn_name="do_ret_sys_execve")
 
 # header
+if args.containersmap:
+    print("%-16s %-16s %-16s %-16s" % ("NODE", "NAMESPACE", "PODNAME", "CONTAINERNAME"), end="")
 if args.time:
     print("%-9s" % ("TIME"), end="")
 if args.timestamp:
@@ -259,6 +274,9 @@ def get_ppid(pid):
         pass
     return 0
 
+if args.containersmap:
+    containers_map = ContainersMap(args.containersmap)
+
 # process event
 def print_event(cpu, data, size):
     event = b["events"].event(data)
@@ -281,6 +299,9 @@ def print_event(cpu, data, size):
             ]
 
         if not skip:
+            if args.containersmap:
+                container = containers_map.get_container(event.mntnsid)
+                printb("%-16s %-16s %-16s %-16s" % (container.NodeName, container.Namespace, container.PodName, container.ContainerName), nl="")
             if args.time:
                 printb(b"%-9s" % strftime("%H:%M:%S").encode('ascii'), nl="")
             if args.timestamp:
