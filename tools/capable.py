@@ -15,7 +15,7 @@ from __future__ import print_function
 from os import getpid
 from functools import partial
 from bcc import BPF
-from bcc.containers import filter_by_containers
+from bcc.containers import filter_by_containers, ContainersMap, print_container_info
 import errno
 import argparse
 from time import strftime
@@ -50,6 +50,8 @@ parser.add_argument("--cgroupmap",
     help="trace cgroups in this BPF map only")
 parser.add_argument("--mntnsmap",
     help="trace mount namespaces in this BPF map only")
+parser.add_argument("--containersmap",
+    help="print additional information about the containers where the events are executed")
 parser.add_argument("--unique", action="store_true",
     help="don't repeat stacks for the same pid or cgroup")
 args = parser.parse_args()
@@ -131,6 +133,9 @@ struct data_t {
 #ifdef USER_STACKS
    int user_stack_id;
 #endif
+#ifdef PRINT_CONTAINER_INFO
+    u64 mntnsid;
+#endif
 };
 
 BPF_PERF_OUTPUT(events);
@@ -189,6 +194,9 @@ int kprobe__cap_capable(struct pt_regs *ctx, const struct cred *cred,
 #ifdef USER_STACKS
     data.user_stack_id = stacks.get_stackid(ctx, BPF_F_USER_STACK);
 #endif
+#ifdef PRINT_CONTAINER_INFO
+    data.mntnsid = get_mntns_id();
+#endif
 
 #if UNIQUESET
     struct repeat_t repeat = {0,};
@@ -230,6 +238,8 @@ bpf_text = bpf_text.replace('FILTER1', '')
 bpf_text = bpf_text.replace('FILTER2', '')
 bpf_text = bpf_text.replace('FILTER3',
     'if (pid == %s) { return 0; }' % getpid())
+if args.containersmap:
+    bpf_text = print_container_info() + bpf_text
 bpf_text = filter_by_containers(args) + bpf_text
 if args.unique:
     bpf_text = bpf_text.replace('UNIQUESET', '1')
@@ -242,6 +252,9 @@ if debug:
 b = BPF(text=bpf_text)
 
 # header
+if args.containersmap:
+    print("%-16s %-16s %-16s %-16s" % ("NODE", "NAMESPACE", "PODNAME", "CONTAINERNAME"), end="")
+
 if args.extra:
     print("%-9s %-6s %-6s %-6s %-16s %-4s %-20s %-6s %s" % (
         "TIME", "UID", "PID", "TID", "COMM", "CAP", "NAME", "AUDIT", "INSETID"))
@@ -263,6 +276,9 @@ def print_stack(bpf, stack_id, stack_type, tgid):
         print("        ", end="")
         print("%s" % (bpf.sym(addr, tgid, show_module=True, show_offset=True)))
 
+if args.containersmap:
+    containers_map = ContainersMap(args.containersmap)
+
 # process event
 def print_event(bpf, cpu, data, size):
     event = b["events"].event(data)
@@ -271,6 +287,10 @@ def print_event(bpf, cpu, data, size):
         name = capabilities[event.cap]
     else:
         name = "?"
+    if args.containersmap:
+        container = containers_map.get_container(event.mntnsid)
+        print("%-16s %-16s %-16s %-16s" % (container.NodeName, container.Namespace, container.PodName, container.ContainerName), end="")
+
     if args.extra:
         print("%-9s %-6d %-6d %-6d %-16s %-4d %-20s %-6d %s" % (strftime("%H:%M:%S"),
             event.uid, event.pid, event.tgid, event.comm.decode('utf-8', 'replace'),
