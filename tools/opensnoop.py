@@ -17,7 +17,7 @@
 
 from __future__ import print_function
 from bcc import ArgString, BPF
-from bcc.containers import filter_by_containers
+from bcc.containers import filter_by_containers, ContainersMap, print_container_info
 from bcc.utils import printb
 import argparse
 from datetime import datetime, timedelta
@@ -57,6 +57,8 @@ parser.add_argument("--cgroupmap",
     help="trace cgroups in this BPF map only")
 parser.add_argument("--mntnsmap",
     help="trace mount namespaces in this BPF map only")
+parser.add_argument("--containersmap",
+    help="print additional information about the containers where the events are executed")
 parser.add_argument("-u", "--uid",
     help="trace this UID only")
 parser.add_argument("-d", "--duration",
@@ -104,6 +106,9 @@ struct data_t {
     char comm[TASK_COMM_LEN];
     char fname[NAME_MAX];
     int flags; // EXTENDED_STRUCT_MEMBER
+#ifdef PRINT_CONTAINER_INFO
+    u64 mntnsid;
+#endif
 };
 
 BPF_PERF_OUTPUT(events);
@@ -132,6 +137,10 @@ int trace_return(struct pt_regs *ctx)
     data.uid = bpf_get_current_uid_gid();
     data.flags = valp->flags; // EXTENDED_STRUCT_MEMBER
     data.ret = PT_REGS_RC(ctx);
+
+#ifdef PRINT_CONTAINER_INFO
+    data.mntnsid = get_mntns_id();
+#endif
 
     events.perf_submit(ctx, &data, sizeof(data));
     infotmp.delete(&id);
@@ -252,6 +261,10 @@ bpf_text_kfunc_body = """
     data.flags = flags; // EXTENDED_STRUCT_MEMBER
     data.ret   = ret;
 
+#ifdef PRINT_CONTAINER_INFO
+    data.mntnsid = get_mntns_id();
+#endif
+
     events.perf_submit(ctx, &data, sizeof(data));
 
     return 0;
@@ -303,6 +316,8 @@ if args.uid:
         'if (uid != %s) { return 0; }' % args.uid)
 else:
     bpf_text = bpf_text.replace('UID_FILTER', '')
+if args.containersmap:
+    bpf_text = print_container_info() + bpf_text
 bpf_text = filter_by_containers(args) + bpf_text
 if args.flag_filter:
     bpf_text = bpf_text.replace('FLAGS_FILTER',
@@ -333,6 +348,8 @@ if not is_support_kfunc:
 initial_ts = 0
 
 # header
+if args.containersmap:
+    print("%-16s %-16s %-16s %-16s" % ("NODE", "NAMESPACE", "PODNAME", "CONTAINERNAME"), end="")
 if args.timestamp:
     print("%-14s" % ("TIME(s)"), end="")
 if args.print_uid:
@@ -342,6 +359,9 @@ print("%-6s %-16s %4s %3s " %
 if args.extended_fields:
     print("%-9s" % ("FLAGS"), end="")
 print("PATH")
+
+if args.containersmap:
+    containers_map = ContainersMap(args.containersmap)
 
 # process event
 def print_event(cpu, data, size):
@@ -364,6 +384,10 @@ def print_event(cpu, data, size):
 
     if args.name and bytes(args.name) not in event.comm:
         return
+
+    if args.containersmap:
+        container = containers_map.get_container(event.mntnsid)
+        printb("%-16s %-16s %-16s %-16s" % (container.NodeName, container.Namespace, container.PodName, container.ContainerName), nl="")
 
     if args.timestamp:
         delta = event.ts - initial_ts
