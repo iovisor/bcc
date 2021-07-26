@@ -16,6 +16,9 @@ import ctypes as ct
 
 lib = ct.CDLL("libbcc.so.0", use_errno=True)
 
+# needed for perf_event_attr() ctype
+from .perf import Perf
+
 # keep in sync with bcc_common.h
 lib.bpf_module_create_b.restype = ct.c_void_p
 lib.bpf_module_create_b.argtypes = [ct.c_char_p, ct.c_char_p, ct.c_uint,
@@ -146,6 +149,9 @@ lib.bpf_attach_xdp.argtypes = [ct.c_char_p, ct.c_int, ct.c_uint]
 lib.bpf_attach_perf_event.restype = ct.c_int
 lib.bpf_attach_perf_event.argtype = [ct.c_int, ct.c_uint, ct.c_uint, ct.c_ulonglong, ct.c_ulonglong,
         ct.c_int, ct.c_int, ct.c_int]
+
+lib.bpf_attach_perf_event_raw.restype = ct.c_int
+lib.bpf_attach_perf_event_raw.argtype = [Perf.perf_event_attr(), ct.c_uint, ct.c_uint, ct.c_uint, ct.c_uint]
 
 lib.bpf_close_perf_event_fd.restype = ct.c_int
 lib.bpf_close_perf_event_fd.argtype = [ct.c_int]

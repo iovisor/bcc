@@ -1178,6 +1178,26 @@ class BPF(object):
                         sample_period, sample_freq, pid, i, group_fd)
         self.open_perf_events[(ev_type, ev_config)] = res
 
+    def _attach_perf_event_raw(self, progfd, attr, pid, cpu, group_fd):
+        res = lib.bpf_attach_perf_event_raw(progfd, ct.byref(attr), pid,
+                cpu, group_fd, 0)
+        if res < 0:
+            raise Exception("Failed to attach BPF to perf raw event")
+        return res
+
+    def attach_perf_event_raw(self, attr=-1, fn_name=b"", pid=-1, cpu=-1, group_fd=-1):
+        fn_name = _assert_is_bytes(fn_name)
+        fn = self.load_func(fn_name, BPF.PERF_EVENT)
+        res = {}
+        if cpu >= 0:
+            res[cpu] = self._attach_perf_event_raw(fn.fd, attr,
+                    pid, cpu, group_fd)
+        else:
+            for i in get_online_cpus():
+                res[i] = self._attach_perf_event_raw(fn.fd, attr,
+                        pid, i, group_fd)
+        self.open_perf_events[(attr.type, attr.config)] = res
+
     def detach_perf_event(self, ev_type=-1, ev_config=-1):
         try:
             fds = self.open_perf_events[(ev_type, ev_config)]
