@@ -65,6 +65,8 @@ bpf_text = """
 
 // the key for the output summary
 struct info_t {
+    unsigned long inode;
+    dev_t dev;
     u32 pid;
     u32 name_len;
     char comm[TASK_COMM_LEN];
@@ -100,7 +102,11 @@ static int do_entry(struct pt_regs *ctx, struct file *file,
         return 0;
 
     // store counts and sizes by pid & file
-    struct info_t info = {.pid = pid};
+    struct info_t info = {
+        .pid = pid,
+        .inode = file->f_inode->i_ino,
+        .dev = file->f_inode->i_rdev,
+    };
     bpf_get_current_comm(&info.comm, sizeof(info.comm));
     info.name_len = d_name.len;
     bpf_probe_read_kernel(&info.name, sizeof(info.name), d_name.name);
@@ -184,7 +190,7 @@ while 1:
         print()
     with open(loadavg) as stats:
         print("%-8s loadavg: %s" % (strftime("%H:%M:%S"), stats.read()))
-    print("%-6s %-16s %-6s %-6s %-7s %-7s %1s %s" % ("TID", "COMM",
+    print("%-7s %-16s %-6s %-6s %-7s %-7s %1s %s" % ("TID", "COMM",
         "READS", "WRITES", "R_Kb", "W_Kb", "T", "FILE"))
 
     # by-TID output
@@ -197,7 +203,7 @@ while 1:
             name = name[:-3] + "..."
 
         # print line
-        print("%-6d %-16s %-6d %-6d %-7d %-7d %1s %s" % (k.pid,
+        print("%-7d %-16s %-6d %-6d %-7d %-7d %1s %s" % (k.pid,
             k.comm.decode('utf-8', 'replace'), v.reads, v.writes,
             v.rbytes / 1024, v.wbytes / 1024,
             k.type.decode('utf-8', 'replace'), name))
