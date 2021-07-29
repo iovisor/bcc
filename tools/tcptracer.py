@@ -17,8 +17,11 @@
 from __future__ import print_function
 from bcc import BPF
 from bcc.containers import filter_by_containers, ContainersMap, print_container_info
+from bcc.utils import disable_stdout
 
 import argparse as ap
+import json
+import sys
 from socket import inet_ntop, AF_INET, AF_INET6
 from struct import pack
 
@@ -45,6 +48,8 @@ parser.add_argument("-v", "--verbose", action="store_true",
                     help="include Network Namespace in the output")
 parser.add_argument("--ebpf", action="store_true",
                     help=ap.SUPPRESS)
+parser.add_argument("--json", action="store_true",
+    help="output the events in json format")
 args = parser.parse_args()
 
 bpf_text = """
@@ -565,6 +570,33 @@ verbose_types = {"C": "connect", "A": "accept",
 if args.containersmap:
     containers_map = ContainersMap(args.containersmap)
 
+# disable sys.stdout when --json is passed
+if args.json:
+    stdout, _ = disable_stdout()
+
+def print_json(event, inetType, type_str):
+    global start_ts
+    # always print timestamp
+    if start_ts == 0:
+            start_ts = event.ts_ns
+    eventJ = {
+        "time": ((float(event.ts_ns) - start_ts) / 1000000000),
+        "pid": event.pid,
+        "comm": event.comm.decode('utf-8', 'replace'),
+        "saddr": inet_ntop(inetType, pack("I", event.saddr)).encode(),
+        "daddr": inet_ntop(inetType, pack("I", event.daddr)).encode(),
+        "ip": event.ip,
+        "dport": event.dport,
+        "sport": event.sport,
+        "type": type_str,
+    }
+
+    if args.containersmap:
+        containers_map.enrich_json_event(eventJ, event.mntnsid)
+
+    json.dump(eventJ, stdout)
+    stdout.write("\n")
+
 def print_ipv4_event(cpu, data, size):
     event = b["tcp_ipv4_event"].event(data)
     global start_ts
@@ -606,6 +638,9 @@ def print_ipv4_event(cpu, data, size):
     else:
         print()
 
+    if args.json:
+        print_json(event, AF_INET, verbose_types[type_str])
+
 
 def print_ipv6_event(cpu, data, size):
     event = b["tcp_ipv6_event"].event(data)
@@ -646,6 +681,8 @@ def print_ipv6_event(cpu, data, size):
     else:
         print()
 
+    if args.json:
+        print_json(event, AF_INET6, verbose_types[type_str])
 
 pid_filter = ""
 netns_filter = ""
