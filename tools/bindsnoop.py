@@ -29,9 +29,11 @@
 from __future__ import print_function, absolute_import, unicode_literals
 from bcc import BPF, DEBUG_SOURCE
 from bcc.containers import filter_by_containers, ContainersMap, print_container_info
-from bcc.utils import printb
+from bcc.utils import printb, disable_stdout
 import argparse
+import json
 import re
+import sys
 from os import strerror
 from socket import (
     inet_ntop, AF_INET, AF_INET6, __all__ as socket_all, __dict__ as socket_dct
@@ -94,6 +96,8 @@ parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 parser.add_argument("--debug-source", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("--json", action="store_true",
+    help="output the events in json format")
 args = parser.parse_args()
 
 # define BPF program
@@ -389,6 +393,10 @@ if args.ebpf:
     print(bpf_text)
     exit()
 
+# disable sys.stdout when --json is passed
+if args.json:
+    stdout, printb = disable_stdout()
+
 # L4 protocol resolver
 class L4Proto:
     def __init__(self):
@@ -418,8 +426,39 @@ def opts2str(bitfield):
         bit *= 2
     return str_options.encode()
 
+def opts2array(bitfield):
+    options = {}
+    bit = 1
+    for opt in "FTNRr":
+        options[opt] = bool(bitfield & bit)
+        bit *= 2
+    return options
+
 if args.containersmap:
     containers_map = ContainersMap(args.containersmap)
+
+def print_json(event, inetType):
+    global start_ts
+    # always print timestamp
+    if start_ts == 0:
+            start_ts = event.ts_us
+    eventJ = {
+        "time": ((float(event.ts_us) - start_ts) / 1000000),
+        "uid": event.uid,
+        "pid": event.pid,
+        "comm": event.task,
+        "addr": inet_ntop(inetType, pack("I", event.saddr)).encode(),
+        "proto": l4.proto2str(event.protocol).encode(),
+        "port": event.sport,
+        "opts": opts2array(event.socket_options),
+        "if": event.bound_dev_if,
+    }
+
+    if args.containersmap:
+        containers_map.enrich_json_event(eventJ, event.mntnsid)
+
+    json.dump(eventJ, stdout)
+    stdout.write("\n")
 
 # process events
 def print_ipv4_bind_event(cpu, data, size):
@@ -444,6 +483,8 @@ def print_ipv4_bind_event(cpu, data, size):
         inet_ntop(AF_INET, pack("I", event.saddr)).encode(),
         event.sport, opts2str(event.socket_options), event.bound_dev_if))
 
+    if args.json:
+        print_json(event, AF_INET)
 
 def print_ipv6_bind_event(cpu, data, size):
     event = b["ipv6_bind_events"].event(data)
@@ -467,6 +508,8 @@ def print_ipv6_bind_event(cpu, data, size):
         inet_ntop(AF_INET6, event.saddr).encode(),
         event.sport, opts2str(event.socket_options), event.bound_dev_if))
 
+    if args.json:
+        print_json(event, AF_INET6)
 
 def depict_cnt(counts_tab, l3prot='ipv4'):
     for k, v in sorted(
