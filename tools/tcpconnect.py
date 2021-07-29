@@ -24,8 +24,10 @@
 from __future__ import print_function
 from bcc import BPF
 from bcc.containers import filter_by_containers, ContainersMap, print_container_info
-from bcc.utils import printb
+from bcc.utils import printb, disable_stdout
 import argparse
+import json
+import sys
 from socket import inet_ntop, ntohs, AF_INET, AF_INET6
 from struct import pack
 from time import sleep
@@ -81,6 +83,8 @@ parser.add_argument("-d", "--dns", action="store_true",
     help="include likely DNS query associated with each connect")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("--json", action="store_true",
+    help="output the events in json format")
 args = parser.parse_args()
 debug = 0
 
@@ -387,6 +391,32 @@ if debug or args.ebpf:
 if args.containersmap:
     containers_map = ContainersMap(args.containersmap)
 
+# disable sys.stdout when --json is passed
+if args.json:
+    stdout, printb = disable_stdout()
+
+def print_json(event, inetType):
+    global start_ts
+    # always print timestamp
+    if start_ts == 0:
+            start_ts = event.ts_us
+    eventJ = {
+        "time": ((float(event.ts_us) - start_ts) / 1000000),
+        "uid": event.uid,
+        "pid": event.pid,
+        "comm": event.task,
+        "saddr": inet_ntop(inetType, pack("I", event.saddr)).encode(),
+        "daddr": inet_ntop(inetType, pack("I", event.daddr)).encode(),
+        "ip": event.ip,
+        "dport": event.dport,
+    }
+
+    if args.containersmap:
+        containers_map.enrich_json_event(eventJ, event.mntnsid)
+
+    json.dump(eventJ, stdout)
+    stdout.write("\n")
+
 # process event
 def print_ipv4_event(cpu, data, size):
     event = b["ipv4_events"].event(data)
@@ -412,6 +442,9 @@ def print_ipv4_event(cpu, data, size):
             inet_ntop(AF_INET, pack("I", event.saddr)).encode(),
             dest_ip, event.dport, print_dns(dest_ip)))
 
+    if args.json:
+        print_json(event, AF_INET)
+
 def print_ipv6_event(cpu, data, size):
     event = b["ipv6_events"].event(data)
     global start_ts
@@ -435,6 +468,9 @@ def print_ipv6_event(cpu, data, size):
             event.task, event.ip,
             inet_ntop(AF_INET6, event.saddr).encode(),
             dest_ip, event.dport, print_dns(dest_ip)))
+
+    if args.json:
+        print_json(event, AF_INET6)
 
 def depict_cnt(counts_tab, l3prot='ipv4'):
     for k, v in sorted(counts_tab.items(),
