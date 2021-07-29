@@ -16,8 +16,11 @@ from os import getpid
 from functools import partial
 from bcc import BPF
 from bcc.containers import filter_by_containers, ContainersMap, print_container_info
+from bcc.utils import disable_stdout
 import errno
 import argparse
+import json
+import sys
 from time import strftime
 
 # arguments
@@ -54,6 +57,8 @@ parser.add_argument("--containersmap",
     help="print additional information about the containers where the events are executed")
 parser.add_argument("--unique", action="store_true",
     help="don't repeat stacks for the same pid or cgroup")
+parser.add_argument("--json", action="store_true",
+    help="output the events in json format")
 args = parser.parse_args()
 debug = 0
 
@@ -251,6 +256,10 @@ if debug:
 # initialize BPF
 b = BPF(text=bpf_text)
 
+# disable sys.stdout when --json is passed
+if args.json:
+    stdout, _ = disable_stdout()
+
 # header
 if args.containersmap:
     print("%-16s %-16s %-16s %-16s" % ("NODE", "NAMESPACE", "PODNAME", "CONTAINERNAME"), end="")
@@ -303,6 +312,23 @@ def print_event(bpf, cpu, data, size):
         print_stack(bpf, event.kernel_stack_id, StackType.Kernel, -1)
     if args.user_stack:
         print_stack(bpf, event.user_stack_id, StackType.User, event.tgid)
+
+    if args.json:
+        eventJ = {
+            "uid": event.uid,
+            "comm": event.comm.decode('utf-8', 'replace'),
+            "pid": event.pid,
+            "cap": event.cap,
+            "cap_name": name,
+            "audit": event.audit,
+            "insetid": str(event.insetid) if event.insetid != -1 else "N/A",
+        }
+
+        if args.containersmap:
+            containers_map.enrich_json_event(eventJ, event.mntnsid)
+
+        json.dump(eventJ, stdout)
+        stdout.write("\n")
 
 # loop with callback to print_event
 callback = partial(print_event, b)
