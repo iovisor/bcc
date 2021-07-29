@@ -20,11 +20,13 @@
 from __future__ import print_function
 from bcc import BPF
 from bcc.containers import filter_by_containers, ContainersMap, print_container_info
-from bcc.utils import ArgString, printb
+from bcc.utils import ArgString, printb, disable_stdout
 import bcc.utils as utils
 import argparse
+import json
 import re
 import time
+import sys
 import pwd
 from collections import defaultdict
 from time import strftime
@@ -94,6 +96,8 @@ parser.add_argument("--max-args", default="20",
     help="maximum number of arguments parsed and displayed, defaults to 20")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("--json", action="store_true",
+    help="output the events in json format")
 args = parser.parse_args()
 
 # define BPF program
@@ -242,6 +246,10 @@ execve_fnname = b.get_syscall_fnname("execve")
 b.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
 b.attach_kretprobe(event=execve_fnname, fn_name="do_ret_sys_execve")
 
+# disable sys.stdout when --json is passed
+if args.json:
+    stdout, printb = disable_stdout()
+
 # header
 if args.containersmap:
     print("%-16s %-16s %-16s %-16s" % ("NODE", "NAMESPACE", "PODNAME", "CONTAINERNAME"), end="")
@@ -313,6 +321,22 @@ def print_event(cpu, data, size):
             argv_text = b' '.join(argv[event.pid]).replace(b'\n', b'\\n')
             printb(b"%-16s %-6d %-6s %3d %s" % (event.comm, event.pid,
                    ppid, event.retval, argv_text))
+
+            if args.json:
+                eventJ = {
+                    "uid": event.uid,
+                    "pcomm": event.comm,
+                    "pid": event.pid,
+                    "ppid": int(ppid),
+                    "ret": event.retval,
+                    "args": argv[event.pid],
+                }
+
+                if args.containersmap:
+                    containers_map.enrich_json_event(eventJ, event.mntnsid)
+
+                json.dump(eventJ, stdout)
+                stdout.write("\n")
         try:
             del(argv[event.pid])
         except Exception:
