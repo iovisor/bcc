@@ -15,6 +15,7 @@
 from bcc.libbcc import lib
 import ctypes as ct
 import os
+import sys
 
 get_mntns_id_text = """
     #ifndef __GET_MTN_NS_ID
@@ -173,3 +174,11 @@ class ContainersMap:
         container.ContainerName = containerC.KubernetesContainer
 
         return container
+
+    def enrich_json_event(self, eventJ, mntnsid):
+        container = self.get_container(mntnsid)
+
+        eventJ["node_name"] = container.NodeName
+        eventJ["pod_name"] = container.PodName
+        eventJ["container_name"] = container.ContainerName
+        eventJ["namespace"] = container.Namespace
