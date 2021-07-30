@@ -145,3 +145,12 @@ static inline bool %s(char const *ignored, uintptr_t str) {
             "probeid": probeid
         }
         return rdict
+
+def __stubprintb(s, file=sys.stdout, nl=1):
+        return
+
+def disable_stdout():
+    orig = sys.stdout
+    sys.stdout = open("/dev/null", 'w', buffering=1)
+
+    return (orig, __stubprintb)
