@@ -24,7 +24,7 @@ struct {
 	__uint(map_flags, BPF_F_NO_PREALLOC);
 } birth SEC(".maps");
 
-static struct hist hist;
+struct hist hist = {};
 
 SEC("fentry/do_page_cache_ra")
 int BPF_PROG(do_page_cache_ra)
