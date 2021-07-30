@@ -18,8 +18,10 @@
 from __future__ import print_function
 from bcc import ArgString, BPF
 from bcc.containers import filter_by_containers, ContainersMap, print_container_info
-from bcc.utils import printb
+from bcc.utils import printb, disable_stdout
 import argparse
+import json
+import sys
 from datetime import datetime, timedelta
 import os
 
@@ -72,6 +74,8 @@ parser.add_argument("-e", "--extended_fields", action="store_true",
     help="show extended fields")
 parser.add_argument("-f", "--flag_filter", action="append",
     help="filter on flags argument (e.g., O_WRONLY)")
+parser.add_argument("--json", action="store_true",
+    help="output the events in json format")
 args = parser.parse_args()
 debug = 0
 if args.duration:
@@ -347,6 +351,10 @@ if not is_support_kfunc:
 
 initial_ts = 0
 
+# disable sys.stdout when --json is passed
+if args.json:
+    stdout, printb = disable_stdout()
+
 # header
 if args.containersmap:
     print("%-16s %-16s %-16s %-16s" % ("NODE", "NAMESPACE", "PODNAME", "CONTAINERNAME"), end="")
@@ -404,6 +412,22 @@ def print_event(cpu, data, size):
         printb(b"%08o " % event.flags, nl="")
 
     printb(b'%s' % event.fname)
+
+    if args.json:
+        eventJ = {
+            "uid": event.uid,
+            "pcomm": event.comm,
+            "pid": event.id & 0xffffffff if args.tid else event.id >> 32,
+            "fd": fd_s,
+            "err": err,
+            "path": event.fname,
+        }
+
+        if args.containersmap:
+            containers_map.enrich_json_event(eventJ, event.mntnsid)
+
+        json.dump(eventJ, stdout)
+        stdout.write("\n")
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event, page_cnt=64)
