@@ -16,6 +16,7 @@ const volatile int filter_ports_len = 0;
 const volatile uid_t filter_uid = -1;
 const volatile pid_t filter_pid = 0;
 const volatile bool do_count = 0;
+const volatile bool filter_by_mnt_ns = false;
 
 /* Define here, because there are conflicts with include files */
 #define AF_INET		2
@@ -50,6 +51,14 @@ struct {
 	__uint(key_size, sizeof(u32));
 	__uint(value_size, sizeof(u32));
 } events SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 1024);
+	__uint(key_size, sizeof(u64));
+	__uint(value_size, sizeof(u32));
+} mount_ns_set SEC(".maps");
+
 
 static __always_inline bool filter_port(__u16 port)
 {
@@ -116,7 +125,7 @@ static __always_inline void count_v6(struct sock *sk, __u16 dport)
 }
 
 static __always_inline void
-trace_v4(struct pt_regs *ctx, pid_t pid, struct sock *sk, __u16 dport)
+trace_v4(struct pt_regs *ctx, pid_t pid, struct sock *sk, __u16 dport, __u64 mntns_id)
 {
 	struct event event = {};
 
@@ -127,6 +136,7 @@ trace_v4(struct pt_regs *ctx, pid_t pid, struct sock *sk, __u16 dport)
 	BPF_CORE_READ_INTO(&event.saddr_v4, sk, __sk_common.skc_rcv_saddr);
 	BPF_CORE_READ_INTO(&event.daddr_v4, sk, __sk_common.skc_daddr);
 	event.dport = dport;
+	event.mntns_id = mntns_id;
 	bpf_get_current_comm(event.task, sizeof(event.task));
 
 	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU,
@@ -134,7 +144,7 @@ trace_v4(struct pt_regs *ctx, pid_t pid, struct sock *sk, __u16 dport)
 }
 
 static __always_inline void
-trace_v6(struct pt_regs *ctx, pid_t pid, struct sock *sk, __u16 dport)
+trace_v6(struct pt_regs *ctx, pid_t pid, struct sock *sk, __u16 dport, __u64 mntns_id)
 {
 	struct event event = {};
 
@@ -142,6 +152,7 @@ trace_v6(struct pt_regs *ctx, pid_t pid, struct sock *sk, __u16 dport)
 	event.pid = pid;
 	event.uid = bpf_get_current_uid_gid();
 	event.ts_us = bpf_ktime_get_ns() / 1000;
+	event.mntns_id = mntns_id;
 	BPF_CORE_READ_INTO(&event.saddr_v6, sk,
 			   __sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
 	BPF_CORE_READ_INTO(&event.daddr_v6, sk,
@@ -158,9 +169,11 @@ exit_tcp_connect(struct pt_regs *ctx, int ret, int ip_ver)
 {
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 pid = pid_tgid >> 32;
+	struct task_struct *task;
 	__u32 tid = pid_tgid;
 	struct sock **skpp;
 	struct sock *sk;
+	u64 mntns_id;
 	__u16 dport;
 
 	skpp = bpf_map_lookup_elem(&sockets, &tid);
@@ -176,6 +189,12 @@ exit_tcp_connect(struct pt_regs *ctx, int ret, int ip_ver)
 	if (filter_port(dport))
 		goto end;
 
+	task = (struct task_struct*)bpf_get_current_task();
+	mntns_id = (u64) BPF_CORE_READ(task, nsproxy, mnt_ns, ns.inum);
+
+	if (filter_by_mnt_ns && !bpf_map_lookup_elem(&mount_ns_set, &mntns_id))
+		return 0;
+
 	if (do_count) {
 		if (ip_ver == 4)
 			count_v4(sk, dport);
@@ -183,9 +202,9 @@ exit_tcp_connect(struct pt_regs *ctx, int ret, int ip_ver)
 			count_v6(sk, dport);
 	} else {
 		if (ip_ver == 4)
-			trace_v4(ctx, pid, sk, dport);
+			trace_v4(ctx, pid, sk, dport, mntns_id);
 		else
-			trace_v6(ctx, pid, sk, dport);
+			trace_v6(ctx, pid, sk, dport, mntns_id);
 	}
 
 end:

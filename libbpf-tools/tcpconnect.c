@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <bpf/bpf.h>
+#include "containers.h"
 #include "tcpconnect.h"
 #include "tcpconnect.skel.h"
 #include "trace_helpers.h"
@@ -17,7 +18,11 @@
 
 #define warn(...) fprintf(stderr, __VA_ARGS__)
 
+#define CONTAINERS_MAP_KEY 260
+
 static volatile sig_atomic_t exiting = 0;
+
+static int containers_map_fd;
 
 const char *argp_program_version = "tcpconnect 0.1";
 const char *argp_program_bug_address =
@@ -112,7 +117,9 @@ static const struct argp_option opts[] = {
 	{ "port", 'P', "PORTS", 0,
 	  "Comma-separated list of destination ports to trace" },
 	{ "cgroupmap", 'C', "PATH", 0, "trace cgroups in this map" },
-	{ "mntnsmap", 'M', "PATH", 0, "trace mount namespaces in this map" },
+	{ "mntnsmap", 'm', "PATH", 0, "Trace mount namespaces in this BPF map only" },
+	{ "containersmap", CONTAINERS_MAP_KEY, "CONTAINERSMAP", 0, "Print additional information about containers using this map" },
+	{ "json", 'j', NULL, 0, "Output using json format" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
@@ -126,6 +133,8 @@ static struct env {
 	uid_t uid;
 	int nports;
 	int ports[MAX_PORTS];
+	const char *mntnsmap;
+	const char *containersmap;
 } env = {
 	.uid = (uid_t) -1,
 };
@@ -177,9 +186,15 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	case 'C':
 		warn("not implemented: --cgroupmap");
 		break;
-	case 'M':
-		warn("not implemented: --mntnsmap");
+	case 'm':
+		env.mntnsmap = arg;
 		break;
+	case CONTAINERS_MAP_KEY:
+		env.containersmap = arg;
+		break;
+	case 'j':
+		fprintf(stderr, "--json is not supported\n");
+		return ENOSYS;
 	default:
 		return ARGP_ERR_UNKNOWN;
 	}
@@ -271,6 +286,8 @@ static void print_count(int map_fd_ipv4, int map_fd_ipv6)
 
 static void print_events_header()
 {
+	if (env.containersmap)
+		printf("%-16s %-16s %-16s %-16s", "NODE", "NAMESPACE", "PODNAME", "CONTAINERNAME");
 	if (env.print_timestamp)
 		printf("%-9s", "TIME(s)");
 	if (env.print_uid)
@@ -299,6 +316,11 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	} else {
 		warn("broken event: event->af=%d", event->af);
 		return;
+	}
+
+	if (env.containersmap) {
+		struct container c = get_container_info(containers_map_fd, event->mntns_id);
+		printf("%-16s %-16s %-16s %-16s", c.node, c.kubernetes_namespace, c.kubernetes_pod, c.kubernetes_container);
 	}
 
 	if (env.print_timestamp) {
@@ -397,10 +419,29 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if (env.mntnsmap != NULL) {
+		obj->rodata->filter_by_mnt_ns = true;
+
+		/* TODO: is there a way to avoid creating this map? */
+		err = bpf_map__set_pin_path(obj->maps.mount_ns_set, env.mntnsmap);
+		if (err) {
+			fprintf(stderr, "failed to set pin path for mntnsmap\n");
+			goto cleanup;
+		}
+	}
+
 	err = tcpconnect_bpf__load(obj);
 	if (err) {
 		warn("failed to load BPF object: %d\n", err);
 		goto cleanup;
+	}
+
+	if (env.containersmap) {
+		containers_map_fd = bpf_obj_get(env.containersmap);
+		if (containers_map_fd < 0) {
+			fprintf(stderr, "failed to open containers map %s: %d\n", env.containersmap, err);
+			return 1;
+		}
 	}
 
 	err = tcpconnect_bpf__attach(obj);
