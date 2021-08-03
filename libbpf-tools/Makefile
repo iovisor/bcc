@@ -65,6 +65,7 @@ COMMON_OBJ = \
 	$(OUTPUT)/errno_helpers.o \
 	$(OUTPUT)/map_helpers.o \
 	$(OUTPUT)/uprobe_helpers.o \
+	$(OUTPUT)/containers.o \
 	#
 
 .PHONY: all
