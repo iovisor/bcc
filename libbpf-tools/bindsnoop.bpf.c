@@ -14,6 +14,7 @@
 const volatile pid_t target_pid = 0;
 const volatile bool ignore_errors = true;
 const volatile bool filter_by_port = false;
+const volatile bool filter_by_mnt_ns = false;
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
@@ -34,6 +35,13 @@ struct {
 	__uint(key_size, sizeof(__u32));
 	__uint(value_size, sizeof(__u32));
 } events SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 1024);
+	__uint(key_size, sizeof(u64));
+	__uint(value_size, sizeof(u32));
+} mount_ns_set SEC(".maps");
 
 static int probe_entry(struct pt_regs *ctx, struct socket *socket)
 {
@@ -58,8 +66,10 @@ static int probe_exit(struct pt_regs *ctx, short ver)
 	struct sock *sock;
 	union bind_options opts;
 	struct bind_event event = {};
+	struct task_struct *task;
 	__u16 sport = 0, *port;
 	int ret;
+	u64 mntns_id;
 
 	socketp = bpf_map_lookup_elem(&sockets, &tid);
 	if (!socketp)
@@ -78,6 +88,12 @@ static int probe_exit(struct pt_regs *ctx, short ver)
 	if (filter_by_port && !port)
 		goto cleanup;
 
+	task = (struct task_struct*)bpf_get_current_task();
+	mntns_id = (u64) BPF_CORE_READ(task, nsproxy, mnt_ns, ns.inum);
+
+	if (filter_by_mnt_ns && !bpf_map_lookup_elem(&mount_ns_set, &mntns_id))
+		return 0;
+
 	opts.fields.freebind             = BPF_CORE_READ_BITFIELD_PROBED(inet_sock, freebind);
 	opts.fields.transparent          = BPF_CORE_READ_BITFIELD_PROBED(inet_sock, transparent);
 	opts.fields.bind_address_no_port = BPF_CORE_READ_BITFIELD_PROBED(inet_sock, bind_address_no_port);
@@ -90,6 +106,7 @@ static int probe_exit(struct pt_regs *ctx, short ver)
 	event.bound_dev_if = BPF_CORE_READ(sock, __sk_common.skc_bound_dev_if);
 	event.ret = ret;
 	event.proto = BPF_CORE_READ_BITFIELD_PROBED(sock, sk_protocol);
+	event.mntns_id = mntns_id;
 	bpf_get_current_comm(&event.task, sizeof(event.task));
 	if (ver == 4) {
 		event.ver = ver;

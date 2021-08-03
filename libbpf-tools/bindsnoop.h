@@ -9,6 +9,7 @@ struct bind_event {
 	__u64 ts_us;
 	__u32 pid;
 	__u32 bound_dev_if;
+	__u64 mntns_id;
 	int ret;
 	__u16 port;
 	__u8 opts;

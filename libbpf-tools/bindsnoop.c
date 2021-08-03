@@ -18,11 +18,13 @@
 #include <bpf/bpf.h>
 #include "bindsnoop.h"
 #include "bindsnoop.skel.h"
+#include "containers.h"
 #include "trace_helpers.h"
 
 #define PERF_BUFFER_PAGES	16
 #define PERF_POLL_TIMEOUT_MS	100
 #define warn(...) fprintf(stderr, __VA_ARGS__)
+#define CONTAINERS_MAP_KEY 260
 
 static volatile sig_atomic_t exiting = 0;
 
@@ -30,6 +32,9 @@ static bool emit_timestamp = false;
 static pid_t target_pid = 0;
 static bool ignore_errors = true;
 static char *target_ports = NULL;
+static char *mntnsmap = NULL;
+static char *containersmap = NULL;
+static int containers_map_fd = -1;
 
 const char *argp_program_version = "bindsnoop 0.1";
 const char *argp_program_bug_address =
@@ -58,6 +63,8 @@ static const struct argp_option opts[] = {
 	{ "failed", 'x', NULL, 0, "Include errors on output." },
 	{ "pid", 'p', "PID", 0, "Process ID to trace" },
 	{ "ports", 'P', "PORTS", 0, "Comma-separated list of ports to trace." },
+	{ "mntnsmap", 'm', "mountnspath", 0, "Trace mount namespaces in this BPF map only" },
+	{ "containersmap", CONTAINERS_MAP_KEY, "CONTAINERSMAP", 0, "Print additional information about containers using this map" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
@@ -102,6 +109,12 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	case 'h':
 		argp_state_help(state, stderr, ARGP_HELP_STD_HELP);
 		break;
+	case 'm':
+		mntnsmap = arg;
+		break;
+	case CONTAINERS_MAP_KEY:
+		containersmap = arg;
+		break;
 	default:
 		return ARGP_ERR_UNKNOWN;
 	}
@@ -122,6 +135,11 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	char opts[] = {'F', 'T', 'N', 'R', 'r', '\0'};
 	const char *proto;
 	int i = 0;
+
+	if (containersmap) {
+		struct container c = get_container_info(containers_map_fd, e->mntns_id);
+		printf("%-16s %-16s %-16s %-16s", c.node, c.kubernetes_namespace, c.kubernetes_pod, c.kubernetes_container);
+	}
 
 	if (emit_timestamp) {
 		time(&t);
@@ -189,10 +207,29 @@ int main(int argc, char **argv)
 	obj->rodata->ignore_errors = ignore_errors;
 	obj->rodata->filter_by_port = target_ports != NULL;
 
+	if (mntnsmap != NULL) {
+		obj->rodata->filter_by_mnt_ns = true;
+
+		/* TODO: is there a way to avoid creating this map? */
+		err = bpf_map__set_pin_path(obj->maps.mount_ns_set, mntnsmap);
+		if (err) {
+			fprintf(stderr, "failed to set pin path for mntnsmap\n");
+			goto cleanup;
+		}
+	}
+
 	err = bindsnoop_bpf__load(obj);
 	if (err) {
 		warn("failed to load BPF object: %d\n", err);
 		goto cleanup;
+	}
+
+	if (containersmap) {
+		containers_map_fd = bpf_obj_get(containersmap);
+		if (containers_map_fd < 0) {
+			fprintf(stderr, "failed to open containers map %s: %d\n", containersmap, err);
+			return 1;
+		}
 	}
 
 	if (target_ports) {
@@ -225,6 +262,10 @@ int main(int argc, char **argv)
 		warn("can't set signal handler: %s\n", strerror(errno));
 		err = 1;
 		goto cleanup;
+	}
+
+	if (containersmap) {
+		printf("%-16s %-16s %-16s %-16s", "NODE", "NAMESPACE", "PODNAME", "CONTAINERNAME");
 	}
 
 	if (emit_timestamp)
