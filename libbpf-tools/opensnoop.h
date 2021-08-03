@@ -16,6 +16,7 @@ struct event {
 	__u64 ts;
 	pid_t pid;
 	uid_t uid;
+	__u64 mntns_id;
 	int ret;
 	int flags;
 	char comm[TASK_COMM_LEN];

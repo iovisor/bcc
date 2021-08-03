@@ -3,6 +3,7 @@
 // Copyright (c) 2020 Netflix
 #include <vmlinux.h>
 #include <bpf/bpf_helpers.h>
+#include <bpf/bpf_core_read.h>
 #include "opensnoop.h"
 
 #define TASK_RUNNING	0
@@ -12,6 +13,7 @@ const volatile pid_t targ_pid = 0;
 const volatile pid_t targ_tgid = 0;
 const volatile uid_t targ_uid = 0;
 const volatile bool targ_failed = false;
+const volatile bool filter_by_mnt_ns = false;
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
@@ -26,6 +28,13 @@ struct {
 	__uint(value_size, sizeof(u32));
 } events SEC(".maps");
 
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 1024);
+	__uint(key_size, sizeof(u64));
+	__uint(value_size, sizeof(u32));
+} mount_ns_set SEC(".maps");
+
 static __always_inline bool valid_uid(uid_t uid) {
 	return uid != INVALID_UID;
 }
@@ -33,6 +42,8 @@ static __always_inline bool valid_uid(uid_t uid) {
 static __always_inline
 bool trace_allowed(u32 tgid, u32 pid)
 {
+	struct task_struct *task;
+	u64 mntns_id;
 	u32 uid;
 
 	/* filters */
@@ -46,6 +57,13 @@ bool trace_allowed(u32 tgid, u32 pid)
 			return false;
 		}
 	}
+
+	task = (struct task_struct*)bpf_get_current_task();
+	mntns_id = (u64) BPF_CORE_READ(task, nsproxy, mnt_ns, ns.inum);
+
+	if (filter_by_mnt_ns && !bpf_map_lookup_elem(&mount_ns_set, &mntns_id))
+		return false;
+
 	return true;
 }
 
@@ -92,6 +110,8 @@ int trace_exit(struct trace_event_raw_sys_exit* ctx)
 	struct args_t *ap;
 	int ret;
 	u32 pid = bpf_get_current_pid_tgid();
+	struct task_struct *task;
+	u64 mntns_id;
 
 	ap = bpf_map_lookup_elem(&start, &pid);
 	if (!ap)
@@ -100,6 +120,12 @@ int trace_exit(struct trace_event_raw_sys_exit* ctx)
 	if (targ_failed && ret >= 0)
 		goto cleanup;	/* want failed only */
 
+	task = (struct task_struct*)bpf_get_current_task();
+	mntns_id = (u64) BPF_CORE_READ(task, nsproxy, mnt_ns, ns.inum);
+
+	if (filter_by_mnt_ns && !bpf_map_lookup_elem(&mount_ns_set, &mntns_id))
+		return 0;
+
 	/* event data */
 	event.pid = bpf_get_current_pid_tgid() >> 32;
 	event.uid = bpf_get_current_uid_gid();
@@ -107,6 +133,7 @@ int trace_exit(struct trace_event_raw_sys_exit* ctx)
 	bpf_probe_read_user_str(&event.fname, sizeof(event.fname), ap->fname);
 	event.flags = ap->flags;
 	event.ret = ret;
+	event.mntns_id = mntns_id;
 
 	/* emit event */
 	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU,

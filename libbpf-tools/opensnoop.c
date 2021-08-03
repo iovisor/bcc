@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
+#include "containers.h"
 #include "opensnoop.h"
 #include "opensnoop.skel.h"
 #include "trace_helpers.h"
@@ -29,6 +30,8 @@
 
 #define NSEC_PER_SEC		1000000000ULL
 
+#define CONTAINERS_MAP_KEY 260
+
 static volatile sig_atomic_t exiting = 0;
 
 static struct env {
@@ -42,9 +45,13 @@ static struct env {
 	bool extended;
 	bool failed;
 	char *name;
+	const char *mntnsmap;
+	const char *containersmap;
 } env = {
 	.uid = INVALID_UID
 };
+
+static int containers_map_fd;
 
 const char *argp_program_version = "opensnoop 0.1";
 const char *argp_program_bug_address =
@@ -79,6 +86,9 @@ static const struct argp_option opts[] = {
 	{ "print-uid", 'U', NULL, 0, "Print UID"},
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{ "failed", 'x', NULL, 0, "Failed opens only"},
+	{ "mntnsmap", 'm', "mountnspath", 0, "Trace mount namespaces in this BPF map only" },
+	{ "containersmap", CONTAINERS_MAP_KEY, "CONTAINERSMAP", 0, "Print additional information about containers using this map" },
+	{ "json", 'j', NULL, 0, "Output using json format" },
 	{},
 };
 
@@ -154,6 +164,15 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		}
 		errno = 0;
 		break;
+	case 'm':
+		env.mntnsmap = arg;
+		break;
+	case CONTAINERS_MAP_KEY:
+		env.containersmap = arg;
+		break;
+	case 'j':
+		fprintf(stderr, "--json is not supported\n");
+		return ENOSYS;
 	default:
 		return ARGP_ERR_UNKNOWN;
 	}
@@ -198,6 +217,10 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	}
 
 	/* print output */
+	if (env.containersmap) {
+		struct container c = get_container_info(containers_map_fd, e->mntns_id);
+		printf("%-16s %-16s %-16s %-16s", c.node, c.kubernetes_namespace, c.kubernetes_pod, c.kubernetes_container);
+	}
 	if (env.timestamp)
 		printf("%-8s ", ts);
 	if (env.print_uid)
@@ -250,6 +273,17 @@ int main(int argc, char **argv)
 	obj->rodata->targ_uid = env.uid;
 	obj->rodata->targ_failed = env.failed;
 
+	if (env.mntnsmap != NULL) {
+		obj->rodata->filter_by_mnt_ns = true;
+
+		/* TODO: is there a way to avoid creating this map? */
+		err = bpf_map__set_pin_path(obj->maps.mount_ns_set, env.mntnsmap);
+		if (err) {
+			fprintf(stderr, "failed to set pin path for mntnsmap\n");
+			goto cleanup;
+		}
+	}
+
 #ifdef __aarch64__
 	/* aarch64 has no open syscall, only openat variants.
 	 * Disable associated tracepoints that do not exist. See #3344.
@@ -266,6 +300,14 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
+	if (env.containersmap) {
+		containers_map_fd = bpf_obj_get(env.containersmap);
+		if (containers_map_fd < 0) {
+			fprintf(stderr, "failed to open containers map %s: %d\n", env.containersmap, err);
+			return 1;
+		}
+	}
+
 	err = opensnoop_bpf__attach(obj);
 	if (err) {
 		fprintf(stderr, "failed to attach BPF programs\n");
@@ -273,6 +315,9 @@ int main(int argc, char **argv)
 	}
 
 	/* print headers */
+	if (env.containersmap) {
+		printf("%-16s %-16s %-16s %-16s", "NODE", "NAMESPACE", "PODNAME", "CONTAINERNAME");
+	}
 	if (env.timestamp)
 		printf("%-8s ", "TIME");
 	if (env.print_uid)
