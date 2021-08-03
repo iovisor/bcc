@@ -117,7 +117,6 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
 
     // dport is either used in a filter here, or later
     u16 dport = args->dport;
-    dport = ntohs(dport);
     FILTER_DPORT
 
     // calculate delta
