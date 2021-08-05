@@ -27,7 +27,7 @@ USAGE:
 
 # tcpstates -h
 usage: tcpstates.py [-h] [-T] [-t] [-w] [-s] [-L LOCALPORT] [-D REMOTEPORT]
-                    [-Y]
+                    [-Y] [-4 | -6]
 
 Trace TCP session state changes and durations
 
@@ -42,6 +42,8 @@ optional arguments:
   -D REMOTEPORT, --remoteport REMOTEPORT
                         comma-separated list of remote ports to trace.
   -Y, --journal         log session state changes to the systemd journal
+  -4, --ipv4            trace IPv4 family only
+  -6, --ipv6            trace IPv6 family only
 
 examples:
     ./tcpstates           # trace all TCP state changes
@@ -53,3 +55,5 @@ examples:
     ./tcpstates -L 80     # only trace local port 80
     ./tcpstates -L 80,81  # only trace local ports 80 and 81
     ./tcpstates -D 80     # only trace remote port 80
+    ./tcpstates -4        # trace IPv4 family only
+    ./tcpstates -6        # trace IPv6 family only

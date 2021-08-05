@@ -4,7 +4,7 @@
 # tcptop    Summarize TCP send/recv throughput by host.
 #           For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: tcptop [-h] [-C] [-S] [-p PID] [interval [count]]
+# USAGE: tcptop [-h] [-C] [-S] [-p PID] [interval [count]] [-4 | -6]
 #
 # This uses dynamic tracing of kernel functions, and will need to be updated
 # to match kernel changes.
@@ -48,6 +48,8 @@ examples = """examples:
     ./tcptop -p 181    # only trace PID 181
     ./tcptop --cgroupmap mappath  # only trace cgroups in this BPF map
     ./tcptop --mntnsmap mappath   # only trace mount namespaces in the map
+    ./tcptop -4        # trace IPv4 family only
+    ./tcptop -6        # trace IPv6 family only
 """
 parser = argparse.ArgumentParser(
     description="Summarize TCP send/recv throughput by host",
@@ -67,6 +69,11 @@ parser.add_argument("--cgroupmap",
     help="trace cgroups in this BPF map only")
 parser.add_argument("--mntnsmap",
     help="trace mount namespaces in this BPF map only")
+group = parser.add_mutually_exclusive_group()
+group.add_argument("-4", "--ipv4", action="store_true",
+    help="trace IPv4 family only")
+group.add_argument("-6", "--ipv6", action="store_true",
+    help="trace IPv6 family only")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
@@ -114,6 +121,8 @@ int kprobe__tcp_sendmsg(struct pt_regs *ctx, struct sock *sk,
 
     u16 dport = 0, family = sk->__sk_common.skc_family;
 
+    FILTER_FAMILY
+    
     if (family == AF_INET) {
         struct ipv4_key_t ipv4_key = {.pid = pid};
         ipv4_key.saddr = sk->__sk_common.skc_rcv_saddr;
@@ -160,6 +169,8 @@ int kprobe__tcp_cleanup_rbuf(struct pt_regs *ctx, struct sock *sk, int copied)
     if (copied <= 0)
         return 0;
 
+    FILTER_FAMILY
+    
     if (family == AF_INET) {
         struct ipv4_key_t ipv4_key = {.pid = pid};
         ipv4_key.saddr = sk->__sk_common.skc_rcv_saddr;
@@ -192,6 +203,13 @@ if args.pid:
         'if (pid != %s) { return 0; }' % args.pid)
 else:
     bpf_text = bpf_text.replace('FILTER_PID', '')
+if args.ipv4:
+    bpf_text = bpf_text.replace('FILTER_FAMILY',
+        'if (family != AF_INET) { return 0; }')
+elif args.ipv6:
+    bpf_text = bpf_text.replace('FILTER_FAMILY',
+        'if (family != AF_INET6) { return 0; }')
+bpf_text = bpf_text.replace('FILTER_FAMILY', '')
 bpf_text = filter_by_containers(args) + bpf_text
 if debug or args.ebpf:
     print(bpf_text)

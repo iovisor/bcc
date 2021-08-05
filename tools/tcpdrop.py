@@ -7,7 +7,7 @@
 # This provides information such as packet details, socket state, and kernel
 # stack trace for packets/segments that were dropped via tcp_drop().
 #
-# USAGE: tcpdrop [-h]
+# USAGE: tcpdrop [-4 | -6] [-h]
 #
 # This uses dynamic tracing of kernel functions, and will need to be updated
 # to match kernel changes.
@@ -29,11 +29,18 @@ from bcc import tcp
 # arguments
 examples = """examples:
     ./tcpdrop           # trace kernel TCP drops
+    ./tcpdrop -4        # trace IPv4 family only
+    ./tcpdrop -6        # trace IPv6 family only
 """
 parser = argparse.ArgumentParser(
     description="Trace TCP drops by the kernel",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
+group = parser.add_mutually_exclusive_group()
+group.add_argument("-4", "--ipv4", action="store_true",
+    help="trace IPv4 family only")
+group.add_argument("-6", "--ipv6", action="store_true",
+    help="trace IPv6 family only")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
@@ -111,6 +118,8 @@ int trace_tcp_drop(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb)
     sport = ntohs(sport);
     dport = ntohs(dport);
 
+    FILTER_FAMILY
+    
     if (family == AF_INET) {
         struct ipv4_data_t data4 = {};
         data4.pid = pid;
@@ -151,6 +160,14 @@ if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
         exit()
+if args.ipv4:
+    bpf_text = bpf_text.replace('FILTER_FAMILY',
+        'if (family != AF_INET) { return 0; }')
+elif args.ipv6:
+    bpf_text = bpf_text.replace('FILTER_FAMILY',
+        'if (family != AF_INET6) { return 0; }')
+else:
+    bpf_text = bpf_text.replace('FILTER_FAMILY', '')
 
 # process event
 def print_ipv4_event(cpu, data, size):

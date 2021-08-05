@@ -106,8 +106,8 @@ USAGE message:
 
 # ./tcpconnect -h
 
-usage: tcpconnect.py [-h] [-t] [-p PID] [-P PORT] [-L] [-U] [-u UID] [-c]
-                     [--cgroupmap CGROUPMAP] [--mntnsmap MNTNSMAP] [-d]
+usage: tcpconnect.py [-h] [-t] [-p PID] [-P PORT] [-4 | -6] [-L] [-U] [-u UID]
+                     [-c] [--cgroupmap CGROUPMAP] [--mntnsmap MNTNSMAP] [-d]
 
 Trace TCP connects
 
@@ -116,6 +116,8 @@ optional arguments:
   -t, --timestamp       include timestamp on output
   -p PID, --pid PID     trace this PID only
   -P PORT, --port PORT  comma-separated list of destination ports to trace.
+  -4, --ipv4            trace IPv4 family only
+  -6, --ipv6            trace IPv6 family only
   -L, --lport           include LPORT on output
   -U, --print-uid       include UID on output
   -u UID, --uid UID     trace this UID only
@@ -132,6 +134,8 @@ examples:
     ./tcpconnect -p 181    # only trace PID 181
     ./tcpconnect -P 80     # only trace port 80
     ./tcpconnect -P 80,81  # only trace port 80 and 81
+    ./tcpconnect -4        # only trace IPv4 family
+    ./tcpconnect -6        # only trace IPv6 family
     ./tcpconnect -U        # include UID
     ./tcpconnect -u 1000   # only trace UID 1000
     ./tcpconnect -c        # count connects per src ip and dest ip/port
