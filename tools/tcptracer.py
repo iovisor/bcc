@@ -294,7 +294,7 @@ int trace_tcp_set_state_entry(struct pt_regs *ctx, struct sock *skp, int state)
       return 0;
   }
 
-  u16 family = sk->__sk_common.skc_family;
+  u16 family = skp->__sk_common.skc_family;
   ##FILTER_FAMILY##
   
   u8 ipver = 0;
