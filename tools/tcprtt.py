@@ -122,7 +122,7 @@ int trace_tcp_rcv(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb)
     bpf_probe_read_kernel(&dport, sizeof(dport), (void *)&inet->inet_dport);
     bpf_probe_read_kernel(&saddr, sizeof(saddr), (void *)&inet->inet_saddr);
     bpf_probe_read_kernel(&daddr, sizeof(daddr), (void *)&inet->inet_daddr);
-    bpf_probe_read_kernel(&family, sizeof(family, (void *)&sk->__sk_common.skc_family);
+    bpf_probe_read_kernel(&family, sizeof(family), (void *)&sk->__sk_common.skc_family);
 
     LPORTFILTER
     RPORTFILTER
