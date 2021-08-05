@@ -18,3 +18,20 @@ backlog_max = 500L
 This output shows that for the backlog limit of 500, there were 961 SYN
 arrival where the backlog was zero or one, and one accept where the backlog was
 two or three. This indicates that we are nowhere near this limit.
+
+USAGE:
+
+# ./tcpsynbl -h
+usage: tcpsynbl.py [-h] [-4 | -6]
+
+Show TCP SYN backlog.
+
+optional arguments:
+  -h, --help  show this help message and exit
+  -4, --ipv4  trace IPv4 family only
+  -6, --ipv6  trace IPv6 family only
+
+examples:
+    ./tcpsynbl          # trace syn backlog
+    ./tcpsynbl -4       # trace IPv4 family only
+    ./tcpsynbl -6       # trace IPv6 family only
