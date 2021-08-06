@@ -77,6 +77,31 @@ ClangLoader::ClangLoader(llvm::LLVMContext *ctx, unsigned flags)
 
 ClangLoader::~ClangLoader() {}
 
+void ClangLoader::add_remapped_includes(clang::CompilerInvocation& invocation)
+{
+  // This option instructs clang whether or not to free the file buffers that we
+  // give to it. Since the embedded header files should be copied fewer times
+  // and reused if possible, set this flag to true.
+  invocation.getPreprocessorOpts().RetainRemappedFileBuffers = true;
+  for (const auto &f : remapped_headers_)
+    invocation.getPreprocessorOpts().addRemappedFile(f.first, &*f.second);
+  for (const auto &f : remapped_footers_)
+    invocation.getPreprocessorOpts().addRemappedFile(f.first, &*f.second);
+}
+
+void ClangLoader::add_main_input(clang::CompilerInvocation& invocation,
+                                 const std::string& main_path,
+                                 llvm::MemoryBuffer *main_buf)
+{
+  invocation.getPreprocessorOpts().addRemappedFile(main_path, main_buf);
+  invocation.getFrontendOpts().Inputs.clear();
+  invocation.getFrontendOpts().Inputs.push_back(
+      clang::FrontendInputFile(
+        main_path,
+        clang::FrontendOptions::getInputKindForExtension("c"))
+  );
+}
+
 namespace
 {
 
@@ -375,17 +400,10 @@ int ClangLoader::do_compile(unique_ptr<llvm::Module> *mod, TableStorage &ts,
   if (!CreateFromArgs(invocation0, ccargs, diags))
     return -1;
 
-  invocation0.getPreprocessorOpts().RetainRemappedFileBuffers = true;
-  for (const auto &f : remapped_headers_)
-    invocation0.getPreprocessorOpts().addRemappedFile(f.first, &*f.second);
-  for (const auto &f : remapped_footers_)
-    invocation0.getPreprocessorOpts().addRemappedFile(f.first, &*f.second);
+  add_remapped_includes(invocation0);
 
   if (in_memory) {
-    invocation0.getPreprocessorOpts().addRemappedFile(main_path, &*main_buf);
-    invocation0.getFrontendOpts().Inputs.clear();
-    invocation0.getFrontendOpts().Inputs.push_back(FrontendInputFile(
-        main_path, FrontendOptions::getInputKindForExtension("c")));
+    add_main_input(invocation0, main_path, &*main_buf);
   }
   invocation0.getFrontendOpts().DisableFree = false;
 
@@ -404,18 +422,8 @@ int ClangLoader::do_compile(unique_ptr<llvm::Module> *mod, TableStorage &ts,
   if (!CreateFromArgs( invocation1, ccargs, diags))
     return -1;
 
-  // This option instructs clang whether or not to free the file buffers that we
-  // give to it. Since the embedded header files should be copied fewer times
-  // and reused if possible, set this flag to true.
-  invocation1.getPreprocessorOpts().RetainRemappedFileBuffers = true;
-  for (const auto &f : remapped_headers_)
-    invocation1.getPreprocessorOpts().addRemappedFile(f.first, &*f.second);
-  for (const auto &f : remapped_footers_)
-    invocation1.getPreprocessorOpts().addRemappedFile(f.first, &*f.second);
-  invocation1.getPreprocessorOpts().addRemappedFile(main_path, &*out_buf);
-  invocation1.getFrontendOpts().Inputs.clear();
-  invocation1.getFrontendOpts().Inputs.push_back(FrontendInputFile(
-      main_path, FrontendOptions::getInputKindForExtension("c")));
+  add_remapped_includes(invocation1);
+  add_main_input(invocation1, main_path, &*out_buf);
   invocation1.getFrontendOpts().DisableFree = false;
 
   compiler1.createDiagnostics();
@@ -435,15 +443,8 @@ int ClangLoader::do_compile(unique_ptr<llvm::Module> *mod, TableStorage &ts,
   if (!CreateFromArgs(invocation2, ccargs, diags))
     return -1;
 
-  invocation2.getPreprocessorOpts().RetainRemappedFileBuffers = true;
-  for (const auto &f : remapped_headers_)
-    invocation2.getPreprocessorOpts().addRemappedFile(f.first, &*f.second);
-  for (const auto &f : remapped_footers_)
-    invocation2.getPreprocessorOpts().addRemappedFile(f.first, &*f.second);
-  invocation2.getPreprocessorOpts().addRemappedFile(main_path, &*out_buf1);
-  invocation2.getFrontendOpts().Inputs.clear();
-  invocation2.getFrontendOpts().Inputs.push_back(FrontendInputFile(
-      main_path, FrontendOptions::getInputKindForExtension("c")));
+  add_remapped_includes(invocation2);
+  add_main_input(invocation2, main_path, &*out_buf1);
   invocation2.getFrontendOpts().DisableFree = false;
   invocation2.getCodeGenOpts().DisableFree = false;
   // Resort to normal inlining. In -O0 the default is OnlyAlwaysInlining and
