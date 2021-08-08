@@ -41,7 +41,7 @@ examples = """examples:
     ./tcpconnlat -p 181    # only trace PID 181
     ./tcpconnlat -L        # include LPORT while printing outputs
     ./tcpconnlat -4        # trace IPv4 family only
-    ./tcpconnlat -6        # trace IPv6 family ony
+    ./tcpconnlat -6        # trace IPv6 family only
 """
 parser = argparse.ArgumentParser(
     description="Trace TCP connects and show connection latency",
