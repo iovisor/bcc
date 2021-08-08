@@ -12,6 +12,7 @@
 /cpufreq
 /drsnoop
 /execsnoop
+/exitsnoop
 /ext4dist
 /ext4slower
 /filelife

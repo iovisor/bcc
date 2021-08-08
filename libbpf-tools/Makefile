@@ -27,6 +27,7 @@ APPS = \
 	cpufreq \
 	drsnoop \
 	execsnoop \
+	exitsnoop \
 	filelife \
 	filetop \
 	fsdist \
