@@ -52,6 +52,7 @@ APPS = \
 	runqlat \
 	runqlen \
 	runqslower \
+	sigsnoop \
 	slabratetop \
 	softirqs \
 	solisten \
@@ -71,7 +72,8 @@ export OUTPUT BPFTOOL ARCH BTFHUB_ARCHIVE APPS
 
 FSDIST_ALIASES = btrfsdist ext4dist nfsdist xfsdist
 FSSLOWER_ALIASES = btrfsslower ext4slower nfsslower xfsslower
-APP_ALIASES = $(FSDIST_ALIASES) $(FSSLOWER_ALIASES)
+SIGSNOOP_ALIAS = killsnoop
+APP_ALIASES = $(FSDIST_ALIASES) $(FSSLOWER_ALIASES) ${SIGSNOOP_ALIAS}
 
 COMMON_OBJ = \
 	$(OUTPUT)/trace_helpers.o \
@@ -168,6 +170,10 @@ $(FSSLOWER_ALIASES): fsslower
 	$(Q)ln -f -s $^ $@
 
 $(FSDIST_ALIASES): fsdist
+	$(call msg,SYMLINK,$@)
+	$(Q)ln -f -s $^ $@
+
+$(SIGSNOOP_ALIAS): sigsnoop
 	$(call msg,SYMLINK,$@)
 	$(Q)ln -f -s $^ $@
 
