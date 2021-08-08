@@ -24,13 +24,14 @@
 /funclatency
 /gethostlatency
 /hardirqs
+/killsnoop
 /klockstat
 /ksnoop
 /llcstat
-/nfsdist
-/nfsslower
 /mdflush
 /mountsnoop
+/nfsdist
+/nfsslower
 /numamove
 /offcputime
 /oomkill
@@ -39,6 +40,7 @@
 /runqlat
 /runqlen
 /runqslower
+/sigsnoop
 /slabratetop
 /softirqs
 /solisten
