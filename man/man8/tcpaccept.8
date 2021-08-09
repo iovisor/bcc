@@ -2,7 +2,7 @@
 .SH NAME
 tcpaccept \- Trace TCP passive connections (accept()). Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B tcpaccept [\-h] [\-T] [\-t] [\-p PID] [\-P PORTS] [\-\-cgroupmap MAPPATH] [\-\-mntnsmap MAPPATH]
+.B tcpaccept [\-h] [\-T] [\-t] [\-p PID] [\-P PORTS] [\-4 | \-6] [\-\-cgroupmap MAPPATH] [\-\-mntnsmap MAPPATH]
 .SH DESCRIPTION
 This tool traces passive TCP connections (eg, via an accept() syscall;
 connect() are active connections). This can be useful for general
@@ -34,6 +34,12 @@ Trace this process ID only (filtered in-kernel).
 \-P PORTS
 Comma-separated list of local ports to trace (filtered in-kernel).
 .TP
+\-4
+Trace IPv4 family only.
+.TP
+\-6
+Trace IPv6 family only.
+.TP
 \-\-cgroupmap MAPPATH
 Trace cgroups in this BPF map only (filtered in-kernel).
 .TP
@@ -56,6 +62,14 @@ Trace connections to local ports 80 and 81 only:
 Trace PID 181 only:
 #
 .B tcpaccept \-p 181
+.TP
+Trace IPv4 family only:
+#
+.B tcpaccept \-4
+.TP
+Trace IPv6 family only:
+#
+.B tcpaccept \-6
 .TP
 Trace a set of cgroups only (see special_filtering.md from bcc sources for more details):
 #

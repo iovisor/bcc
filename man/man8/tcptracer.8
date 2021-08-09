@@ -2,7 +2,7 @@
 .SH NAME
 tcptracer \- Trace TCP established connections. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B tcptracer [\-h] [\-v] [\-p PID] [\-N NETNS] [\-\-cgroupmap MAPPATH] [--mntnsmap MAPPATH]
+.B tcptracer [\-h] [\-v] [\-p PID] [\-N NETNS] [\-\-cgroupmap MAPPATH] [--mntnsmap MAPPATH] [\-4 | \-6]
 .SH DESCRIPTION
 This tool traces established TCP connections that open and close while tracing,
 and prints a line of output per connect, accept and close events. This includes
@@ -34,6 +34,12 @@ Trace cgroups in this BPF map only (filtered in-kernel).
 .TP
 \-\-mntnsmap  MAPPATH
 Trace mount namespaces in the map (filtered in-kernel).
+.TP
+\-4
+Trace IPv4 family only.
+.TP
+\-6
+Trace IPv6 family only.
 .SH EXAMPLES
 .TP
 Trace all TCP established connections:
@@ -55,6 +61,14 @@ Trace connections in network namespace 4026531969 only:
 Trace a set of cgroups only (see special_filtering.md from bcc sources for more details):
 #
 .B tcptracer \-\-cgroupmap /sys/fs/bpf/test01
+.TP
+Trace IPv4 family only:
+#
+.B tcptracer -4
+.TP
+Trace IPv6 family only:
+#
+.B tcptracer -6
 .SH FIELDS
 .TP
 TYPE

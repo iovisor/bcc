@@ -2,7 +2,7 @@
 .SH NAME
 tcpconnect \- Trace TCP active connections (connect()). Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B tcpconnect [\-h] [\-c] [\-t] [\-p PID] [-P PORT] [\-L] [-u UID] [-U] [\-\-cgroupmap MAPPATH] [\-\-mntnsmap MAPPATH] [\-d]
+.B tcpconnect [\-h] [\-c] [\-t] [\-p PID] [-P PORT] [\-4 | \-6] [\-L] [-u UID] [-U] [\-\-cgroupmap MAPPATH] [\-\-mntnsmap MAPPATH] [\-d]
 .SH DESCRIPTION
 This tool traces active TCP connections (eg, via a connect() syscall;
 accept() are passive connections). This can be useful for general
@@ -42,6 +42,12 @@ Trace this process ID only (filtered in-kernel).
 .TP
 \-P PORT
 Comma-separated list of destination ports to trace (filtered in-kernel).
+.TP
+\-4
+Trace IPv4 family only.
+.TP
+\-6
+Trace IPv6 family only.
 .TP
 \-L
 Include a LPORT column.
@@ -98,6 +104,14 @@ Trace PID 181 only:
 Trace ports 80 and 81 only:
 #
 .B tcpconnect \-P 80,81
+.TP
+Trace IPv4 family only:
+#
+.B tcpconnect -4
+.TP
+Trace IPv6 family only:
+#
+.B tcpconnect -6
 .TP
 Trace all TCP connects, and include LPORT:
 #

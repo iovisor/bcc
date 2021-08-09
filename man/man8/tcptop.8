@@ -3,7 +3,7 @@
 tcptop \- Summarize TCP send/recv throughput by host. Top for TCP.
 .SH SYNOPSIS
 .B tcptop [\-h] [\-C] [\-S] [\-p PID] [\-\-cgroupmap MAPPATH]
-          [--mntnsmap MAPPATH] [interval] [count]
+          [--mntnsmap MAPPATH] [interval] [count] [\-4 | \-6]
 .SH DESCRIPTION
 This is top for TCP sessions.
 
@@ -47,6 +47,12 @@ Interval between updates, seconds (default 1).
 .TP
 count
 Number of interval summaries (default is many).
+.TP
+\-4
+Trace IPv4 family only.
+.TP
+\-6
+Trace IPv6 family only.
 .SH EXAMPLES
 .TP
 Summarize TCP throughput by active sessions, 1 second refresh:
@@ -64,6 +70,14 @@ Trace PID 181 only, and don't clear the screen:
 Trace a set of cgroups only (see special_filtering.md from bcc sources for more details):
 #
 .B tcptop \-\-cgroupmap /sys/fs/bpf/test01
+.TP
+Trace IPv4 family only:
+#
+.B tcptop \-4
+.TP
+Trace IPv6 family only:
+#
+.B tcptop \-6
 .SH FIELDS
 .TP
 loadavg:
