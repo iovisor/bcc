@@ -16,6 +16,7 @@ flags = 0
 def usage():
     print("Usage: {0} [-S] <ifdev>".format(sys.argv[0]))
     print("       -S: use skb mode\n")
+    print("       -D: use driver mode\n")
     print("       -H: use hardware offload mode\n")
     print("e.g.: {0} eth0\n".format(sys.argv[0]))
     exit(1)
@@ -34,6 +35,9 @@ if len(sys.argv) == 3:
     if "-S" in sys.argv:
         # XDP_FLAGS_SKB_MODE
         flags |= BPF.XDP_FLAGS_SKB_MODE
+    if "-D" in sys.argv:
+        # XDP_FLAGS_DRV_MODE
+        flags |= BPF.XDP_FLAGS_DRV_MODE
     if "-H" in sys.argv:
         # XDP_FLAGS_HW_MODE
         maptype = "array"
