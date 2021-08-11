@@ -3,7 +3,7 @@
 # offcputime    Summarize off-CPU time by stack trace
 #               For Linux, uses BCC, eBPF.
 #
-# USAGE: offcputime [-h] [-p PID | -u | -k] [-U | -K] [-f] [duration]
+# USAGE: offcputime [-h] [-p PID | -u | -k] [-U | -K] [-F frequency] [-f] [duration]
 #
 # Copyright 2016 Netflix, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -45,6 +45,7 @@ examples = """examples:
     ./offcputime             # trace off-CPU stack time until Ctrl-C
     ./offcputime 5           # trace for 5 seconds only
     ./offcputime -f 5        # 5 seconds, and output in folded format
+    ./offcputime -F 997      # sample off-CPU stack time at frequency 997 Hz
     ./offcputime -m 1000     # trace only events that last more than 1000 usec
     ./offcputime -M 10000    # trace only events that last less than 10000 usec
     ./offcputime -p 185      # only trace threads for PID 185
@@ -82,6 +83,11 @@ parser.add_argument("--stack-storage-size", default=1024,
     type=positive_nonzero_int,
     help="the number of unique stack traces that can be stored and "
          "displayed (default 1024)")
+parser.add_argument("-F", "--frequency", metavar="FREQUENCY", dest="frequency",
+    type=positive_nonzero_int,
+    help="the frequency at which sampling happens, per thread - we sample " +
+         "the wakeup stack whenever a thread's accumulated sleep time " +
+         "crosses a multiple of the sample period")
 parser.add_argument("duration", nargs="?", default=99999999,
     type=positive_nonzero_int,
     help="duration of trace, in seconds")
@@ -123,7 +129,18 @@ struct key_t {
     char name[TASK_COMM_LEN];
 };
 BPF_HASH(counts, struct key_t);
-BPF_HASH(start, u32);
+
+struct thread_timing_t {
+    // The timestamp at which the most recent sleep period 
+    // of this thread started.
+    u64 sleep_start_ts;
+
+    // The sleep delta time, in nanoseconds, which has accumulated
+    // since the last multiple of SAMPLE_PERIOD was crossed.
+    // Only used if SAMPLE_PERIOD is non-zero.
+    u64 accum_delta_ns;
+};
+BPF_HASH(thread_timing, u32, struct thread_timing_t);
 BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE);
 
 struct warn_event_t {
@@ -137,26 +154,32 @@ BPF_PERF_OUTPUT(warn_events);
 int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
     u32 pid = prev->pid;
     u32 tgid = prev->tgid;
+    u64 now = bpf_ktime_get_ns();
     u64 ts, *tsp;
 
     // record previous thread sleep time
     if ((THREAD_FILTER) && (STATE_FILTER)) {
-        ts = bpf_ktime_get_ns();
-        start.update(&pid, &ts);
+        struct thread_timing_t* timing =
+            thread_timing.lookup_or_try_init(&pid, &(struct thread_timing_t){ 0, 0 });
+        if (timing) {
+            // Update the sleep start time, and leave the accumulated sleep
+            // delta untouched.
+            timing->sleep_start_ts = now;
+        }
     }
 
     // get the current thread's start time
     pid = bpf_get_current_pid_tgid();
     tgid = bpf_get_current_pid_tgid() >> 32;
-    tsp = start.lookup(&pid);
-    if (tsp == 0) {
-        return 0;        // missed start or filtered
+    struct thread_timing_t* timing = thread_timing.lookup(&pid);
+    if (timing == 0) {
+        // missed sleep start, or the thread was filtered out
+        return 0;
     }
 
     // calculate current thread's delta time
-    u64 t_start = *tsp;
-    u64 t_end = bpf_ktime_get_ns();
-    start.delete(&pid);
+    u64 t_start = timing->sleep_start_ts;
+    u64 t_end = now;
     if (t_start > t_end) {
         struct warn_event_t event = {
             .pid = pid,
@@ -167,10 +190,26 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
         warn_events.perf_submit(ctx, &event, sizeof(event));
         return 0;
     }
-    u64 delta = t_end - t_start;
-    delta = delta / 1000;
-    if ((delta < MINBLOCK_US) || (delta > MAXBLOCK_US)) {
+    u64 delta_ns = t_end - t_start;
+    timing->accum_delta_ns += delta_ns;
+
+    u64 delta_us = delta_ns / 1000;
+    if ((delta_us < MINBLOCK_US) || (delta_us > MAXBLOCK_US)) {
         return 0;
+    }
+
+    u64 score_us = delta_us;
+
+    if (SAMPLE_PERIOD_NS) {
+        if (timing->accum_delta_ns <= SAMPLE_PERIOD_NS) {
+            // Do not sample. The thread's accumulated sleep time has not yet 
+            // crossed the sample period threshold.
+            return 0;
+        }
+
+        u64 sample_count = timing->accum_delta_ns / SAMPLE_PERIOD_NS;
+        timing->accum_delta_ns -= sample_count * SAMPLE_PERIOD_NS;
+        score_us = sample_count * SAMPLE_PERIOD_NS / 1000;
     }
 
     // create map key
@@ -182,7 +221,7 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
     key.kernel_stack_id = KERNEL_STACK_GET;
     bpf_get_current_comm(&key.name, sizeof(key.name));
 
-    counts.increment(key, delta);
+    counts.increment(key, score_us);
     return 0;
 }
 """
@@ -216,8 +255,14 @@ bpf_text = bpf_text.replace('STATE_FILTER', state_filter)
 
 # set stack storage size
 bpf_text = bpf_text.replace('STACK_STORAGE_SIZE', str(args.stack_storage_size))
+
+sample_period_ns = 0
+if args.frequency:
+    sample_period_ns = 1000000000 // args.frequency
+
 bpf_text = bpf_text.replace('MINBLOCK_US_VALUE', str(args.min_block_time))
 bpf_text = bpf_text.replace('MAXBLOCK_US_VALUE', str(args.max_block_time))
+bpf_text = bpf_text.replace('SAMPLE_PERIOD_NS', str(sample_period_ns))
 
 # handle stack args
 kernel_stack_get = "stack_traces.get_stackid(ctx, 0)"
