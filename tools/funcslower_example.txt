@@ -34,19 +34,16 @@ between failures and slow invocations. Most open() calls seemed to have
 completed successfully (returning a valid file descriptor), but some have failed
 and returned -1.
 
-You can also trace kernel functions:
+You can also trace syscalls and kernel functions
 
-# ./funcslower -m 10 vfs_read
+# ./funcslower -m 10 syscall:write vfs_read
 Tracing function calls slower than 10 ms... Ctrl+C to quit.
 COMM           PID    LAT(ms)             RVAL FUNC
 bash           11527    78.97                1 vfs_read 
 bash           11527   101.26                1 vfs_read 
 bash           11527  1053.60                1 vfs_read 
 bash           11527    44.21                1 vfs_read 
-bash           11527    79.50                1 vfs_read 
-bash           11527    33.37                1 vfs_read 
-bash           11527   112.17                1 vfs_read 
-bash           11527   101.49                1 vfs_read 
+bash           11527   200.49               10 syscall:write
 ^C
 
 Occasionally, it is also useful to see the arguments passed to the functions.

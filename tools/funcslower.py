@@ -27,14 +27,15 @@ import argparse
 import time
 
 examples = """examples:
-  ./funcslower vfs_write        # trace vfs_write calls slower than 1ms
+  ./funcslower syscall:write    # trace syscall write calls slower than 1ms
+  ./funcslower vfs_write        # same  but trace vfs_write
   ./funcslower -m 10 vfs_write  # same, but slower than 10ms
   ./funcslower -u 10 c:open     # trace open calls slower than 10us
   ./funcslower -p 135 c:open    # trace pid 135 only
   ./funcslower c:malloc c:free  # trace both malloc and free slower than 1ms
   ./funcslower -a 2 c:open      # show first two arguments to open
   ./funcslower -UK -m 10 c:open # Show user and kernel stack frame of open calls slower than 10ms
-  ./funcslower -f -UK c:open    # Output in folded format for flame graphs
+  ./funcslower -f -UK :open    # Output in folded format for flame graphs
 """
 parser = argparse.ArgumentParser(
     description="Trace slow kernel or user function calls.",
@@ -241,9 +242,16 @@ if args.verbose or args.ebpf:
 
 b = BPF(text=bpf_text)
 
+# Attach  probes
 for i, function in enumerate(args.functions):
+    library=""
+
     if ":" in function:
         library, func = function.split(":")
+        if library == "syscall":
+            library = ""
+            function = b.get_syscall_fnname(func)
+    if library:
         b.attach_uprobe(name=library, sym=func, fn_name="trace_%d" % i)
         b.attach_uretprobe(name=library, sym=func, fn_name="trace_return")
     else:
