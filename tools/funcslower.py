@@ -23,6 +23,7 @@
 
 from __future__ import print_function
 from bcc import BPF
+from bcc.containers import filter_by_containers
 import argparse
 import time
 
@@ -59,6 +60,10 @@ parser.add_argument(metavar="function", nargs="+", dest="functions",
     help="function(s) to trace")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("--cgroupmap",
+    help="trace cgroups in this BPF map only")
+parser.add_argument("--mntnsmap",
+    help="trace mount namespaces in this BPF map only")
 parser.add_argument("-f", "--folded", action="store_true",
     help="output folded format, one line per stack (for flame graphs)")
 parser.add_argument("-U", "--user-stack",
@@ -126,6 +131,8 @@ static int trace_entry(struct pt_regs *ctx, int id)
     u64 tgid_pid = bpf_get_current_pid_tgid();
     u32 tgid = tgid_pid >> 32;
     if (TGID_FILTER)
+        return 0;
+    if (container_should_be_filtered())
         return 0;
 
     u32 pid = tgid_pid;
@@ -217,6 +224,8 @@ int trace_return(struct pt_regs *ctx)
 """
 
 bpf_text = bpf_text.replace('DURATION_NS', str(duration_ns))
+bpf_text = filter_by_containers(args) + bpf_text
+
 if args.arguments:
     bpf_text = "#define GRAB_ARGS\n" + bpf_text
 if args.user_stack:
