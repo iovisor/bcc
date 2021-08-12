@@ -62,7 +62,7 @@ responsible for clamping tcp performance.
 USAGE message:
 
 # ./tcpretrans -h
-usage: tcpretrans [-h] [-l]
+usage: tcpretrans [-h] [-l] [-4 | -6]
 
 Trace TCP retransmits
 
@@ -70,7 +70,11 @@ optional arguments:
   -h, --help       show this help message and exit
   -l, --lossprobe  include tail loss probe attempts
   -c, --count      count occurred retransmits per flow
+  -4, --ipv4       trace IPv4 family only
+  -6, --ipv6       trace IPv6 family only
 
 examples:
     ./tcpretrans           # trace TCP retransmits
     ./tcpretrans -l        # include TLP attempts
+    ./tcpretrans -4        # trace IPv4 family only
+    ./tcpretrans -6        # trace IPv6 family only

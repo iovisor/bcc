@@ -4,7 +4,7 @@
 # tcplife   Trace the lifespan of TCP sessions and summarize.
 #           For Linux, uses BCC, BPF. Embedded C.
 #
-# USAGE: tcplife [-h] [-C] [-S] [-p PID] [interval [count]]
+# USAGE: tcplife [-h] [-C] [-S] [-p PID] [-4 | -6] [interval [count]]
 #
 # This uses the sock:inet_sock_set_state tracepoint if it exists (added to
 # Linux 4.16, and replacing the earlier tcp:tcp_set_state), else it uses
@@ -39,6 +39,8 @@ examples = """examples:
     ./tcplife -L 80     # only trace local port 80
     ./tcplife -L 80,81  # only trace local ports 80 and 81
     ./tcplife -D 80     # only trace remote port 80
+    ./tcplife -4        # only trace IPv4 family
+    ./tcplife -6        # only trace IPv6 family
 """
 parser = argparse.ArgumentParser(
     description="Trace the lifespan of TCP sessions and summarize",
@@ -58,6 +60,11 @@ parser.add_argument("-L", "--localport",
     help="comma-separated list of local ports to trace.")
 parser.add_argument("-D", "--remoteport",
     help="comma-separated list of remote ports to trace.")
+group = parser.add_mutually_exclusive_group()
+group.add_argument("-4", "--ipv4", action="store_true",
+    help="trace IPv4 family only")
+group.add_argument("-6", "--ipv6", action="store_true",
+    help="trace IPv6 family only")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
@@ -190,6 +197,8 @@ int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
     tx_b = tp->bytes_acked;
 
     u16 family = sk->__sk_common.skc_family;
+    
+    FILTER_FAMILY
 
     if (family == AF_INET) {
         struct ipv4_data_t data4 = {};
@@ -309,6 +318,9 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
     if (mep != 0)
         pid = mep->pid;
     FILTER_PID
+    
+    u16 family = args->family;
+    FILTER_FAMILY
 
     // get throughput stats. see tcp_get_info().
     u64 rx_b = 0, tx_b = 0, sport = 0;
@@ -380,9 +392,16 @@ if args.localport:
     lports_if = ' && '.join(['lport != %d' % lport for lport in lports])
     bpf_text = bpf_text.replace('FILTER_LPORT',
         'if (%s) { birth.delete(&sk); return 0; }' % lports_if)
+if args.ipv4:
+    bpf_text = bpf_text.replace('FILTER_FAMILY',
+        'if (family != AF_INET) { return 0; }')
+elif args.ipv6:
+    bpf_text = bpf_text.replace('FILTER_FAMILY',
+        'if (family != AF_INET6) { return 0; }')
 bpf_text = bpf_text.replace('FILTER_PID', '')
 bpf_text = bpf_text.replace('FILTER_DPORT', '')
 bpf_text = bpf_text.replace('FILTER_LPORT', '')
+bpf_text = bpf_text.replace('FILTER_FAMILY', '')
 
 if debug or args.ebpf:
     print(bpf_text)

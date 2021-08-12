@@ -4,7 +4,7 @@
 # tcpconnect    Trace TCP connect()s.
 #               For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: tcpconnect [-h] [-c] [-t] [-p PID] [-P PORT [PORT ...]]
+# USAGE: tcpconnect [-h] [-c] [-t] [-p PID] [-P PORT [PORT ...]] [-4 | -6]
 #
 # All connection attempts are traced, even if they ultimately fail.
 #
@@ -39,6 +39,8 @@ examples = """examples:
     ./tcpconnect -p 181    # only trace PID 181
     ./tcpconnect -P 80     # only trace port 80
     ./tcpconnect -P 80,81  # only trace port 80 and 81
+    ./tcpconnect -4        # only trace IPv4 family
+    ./tcpconnect -6        # only trace IPv6 family
     ./tcpconnect -U        # include UID
     ./tcpconnect -u 1000   # only trace UID 1000
     ./tcpconnect -c        # count connects per src ip and dest ip/port
@@ -56,6 +58,11 @@ parser.add_argument("-p", "--pid",
     help="trace this PID only")
 parser.add_argument("-P", "--port",
     help="comma-separated list of destination ports to trace.")
+group = parser.add_mutually_exclusive_group()
+group.add_argument("-4", "--ipv4", action="store_true",
+    help="trace IPv4 family only")
+group.add_argument("-6", "--ipv6", action="store_true",
+    help="trace IPv6 family only")
 parser.add_argument("-L", "--lport", action="store_true",
     help="include LPORT on output")
 parser.add_argument("-U", "--print-uid", action="store_true",
@@ -171,6 +178,8 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
     u16 dport = skp->__sk_common.skc_dport;
 
     FILTER_PORT
+    
+    FILTER_FAMILY
 
     if (ipver == 4) {
         IPV4_CODE
@@ -335,6 +344,12 @@ if args.port:
     dports_if = ' && '.join(['dport != %d' % ntohs(dport) for dport in dports])
     bpf_text = bpf_text.replace('FILTER_PORT',
         'if (%s) { currsock.delete(&tid); return 0; }' % dports_if)
+if args.ipv4:
+    bpf_text = bpf_text.replace('FILTER_FAMILY',
+        'if (ipver != 4) { return 0; }')
+elif args.ipv6:
+    bpf_text = bpf_text.replace('FILTER_FAMILY',
+        'if (ipver != 6) { return 0; }')
 if args.uid:
     bpf_text = bpf_text.replace('FILTER_UID',
         'if (uid != %s) { return 0; }' % args.uid)
@@ -342,6 +357,7 @@ bpf_text = filter_by_containers(args) + bpf_text
 
 bpf_text = bpf_text.replace('FILTER_PID', '')
 bpf_text = bpf_text.replace('FILTER_PORT', '')
+bpf_text = bpf_text.replace('FILTER_FAMILY', '')
 bpf_text = bpf_text.replace('FILTER_UID', '')
 
 if args.dns:

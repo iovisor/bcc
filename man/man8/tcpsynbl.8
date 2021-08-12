@@ -2,7 +2,7 @@
 .SH NAME
 tcpsynbl \- Show the TCP SYN backlog as a histogram. Uses BCC/eBPF.
 .SH SYNOPSIS
-.B tcpsynbl
+.B tcpsynbl [\-4 | \-6]
 .SH DESCRIPTION
 This tool shows the TCP SYN backlog size during SYN arrival as a histogram.
 This lets you see how close your applications are to hitting the backlog limit
@@ -17,11 +17,29 @@ change in future kernels, this tool may need maintenance to keep working.
 Since this uses BPF, only the root user can use this tool.
 .SH REQUIREMENTS
 CONFIG_BPF and BCC.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-4
+Trace IPv4 family only.
+.TP
+\-6
+Trace IPv6 family only.
 .SH EXAMPLES
 .TP
 Show the TCP SYN backlog as a histogram.
 #
 .B tcpsynbl
+.TP
+Trace IPv4 family only:
+#
+.B tcpsynbl -4
+.TP
+Trace IPv6 family only:
+#
+.B tcpsynbl -6
 .SH FIELDS
 .TP
 backlog

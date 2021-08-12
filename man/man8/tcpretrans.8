@@ -2,7 +2,7 @@
 .SH NAME
 tcpretrans \- Trace or count TCP retransmits and TLPs. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B tcpretrans [\-h] [\-l] [\-c]
+.B tcpretrans [\-h] [\-l] [\-c] [\-4 | \-6]
 .SH DESCRIPTION
 This traces TCP retransmits, showing address, port, and TCP state information,
 and sometimes the PID (although usually not, since retransmits are usually
@@ -29,7 +29,13 @@ Include tail loss probe attempts (in some cases the kernel may not
 complete the TLP send).
 .TP
 \-c
-Count occurring retransmits per flow. 
+Count occurring retransmits per flow.
+.TP
+\-4
+Trace IPv4 family only.
+.TP
+\-6
+Trace IPv6 family only.
 .SH EXAMPLES
 .TP
 Trace TCP retransmits:
@@ -39,6 +45,14 @@ Trace TCP retransmits:
 Trace TCP retransmits and TLP attempts:
 #
 .B tcpretrans \-l
+.TP
+Trace IPv4 family only:
+#
+.B tcpretrans \-4
+.TP
+Trace IPv6 family only:
+#
+.B tcpretrans \-6
 .SH FIELDS
 .TP
 TIME

@@ -2,7 +2,7 @@
 .SH NAME
 tcprtt \- Trace TCP RTT of established connections. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B tcprtt [\-h] [\-T] [\-D] [\-m] [\-i INTERVAL] [\-d DURATION] [\-b] [\-B] [\-e]
+.B tcprtt [\-h] [\-T] [\-D] [\-m] [\-i INTERVAL] [\-d DURATION] [\-b] [\-B] [\-e] [\-4 | \-6]
 .SH DESCRIPTION
 This tool traces established connections RTT(round-trip time) to analyze the
 quality of network. This can be useful for general troubleshooting to
@@ -51,6 +51,12 @@ Show sockets histogram by remote address.
 .TP
 \-e
 Show extension summary(average).
+.TP
+\-4
+Trace IPv4 family only.
+.TP
+\-6
+Trace IPv6 family only.
 .SH EXAMPLES
 .TP
 Trace TCP RTT and print 1 second summaries, 10 times:
@@ -68,6 +74,14 @@ Only trace TCP RTT for remote address 192.168.1.100 and remote port 80:
 Trace local port and show a breakdown of remote hosts RTT:
 #
 .B tcprtt \-i 3 --lport 80 --byraddr
+.TP
+Trace IPv4 family only:
+#
+.B tcprtt \-4
+.TP
+Trace IPv6 family only:
+#
+.B tcprtt \-6
 .SH OVERHEAD
 This traces the kernel tcp_rcv_established function and collects TCP RTT. The
 rate of this depends on your server application. If it is a web or proxy server

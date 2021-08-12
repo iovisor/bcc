@@ -3,7 +3,7 @@
 # tcpv4tracer   Trace TCP connections.
 #               For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: tcpv4tracer [-h] [-v] [-p PID] [-N NETNS]
+# USAGE: tcpv4tracer [-h] [-v] [-p PID] [-N NETNS] [-4 | -6]
 #
 # You should generally try to avoid writing long scripts that measure multiple
 # functions and walk multiple kernel structures, as they will be a burden to
@@ -34,6 +34,11 @@ parser.add_argument("--cgroupmap",
                     help="trace cgroups in this BPF map only")
 parser.add_argument("--mntnsmap",
                     help="trace mount namespaces in this BPF map only")
+group = parser.add_mutually_exclusive_group()
+group.add_argument("-4", "--ipv4", action="store_true",
+                    help="trace IPv4 family only")
+group.add_argument("-6", "--ipv6", action="store_true",
+                   help="trace IPv6 family only")
 parser.add_argument("-v", "--verbose", action="store_true",
                     help="include Network Namespace in the output")
 parser.add_argument("--ebpf", action="store_true",
@@ -185,6 +190,10 @@ int trace_connect_v4_entry(struct pt_regs *ctx, struct sock *sk)
   u64 pid = bpf_get_current_pid_tgid();
 
   ##FILTER_PID##
+  
+  u16 family = sk->__sk_common.skc_family;
+  ##FILTER_FAMILY##
+
 
   // stash the sock ptr for lookup on return
   connectsock.update(&pid, &sk);
@@ -235,6 +244,8 @@ int trace_connect_v6_entry(struct pt_regs *ctx, struct sock *sk)
   u64 pid = bpf_get_current_pid_tgid();
 
   ##FILTER_PID##
+  u16 family = sk->__sk_common.skc_family;
+  ##FILTER_FAMILY##
 
   // stash the sock ptr for lookup on return
   connectsock.update(&pid, &sk);
@@ -283,6 +294,9 @@ int trace_tcp_set_state_entry(struct pt_regs *ctx, struct sock *skp, int state)
       return 0;
   }
 
+  u16 family = skp->__sk_common.skc_family;
+  ##FILTER_FAMILY##
+  
   u8 ipver = 0;
   if (check_family(skp, AF_INET)) {
       ipver = 4;
@@ -371,6 +385,9 @@ int trace_close_entry(struct pt_regs *ctx, struct sock *skp)
   u64 pid = bpf_get_current_pid_tgid();
 
   ##FILTER_PID##
+  
+  u16 family = skp->__sk_common.skc_family;
+  ##FILTER_FAMILY##
 
   u8 oldstate = skp->sk_state;
   // Don't generate close events for connections that were never
@@ -456,6 +473,9 @@ int trace_accept_return(struct pt_regs *ctx)
 #endif
 
   ##FILTER_NETNS##
+  
+  u16 family = newsk->__sk_common.skc_family;
+  ##FILTER_FAMILY##
 
   if (check_family(newsk, AF_INET)) {
       ipver = 4;
@@ -598,7 +618,13 @@ if args.pid:
     pid_filter = 'if (pid >> 32 != %d) { return 0; }' % args.pid
 if args.netns:
     netns_filter = 'if (net_ns_inum != %d) { return 0; }' % args.netns
-
+if args.ipv4:
+    bpf_text = bpf_text.replace('##FILTER_FAMILY##',
+        'if (family != AF_INET) { return 0; }')
+elif args.ipv6:
+    bpf_text = bpf_text.replace('##FILTER_FAMILY##',
+        'if (family != AF_INET6) { return 0; }')
+bpf_text = bpf_text.replace('##FILTER_FAMILY##', '')
 bpf_text = bpf_text.replace('##FILTER_PID##', pid_filter)
 bpf_text = bpf_text.replace('##FILTER_NETNS##', netns_filter)
 bpf_text = filter_by_containers(args) + bpf_text
@@ -609,10 +635,17 @@ if args.ebpf:
 
 # initialize BPF
 b = BPF(text=bpf_text)
-b.attach_kprobe(event="tcp_v4_connect", fn_name="trace_connect_v4_entry")
-b.attach_kretprobe(event="tcp_v4_connect", fn_name="trace_connect_v4_return")
-b.attach_kprobe(event="tcp_v6_connect", fn_name="trace_connect_v6_entry")
-b.attach_kretprobe(event="tcp_v6_connect", fn_name="trace_connect_v6_return")
+if args.ipv4:
+    b.attach_kprobe(event="tcp_v4_connect", fn_name="trace_connect_v4_entry")
+    b.attach_kretprobe(event="tcp_v4_connect", fn_name="trace_connect_v4_return")
+elif args.ipv6:
+    b.attach_kprobe(event="tcp_v6_connect", fn_name="trace_connect_v6_entry")
+    b.attach_kretprobe(event="tcp_v6_connect", fn_name="trace_connect_v6_return")
+else:
+    b.attach_kprobe(event="tcp_v4_connect", fn_name="trace_connect_v4_entry")
+    b.attach_kretprobe(event="tcp_v4_connect", fn_name="trace_connect_v4_return")
+    b.attach_kprobe(event="tcp_v6_connect", fn_name="trace_connect_v6_entry")
+    b.attach_kretprobe(event="tcp_v6_connect", fn_name="trace_connect_v6_return")
 b.attach_kprobe(event="tcp_set_state", fn_name="trace_tcp_set_state_entry")
 b.attach_kprobe(event="tcp_close", fn_name="trace_close_entry")
 b.attach_kretprobe(event="inet_csk_accept", fn_name="trace_accept_return")

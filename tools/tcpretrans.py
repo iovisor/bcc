@@ -4,7 +4,7 @@
 # tcpretrans    Trace or count TCP retransmits and TLPs.
 #               For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: tcpretrans [-c] [-h] [-l]
+# USAGE: tcpretrans [-c] [-h] [-l] [-4 | -6]
 #
 # This uses dynamic tracing of kernel functions, and will need to be updated
 # to match kernel changes.
@@ -27,6 +27,8 @@ from time import sleep
 examples = """examples:
     ./tcpretrans           # trace TCP retransmits
     ./tcpretrans -l        # include TLP attempts
+    ./tcpretrans -4        # trace IPv4 family only
+    ./tcpretrans -6        # trace IPv6 family only
 """
 parser = argparse.ArgumentParser(
     description="Trace TCP retransmits",
@@ -36,6 +38,11 @@ parser.add_argument("-l", "--lossprobe", action="store_true",
     help="include tail loss probe attempts")
 parser.add_argument("-c", "--count", action="store_true",
     help="count occurred retransmits per flow")
+group = parser.add_mutually_exclusive_group()
+group.add_argument("-4", "--ipv4", action="store_true",
+    help="trace IPv4 family only")
+group.add_argument("-6", "--ipv6", action="store_true",
+    help="trace IPv6 family only")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
@@ -106,6 +113,8 @@ static int trace_event(struct pt_regs *ctx, struct sock *skp, int type)
     u16 dport = skp->__sk_common.skc_dport;
     char state = skp->__sk_common.skc_state;
 
+    FILTER_FAMILY
+    
     if (family == AF_INET) {
         IPV4_INIT
         IPV4_CORE
@@ -145,6 +154,8 @@ TRACEPOINT_PROBE(tcp, tcp_retransmit_skb)
     char state = skp->__sk_common.skc_state;
     u16 family = skp->__sk_common.skc_family;
 
+    FILTER_FAMILY 
+    
     if (family == AF_INET) {
         IPV4_CODE
     } else if (family == AF_INET6) {
@@ -278,7 +289,14 @@ if args.lossprobe or not BPF.tracepoint_exists("tcp", "tcp_retransmit_skb"):
         bpf_text += bpf_text_kprobe_tlp
     if not BPF.tracepoint_exists("tcp", "tcp_retransmit_skb"):
         bpf_text += bpf_text_kprobe_retransmit
-
+if args.ipv4:
+    bpf_text = bpf_text.replace('FILTER_FAMILY',
+        'if (family != AF_INET) { return 0; }')
+elif args.ipv6:
+    bpf_text = bpf_text.replace('FILTER_FAMILY',
+        'if (family != AF_INET6) { return 0; }')
+else:
+    bpf_text = bpf_text.replace('FILTER_FAMILY', '')
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:

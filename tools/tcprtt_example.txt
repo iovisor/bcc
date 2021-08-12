@@ -144,6 +144,7 @@ Full USAGE:
 # ./tcprtt -h
 usage: tcprtt [-h] [-i INTERVAL] [-d DURATION] [-T] [-m] [-p LPORT]
               [-P RPORT] [-a LADDR] [-A RADDR] [-b] [-B] [-e] [-D]
+              [-4 | -6]
 
 Summarize TCP RTT as a histogram
 
@@ -168,6 +169,8 @@ optional arguments:
   -e, --extension       show extension summary(average)
   -D, --debug           print BPF program before starting (for debugging
                         purposes)
+  -4, --ipv4            trace IPv4 family only
+  -6, --ipv6            trace IPv6 family only
 
 examples:
     ./tcprtt            # summarize TCP RTT
@@ -181,3 +184,5 @@ examples:
     ./tcprtt -B         # show sockets histogram by remote address
     ./tcprtt -D         # show debug bpf text
     ./tcprtt -e         # show extension summary(average)
+    ./tcprtt -4         # trace IPv4 family only
+    ./tcprtt -6         # trace IPv6 family only

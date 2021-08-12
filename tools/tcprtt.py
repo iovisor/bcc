@@ -5,6 +5,7 @@
 #
 # USAGE: tcprtt [-h] [-T] [-D] [-m] [-i INTERVAL] [-d DURATION]
 #           [-p LPORT] [-P RPORT] [-a LADDR] [-A RADDR] [-b] [-B] [-e]
+#           [-4 | -6]
 #
 # Copyright (c) 2020 zhenwei pi
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -32,6 +33,8 @@ examples = """examples:
     ./tcprtt -B         # show sockets histogram by remote address
     ./tcprtt -D         # show debug bpf text
     ./tcprtt -e         # show extension summary(average)
+    ./tcprtt -4         # trace only IPv4 family
+    ./tcprtt -6         # trace only IPv6 family
 """
 parser = argparse.ArgumentParser(
     description="Summarize TCP RTT as a histogram",
@@ -61,6 +64,11 @@ parser.add_argument("-e", "--extension", action="store_true",
     help="show extension summary(average)")
 parser.add_argument("-D", "--debug", action="store_true",
     help="print BPF program before starting (for debugging purposes)")
+group = parser.add_mutually_exclusive_group()
+group.add_argument("-4", "--ipv4", action="store_true",
+    help="trace IPv4 family only")
+group.add_argument("-6", "--ipv6", action="store_true",
+    help="trace IPv6 family only")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
@@ -102,6 +110,7 @@ int trace_tcp_rcv(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb)
     u16 dport = 0;
     u32 saddr = 0;
     u32 daddr = 0;
+    u16 family = 0;
 
     /* for histogram */
     sock_key_t key;
@@ -113,11 +122,13 @@ int trace_tcp_rcv(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb)
     bpf_probe_read_kernel(&dport, sizeof(dport), (void *)&inet->inet_dport);
     bpf_probe_read_kernel(&saddr, sizeof(saddr), (void *)&inet->inet_saddr);
     bpf_probe_read_kernel(&daddr, sizeof(daddr), (void *)&inet->inet_daddr);
+    bpf_probe_read_kernel(&family, sizeof(family), (void *)&sk->__sk_common.skc_family);
 
     LPORTFILTER
     RPORTFILTER
     LADDRFILTER
     RADDRFILTER
+    FAMILYFILTER
 
     FACTOR
 
@@ -162,7 +173,14 @@ if args.raddr:
         return 0;""" % struct.unpack("=I", socket.inet_aton(args.raddr))[0])
 else:
     bpf_text = bpf_text.replace('RADDRFILTER', '')
-
+if args.ipv4:
+    bpf_text = bpf_text.replace('FAMILYFILTER',
+        'if (family != AF_INET) { return 0; }')
+elif args.ipv6:
+    bpf_text = bpf_text.replace('FAMILYFILTER',
+        'if (family != AF_INET6) { return 0; }')
+else:
+    bpf_text = bpf_text.replace('FAMILYFILTER', '')
 # show msecs or usecs[default]
 if args.milliseconds:
     bpf_text = bpf_text.replace('FACTOR', 'srtt /= 1000;')

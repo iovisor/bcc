@@ -44,7 +44,7 @@ For more details, see docs/special_filtering.md
 USAGE message:
 
 # ./tcpaccept -h
-usage: tcpaccept.py [-h] [-T] [-t] [-p PID] [-P PORT] [--cgroupmap CGROUPMAP]
+usage: tcpaccept.py [-h] [-T] [-t] [-p PID] [-P PORT] [-4 | -6] [--cgroupmap CGROUPMAP]
 
 Trace TCP accepts
 
@@ -54,6 +54,8 @@ optional arguments:
   -t, --timestamp       include timestamp on output
   -p PID, --pid PID     trace this PID only
   -P PORT, --port PORT  comma-separated list of local ports to trace
+  -4, --ipv4            trace IPv4 family only
+  -6, --ipv6            trace IPv6 family only
   --cgroupmap CGROUPMAP
                         trace cgroups in this BPF map only
 
@@ -64,3 +66,5 @@ examples:
     ./tcpaccept -p 181    # only trace PID 181
     ./tcpaccept --cgroupmap mappath  # only trace cgroups in this BPF map
     ./tcpaccept --mntnsmap mappath   # only trace mount namespaces in the map
+    ./tcpaccept -4        # trace IPv4 family only
+    ./tcpaccept -6        # trace IPv6 family only

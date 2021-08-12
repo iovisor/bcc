@@ -4,7 +4,7 @@
 # tcpconnlat    Trace TCP active connection latency (connect).
 #               For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: tcpconnlat [-h] [-t] [-p PID]
+# USAGE: tcpconnlat [-h] [-t] [-p PID] [-4 | -6]
 #
 # This uses dynamic tracing of kernel functions, and will need to be updated
 # to match kernel changes.
@@ -40,6 +40,8 @@ examples = """examples:
     ./tcpconnlat -t        # include timestamps
     ./tcpconnlat -p 181    # only trace PID 181
     ./tcpconnlat -L        # include LPORT while printing outputs
+    ./tcpconnlat -4        # trace IPv4 family only
+    ./tcpconnlat -6        # trace IPv6 family only
 """
 parser = argparse.ArgumentParser(
     description="Trace TCP connects and show connection latency",
@@ -51,6 +53,11 @@ parser.add_argument("-p", "--pid",
     help="trace this PID only")
 parser.add_argument("-L", "--lport", action="store_true",
     help="include LPORT on output")
+group = parser.add_mutually_exclusive_group()
+group.add_argument("-4", "--ipv4", action="store_true",
+    help="trace IPv4 family only")
+group.add_argument("-6", "--ipv6", action="store_true",
+    help="trace IPv6 family only")
 parser.add_argument("duration_ms", nargs="?", default=0,
     type=positive_float,
     help="minimum duration to trace (ms)")
@@ -202,8 +209,14 @@ if debug or args.verbose or args.ebpf:
 
 # initialize BPF
 b = BPF(text=bpf_text)
-b.attach_kprobe(event="tcp_v4_connect", fn_name="trace_connect")
-b.attach_kprobe(event="tcp_v6_connect", fn_name="trace_connect")
+if args.ipv4:
+    b.attach_kprobe(event="tcp_v4_connect", fn_name="trace_connect")
+elif args.ipv6:
+    b.attach_kprobe(event="tcp_v6_connect", fn_name="trace_connect")
+else:
+    b.attach_kprobe(event="tcp_v4_connect", fn_name="trace_connect")
+    b.attach_kprobe(event="tcp_v6_connect", fn_name="trace_connect")
+
 b.attach_kprobe(event="tcp_rcv_state_process",
     fn_name="trace_tcp_rcv_state_process")
 
@@ -260,8 +273,14 @@ else:
         "SADDR", "DADDR", "DPORT", "LAT(ms)"))
 
 # read events
-b["ipv4_events"].open_perf_buffer(print_ipv4_event)
-b["ipv6_events"].open_perf_buffer(print_ipv6_event)
+if args.ipv4:
+    b["ipv4_events"].open_perf_buffer(print_ipv4_event)
+elif args.ipv6:
+    b["ipv6_events"].open_perf_buffer(print_ipv6_event)
+else:
+    b["ipv4_events"].open_perf_buffer(print_ipv4_event)
+    b["ipv6_events"].open_perf_buffer(print_ipv6_event)
+
 while 1:
     try:
         b.perf_buffer_poll()
