@@ -109,6 +109,55 @@ nginx          1629     30.14                9 /usr/sbin/nginx:database_write
 
 Shows the user space stack trace of calls to the user space function call open taking longer than 30 ms.
 
+# ./funcslower  -T -m 10 syscall:io_submit  -KB -p 351521
+TIME       COMM           PID    LAT(ms)             RVAL FUNC
+16:10:18   fio            351521   26.07                1 syscall:io_submit
+B        1    0.00   25.99   25.99
+    finish_task_switch
+    __sched_text_start
+    schedule
+    io_schedule
+    bit_wait_io
+    __wait_on_bit
+    out_of_line_wait_on_bit
+    do_get_write_access
+    jbd2_journal_get_write_access
+    __ext4_journal_get_write_access
+    ext4_reserve_inode_write
+    ext4_mark_inode_dirty
+    ext4_dirty_inode
+    __mark_inode_dirty
+    generic_update_time
+    file_update_time
+    __generic_file_write_iter
+    ext4_file_write_iter
+    aio_write
+    io_submit_one
+    __x64_sys_io_submit
+    kretprobe_trampoline
+Shows kernel stack trace for syscall:io_submit slower than 10ms if it was blocked on schedule
+
+# ./funcslower -f -T -m 1000 -KB  syscall:sync
+17:10:15   sync           30041  5470.08                0 syscall:sync 
+B        2    0.13 5109.46  401.40 ;kretprobe_trampoline;__x64_sys_sync;ksys_sync;iterate_supers;sync_inodes_sb;wb_wait_for_completion;schedule;__sched_text_start;finish_task_switch 1
+B      106  372.69 4708.02   58.96 ;kretprobe_trampoline;__x64_sys_sync;ksys_sync;iterate_supers;sync_inodes_sb;filemap_fdatawait_keep_errors;__filemap_fdatawait_range;wait_on_page_bit_common;io_schedule;schedul
+e;__sched_text_start;finish_task_switch 1
+B        1  376.37 4615.34 4615.34 ;kretprobe_trampoline;__x64_sys_sync;ksys_sync;iterate_supers;sync_inodes_sb;wb_wait_for_completion;schedule;__sched_text_start;finish_task_switch 1
+B        1 4991.72   33.25   33.25 ;kretprobe_trampoline;__x64_sys_sync;ksys_sync;iterate_supers;sync_inodes_sb;filemap_fdatawait_keep_errors;__filemap_fdatawait_range;wait_on_page_bit_common;io_schedule;schedul
+e;__sched_text_start;finish_task_switch 1
+B        1 5109.71  188.57  188.57 ;kretprobe_trampoline;__x64_sys_sync;ksys_sync;iterate_supers;ext4_sync_fs;jbd2_log_wait_commit;schedule;__sched_text_start;finish_task_switch 1
+B        5 5109.71  191.09  191.08 ;kretprobe_trampoline;__x64_sys_sync;ksys_sync;iterate_supers;ext4_sync_fs;blkdev_issue_flush;submit_bio_wait;wait_for_completion_io;_cond_resched;preempt_schedule_common;__sch
+ed_text_start;finish_task_switch 1
+B        4 5298.34    2.42    2.35 ;kretprobe_trampoline;__x64_sys_sync;ksys_sync;iterate_supers;ext4_sync_fs;blkdev_issue_flush;submit_bio_wait;wait_for_completion_io;io_schedule_timeout;schedule_timeout;schedu
+le;__sched_text_start;finish_task_switch 1
+B       29 5301.60  156.10  149.52 ;kretprobe_trampoline;__x64_sys_sync;ksys_sync;iterate_bdevs;__filemap_fdatawrite_range;do_writepages;generic_writepages;write_cache_pages;__writepage;__block_write_full_page;s
+ubmit_bh_wbc;submit_bio;generic_make_request;blk_mq_make_request;blk_mq_get_request;blk_mq_get_tag;io_schedule;schedule;__sched_text_start;finish_task_switch 1
+B       42 5458.00   12.08   11.86 ;kretprobe_trampoline;__x64_sys_sync;ksys_sync;iterate_bdevs;filemap_fdatawait_keep_errors;__filemap_fdatawait_range;wait_on_page_bit_common;io_schedule;schedule;__sched_text_s
+tart;finish_task_switch 1
+
+Show folded kernel stacks of sycall:sync while it's blocked on IO, as we can
+see it spent most of it's time 4615.34ms inside wb_wait_for_completion().
+
 USAGE message:
 
 usage: funcslower.py [-hf] [-p PID] [-U | -K] [-m MIN_MS] [-u MIN_US] [-a ARGUMENTS] [-T]
