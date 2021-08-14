@@ -6,11 +6,14 @@ import bcc
 import os
 import time
 import unittest
-from bcc import BPF, PerfType, PerfHWConfig
+from bcc import BPF, PerfType, PerfHWConfig, PerfEventSampleFormat
 from bcc import Perf
 from time import sleep
+from utils import kernel_version_ge, mayFail
 
 class TestPerfAttachRaw(unittest.TestCase):
+    @mayFail("This fails on github actions environment, hw perf events are not supported")
+    @unittest.skipUnless(kernel_version_ge(4,9), "requires kernel >= 4.9")
     def test_attach_raw_event(self):
         bpf_text="""
 #include <linux/perf_event.h>
@@ -50,15 +53,15 @@ int on_sample_hit(struct bpf_perf_event_data *ctx) {
             event_attr.type = Perf.PERF_TYPE_HARDWARE
             event_attr.config = PerfHWConfig.CACHE_MISSES
             event_attr.sample_period = 1000000
-            event_attr.sample_type = 0x8 # PERF_SAMPLE_ADDR
+            event_attr.sample_type = PerfEventSampleFormat.ADDR
             event_attr.exclude_kernel = 1
             b.attach_perf_event_raw(attr=event_attr, fn_name="on_sample_hit", pid=-1, cpu=-1)
         except Exception:
             print("Failed to attach to a raw event. Please check the event attr used")
             exit()
 
-        print("Running for 4 seconds or hit Ctrl-C to end. Check trace file for samples information written by bpf_trace_printk.")
-        sleep(4)
+        print("Running for 2 seconds or hit Ctrl-C to end. Check trace file for samples information written by bpf_trace_printk.")
+        sleep(2)
 
 if __name__ == "__main__":
     unittest.main()
