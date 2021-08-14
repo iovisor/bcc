@@ -16,31 +16,113 @@ import ctypes as ct
 import os
 from .utils import get_online_cpus
 
+class _sample_period_union(ct.Union):
+        _fields_ = [
+                ('sample_period', ct.c_ulong),
+                ('sample_freq', ct.c_ulong),
+        ]
+
+class _wakeup_events_union(ct.Union):
+        _fields_ = [
+                ('wakeup_events', ct.c_uint),
+                ('wakeup_watermark', ct.c_uint),
+        ]
+
+class _bp_addr_union(ct.Union):
+        _fields_ = [
+                ('bp_addr', ct.c_ulong),
+                ('kprobe_func', ct.c_ulong),
+                ('uprobe_path', ct.c_ulong),
+                ('config1', ct.c_ulong),
+        ]
+
+class _bp_len_union(ct.Union):
+        _fields_ = [
+                ('bp_len', ct.c_ulong),
+                ('kprobe_addr', ct.c_ulong),
+                ('probe_offset', ct.c_ulong),
+                ('config2', ct.c_ulong),
+        ]
+
 class Perf(object):
+
         class perf_event_attr(ct.Structure):
+                _anonymous_ = [
+                        "_sample_period_union",
+                        "_wakeup_events_union",
+                        "_bp_addr_union",
+                        "_bp_len_union"
+                ]
+
                 _fields_ = [
                         ('type', ct.c_uint),
                         ('size', ct.c_uint),
                         ('config', ct.c_ulong),
-                        ('sample_period', ct.c_ulong),
+                        ('_sample_period_union', _sample_period_union),  # ct.c_ulong
                         ('sample_type', ct.c_ulong),
                         ('read_format', ct.c_ulong),
-                        ('flags', ct.c_ulong),
-                        ('wakeup_events', ct.c_uint),
-                        ('IGNORE3', ct.c_uint),  # bp_type
-                        ('IGNORE4', ct.c_ulong),  # bp_addr
-                        ('IGNORE5', ct.c_ulong),  # bp_len
-                        ('IGNORE6', ct.c_ulong),  # branch_sample_type
-                        ('IGNORE7', ct.c_ulong),  # sample_regs_user
-                        ('IGNORE8', ct.c_uint),  # sample_stack_user
-                        ('IGNORE9', ct.c_int),  # clockid
-                        ('IGNORE10', ct.c_ulong),  # sample_regs_intr
-                        ('IGNORE11', ct.c_uint),  # aux_watermark
-                        ('IGNORE12', ct.c_uint16),  # sample_max_stack
-                        ('IGNORE13', ct.c_uint16),  # __reserved_2
-                        ('IGNORE14', ct.c_uint),  # aux_sample_size
-                        ('IGNORE15', ct.c_uint),  # __reserved_3
+                        ('disabled', ct.c_uint, 1),
+                        ('inherit', ct.c_uint, 1),
+                        ('pinned', ct.c_uint, 1),
+                        ('exclusive', ct.c_uint, 1),
+                        ('exclude_user', ct.c_uint, 1),
+                        ('exclude_kernel', ct.c_uint, 1),
+                        ('exclude_hv', ct.c_uint, 1),
+                        ('exclude_idle', ct.c_uint, 1),
+                        ('mmap', ct.c_uint, 1),
+                        ('comm', ct.c_uint, 1),
+                        ('freq', ct.c_uint, 1),
+                        ('inherit_stat', ct.c_uint, 1),
+                        ('enable_on_exec', ct.c_uint, 1),
+                        ('task', ct.c_uint, 1),
+                        ('watermark', ct.c_uint, 1),
+                        ('precise_ip', ct.c_uint, 2),
+                        ('mmap_data', ct.c_uint, 1),
+                        ('sample_id_all', ct.c_uint, 1),
+                        ('exclude_host', ct.c_uint, 1),
+                        ('exclude_guest', ct.c_uint, 1),
+                        ('exclude_callchain_kernel', ct.c_uint, 1),
+                        ('exclude_callchain_user', ct.c_uint, 1),
+                        ('mmap2', ct.c_uint, 1),
+                        ('comm_exec', ct.c_uint, 1),
+                        ('use_clockid', ct.c_uint, 1),
+                        ('context_switch', ct.c_uint, 1),
+                        ('write_backward', ct.c_uint, 1),
+                        ('namespaces', ct.c_uint, 1),
+                        ('ksymbol', ct.c_uint, 1),
+                        ('bpf_event', ct.c_uint, 1),
+                        ('aux_output', ct.c_uint, 1),
+                        ('cgroup', ct.c_uint, 1),
+                        ('text_poke', ct.c_uint, 1),
+                        ('__reserved_1', ct.c_uint, 30),
+                        ('_wakeup_events_union', _wakeup_events_union),  # ct.c_uint
+                        ('bp_type', ct.c_uint),
+                        ('_bp_addr_union', _bp_addr_union),  # ct.c_ulong
+                        ('_bp_len_union', _bp_len_union),  # ct.c_ulong
+                        ('branch_sample_type', ct.c_ulong),
+                        ('sample_regs_user', ct.c_ulong),
+                        ('sample_stack_user', ct.c_uint),
+                        ('clockid', ct.c_int),
+                        ('sample_regs_intr', ct.c_ulong),
+                        ('aux_watermark', ct.c_uint),
+                        ('sample_max_stack', ct.c_uint16),
+                        ('__reserved_2', ct.c_uint16),
+                        ('aux_sample_size', ct.c_uint),
+                        ('__reserved_3', ct.c_uint),
                 ]
+
+                def __init__(self):
+                    self.size = 120  # PERF_ATTR_SIZE_VER6
+                    self.ctype_fields = [item[0] for item in self._fields_]
+                    self.ctype_fields.extend([item[0] for item in _sample_period_union._fields_])
+                    self.ctype_fields.extend([item[0] for item in _wakeup_events_union._fields_])
+                    self.ctype_fields.extend([item[0] for item in _bp_addr_union._fields_])
+                    self.ctype_fields.extend([item[0] for item in _bp_len_union._fields_])
+
+                def __setattr__(self, key, value):
+                    if hasattr(self, 'ctype_fields') and key not in self.ctype_fields:
+                        print("Warning: Setting field {} on perf_event_attr that isn't part of the ctype - {} won't make it to perf_event_open".format(key, key))
+                    super(Perf.perf_event_attr, self).__setattr__(key, value)
 
         # x86 specific, from arch/x86/include/generated/uapi/asm/unistd_64.h
         NR_PERF_EVENT_OPEN = 298
@@ -58,9 +140,6 @@ class Perf(object):
 
         # perf_event_sample_format
         PERF_SAMPLE_RAW = 1024      # it's a u32; could also try zero args
-
-        # perf_event_attr
-        PERF_ATTR_FLAG_FREQ = 1024
 
         # perf_event.h
         PERF_FLAG_FD_CLOEXEC = 8
@@ -103,7 +182,7 @@ class Perf(object):
                 attr.sample_type = Perf.PERF_SAMPLE_RAW
                 if freq > 0:
                     # setup sampling
-                    attr.flags = Perf.PERF_ATTR_FLAG_FREQ   # no mmap or comm
+                    attr.freq = 1  # no mmap or comm
                     attr.sample_period = freq
                 else:
                     attr.sample_period = 1
