@@ -7,8 +7,8 @@
 
 from __future__ import print_function
 from bcc import BPF
-import distutils.version
 from unittest import main, skipUnless, TestCase
+from utils import kernel_version_ge
 import ctypes as ct
 import os
 
@@ -18,17 +18,6 @@ class CustomKey(ct.Structure):
     ("value_1", ct.c_int),
     ("value_2", ct.c_int)
   ]
-
-def kernel_version_ge(major, minor):
-    # True if running kernel is >= X.Y
-    version = distutils.version.LooseVersion(os.uname()[2]).version
-    if version[0] > major:
-        return True
-    if version[0] < major:
-        return False
-    if minor and version[1] < minor:
-        return False
-    return True
 
 @skipUnless(kernel_version_ge(4,11), "requires kernel >= 4.11")
 class TestUDST(TestCase):

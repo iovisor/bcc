@@ -4,23 +4,12 @@
 
 from bcc import BPF
 import os
-import distutils.version
 import ctypes as ct
 import random
 import time
 import subprocess
 from unittest import main, TestCase, skipUnless
-
-def kernel_version_ge(major, minor):
-    # True if running kernel is >= X.Y
-    version = distutils.version.LooseVersion(os.uname()[2]).version
-    if version[0] > major:
-        return True
-    if version[0] < major:
-        return False
-    if minor and version[1] < minor:
-        return False
-    return True
+from utils import kernel_version_ge
 
 class TestRingbuf(TestCase):
     @skipUnless(kernel_version_ge(5,8), "requires kernel >= 5.8")

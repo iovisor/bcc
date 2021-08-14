@@ -3,22 +3,11 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 
 import ctypes as ct
-import distutils.version
 import os
 from unittest import main, skipUnless, TestCase
+from utils import kernel_version_ge
 from bcc import BPF
 from netaddr import IPAddress
-
-def kernel_version_ge(major, minor):
-    # True if running kernel is >= X.Y
-    version = distutils.version.LooseVersion(os.uname()[2]).version
-    if version[0] > major:
-        return True
-    if version[0] < major:
-        return False
-    if minor and version[1] < minor:
-        return False
-    return True
 
 class KeyV4(ct.Structure):
     _fields_ = [("prefixlen", ct.c_uint),

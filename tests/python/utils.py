@@ -1,6 +1,7 @@
 from pyroute2 import NSPopen
 from distutils.spawn import find_executable
 import traceback
+import distutils.version
 
 import logging, os, sys
 
@@ -62,3 +63,14 @@ class NSPopenWithCheck(NSPopen):
         name = list(argv)[0][0]
         has_executable(name)
         super(NSPopenWithCheck, self).__init__(nsname, *argv, **kwarg)
+
+def kernel_version_ge(major, minor):
+    # True if running kernel is >= X.Y
+    version = distutils.version.LooseVersion(os.uname()[2]).version
+    if version[0] > major:
+        return True
+    if version[0] < major:
+        return False
+    if minor and version[1] < minor:
+        return False
+    return True

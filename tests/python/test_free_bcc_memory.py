@@ -9,19 +9,8 @@ from __future__ import print_function
 from bcc import BPF
 from unittest import main, skipUnless, TestCase
 from subprocess import Popen, PIPE
-import distutils.version
+from utils import kernel_version_ge
 import os
-
-def kernel_version_ge(major, minor):
-    # True if running kernel is >= X.Y
-    version = distutils.version.LooseVersion(os.uname()[2]).version
-    if version[0] > major:
-        return True
-    if version[0] < major:
-        return False
-    if minor and version[1] < minor:
-        return False
-    return True
 
 class TestFreeLLVMMemory(TestCase):
     def getRssFile(self):
