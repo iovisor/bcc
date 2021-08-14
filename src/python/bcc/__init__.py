@@ -141,6 +141,34 @@ class PerfSWConfig:
     DUMMY = 9
     BPF_OUTPUT = 10
 
+class PerfEventSampleFormat:
+    # from perf_event_sample_format in uapi/linux/bpf.h
+    IP = (1 << 0)
+    TID = (1 << 1)
+    TIME = (1 << 2)
+    ADDR = (1 << 3)
+    READ = (1 << 4)
+    CALLCHAIN = (1 << 5)
+    ID = (1 << 6)
+    CPU = (1 << 7)
+    PERIOD = (1 << 8)
+    STREAM_ID = (1 << 9)
+    RAW = (1 << 10)
+    BRANCH_STACK = (1 << 11)
+    REGS_USER = (1 << 12)
+    STACK_USER = (1 << 13)
+    WEIGHT = (1 << 14)
+    DATA_SRC = (1 << 15)
+    IDENTIFIER = (1 << 16)
+    TRANSACTION = (1 << 17)
+    REGS_INTR = (1 << 18)
+    PHYS_ADDR = (1 << 19)
+    AUX = (1 << 20)
+    CGROUP = (1 << 21)
+    DATA_PAGE_SIZE = (1 << 22)
+    CODE_PAGE_SIZE = (1 << 23)
+    WEIGHT_STRUCT = (1 << 24)
+
 class BPFProgType:
     # From bpf_prog_type in uapi/linux/bpf.h
     SOCKET_FILTER = 1
