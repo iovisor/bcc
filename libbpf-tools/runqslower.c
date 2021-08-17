@@ -18,6 +18,7 @@ struct env {
 	pid_t pid;
 	pid_t tid;
 	__u64 min_us;
+	bool previous;
 	bool verbose;
 } env = {
 	.min_us = 10000,
@@ -29,18 +30,20 @@ const char *argp_program_bug_address =
 const char argp_program_doc[] =
 "Trace high run queue latency.\n"
 "\n"
-"USAGE: runqslower [--help] [-p PID] [-t TID] [min_us]\n"
+"USAGE: runqslower [--help] [-p PID] [-t TID] [-P] [min_us]\n"
 "\n"
 "EXAMPLES:\n"
 "    runqslower         # trace latency higher than 10000 us (default)\n"
 "    runqslower 1000    # trace latency higher than 1000 us\n"
 "    runqslower -p 123  # trace pid 123\n"
-"    runqslower -t 123  # trace tid 123 (use for threads only)\n";
+"    runqslower -t 123  # trace tid 123 (use for threads only)\n"
+"    runqslower -P      # also show previous task name and TID\n";
 
 static const struct argp_option opts[] = {
 	{ "pid", 'p', "PID", 0, "Process PID to trace"},
 	{ "tid", 't', "TID", 0, "Thread TID to trace"},
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
+	{ "previous", 'P', NULL, 0, "also show previous task name and TID" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
@@ -57,6 +60,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'v':
 		env.verbose = true;
+		break;
+	case 'P':
+		env.previous = true;
 		break;
 	case 'p':
 		errno = 0;
@@ -114,7 +120,10 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	time(&t);
 	tm = localtime(&t);
 	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
-	printf("%-8s %-16s %-6d %14llu\n", ts, e->task, e->pid, e->delta_us);
+	if (env.previous)
+		printf("%-8s %-16s %-6d %14llu %-16s %-6d\n", ts, e->task, e->pid, e->delta_us, e->prev_task, e->prev_pid);
+	else
+		printf("%-8s %-16s %-6d %14llu\n", ts, e->task, e->pid, e->delta_us);
 }
 
 void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
@@ -170,7 +179,10 @@ int main(int argc, char **argv)
 	}
 
 	printf("Tracing run queue latency higher than %llu us\n", env.min_us);
-	printf("%-8s %-16s %-6s %14s\n", "TIME", "COMM", "TID", "LAT(us)");
+	if (env.previous)
+		printf("%-8s %-16s %-6s %14s %-16s %-6s\n", "TIME", "COMM", "TID", "LAT(us)", "PREV COMM", "PREV TID");
+	else
+		printf("%-8s %-16s %-6s %14s\n", "TIME", "COMM", "TID", "LAT(us)");
 
 	pb_opts.sample_cb = handle_event;
 	pb_opts.lost_cb = handle_lost_events;
