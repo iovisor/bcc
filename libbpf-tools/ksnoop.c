@@ -307,11 +307,11 @@ static int trace_to_value(struct btf *btf, struct func *func, char *argname,
 {
 	__u8 i;
 
-	strncpy(val->name, argname, sizeof(val->name));
-	if (strlen(membername) > 0) {
-		strncat(val->name, "->", sizeof(val->name));
-		strncat(val->name, membername, sizeof(val->name));
-	}
+	if (strlen(membername) > 0)
+		snprintf(val->name, sizeof(val->name), "%s->%s",
+			 argname, membername);
+	else
+		strncpy(val->name, argname, sizeof(val->name));
 
 	for (i = 0; i < MAX_TRACES; i++) {
 		if (!func->args[i].name)
@@ -510,7 +510,7 @@ static void trace_printf(void *ctx, const char *fmt, va_list args)
 static int parse_trace(char *str, struct trace *trace)
 {
 	__u8 i, nr_predicates = 0, nr_entry = 0, nr_return = 0;
-	char argname[MAX_STR], membername[MAX_STR];
+	char argname[MAX_NAME], membername[MAX_NAME];
 	char tracestr[MAX_STR], argdata[MAX_STR];
 	struct func *func = &trace->func;
 	struct btf_dump_opts opts = { };

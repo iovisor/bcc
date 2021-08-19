@@ -7,7 +7,6 @@
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
 
-#include <asm-generic/errno.h>
 #include "ksnoop.h"
 
 /* For kretprobes, the instruction pointer in the struct pt_regs context
@@ -21,8 +20,8 @@
  */
 #define FUNC_MAX_STACK_DEPTH	16
 
-#ifndef NULL
-#define NULL			0
+#ifndef ENOSPC
+#define ENOSPC			28
 #endif
 
 struct func_stack {
@@ -53,7 +52,7 @@ struct {
 	__uint(key_size, sizeof(int));
 } ksnoop_perf_map SEC(".maps");
 
-static inline void clear_trace(struct trace *trace)
+static void clear_trace(struct trace *trace)
 {
 	__builtin_memset(&trace->trace_data, 0, sizeof(trace->trace_data));
 	trace->data_flags = 0;

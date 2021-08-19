@@ -23,7 +23,8 @@ enum arg {
  */
 #define KSNOOP_ID_UNKNOWN		0xffffffff
 
-#define MAX_STR				256
+#define MAX_NAME			96	
+#define MAX_STR				256	
 #define MAX_PATH			512
 #define MAX_VALUES			6
 #define MAX_ARGS			(MAX_VALUES - 1)
@@ -67,8 +68,8 @@ struct value {
 };
 
 struct func {
-	char name[MAX_STR];
-	char mod[MAX_STR];
+	char name[MAX_NAME];
+	char mod[MAX_NAME];
 	__s32 id;
 	__u8 nr_args;
 	__u64 ip;
