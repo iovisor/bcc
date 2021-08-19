@@ -21,6 +21,7 @@
 /funclatency
 /gethostlatency
 /hardirqs
+/ksnoop
 /llcstat
 /nfsdist
 /nfsslower
