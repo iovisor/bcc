@@ -13,6 +13,7 @@
 from __future__ import print_function
 import argparse
 import bcc
+from bcc.containers import filter_by_containers
 import ctypes
 import errno
 import functools
@@ -31,7 +32,14 @@ bpf_text = r"""
  * VFS and not installed in any kernel-devel packages. So, let's duplicate the
  * important part of the definition. There are actually more members in the
  * real struct, but we don't need them, and they're more likely to change.
+ *
+ * To add support for --selector option, we need to call filter_by_containers().
+ * But this function adds code which defines struct mnt_namespace.
+ * To avoid having this structure twice, we define MNT_NAMESPACE_DEFINED in
+ * filter_by_containers(), then here we check if macro is already defined before
+ * adding struct definition.
  */
+#ifndef MNT_NAMESPACE_DEFINED
 struct mnt_namespace {
     // This field was removed in https://github.com/torvalds/linux/commit/1a7b8969e664d6af328f00fe6eb7aabd61a71d13
     #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 11, 0)
@@ -39,6 +47,7 @@ struct mnt_namespace {
     #endif
     struct ns_common ns;
 };
+#endif /* !MNT_NAMESPACE_DEFINED */
 
 /*
  * XXX: this could really use first-class string support in BPF. target is a
@@ -100,6 +109,10 @@ int syscall__mount(struct pt_regs *ctx, char __user *source,
     struct nsproxy *nsproxy;
     struct mnt_namespace *mnt_ns;
 
+    if (container_should_be_filtered()) {
+        return 0;
+    }
+
     event.pid = bpf_get_current_pid_tgid() & 0xffffffff;
     event.tgid = bpf_get_current_pid_tgid() >> 32;
 
@@ -156,6 +169,10 @@ int syscall__umount(struct pt_regs *ctx, char __user *target, int flags)
     struct task_struct *task;
     struct nsproxy *nsproxy;
     struct mnt_namespace *mnt_ns;
+
+    if (container_should_be_filtered()) {
+        return 0;
+    }
 
     event.pid = bpf_get_current_pid_tgid() & 0xffffffff;
     event.tgid = bpf_get_current_pid_tgid() >> 32;
@@ -416,10 +433,16 @@ def main():
         help=argparse.SUPPRESS)
     parser.add_argument("-P", "--parent_process", action="store_true",
         help="also snoop the parent process")
+    parser.add_argument("--cgroupmap",
+        help="trace cgroups in this BPF map only")
+    parser.add_argument("--mntnsmap",
+        help="trace mount namespaces in this BPF map only")
     args = parser.parse_args()
 
     mounts = {}
     umounts = {}
+    global bpf_text
+    bpf_text = filter_by_containers(args) + bpf_text
     if args.ebpf:
         print(bpf_text)
         exit()
