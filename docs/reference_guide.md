@@ -99,6 +99,8 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [9. attach_xdp()](#9-attach_xdp)
         - [10. attach_func()](#10-attach_func)
         - [11. detach_func()](#11-detach_func)
+        - [12. detach_kprobe()](#12-detach_kprobe)
+        - [13. detach_kretprobe()](#13-detach_kretprobe)
     - [Debug Output](#debug-output)
         - [1. trace_print()](#1-trace_print)
         - [2. trace_fields()](#2-trace_fields)
@@ -1605,6 +1607,7 @@ b.attach_kprobe(event="sys_clone", fn_name="do_trace")
 This will instrument the kernel ```sys_clone()``` function, which will then run our BPF defined ```do_trace()``` function each time it is called.
 
 You can call attach_kprobe() more than once, and attach your BPF function to multiple kernel functions.
+You can also call attach_kprobe() more than once to attach multiple BPF functions to the same kernel function.
 
 See the previous kprobes section for how to instrument arguments from BPF.
 
@@ -1627,6 +1630,7 @@ b.attach_kretprobe(event="vfs_read", fn_name="do_return")
 This will instrument the kernel ```vfs_read()``` function, which will then run our BPF defined ```do_return()``` function each time it is called.
 
 You can call attach_kretprobe() more than once, and attach your BPF function to multiple kernel function returns.
+You can also call attach_kretprobe() more than once to attach multiple BPF functions to the same kernel function return.
 
 When a kretprobe is installed on a kernel function, there is a limit on how many parallel calls it can catch. You can change that limit with ```maxactive```. See the kprobes documentation for its default value.
 
@@ -1888,6 +1892,30 @@ b.detach_func(fn, map_fd, BPFAttachType.SK_MSG_VERDICT)
 Examples in situ:
 
 [search /examples](https://github.com/iovisor/bcc/search?q=detach_func+path%3Aexamples+language%3Apython&type=Code),
+
+### 12. detach_kprobe()
+
+Syntax: ```BPF.detach_kprobe(event="event", fn_name="name")```
+
+Detach a kprobe handler function of the specified event.
+
+For example:
+
+```Python
+b.detach_kprobe(event="__page_cache_alloc", fn_name="trace_func_entry")
+```
+
+### 13. detach_kretprobe()
+
+Syntax: ```BPF.detach_kretprobe(event="event", fn_name="name")```
+
+Detach a kretprobe handler function of the specified event.
+
+For example:
+
+```Python
+b.detach_kretprobe(event="__page_cache_alloc", fn_name="trace_func_return")
+```
 
 ## Debug Output
 
