@@ -1,15 +1,14 @@
 .TH killsnoop 8  "2015-08-20" "USER COMMANDS"
 .SH NAME
-killsnoop \- Trace signals issued by the kill() syscall. Uses Linux eBPF/bcc.
+killsnoop \- Trace signals issued by the kill() family of syscalls. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
 .B killsnoop [\-h] [\-x] [-p PID]
 .SH DESCRIPTION
-killsnoop traces the kill() syscall, to show signals sent via this method. This
-may be useful to troubleshoot failing applications, where an unknown mechanism
-is sending signals.
+killsnoop traces the kill() family of syscalls, to show signals sent via this
+method. This may be useful to troubleshoot failing applications, where an
+unknown mechanism is sending signals.
 
-This works by tracing the kernel sys_kill() function using dynamic tracing, and
-will need updating to match any changes to this function.
+This tool works by tracing kill/tkill/tgkill syscalls' entry and exit tracepoints.
 
 This makes use of a Linux 4.4 feature (bpf_perf_event_output());
 for kernels older than 4.4, see the version under tools/old,
@@ -31,6 +30,9 @@ Trace this process ID only (filtered in-kernel).
 .TP
 \-s SIGNAL
 Trace this signal only (filtered in-kernel).
+.TP
+\-n
+Output signal name instead of signal number.
 .SH EXAMPLES
 .TP
 Trace all kill() syscalls:
