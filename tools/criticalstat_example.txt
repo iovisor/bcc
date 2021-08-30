@@ -13,6 +13,7 @@ has to be built with certain CONFIG options enabled inorder for it to work:
 CONFIG_PREEMPTIRQ_EVENTS before kernel 4.19
 CONFIG_PREEMPTIRQ_TRACEPOINTS in kernel 4.19 and later
 CONFIG_DEBUG_PREEMPT
+CONFIG_PREEMPT_TRACER
 Additionally, the following options should be turned off on older kernels:
 CONFIG_PROVE_LOCKING
 CONFIG_LOCKDEP
