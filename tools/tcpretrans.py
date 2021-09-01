@@ -34,6 +34,8 @@ parser = argparse.ArgumentParser(
     description="Trace TCP retransmits",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
+parser.add_argument("-s", "--sequence", action="store_true",
+    help="display TCP sequence numbers")
 parser.add_argument("-l", "--lossprobe", action="store_true",
     help="include tail loss probe attempts")
 parser.add_argument("-c", "--count", action="store_true",
@@ -52,6 +54,7 @@ debug = 0
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <net/sock.h>
+#include <net/tcp.h>
 #include <bcc/proto.h>
 
 #define RETRANSMIT  1
@@ -61,6 +64,7 @@ bpf_text = """
 struct ipv4_data_t {
     u32 pid;
     u64 ip;
+    u32 seq;
     u32 saddr;
     u32 daddr;
     u16 lport;
@@ -72,6 +76,7 @@ BPF_PERF_OUTPUT(ipv4_events);
 
 struct ipv6_data_t {
     u32 pid;
+    u32 seq;
     u64 ip;
     unsigned __int128 saddr;
     unsigned __int128 daddr;
@@ -101,8 +106,11 @@ BPF_HASH(ipv6_count, struct ipv6_flow_key_t);
 """
 
 bpf_text_kprobe = """
-static int trace_event(struct pt_regs *ctx, struct sock *skp, int type)
+static int trace_event(struct pt_regs *ctx, struct sock *skp, struct sk_buff *skb, int type)
 {
+    struct tcp_skb_cb *tcb;
+    u32 seq;
+
     if (skp == NULL)
         return 0;
     u32 pid = bpf_get_current_pid_tgid() >> 32;
@@ -113,8 +121,15 @@ static int trace_event(struct pt_regs *ctx, struct sock *skp, int type)
     u16 dport = skp->__sk_common.skc_dport;
     char state = skp->__sk_common.skc_state;
 
+    seq = 0;
+    if (skb) {
+        /* macro TCP_SKB_CB from net/tcp.h */
+        tcb = ((struct tcp_skb_cb *)&((skb)->cb[0]));
+        seq = tcb->seq;
+    }
+
     FILTER_FAMILY
-    
+
     if (family == AF_INET) {
         IPV4_INIT
         IPV4_CORE
@@ -129,9 +144,9 @@ static int trace_event(struct pt_regs *ctx, struct sock *skp, int type)
 """
 
 bpf_text_kprobe_retransmit = """
-int trace_retransmit(struct pt_regs *ctx, struct sock *sk)
+int trace_retransmit(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb)
 {
-    trace_event(ctx, sk, RETRANSMIT);
+    trace_event(ctx, sk, skb, RETRANSMIT);
     return 0;
 }
 """
@@ -139,7 +154,7 @@ int trace_retransmit(struct pt_regs *ctx, struct sock *sk)
 bpf_text_kprobe_tlp = """
 int trace_tlp(struct pt_regs *ctx, struct sock *sk)
 {
-    trace_event(ctx, sk, TLP);
+    trace_event(ctx, sk, NULL, TLP);
     return 0;
 }
 """
@@ -147,15 +162,26 @@ int trace_tlp(struct pt_regs *ctx, struct sock *sk)
 bpf_text_tracepoint = """
 TRACEPOINT_PROBE(tcp, tcp_retransmit_skb)
 {
+    struct tcp_skb_cb *tcb;
+    u32 seq;
+
     u32 pid = bpf_get_current_pid_tgid() >> 32;
     const struct sock *skp = (const struct sock *)args->skaddr;
+    const struct sk_buff *skb = (const struct sk_buff *)args->skbaddr;
     u16 lport = args->sport;
     u16 dport = args->dport;
     char state = skp->__sk_common.skc_state;
     u16 family = skp->__sk_common.skc_family;
 
-    FILTER_FAMILY 
-    
+    seq = 0;
+    if (skb) {
+        /* macro TCP_SKB_CB from net/tcp.h */
+        tcb = ((struct tcp_skb_cb *)&((skb)->cb[0]));
+        seq = tcb->seq;
+    }
+
+    FILTER_FAMILY
+
     if (family == AF_INET) {
         IPV4_CODE
     } else if (family == AF_INET6) {
@@ -179,6 +205,7 @@ struct_init = { 'ipv4':
                struct ipv4_data_t data4 = {};
                data4.pid = pid;
                data4.ip = 4;
+               data4.seq = seq;
                data4.type = type;
                data4.saddr = skp->__sk_common.skc_rcv_saddr;
                data4.daddr = skp->__sk_common.skc_daddr;
@@ -202,6 +229,7 @@ struct_init = { 'ipv4':
                     struct ipv6_data_t data6 = {};
                     data6.pid = pid;
                     data6.ip = 6;
+                    data6.seq = seq;
                     data6.type = type;
                     bpf_probe_read_kernel(&data6.saddr, sizeof(data6.saddr),
                         skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
@@ -230,6 +258,7 @@ struct_init_tracepoint = { 'ipv4':
                data4.dport = dport;
                data4.type = RETRANSMIT;
                data4.ip = 4;
+               data4.seq = seq;
                data4.state = state;
                __builtin_memcpy(&data4.saddr, args->saddr, sizeof(data4.saddr));
                __builtin_memcpy(&data4.daddr, args->daddr, sizeof(data4.daddr));
@@ -252,6 +281,7 @@ struct_init_tracepoint = { 'ipv4':
                data6.dport = dport;
                data6.type = RETRANSMIT;
                data6.ip = 6;
+               data6.seq = seq;
                data6.state = state;
                __builtin_memcpy(&data6.saddr, args->saddr_v6, sizeof(data6.saddr));
                __builtin_memcpy(&data6.daddr, args->daddr_v6, sizeof(data6.daddr));
@@ -325,21 +355,29 @@ tcpstate[12] = 'NEW_SYN_RECV'
 # process event
 def print_ipv4_event(cpu, data, size):
     event = b["ipv4_events"].event(data)
-    print("%-8s %-6d %-2d %-20s %1s> %-20s %s" % (
+    print("%-8s %-6d %-2d %-20s %1s> %-20s" % (
         strftime("%H:%M:%S"), event.pid, event.ip,
         "%s:%d" % (inet_ntop(AF_INET, pack('I', event.saddr)), event.lport),
         type[event.type],
-        "%s:%s" % (inet_ntop(AF_INET, pack('I', event.daddr)), event.dport),
-        tcpstate[event.state]))
+        "%s:%s" % (inet_ntop(AF_INET, pack('I', event.daddr)), event.dport)),
+        end='')
+    if args.sequence:
+        print(" %-12s %s" % (tcpstate[event.state], event.seq))
+    else:
+        print(" %s" % (tcpstate[event.state]))
 
 def print_ipv6_event(cpu, data, size):
     event = b["ipv6_events"].event(data)
-    print("%-8s %-6d %-2d %-20s %1s> %-20s %s" % (
+    print("%-8s %-6d %-2d %-20s %1s> %-20s" % (
         strftime("%H:%M:%S"), event.pid, event.ip,
         "%s:%d" % (inet_ntop(AF_INET6, event.saddr), event.lport),
         type[event.type],
-        "%s:%d" % (inet_ntop(AF_INET6, event.daddr), event.dport),
-        tcpstate[event.state]))
+        "%s:%d" % (inet_ntop(AF_INET6, event.daddr), event.dport)),
+        end='')
+    if args.sequence:
+        print(" %-12s %s" % (tcpstate[event.state], event.seq))
+    else:
+        print(" %s" % (tcpstate[event.state]))
 
 def depict_cnt(counts_tab, l3prot='ipv4'):
     for k, v in sorted(counts_tab.items(), key=lambda counts: counts[1].value):
@@ -377,8 +415,12 @@ if args.count:
 # read events
 else:
     # header
-    print("%-8s %-6s %-2s %-20s %1s> %-20s %-4s" % ("TIME", "PID", "IP",
-        "LADDR:LPORT", "T", "RADDR:RPORT", "STATE"))
+    print("%-8s %-6s %-2s %-20s %1s> %-20s" % ("TIME", "PID", "IP",
+        "LADDR:LPORT", "T", "RADDR:RPORT"), end='')
+    if args.sequence:
+        print(" %-12s %-10s" % ("STATE", "SEQ"))
+    else:
+        print(" %-4s" % ("STATE"))
     b["ipv4_events"].open_perf_buffer(print_ipv4_event)
     b["ipv6_events"].open_perf_buffer(print_ipv6_event)
     while 1:
