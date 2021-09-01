@@ -28,7 +28,7 @@ parser.add_argument("-l", "--lib", default="",
         help="List USDT probes in the specified library or executable")
 parser.add_argument("-v", dest="verbosity", action="count", default=0,
         help="Increase verbosity level (print variables, arguments, etc.)")
-parser.add_argument(dest="filter", nargs="?",
+parser.add_argument("-f", dest="filter", nargs="?",
         help="A filter that specifies which probes/tracepoints to print")
 args = parser.parse_args()
 
