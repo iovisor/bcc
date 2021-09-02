@@ -30,11 +30,13 @@ struct func_stack {
 	__u8 stack_depth;
 };
 
+#define MAX_TASKS		2048
+
 /* function call stack hashed on a per-task key */
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	/* function call stack for functions we are tracing */
-	__uint(max_entries, (8 * MAX_FUNC_TRACES));
+	__uint(max_entries, MAX_TASKS);
 	__type(key, __u64);
 	__type(value, struct func_stack);
 } ksnoop_func_stack SEC(".maps");
