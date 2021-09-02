@@ -20,9 +20,9 @@
 #define KSNOOP_VERSION	"0.1"
 #endif
 
-struct btf *vmlinux_btf;
-const char *bin_name;
-int pages = PAGES_DEFAULT;
+static struct btf *vmlinux_btf;
+static const char *bin_name;
+static int pages = PAGES_DEFAULT;
 
 enum log_level {
 	DEBUG,
@@ -30,10 +30,10 @@ enum log_level {
 	ERROR,
 };
 
-enum log_level log_level = WARN;
+static enum log_level log_level = WARN;
 
-__u32 filter_pid;
-bool stack_mode;
+static __u32 filter_pid;
+static bool stack_mode;
 
 #define libbpf_errstr(val)	strerror(-libbpf_get_error(val))
 
@@ -68,7 +68,7 @@ static int cmd_help(int argc, char **argv)
 		"	COMMAND	:= { trace | info }\n"
 		"	FUNC	:= { name | name(ARG[,ARG]*) }\n"
 		"	ARG	:= { arg | arg [PRED] | arg->member [PRED] }\n"
-		"	PRED	:= { == | != | > | >= | <= value }\n"
+		"	PRED	:= { == | != | > | >= | < | <=  value }\n"
 		"	OPTIONS	:= { {-d|--debug} | {-V|--version} |\n"
 		"                    {-p|--pid filter_pid}|\n"
 		"                    {-P|--pages nr_pages} }\n"
@@ -80,8 +80,9 @@ static int cmd_help(int argc, char **argv)
 		"	%s trace ip_send_skb\n"
 		"	%s trace \"ip_send_skb(skb, return)\"\n"
 		"	%s trace \"ip_send_skb(skb->sk, return)\"\n"
-		"	%s trace \"ip_send_skb(skb->len > 128, skb)\"\n",
-		bin_name, bin_name, bin_name, bin_name, bin_name);
+		"	%s trace \"ip_send_skb(skb->len > 128, skb)\"\n"
+		"	%s trace -s udp_sendmsg ip_send_skb\n",
+		bin_name, bin_name, bin_name, bin_name, bin_name, bin_name);
 	return 0;
 }
 
@@ -340,13 +341,12 @@ static int trace_to_value(struct btf *btf, struct func *func, char *argname,
 static struct btf *get_btf(const char *name)
 {
 	struct btf *mod_btf;
-	char path[MAX_PATH];
 
 	p_debug("getting BTF for %s",
 		name && strlen(name) > 0 ? name : "vmlinux");
 
 	if (!vmlinux_btf) {
-		vmlinux_btf = libbpf_find_kernel_btf();
+		vmlinux_btf = btf__load_vmlinux_btf();
 		if (libbpf_get_error(vmlinux_btf)) {
 			p_err("No BTF, cannot determine type info: %s",
 			      libbpf_errstr(vmlinux_btf));
@@ -356,9 +356,7 @@ static struct btf *get_btf(const char *name)
 	if (!name || strlen(name) == 0)
 		return vmlinux_btf;
 
-	snprintf(path, sizeof(path), "/sys/kernel/btf/%s", name);
-
-	mod_btf = btf__parse_raw_split(path, vmlinux_btf);
+	mod_btf = btf__load_module_btf(name, vmlinux_btf);
 	if (libbpf_get_error(mod_btf)) {
 		p_err("No BTF for module '%s': %s",
 		      name, libbpf_errstr(mod_btf));
@@ -484,7 +482,7 @@ static int get_func_ip_mod(struct func *func)
 		func->mod[0] = '\0';
 		/* get module name from [modname] */
 		if (ret == 4) {
-			if (sscanf(mod_info, "%*[\t ]\[%[^]]", func->mod) < 1) {
+			if (sscanf(mod_info, "%*[\t ][%[^]]", func->mod) < 1) {
 				p_err("failed to read module name");
 				err = -EINVAL;
 				goto out;
@@ -799,39 +797,41 @@ static int add_traces(struct bpf_map *func_map, struct trace *traces,
 		if (ret) {
 			p_err("Could not add map entry for '%s': %s",
 			      traces[i].func.name, strerror(-ret));
-			return ret;
+			break;
 		}
 	}
-	return 0;
+	free(map_traces);
+	return ret;
 }
 
 static int attach_traces(struct ksnoop_bpf *skel, struct trace *traces,
 			 int nr_traces)
 {
-	struct bpf_object *obj = skel->obj;
-	struct bpf_program *prog;
 	struct bpf_link *link;
 	int i, ret;
 
 	for (i = 0; i < nr_traces; i++) {
-		bpf_object__for_each_program(prog, obj) {
-			const char *sec_name = bpf_program__section_name(prog);
-			bool kretprobe = strstr(sec_name, "kretprobe/") != NULL;
-
-			link = bpf_program__attach_kprobe(prog, kretprobe,
-							  traces[i].func.name);
-			ret = libbpf_get_error(link);
-			if (ret) {
-				p_err("Could not attach %s to '%s': %s",
-				      kretprobe ? "kretprobe" : "kprobe",
-				      traces[i].func.name,
-				      strerror(-ret));
+		link = bpf_program__attach_kprobe(skel->progs.kprobe_entry,
+						  false,
+						  traces[i].func.name);
+		ret = libbpf_get_error(link);
+		if (ret) {
+			p_err("Could not attach kprobe to '%s': %s",
+			      traces[i].func.name, strerror(-ret));
 				return ret;
 			}
-			p_debug("Attached %s for '%s'",
-				kretprobe ? "kretprobe" : "kprobe",
-				traces[i].func.name);
+		p_debug("Attached kprobe for '%s'", traces[i].func.name);
+
+		link = bpf_program__attach_kprobe(skel->progs.kprobe_return,
+						  true,
+						  traces[i].func.name);
+		ret = libbpf_get_error(link);
+		if (ret) {
+			p_err("Could not attach kretprobe to '%s': %s",
+			      traces[i].func.name, strerror(-ret));
+			return ret;
 		}
+		p_debug("Attached kretprobe for '%s'", traces[i].func.name);
 	}
 	return 0;
 }
@@ -842,8 +842,8 @@ static int cmd_trace(int argc, char **argv)
 	struct bpf_map *perf_map, *func_map;
 	struct perf_buffer *pb;
 	struct ksnoop_bpf *skel;
+	int nr_traces, ret = 0;
 	struct trace *traces;
-	int nr_traces, ret;
 
 	nr_traces = parse_traces(argc, argv, &traces);
 	if (nr_traces < 0)
@@ -855,7 +855,7 @@ static int cmd_trace(int argc, char **argv)
 		return 1;
 	}
 
-	perf_map = bpf_object__find_map_by_name(skel->obj, "ksnoop_perf_map");
+	perf_map = skel->maps.ksnoop_perf_map;
 	if (!perf_map) {
 		p_err("Could not find '%s'", "ksnoop_perf_map");
 		return 1;
@@ -891,11 +891,14 @@ static int cmd_trace(int argc, char **argv)
 		ret = perf_buffer__poll(pb, 1);
 		if (ret < 0 && ret != -EINTR) {
 			p_err("Polling failed: %s", strerror(-ret));
-			return 1;
+			break;
 		}
 	}
 
-	return 0;
+	perf_buffer__free(pb);
+	ksnoop_bpf__destroy(skel);
+
+	return ret;
 }
 
 struct cmd {
@@ -974,6 +977,4 @@ int main(int argc, char *argv[])
 		usage();
 
 	return cmd_select(argc, argv);
-
-	return 0;
 }

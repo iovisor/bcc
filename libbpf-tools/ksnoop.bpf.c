@@ -33,7 +33,8 @@ struct func_stack {
 /* function call stack hashed on a per-task key */
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
-	__uint(max_entries, 512);
+	/* function call stack for functions we are tracing */
+	__uint(max_entries, (8 * MAX_FUNC_TRACES));
 	__type(key, __u64);
 	__type(value, struct func_stack);
 } ksnoop_func_stack SEC(".maps");
@@ -41,7 +42,7 @@ struct {
 /* per-cpu trace info hashed on function address */
 struct {
 	__uint(type, BPF_MAP_TYPE_PERCPU_HASH);
-	__uint(max_entries, 8);
+	__uint(max_entries, MAX_FUNC_TRACES);
 	__type(key, __u64);
 	__type(value, struct trace);
 } ksnoop_func_map SEC(".maps");
@@ -59,7 +60,7 @@ static void clear_trace(struct trace *trace)
 	trace->buf_len = 0;
 }
 
-static inline struct trace *get_trace(struct pt_regs *ctx, bool entry)
+static struct trace *get_trace(struct pt_regs *ctx, bool entry)
 {
 	__u8 stack_depth, last_stack_depth;
 	struct func_stack *func_stack;
@@ -184,7 +185,7 @@ static inline struct trace *get_trace(struct pt_regs *ctx, bool entry)
 	return trace;
 }
 
-static inline void output_trace(struct pt_regs *ctx, struct trace *trace)
+static void output_trace(struct pt_regs *ctx, struct trace *trace)
 {
 	__u16 trace_len;
 
@@ -212,7 +213,7 @@ skip:
 	clear_trace(trace);
 }
 
-static inline void output_stashed_traces(struct pt_regs *ctx,
+static void output_stashed_traces(struct pt_regs *ctx,
 					 struct trace *currtrace,
 					 bool entry)
 {
@@ -267,7 +268,7 @@ static inline void output_stashed_traces(struct pt_regs *ctx,
 	output_trace(ctx, currtrace);
 }
 
-static inline __u64 get_arg(struct pt_regs *ctx, enum arg argnum)
+static __u64 get_arg(struct pt_regs *ctx, enum arg argnum)
 {
 	switch (argnum) {
 	case KSNOOP_ARG1:
@@ -287,7 +288,7 @@ static inline __u64 get_arg(struct pt_regs *ctx, enum arg argnum)
 	}
 }
 
-static inline int ksnoop(struct pt_regs *ctx, bool entry)
+static int ksnoop(struct pt_regs *ctx, bool entry)
 {
 	void *data_ptr = NULL;
 	struct trace *trace;

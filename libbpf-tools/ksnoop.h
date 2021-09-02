@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause) */
 /* Copyright (c) 2021, Oracle and/or its affiliates. */
 
-#define MAX_FUNC_TRACES			8
+/* maximum number of different functions we can trace at once */
+#define MAX_FUNC_TRACES			64
 
 enum arg {
 	KSNOOP_ARG1,
