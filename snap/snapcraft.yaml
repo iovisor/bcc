@@ -28,6 +28,14 @@ assumes: [snapd2.37]
 base: core18
 adopt-info: bcc
 
+architectures:
+    - build-on: s390x
+    - build-on: ppc64el
+    - build-on: arm64
+    - build-on: armhf
+    - build-on: amd64
+    - build-on: i386
+
 parts:
     bcc:
         plugin: cmake
@@ -241,7 +249,7 @@ apps:
         command: bcc-wrapper pythonstat
     readahead:
         command: bcc-wrapper readahead
-    reset_trace:
+    reset-trace:
         command: bcc-wrapper reset-trace
     rubycalls:
         command: bcc-wrapper rubycalls
