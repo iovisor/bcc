@@ -345,6 +345,7 @@ Trace a function and display a summary of its parameter values.
 optional arguments:
   -h, --help            show this help message and exit
   -p PID, --pid PID     id of the process to trace (optional)
+  -t TID, --tid TID     id of the thread to trace (optional)
   -z STRING_SIZE, --string-size STRING_SIZE
                         maximum string size to read from char* arguments
   -i INTERVAL, --interval INTERVAL
