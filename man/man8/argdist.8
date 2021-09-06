@@ -2,7 +2,7 @@
 .SH NAME
 argdist \- Trace a function and display a histogram or frequency count of its parameter values. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B argdist [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL] [-d DURATION] [-n COUNT] [-v] [-T TOP] [-H specifier] [-C specifier] [-I header]
+.B argdist [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL] [-d DURATION] [-n COUNT] [-v] [-T TOP] [-H specifier] [-C specifier] [-I header] [-t TID]
 .SH DESCRIPTION
 argdist attaches to function entry and exit points, collects specified parameter
 values, and stores them in a histogram or a frequency collection that counts
@@ -19,6 +19,9 @@ Print usage message.
 .TP
 \-p PID
 Trace only functions in the process PID.
+.TP
+\-t TID
+Trace only functions in the thread TID.
 .TP
 \-z STRING_SIZE
 When collecting string arguments (of type char*), collect up to STRING_SIZE 
