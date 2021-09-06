@@ -35,6 +35,7 @@ APPS = \
 	funclatency \
 	gethostlatency \
 	hardirqs \
+	ksnoop \
 	llcstat \
 	mountsnoop \
 	numamove \
