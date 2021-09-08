@@ -76,8 +76,24 @@ def _mntns_filter_func_writer(mntnsmap):
 
     static inline int _mntns_filter() {
         struct task_struct *current_task;
+        struct nsproxy *nsproxy;
+        struct mnt_namespace *mnt_ns;
+        unsigned int inum;
+        u64 ns_id;
+
         current_task = (struct task_struct *)bpf_get_current_task();
-        u64 ns_id = current_task->nsproxy->mnt_ns->ns.inum;
+
+        if (bpf_probe_read_kernel(&nsproxy, sizeof(nsproxy), &current_task->nsproxy))
+            return 0;
+
+        if (bpf_probe_read_kernel(&mnt_ns, sizeof(mnt_ns), &nsproxy->mnt_ns))
+            return 0;
+
+        if (bpf_probe_read_kernel(&inum, sizeof(inum), &mnt_ns->ns.inum))
+            return 0;
+
+        ns_id =  (u64) inum;
+
         return mount_ns_set.lookup(&ns_id) == NULL;
     }
     """
