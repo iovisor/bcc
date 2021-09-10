@@ -57,7 +57,7 @@ BPF_PERF_OUTPUT(events);
 // trace file creation time
 int trace_create(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
 {
-    u32 pid = bpf_get_current_pid_tgid();
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
     FILTER
 
     u64 ts = bpf_ktime_get_ns();
@@ -70,7 +70,7 @@ int trace_create(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
 int trace_unlink(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
 {
     struct data_t data = {};
-    u32 pid = bpf_get_current_pid_tgid();
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
 
     FILTER
 
@@ -90,7 +90,7 @@ int trace_unlink(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
     if (bpf_get_current_comm(&data.comm, sizeof(data.comm)) == 0) {
         data.pid = pid;
         data.delta = delta;
-        bpf_probe_read(&data.fname, sizeof(data.fname), d_name.name);
+        bpf_probe_read_kernel(&data.fname, sizeof(data.fname), d_name.name);
     }
 
     events.perf_submit(ctx, &data, sizeof(data));

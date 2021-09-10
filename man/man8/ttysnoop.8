@@ -20,6 +20,12 @@ CONFIG_BPF and bcc.
 \-C
 Don't clear the screen.
 .TP
+\-s SIZE , \-\-datasize SIZE
+Size of the transmitting buffer (default 256).
+.TP
+\-c COUNT, \-\-datacount COUNT
+Number of times ttysnop checks for SIZE bytes of data (default 16).
+.TP
 device
 Either a path to a tty device (eg, /dev/tty0) or a pts number (eg, the "3"
 from /dev/pts/3).

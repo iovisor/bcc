@@ -84,13 +84,13 @@ void submit_event(struct pt_regs *ctx, void *name, int type, u32 pid)
         .type = type,
     };
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
-    bpf_probe_read(&data.filename, sizeof(data.filename), name);
+    bpf_probe_read_kernel(&data.filename, sizeof(data.filename), name);
     events.perf_submit(ctx, &data, sizeof(data));
 }
 
 int trace_fast(struct pt_regs *ctx, struct nameidata *nd, struct path *path)
 {
-    u32 pid = bpf_get_current_pid_tgid();
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
     submit_event(ctx, (void *)nd->last.name, LOOKUP_REFERENCE, pid);
     return 1;
 }
@@ -98,26 +98,34 @@ int trace_fast(struct pt_regs *ctx, struct nameidata *nd, struct path *path)
 int kprobe__d_lookup(struct pt_regs *ctx, const struct dentry *parent,
     const struct qstr *name)
 {
-    u32 pid = bpf_get_current_pid_tgid();
+    u32 tid = bpf_get_current_pid_tgid();
     struct entry_t entry = {};
     const char *fname = name->name;
     if (fname) {
-        bpf_probe_read(&entry.name, sizeof(entry.name), (void *)fname);
+        bpf_probe_read_kernel(&entry.name, sizeof(entry.name), (void *)fname);
     }
-    entrybypid.update(&pid, &entry);
+    entrybypid.update(&tid, &entry);
     return 0;
 }
 
 int kretprobe__d_lookup(struct pt_regs *ctx)
 {
-    u32 pid = bpf_get_current_pid_tgid();
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 pid = pid_tgid >> 32;
+    u32 tid = (u32)pid_tgid;
     struct entry_t *ep;
-    ep = entrybypid.lookup(&pid);
-    if (ep == 0 || PT_REGS_RC(ctx) != 0) {
-        return 0;   // missed entry or lookup didn't fail
+
+    ep = entrybypid.lookup(&tid);
+    if (ep == 0) {
+        return 0;   // missed entry
     }
+    if (PT_REGS_RC(ctx) != 0) {
+        entrybypid.delete(&tid);
+        return 0;   // lookup didn't fail
+    }
+
     submit_event(ctx, (void *)ep->name, LOOKUP_MISS, pid);
-    entrybypid.delete(&pid);
+    entrybypid.delete(&tid);
     return 0;
 }
 """
@@ -129,7 +137,7 @@ if args.ebpf:
 # initialize BPF
 b = BPF(text=bpf_text)
 if args.all:
-    b.attach_kprobe(event="lookup_fast", fn_name="trace_fast")
+    b.attach_kprobe(event_re="^lookup_fast$|^lookup_fast.constprop.*.\d$", fn_name="trace_fast")
 
 mode_s = {
     0: 'M',

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (c) 2019 Facebook
-#include "vmlinux.h"
+#include <vmlinux.h>
 #include <bpf/bpf_helpers.h>
 #include "runqslower.h"
 
-#define TASK_RUNNING 0
+#define TASK_RUNNING	0
 
 const volatile __u64 min_us = 0;
 const volatile pid_t targ_pid = 0;
@@ -88,8 +88,10 @@ int handle__sched_switch(u64 *ctx)
 		return 0;
 
 	event.pid = pid;
+	event.prev_pid = prev->pid;
 	event.delta_us = delta_us;
-	bpf_probe_read_str(&event.task, sizeof(event.task), next->comm);
+	bpf_probe_read_kernel_str(&event.task, sizeof(event.task), next->comm);
+	bpf_probe_read_kernel_str(&event.prev_task, sizeof(event.prev_task), prev->comm);
 
 	/* output */
 	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU,

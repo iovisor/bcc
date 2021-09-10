@@ -187,14 +187,15 @@ with an externally created map.
 
 # ./opensnoop --cgroupmap /sys/fs/bpf/test01
 
-For more details, see docs/filtering_by_cgroups.md
+For more details, see docs/special_filtering.md
 
 
 USAGE message:
 
 # ./opensnoop -h
-usage: opensnoop [-h] [-T] [-x] [-p PID] [-t TID] [-d DURATION] [-n NAME]
-                 [-e] [-f FLAG_FILTER]
+usage: opensnoop.py [-h] [-T] [-U] [-x] [-p PID] [-t TID]
+                    [--cgroupmap CGROUPMAP] [--mntnsmap MNTNSMAP] [-u UID]
+                    [-d DURATION] [-n NAME] [-e] [-f FLAG_FILTER]
 
 Trace open() syscalls
 
@@ -205,6 +206,9 @@ optional arguments:
   -x, --failed          only show failed opens
   -p PID, --pid PID     trace this PID only
   -t TID, --tid TID     trace this TID only
+  --cgroupmap CGROUPMAP
+                        trace cgroups in this BPF map only
+  --mntnsmap MNTNSMAP   trace mount namespaces in this BPF map on
   -u UID, --uid UID     trace this UID only
   -d DURATION, --duration DURATION
                         total duration of trace in seconds
@@ -226,3 +230,5 @@ examples:
     ./opensnoop -n main   # only print process names containing "main"
     ./opensnoop -e        # show extended fields
     ./opensnoop -f O_WRONLY -f O_RDWR  # only print calls for writing
+    ./opensnoop --cgroupmap mappath  # only trace cgroups in this BPF map
+    ./opensnoop --mntnsmap mappath   # only trace mount namespaces in the map

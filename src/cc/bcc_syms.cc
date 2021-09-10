@@ -116,29 +116,7 @@ ProcSyms::ProcSyms(int pid, struct bcc_symbol_option *option)
   load_modules();
 }
 
-int ProcSyms::_add_load_sections(uint64_t v_addr, uint64_t mem_sz,
-                                 uint64_t file_offset, void *payload) {
-  auto module = static_cast<Module *>(payload);
-  module->ranges_.emplace_back(v_addr, v_addr + mem_sz, file_offset);
-  return 0;
-}
-
-void ProcSyms::load_exe() {
-  std::string exe = ebpf::get_pid_exe(pid_);
-  Module module(exe.c_str(), exe.c_str(), &symbol_option_);
-
-  if (module.type_ != ModuleType::EXEC)
-    return;
-
-
-  bcc_elf_foreach_load_section(exe.c_str(), &_add_load_sections, &module);
-
-  if (!module.ranges_.empty())
-    modules_.emplace_back(std::move(module));
-}
-
 void ProcSyms::load_modules() {
-  load_exe();
   bcc_procutils_each_module(pid_, _add_module, this);
 }
 
@@ -707,12 +685,13 @@ int bcc_resolve_symname(const char *module, const char *symname,
                         const uint64_t addr, int pid,
                         struct bcc_symbol_option *option,
                         struct bcc_symbol *sym) {
+  int module_type;
   static struct bcc_symbol_option default_option = {
     .use_debug_file = 1,
     .check_debug_file_crc = 1,
     .lazy_symbolize = 1,
-#if defined(__powerpc64__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    .use_symbol_type = BCC_SYM_ALL_TYPES | (1 << STT_PPC64LE_SYM_LEP),
+#if defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
+    .use_symbol_type = BCC_SYM_ALL_TYPES | (1 << STT_PPC64_ELFV2_SYM_LEP),
 #else
     .use_symbol_type = BCC_SYM_ALL_TYPES,
 #endif
@@ -747,11 +726,10 @@ int bcc_resolve_symname(const char *module, const char *symname,
   if (sym->offset == 0x0)
     goto invalid_module;
 
-  // For executable (ET_EXEC) binaries, translate the virtual address
-  // to physical address in the binary file.
-  // For shared object binaries (ET_DYN), the address from symbol table should
-  // already be physical address in the binary file.
-  if (bcc_elf_get_type(sym->module) == ET_EXEC) {
+  // For executable (ET_EXEC) binaries and shared objects (ET_DYN), translate
+  // the virtual address to physical address in the binary file.
+  module_type = bcc_elf_get_type(sym->module);
+  if (module_type == ET_EXEC || module_type == ET_DYN) {
     struct load_addr_t addr = {
       .target_addr = sym->offset,
       .binary_addr = 0x0,

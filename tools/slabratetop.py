@@ -20,7 +20,6 @@ from bcc import BPF
 from bcc.utils import printb
 from time import sleep, strftime
 import argparse
-import signal
 from subprocess import call
 
 # arguments
@@ -54,15 +53,18 @@ debug = 0
 # linux stats
 loadavg = "/proc/loadavg"
 
-# signal handler
-def signal_ignore(signal, frame):
-    print()
-
 # define BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/mm.h>
-#include <linux/slab.h>
+#include <linux/kasan.h>
+
+// memcg_cache_params is a part of kmem_cache, but is not publicly exposed in
+// kernel versions 5.4 to 5.8.  Define an empty struct for it here to allow the
+// bpf program to compile.  It has been completely removed in kernel version
+// 5.9, but it does not hurt to have it here for versions 5.4 to 5.8.
+struct memcg_cache_params {};
+
 #ifdef CONFIG_SLUB
 #include <linux/slub_def.h>
 #else
@@ -88,7 +90,7 @@ int kprobe__kmem_cache_alloc(struct pt_regs *ctx, struct kmem_cache *cachep)
 {
     struct info_t info = {};
     const char *name = cachep->name;
-    bpf_probe_read(&info.name, sizeof(info.name), name);
+    bpf_probe_read_kernel(&info.name, sizeof(info.name), name);
 
     struct val_t *valp, zero = {};
     valp = counts.lookup_or_try_init(&info, &zero);

@@ -2,7 +2,7 @@
 .SH NAME
 tcpdrop \- Trace kernel-based TCP packet drops with details. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B tcpdrop [\-h]
+.B tcpdrop [\-4 | \-6] [\-h]
 .SH DESCRIPTION
 This tool traces TCP packets or segments that were dropped by the kernel, and
 shows details from the IP and TCP headers, the socket state, and the
@@ -17,9 +17,27 @@ Since this uses BPF, only the root user can use this tool.
 CONFIG_BPF and bcc.
 .SH OPTIONS
 .TP
+\-4
+Trace IPv4 family only.
+.TP
+\-6
+Trace IPv6 family only.
+.TP
 \-h
 Print usage message.
+.SH EXAMPLES
+.TP
+Trace kernel-based TCP packet drops with details:
+#
 .B tcpdrop
+.TP
+Trace IPv4 family only:
+#
+.B tcpdrop \-4
+.TP
+Trace IPv6 family only:
+#
+.B tcpdrop \-6
 .SH FIELDS
 .TP
 TIME

@@ -8,6 +8,7 @@
 #include <iostream>
 #include <string>
 
+#include "bcc_version.h"
 #include "BPF.h"
 
 const std::string BPF_PROGRAM = R"(
@@ -34,6 +35,8 @@ int main() {
     std::cerr << attach_res.msg() << std::endl;
     return 1;
   }
+
+  std::cout << "Starting HelloWorld with BCC " << LIBBCC_VERSION << std::endl;
 
   while (true) {
     if (std::getline(pipe, line)) {

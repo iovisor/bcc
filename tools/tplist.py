@@ -80,8 +80,8 @@ def print_usdt_details(probe):
                         print("  %d location(s)" % probe.num_locations)
                         print("  %d argument(s)" % probe.num_arguments)
         else:
-                print("%s %s:%s" %
-                      (probe.bin_path, probe.provider, probe.name))
+                print("%s %s" %
+                      (probe.bin_path.decode(), probe.short_name()))
 
 def print_usdt(pid, lib):
         reader = USDT(path=lib, pid=pid)

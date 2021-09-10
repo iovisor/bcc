@@ -59,7 +59,7 @@ It is meant to be used with an externally created map.
 
 # ./bindsnoop.py --cgroupmap /sys/fs/bpf/test01
 
-For more details, see docs/filtering_by_cgroups.md
+For more details, see docs/special_filtering.md
 
 
 In order to track heavy bind usage one can use --count option
@@ -74,7 +74,7 @@ LADDR                                           LPORT     BINDS
 Usage message:
 # ./bindsnoop.py -h
 usage: bindsnoop.py [-h] [-t] [-w] [-p PID] [-P PORT] [-E] [-U] [-u UID]
-                  [--count] [--cgroupmap CGROUPMAP]
+                  [--count] [--cgroupmap CGROUPMAP] [--mntnsmap MNTNSMAP]
 
 Trace TCP binds
 
@@ -103,6 +103,7 @@ examples:
     ./bindsnoop -E        # report bind errors
     ./bindsnoop --count   # count bind per src ip
     ./bindsnoop --cgroupmap mappath  # only trace cgroups in this BPF map
+    ./bindsnoop --mntnsmap  mappath  # only trace mount namespaces in the map
 
     it is reporting socket options set before the bins call
     impacting system call behavior:

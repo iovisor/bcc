@@ -19,16 +19,17 @@ import fcntl
 import json
 import os
 import re
-import struct
 import errno
 import sys
+import platform
 
 from .libbcc import lib, bcc_symbol, bcc_symbol_option, bcc_stacktrace_build_id, _SYM_CB_TYPE
-from .table import Table, PerfEventArray
+from .table import Table, PerfEventArray, RingBuf, BPF_MAP_TYPE_QUEUE, BPF_MAP_TYPE_STACK
 from .perf import Perf
-from .utils import get_online_cpus, printb, _assert_is_bytes, ArgString
+from .utils import get_online_cpus, printb, _assert_is_bytes, ArgString, StrcmpRewrite
 from .version import __version__
 from .disassembler import disassemble_prog, decode_map
+from .usdt import USDT, USDTException
 
 try:
     basestring
@@ -108,6 +109,10 @@ class PerfType:
     # From perf_type_id in uapi/linux/perf_event.h
     HARDWARE = 0
     SOFTWARE = 1
+    TRACEPOINT = 2
+    HW_CACHE = 3
+    RAW = 4
+    BREAKPOINT = 5
 
 class PerfHWConfig:
     # From perf_hw_id in uapi/linux/perf_event.h
@@ -136,7 +141,35 @@ class PerfSWConfig:
     DUMMY = 9
     BPF_OUTPUT = 10
 
-class BPF(object):
+class PerfEventSampleFormat:
+    # from perf_event_sample_format in uapi/linux/bpf.h
+    IP = (1 << 0)
+    TID = (1 << 1)
+    TIME = (1 << 2)
+    ADDR = (1 << 3)
+    READ = (1 << 4)
+    CALLCHAIN = (1 << 5)
+    ID = (1 << 6)
+    CPU = (1 << 7)
+    PERIOD = (1 << 8)
+    STREAM_ID = (1 << 9)
+    RAW = (1 << 10)
+    BRANCH_STACK = (1 << 11)
+    REGS_USER = (1 << 12)
+    STACK_USER = (1 << 13)
+    WEIGHT = (1 << 14)
+    DATA_SRC = (1 << 15)
+    IDENTIFIER = (1 << 16)
+    TRANSACTION = (1 << 17)
+    REGS_INTR = (1 << 18)
+    PHYS_ADDR = (1 << 19)
+    AUX = (1 << 20)
+    CGROUP = (1 << 21)
+    DATA_PAGE_SIZE = (1 << 22)
+    CODE_PAGE_SIZE = (1 << 23)
+    WEIGHT_STRUCT = (1 << 24)
+
+class BPFProgType:
     # From bpf_prog_type in uapi/linux/bpf.h
     SOCKET_FILTER = 1
     KPROBE = 2
@@ -157,7 +190,51 @@ class BPF(object):
     RAW_TRACEPOINT = 17
     CGROUP_SOCK_ADDR = 18
     TRACING = 26
+    LSM = 29
 
+class BPFAttachType:
+    # from bpf_attach_type uapi/linux/bpf.h
+    CGROUP_INET_INGRESS = 0
+    CGROUP_INET_EGRESS = 1
+    CGROUP_INET_SOCK_CREATE = 2
+    CGROUP_SOCK_OPS = 3
+    SK_SKB_STREAM_PARSER = 4
+    SK_SKB_STREAM_VERDICT = 5
+    CGROUP_DEVICE = 6
+    SK_MSG_VERDICT = 7
+    CGROUP_INET4_BIND = 8
+    CGROUP_INET6_BIND = 9
+    CGROUP_INET4_CONNECT = 10
+    CGROUP_INET6_CONNECT = 11
+    CGROUP_INET4_POST_BIND = 12
+    CGROUP_INET6_POST_BIND = 13
+    CGROUP_UDP4_SENDMSG = 14
+    CGROUP_UDP6_SENDMSG = 15
+    LIRC_MODE2 = 16
+    FLOW_DISSECTOR = 17
+    CGROUP_SYSCTL = 18
+    CGROUP_UDP4_RECVMSG = 19
+    CGROUP_UDP6_RECVMSG = 20
+    CGROUP_GETSOCKOPT = 21
+    CGROUP_SETSOCKOPT = 22
+    TRACE_RAW_TP = 23
+    TRACE_FENTRY = 24
+    TRACE_FEXIT  = 25
+    MODIFY_RETURN = 26
+    LSM_MAC = 27
+    TRACE_ITER = 28
+    CGROUP_INET4_GETPEERNAME = 29
+    CGROUP_INET6_GETPEERNAME = 30
+    CGROUP_INET4_GETSOCKNAME = 31
+    CGROUP_INET6_GETSOCKNAME = 32
+    XDP_DEVMAP = 33
+    CGROUP_INET_SOCK_RELEASE = 34
+    XDP_CPUMAP = 35
+    SK_LOOKUP = 36
+    XDP = 37
+    SK_SKB_VERDICT = 38
+
+class XDPAction:
     # from xdp_action uapi/linux/bpf.h
     XDP_ABORTED = 0
     XDP_DROP = 1
@@ -165,9 +242,53 @@ class BPF(object):
     XDP_TX = 3
     XDP_REDIRECT = 4
 
-    # from bpf_attach_type uapi/linux/bpf.h
-    TRACE_FENTRY = 24
-    TRACE_FEXIT  = 25
+class XDPFlags:
+    # from xdp_flags uapi/linux/if_link.h
+    # unlike similar enum-type holder classes in this file, source for these
+    # is #define XDP_FLAGS_UPDATE_IF_NOEXIST, #define XDP_FLAGS_SKB_MODE, ...
+    UPDATE_IF_NOEXIST = (1 << 0)
+    SKB_MODE = (1 << 1)
+    DRV_MODE = (1 << 2)
+    HW_MODE = (1 << 3)
+    REPLACE = (1 << 4)
+
+class BPF(object):
+    # Here for backwards compatibility only, add new enum members and types
+    # the appropriate wrapper class elsewhere in this file to avoid namespace
+    # collision issues
+    SOCKET_FILTER = BPFProgType.SOCKET_FILTER
+    KPROBE = BPFProgType.KPROBE
+    SCHED_CLS = BPFProgType.SCHED_CLS
+    SCHED_ACT = BPFProgType.SCHED_ACT
+    TRACEPOINT = BPFProgType.TRACEPOINT
+    XDP = BPFProgType.XDP
+    PERF_EVENT = BPFProgType.PERF_EVENT
+    CGROUP_SKB = BPFProgType.CGROUP_SKB
+    CGROUP_SOCK = BPFProgType.CGROUP_SOCK
+    LWT_IN = BPFProgType.LWT_IN
+    LWT_OUT = BPFProgType.LWT_OUT
+    LWT_XMIT = BPFProgType.LWT_XMIT
+    SOCK_OPS = BPFProgType.SOCK_OPS
+    SK_SKB = BPFProgType.SK_SKB
+    CGROUP_DEVICE = BPFProgType.CGROUP_DEVICE
+    SK_MSG = BPFProgType.SK_MSG
+    RAW_TRACEPOINT = BPFProgType.RAW_TRACEPOINT
+    CGROUP_SOCK_ADDR = BPFProgType.CGROUP_SOCK_ADDR
+    TRACING = BPFProgType.TRACING
+    LSM = BPFProgType.LSM
+
+    XDP_ABORTED = XDPAction.XDP_ABORTED
+    XDP_DROP = XDPAction.XDP_DROP
+    XDP_PASS = XDPAction.XDP_PASS
+    XDP_TX = XDPAction.XDP_TX
+    XDP_REDIRECT = XDPAction.XDP_REDIRECT
+
+    XDP_FLAGS_UPDATE_IF_NOEXIST = XDPFlags.UPDATE_IF_NOEXIST
+    XDP_FLAGS_SKB_MODE = XDPFlags.SKB_MODE
+    XDP_FLAGS_DRV_MODE = XDPFlags.DRV_MODE
+    XDP_FLAGS_HW_MODE = XDPFlags.HW_MODE
+    XDP_FLAGS_REPLACE = XDPFlags.REPLACE
+    # END enum backwards compat
 
     _probe_repl = re.compile(b"[^a-zA-Z0-9_]")
     _sym_caches = {}
@@ -246,7 +367,7 @@ class BPF(object):
         if filename:
             if not os.path.isfile(filename):
                 argv0 = ArgString(sys.argv[0])
-                t = b"/".join([os.path.abspath(os.path.dirname(argv0.__str__())), filename])
+                t = b"/".join([os.path.abspath(os.path.dirname(argv0.__bytes__())), filename])
                 if os.path.isfile(t):
                     filename = t
                 else:
@@ -277,13 +398,14 @@ class BPF(object):
         else:
             for path in os.environ["PATH"].split(os.pathsep):
                 path = path.strip('"')
-                exe_file = os.path.join(path, bin_path)
+                exe_file = os.path.join(path.encode(), bin_path)
                 if is_exe(exe_file):
                     return exe_file
         return None
 
     def __init__(self, src_file=b"", hdr_file=b"", text=None, debug=0,
-            cflags=[], usdt_contexts=[], allow_rlimit=True, device=None):
+            cflags=[], usdt_contexts=[], allow_rlimit=True, device=None,
+            attach_usdt_ignore_pid=False):
         """Create a new BPF module with the given source code.
 
         Note:
@@ -310,8 +432,10 @@ class BPF(object):
         self.raw_tracepoint_fds = {}
         self.kfunc_entry_fds = {}
         self.kfunc_exit_fds = {}
+        self.lsm_fds = {}
         self.perf_buffers = {}
         self.open_perf_events = {}
+        self._ringbuf_manager = None
         self.tracefile = None
         atexit.register(self.cleanup)
 
@@ -356,7 +480,7 @@ class BPF(object):
             raise Exception("Failed to compile BPF module %s" % (src_file or "<text>"))
 
         for usdt_context in usdt_contexts:
-            usdt_context.attach_uprobes(self)
+            usdt_context.attach_uprobes(self, attach_usdt_ignore_pid)
 
         # If any "kprobe__" or "tracepoint__" or "raw_tracepoint__"
         # prefixed functions were defined,
@@ -392,7 +516,7 @@ class BPF(object):
                 lib.bpf_function_size(self.module, func_name),
                 lib.bpf_module_license(self.module),
                 lib.bpf_module_kern_version(self.module),
-                log_level, None, 0, device);
+                log_level, None, 0, device)
 
         if fd < 0:
             atexit.register(self.donothing)
@@ -496,9 +620,10 @@ class BPF(object):
         name = _assert_is_bytes(name)
         map_id = lib.bpf_table_id(self.module, name)
         map_fd = lib.bpf_table_fd(self.module, name)
+        is_queuestack = lib.bpf_table_type_id(self.module, map_id) in [BPF_MAP_TYPE_QUEUE, BPF_MAP_TYPE_STACK]
         if map_fd < 0:
             raise KeyError
-        if not keytype:
+        if not keytype and not is_queuestack:
             key_desc = lib.bpf_table_key_desc(self.module, name).decode("utf-8")
             if not key_desc:
                 raise Exception("Failed to load BPF Table %s key desc" % name)
@@ -528,6 +653,26 @@ class BPF(object):
         return self.tables.__iter__()
 
     @staticmethod
+    def attach_func(fn, attachable_fd, attach_type, flags=0):
+        if not isinstance(fn, BPF.Function):
+            raise Exception("arg 1 must be of type BPF.Function")
+
+        res = lib.bpf_prog_attach(fn.fd, attachable_fd, attach_type, flags)
+        if res < 0:
+            raise Exception("Failed to attach BPF function with attach_type "\
+                            "{0}: {1}".format(attach_type, os.strerror(-res)))
+
+    @staticmethod
+    def detach_func(fn, attachable_fd, attach_type):
+        if not isinstance(fn, BPF.Function):
+            raise Exception("arg 1 must be of type BPF.Function")
+
+        res = lib.bpf_prog_detach2(fn.fd, attachable_fd, attach_type)
+        if res < 0:
+            raise Exception("Failed to detach BPF function with attach_type "\
+                            "{0}: {1}".format(attach_type, os.strerror(-res)))
+
+    @staticmethod
     def attach_raw_socket(fn, dev):
         dev = _assert_is_bytes(dev)
         if not isinstance(fn, BPF.Function):
@@ -545,8 +690,15 @@ class BPF(object):
 
     @staticmethod
     def get_kprobe_functions(event_re):
-        with open("%s/../kprobes/blacklist" % TRACEFS, "rb") as blacklist_f:
-            blacklist = set([line.rstrip().split()[1] for line in blacklist_f])
+        blacklist_file = "%s/../kprobes/blacklist" % TRACEFS
+        try:
+            with open(blacklist_file, "rb") as blacklist_f:
+                blacklist = set([line.rstrip().split()[1] for line in blacklist_f])
+        except IOError as e:
+            if e.errno != errno.EPERM:
+                raise e
+            blacklist = set([])
+
         fns = []
 
         in_init_section = 0
@@ -569,6 +721,12 @@ class BPF(object):
                 if in_irq_section == 0:
                     if fn == b'__irqentry_text_start':
                         in_irq_section = 1
+                        continue
+                    # __irqentry_text_end is not always after
+                    # __irqentry_text_start. But only happens when
+                    # no functions between two irqentry_text
+                    elif fn == b'__irqentry_text_end':
+                        in_irq_section = 2
                         continue
                 elif in_irq_section == 1:
                     if fn == b'__irqentry_text_end':
@@ -597,16 +755,18 @@ class BPF(object):
         if _num_open_probes + num_new_probes > _probe_limit:
             raise Exception("Number of open probes would exceed global quota")
 
-    def _add_kprobe_fd(self, name, fd):
+    def _add_kprobe_fd(self, ev_name, fn_name, fd):
         global _num_open_probes
-        self.kprobe_fds[name] = fd
+        if ev_name not in self.kprobe_fds:
+            self.kprobe_fds[ev_name] = {}
+        self.kprobe_fds[ev_name][fn_name] = fd
         _num_open_probes += 1
 
-    def _del_kprobe_fd(self, name):
+    def _del_kprobe_fd(self, ev_name, fn_name):
         global _num_open_probes
-        del self.kprobe_fds[name]
+        del self.kprobe_fds[ev_name][fn_name]
         _num_open_probes -= 1
- 
+
     def _add_uprobe_fd(self, name, fd):
         global _num_open_probes
         self.uprobe_fds[name] = fd
@@ -642,7 +802,7 @@ class BPF(object):
             if name.startswith(prefix):
                 return self.get_syscall_fnname(name[len(prefix):])
         return name
-       
+
     def attach_kprobe(self, event=b"", event_off=0, fn_name=b"", event_re=b""):
         event = _assert_is_bytes(event)
         fn_name = _assert_is_bytes(fn_name)
@@ -652,11 +812,17 @@ class BPF(object):
         if event_re:
             matches = BPF.get_kprobe_functions(event_re)
             self._check_probe_quota(len(matches))
+            failed = 0
+            probes = []
             for line in matches:
                 try:
                     self.attach_kprobe(event=line, fn_name=fn_name)
                 except:
-                    pass
+                    failed += 1
+                    probes.append(line)
+            if failed == len(matches):
+                raise Exception("Failed to attach BPF program %s to kprobe %s" %
+                                (fn_name, '/'.join(probes)))
             return
 
         self._check_probe_quota(1)
@@ -666,7 +832,7 @@ class BPF(object):
         if fd < 0:
             raise Exception("Failed to attach BPF program %s to kprobe %s" %
                             (fn_name, event))
-        self._add_kprobe_fd(ev_name, fd)
+        self._add_kprobe_fd(ev_name, fn_name, fd)
         return self
 
     def attach_kretprobe(self, event=b"", fn_name=b"", event_re=b"", maxactive=0):
@@ -676,12 +842,19 @@ class BPF(object):
 
         # allow the caller to glob multiple functions together
         if event_re:
-            for line in BPF.get_kprobe_functions(event_re):
+            matches = BPF.get_kprobe_functions(event_re)
+            failed = 0
+            probes = []
+            for line in matches:
                 try:
                     self.attach_kretprobe(event=line, fn_name=fn_name,
                                           maxactive=maxactive)
                 except:
-                    pass
+                    failed += 1
+                    probes.append(line)
+            if failed == len(matches):
+                raise Exception("Failed to attach BPF program %s to kretprobe %s" %
+                                (fn_name, '/'.join(probes)))
             return
 
         self._check_probe_quota(1)
@@ -691,29 +864,47 @@ class BPF(object):
         if fd < 0:
             raise Exception("Failed to attach BPF program %s to kretprobe %s" %
                             (fn_name, event))
-        self._add_kprobe_fd(ev_name, fd)
+        self._add_kprobe_fd(ev_name, fn_name, fd)
         return self
 
     def detach_kprobe_event(self, ev_name):
+        ev_name = _assert_is_bytes(ev_name)
+        fn_names = list(self.kprobe_fds[ev_name].keys())
+        for fn_name in fn_names:
+            self.detach_kprobe_event_by_fn(ev_name, fn_name)
+
+    def detach_kprobe_event_by_fn(self, ev_name, fn_name):
+        ev_name = _assert_is_bytes(ev_name)
+        fn_name = _assert_is_bytes(fn_name)
         if ev_name not in self.kprobe_fds:
             raise Exception("Kprobe %s is not attached" % ev_name)
-        res = lib.bpf_close_perf_event_fd(self.kprobe_fds[ev_name])
+        res = lib.bpf_close_perf_event_fd(self.kprobe_fds[ev_name][fn_name])
         if res < 0:
             raise Exception("Failed to close kprobe FD")
-        res = lib.bpf_detach_kprobe(ev_name)
-        if res < 0:
-            raise Exception("Failed to detach BPF from kprobe")
-        self._del_kprobe_fd(ev_name)
+        self._del_kprobe_fd(ev_name, fn_name)
+        if len(self.kprobe_fds[ev_name]) == 0:
+            res = lib.bpf_detach_kprobe(ev_name)
+            if res < 0:
+                raise Exception("Failed to detach BPF from kprobe")
 
-    def detach_kprobe(self, event):
+    def detach_kprobe(self, event, fn_name=None):
         event = _assert_is_bytes(event)
         ev_name = b"p_" + event.replace(b"+", b"_").replace(b".", b"_")
-        self.detach_kprobe_event(ev_name)
+        if fn_name:
+            fn_name = _assert_is_bytes(fn_name)
+            self.detach_kprobe_event_by_fn(ev_name, fn_name)
+        else:
+            self.detach_kprobe_event(ev_name)
 
-    def detach_kretprobe(self, event):
+
+    def detach_kretprobe(self, event, fn_name=None):
         event = _assert_is_bytes(event)
         ev_name = b"r_" + event.replace(b"+", b"_").replace(b".", b"_")
-        self.detach_kprobe_event(ev_name)
+        if fn_name:
+            fn_name = _assert_is_bytes(fn_name)
+            self.detach_kprobe_event_by_fn(ev_name, fn_name)
+        else:
+            self.detach_kprobe_event(ev_name)
 
     @staticmethod
     def attach_xdp(dev, fn, flags=0):
@@ -858,7 +1049,7 @@ class BPF(object):
         fd = lib.bpf_attach_raw_tracepoint(fn.fd, tp)
         if fd < 0:
             raise Exception("Failed to attach BPF to raw tracepoint")
-        self.raw_tracepoint_fds[tp] = fd;
+        self.raw_tracepoint_fds[tp] = fd
         return self
 
     def detach_raw_tracepoint(self, tp=b""):
@@ -884,10 +1075,22 @@ class BPF(object):
 
     @staticmethod
     def support_kfunc():
+        # there's no trampoline support for other than x86_64 arch
+        if platform.machine() != 'x86_64':
+            return False
         if not lib.bpf_has_kernel_btf():
-            return False;
+            return False
         # kernel symbol "bpf_trampoline_link_prog" indicates kfunc support
         if BPF.ksymname("bpf_trampoline_link_prog") != -1:
+            return True
+        return False
+
+    @staticmethod
+    def support_lsm():
+        if not lib.bpf_has_kernel_btf():
+            return False
+        # kernel symbol "bpf_lsm_bpf" indicates BPF LSM support
+        if BPF.ksymname(b"bpf_lsm_bpf") != -1:
             return True
         return False
 
@@ -920,7 +1123,7 @@ class BPF(object):
         fd = lib.bpf_attach_kfunc(fn.fd)
         if fd < 0:
             raise Exception("Failed to attach BPF to entry kernel func")
-        self.kfunc_entry_fds[fn_name] = fd;
+        self.kfunc_entry_fds[fn_name] = fd
         return self
 
     def attach_kretfunc(self, fn_name=b""):
@@ -934,7 +1137,30 @@ class BPF(object):
         fd = lib.bpf_attach_kfunc(fn.fd)
         if fd < 0:
             raise Exception("Failed to attach BPF to exit kernel func")
-        self.kfunc_exit_fds[fn_name] = fd;
+        self.kfunc_exit_fds[fn_name] = fd
+        return self
+
+    def detach_lsm(self, fn_name=b""):
+        fn_name = _assert_is_bytes(fn_name)
+        fn_name = BPF.add_prefix(b"lsm__", fn_name)
+
+        if fn_name not in self.lsm_fds:
+            raise Exception("LSM %s is not attached" % fn_name)
+        os.close(self.lsm_fds[fn_name])
+        del self.lsm_fds[fn_name]
+
+    def attach_lsm(self, fn_name=b""):
+        fn_name = _assert_is_bytes(fn_name)
+        fn_name = BPF.add_prefix(b"lsm__", fn_name)
+
+        if fn_name in self.lsm_fds:
+            raise Exception("LSM %s has been attached" % fn_name)
+
+        fn = self.load_func(fn_name, BPF.LSM)
+        fd = lib.bpf_attach_lsm(fn.fd)
+        if fd < 0:
+            raise Exception("Failed to attach LSM")
+        self.lsm_fds[fn_name] = fd
         return self
 
     @staticmethod
@@ -944,6 +1170,18 @@ class BPF(object):
            BPF.ksymname("bpf_get_raw_tracepoint") != -1:
             return True
         return False
+
+    @staticmethod
+    def support_raw_tracepoint_in_module():
+        # kernel symbol "bpf_trace_modules" indicates raw tp support in modules, ref: kernel commit a38d1107
+        kallsyms = "/proc/kallsyms"
+        with open(kallsyms) as syms:
+            for line in syms:
+                (_, _, name) = line.rstrip().split(" ", 2)
+                name = name.split("\t")[0]
+                if name == "bpf_trace_modules":
+                    return True
+            return False
 
     def detach_tracepoint(self, tp=b""):
         """detach_tracepoint(tp="")
@@ -987,6 +1225,26 @@ class BPF(object):
                 res[i] = self._attach_perf_event(fn.fd, ev_type, ev_config,
                         sample_period, sample_freq, pid, i, group_fd)
         self.open_perf_events[(ev_type, ev_config)] = res
+
+    def _attach_perf_event_raw(self, progfd, attr, pid, cpu, group_fd):
+        res = lib.bpf_attach_perf_event_raw(progfd, ct.byref(attr), pid,
+                cpu, group_fd, 0)
+        if res < 0:
+            raise Exception("Failed to attach BPF to perf raw event")
+        return res
+
+    def attach_perf_event_raw(self, attr=-1, fn_name=b"", pid=-1, cpu=-1, group_fd=-1):
+        fn_name = _assert_is_bytes(fn_name)
+        fn = self.load_func(fn_name, BPF.PERF_EVENT)
+        res = {}
+        if cpu >= 0:
+            res[cpu] = self._attach_perf_event_raw(fn.fd, attr,
+                    pid, cpu, group_fd)
+        else:
+            for i in get_online_cpus():
+                res[i] = self._attach_perf_event_raw(fn.fd, attr,
+                        pid, i, group_fd)
+        self.open_perf_events[(attr.type, attr.config)] = res
 
     def detach_perf_event(self, ev_type=-1, ev_config=-1):
         try:
@@ -1196,6 +1454,8 @@ class BPF(object):
                 self.attach_kfunc(fn_name=func_name)
             elif func_name.startswith(b"kretfunc__"):
                 self.attach_kretfunc(fn_name=func_name)
+            elif func_name.startswith(b"lsm__"):
+                self.attach_lsm(fn_name=func_name)
 
     def trace_open(self, nonblocking=False):
         """trace_open(nonblocking=False)
@@ -1225,7 +1485,10 @@ class BPF(object):
             task = line[:16].lstrip()
             line = line[17:]
             ts_end = line.find(b":")
-            pid, cpu, flags, ts = line[:ts_end].split()
+            try:
+                pid, cpu, flags, ts = line[:ts_end].split()
+            except Exception as e:
+                continue
             cpu = cpu[1:-1]
             # line[ts_end:] will have ": [sym_or_addr]: msgs"
             # For trace_pipe debug output, the addr typically
@@ -1237,7 +1500,10 @@ class BPF(object):
             line = line[ts_end + 1:]
             sym_end = line.find(b":")
             msg = line[sym_end + 2:]
-            return (task, int(pid), int(cpu), flags, float(ts), msg)
+            try:
+                return (task, int(pid), int(cpu), flags, float(ts), msg)
+            except Exception as e:
+                return ("Unknown", 0, 0, "Unknown", 0.0, "Unknown")
 
     def trace_readline(self, nonblocking=False):
         """trace_readline(nonblocking=False)
@@ -1313,7 +1579,7 @@ class BPF(object):
           b = bcc_stacktrace_build_id()
           b.status = addr.status
           b.build_id = addr.build_id
-          b.u.offset = addr.offset;
+          b.u.offset = addr.offset
           res = lib.bcc_buildsymcache_resolve(BPF._bsymcache,
                                               ct.byref(b),
                                               ct.byref(sym))
@@ -1398,6 +1664,38 @@ class BPF(object):
         """
         self.perf_buffer_poll(timeout)
 
+    def _open_ring_buffer(self, map_fd, fn, ctx=None):
+        if not self._ringbuf_manager:
+            self._ringbuf_manager = lib.bpf_new_ringbuf(map_fd, fn, ctx)
+            if not self._ringbuf_manager:
+                raise Exception("Could not open ring buffer")
+        else:
+            ret = lib.bpf_add_ringbuf(self._ringbuf_manager, map_fd, fn, ctx)
+            if ret < 0:
+                raise Exception("Could not open ring buffer")
+
+    def ring_buffer_poll(self, timeout = -1):
+        """ring_buffer_poll(self)
+
+        Poll from all open ringbuf buffers, calling the callback that was
+        provided when calling open_ring_buffer for each entry.
+        """
+        if not self._ringbuf_manager:
+            raise Exception("No ring buffers to poll")
+        lib.bpf_poll_ringbuf(self._ringbuf_manager, timeout)
+
+    def ring_buffer_consume(self):
+        """ring_buffer_consume(self)
+
+        Consume all open ringbuf buffers, regardless of whether or not
+        they currently contain events data. This is best for use cases
+        where low latency is desired, but it can impact performance.
+        If you are unsure, use ring_buffer_poll instead.
+        """
+        if not self._ringbuf_manager:
+            raise Exception("No ring buffers to poll")
+        lib.bpf_consume_ringbuf(self._ringbuf_manager)
+
     def free_bcc_memory(self):
         return lib.bcc_free_memory()
 
@@ -1429,6 +1727,8 @@ class BPF(object):
             self.detach_kfunc(k)
         for k, v in list(self.kfunc_exit_fds.items()):
             self.detach_kretfunc(k)
+        for k, v in list(self.lsm_fds.items()):
+            self.detach_lsm(k)
 
         # Clean up opened perf ring buffer and perf events
         table_keys = list(self.tables.keys())
@@ -1447,11 +1747,13 @@ class BPF(object):
             lib.bpf_module_destroy(self.module)
             self.module = None
 
+        # Clean up ringbuf
+        if self._ringbuf_manager:
+            lib.bpf_free_ringbuf(self._ringbuf_manager)
+            self._ringbuf_manager = None
+
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.cleanup()
-
-
-from .usdt import USDT, USDTException

@@ -98,7 +98,7 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  auto attach_res = bpf->attach_usdt(u);
+  auto attach_res = bpf->attach_usdt_all();
   if (attach_res.code() != 0) {
     std::cerr << attach_res.msg() << std::endl;
     return 1;
@@ -114,7 +114,7 @@ int main(int argc, char** argv) {
 
   shutdown_handler = [&](int s) {
     std::cerr << "Terminating..." << std::endl;
-    bpf->detach_usdt(u);
+    bpf->detach_usdt_all();
     delete bpf;
     exit(0);
   };

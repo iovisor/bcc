@@ -67,15 +67,19 @@ int test(struct bpf_sock_ops *skops)
 TEST_CASE("test sock hash", "[sockhash]") {
   {
     const std::string BPF_PROGRAM = R"(
-BPF_SOCKHASH(sk_hash1, 10);
-BPF_SOCKHASH(sk_hash2, 10);
+BPF_SOCKHASH(sk_hash1, u32, 10);
+BPF_SOCKHASH(sk_hash2, u32, 10);
 int test(struct bpf_sock_ops *skops)
 {
   u32 key = 0, val = 0;
+  struct sk_msg_buff *msg;
+  struct sk_buff *skb;
 
   sk_hash2.update(&key, &val);
   sk_hash2.delete(&key);
   sk_hash2.sock_hash_update(skops, &key, 0);
+  sk_hash2.msg_redirect_hash(msg, &key, 0);
+  sk_hash2.sk_redirect_hash(skb, &key, 0);
 
   return 0;
 }

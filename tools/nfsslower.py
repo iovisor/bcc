@@ -190,18 +190,18 @@ static int trace_exit(struct pt_regs *ctx, int type)
     struct qstr qs = {};
     if(type == TRACE_GETATTR)
     {
-        bpf_probe_read(&de,sizeof(de), &valp->d);
+        bpf_probe_read_kernel(&de,sizeof(de), &valp->d);
     }
     else
     {
-        bpf_probe_read(&de, sizeof(de), &valp->fp->f_path.dentry);
+        bpf_probe_read_kernel(&de, sizeof(de), &valp->fp->f_path.dentry);
     }
 
-    bpf_probe_read(&qs, sizeof(qs), (void *)&de->d_name);
+    bpf_probe_read_kernel(&qs, sizeof(qs), (void *)&de->d_name);
     if (qs.len == 0)
         return 0;
 
-    bpf_probe_read(&data.file, sizeof(data.file), (void *)qs.name);
+    bpf_probe_read_kernel(&data.file, sizeof(data.file), (void *)qs.name);
     // output
     events.perf_submit(ctx, &data, sizeof(data));
     return 0;

@@ -2,7 +2,7 @@
 #ifndef __DRSNOOP_H
 #define __DRSNOOP_H
 
-#define TASK_COMM_LEN 16
+#define TASK_COMM_LEN	16
 
 struct event {
 	char task[TASK_COMM_LEN];

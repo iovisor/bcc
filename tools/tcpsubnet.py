@@ -175,7 +175,7 @@ def generate_bpf_subnets(subnets):
         if (!categorized && (__NET_ADDR__ & __NET_MASK__) ==
              (dst & __NET_MASK__)) {
           struct index_key_t key = {.index = __POS__};
-          ipv4_send_bytes.increment(key, size);
+          ipv4_send_bytes.atomic_increment(key, size);
           categorized = 1;
         }
     """

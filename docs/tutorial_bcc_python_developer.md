@@ -48,7 +48,7 @@ Improve it by printing "Tracing sys_sync()... Ctrl-C to end." when the program f
 
 ### Lesson 3. hello_fields.py
 
-This program is in [examples/tracing/hello_fields.py](../examples/tracing/trace_fields.py). Sample output (run commands in another session):
+This program is in [examples/tracing/hello_fields.py](../examples/tracing/hello_fields.py). Sample output (run commands in another session):
 
 ```
 # ./examples/tracing/hello_fields.py
@@ -128,7 +128,7 @@ int do_trace(struct pt_regs *ctx) {
 
     // attempt to read stored timestamp
     tsp = last.lookup(&key);
-    if (tsp != 0) {
+    if (tsp != NULL) {
         delta = bpf_ktime_get_ns() - *tsp;
         if (delta < 1000000000) {
             // output if time is less than 1 second
@@ -163,7 +163,8 @@ Things to learn:
 1. ```BPF_HASH(last)```: Creates a BPF map object that is a hash (associative array), called "last". We didn't specify any further arguments, so it defaults to key and value types of u64.
 1. ```key = 0```: We'll only store one key/value pair in this hash, where the key is hardwired to zero.
 1. ```last.lookup(&key)```: Lookup the key in the hash, and return a pointer to its value if it exists, else NULL. We pass the key in as an address to a pointer.
-1. ```last.delete(&key)```: Delete the key from the hash. This is currently required because of [a kernel bug in `.update()`](https://git.kernel.org/cgit/linux/kernel/git/davem/net.git/commit/?id=a6ed3ea65d9868fdf9eff84e6fe4f666b8d14b02).
+1. ```if (tsp != NULL) {```: The verifier requires that pointer values derived from a map lookup must be checked for a null value before they can be dereferenced and used.
+1. ```last.delete(&key)```: Delete the key from the hash. This is currently required because of [a kernel bug in `.update()`](https://git.kernel.org/cgit/linux/kernel/git/davem/net.git/commit/?id=a6ed3ea65d9868fdf9eff84e6fe4f666b8d14b02) (fixed in 4.8.10).
 1. ```last.update(&key, &ts)```: Associate the value in the 2nd argument to the key, overwriting any previous value. This records the timestamp.
 
 ### Lesson 5. sync_count.py
@@ -219,7 +220,7 @@ void trace_completion(struct pt_regs *ctx, struct request *req) {
 
 b.attach_kprobe(event="blk_start_request", fn_name="trace_start")
 b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_start")
-b.attach_kprobe(event="blk_account_io_completion", fn_name="trace_completion")
+b.attach_kprobe(event="blk_account_io_done", fn_name="trace_completion")
 [...]
 ```
 
@@ -228,7 +229,7 @@ Things to learn:
 1. ```REQ_WRITE```: We're defining a kernel constant in the Python program because we'll use it there later. If we were using REQ_WRITE in the BPF program, it should just work (without needing to be defined) with the appropriate #includes.
 1. ```trace_start(struct pt_regs *ctx, struct request *req)```: This function will later be attached to kprobes. The arguments to kprobe functions are ```struct pt_regs *ctx```, for registers and BPF context, and then the actual arguments to the function. We'll attach this to blk_start_request(), where the first argument is ```struct request *```.
 1. ```start.update(&req, &ts)```: We're using the pointer to the request struct as a key in our hash. What? This is commonplace in tracing. Pointers to structs turn out to be great keys, as they are unique: two structs can't have the same pointer address. (Just be careful about when it gets free'd and reused.) So what we're really doing is tagging the request struct, which describes the disk I/O, with our own timestamp, so that we can time it. There's two common keys used for storing timestamps: pointers to structs, and, thread IDs (for timing function entry to return).
-1. ```req->__data_len```: We're dereferencing members of ```struct request```. See its definition in the kernel source for what members are there. bcc actually rewrites these expressions to be a series of ```bpf_probe_read()``` calls. Sometimes bcc can't handle a complex dereference, and you need to call ```bpf_probe_read()``` directly.
+1. ```req->__data_len```: We're dereferencing members of ```struct request```. See its definition in the kernel source for what members are there. bcc actually rewrites these expressions to be a series of ```bpf_probe_read_kernel()``` calls. Sometimes bcc can't handle a complex dereference, and you need to call ```bpf_probe_read_kernel()``` directly.
 
 This is a pretty interesting program, and if you can understand all the code, you'll understand many important basics. We're still using the bpf_trace_printk() hack, so let's fix that next.
 
@@ -350,7 +351,7 @@ b = BPF(text="""
 
 BPF_HISTOGRAM(dist);
 
-int kprobe__blk_account_io_completion(struct pt_regs *ctx, struct request *req)
+int kprobe__blk_account_io_done(struct pt_regs *ctx, struct request *req)
 {
 	dist.increment(bpf_log2l(req->__data_len / 1024));
 	return 0;
@@ -373,7 +374,7 @@ b["dist"].print_log2_hist("kbytes")
 A recap from earlier lessons:
 
 - ```kprobe__```: This prefix means the rest will be treated as a kernel function name that will be instrumented using kprobe.
-- ```struct pt_regs *ctx, struct request *req```: Arguments to kprobe. The ```ctx``` is registers and BPF context, the ```req``` is the first argument to the instrumented function: ```blk_account_io_completion()```.
+- ```struct pt_regs *ctx, struct request *req```: Arguments to kprobe. The ```ctx``` is registers and BPF context, the ```req``` is the first argument to the instrumented function: ```blk_account_io_done()```.
 - ```req->__data_len```: Dereferencing that member.
 
 New things to learn:
@@ -556,7 +557,7 @@ int count(struct pt_regs *ctx) {
     struct key_t key = {};
     u64 zero = 0, *val;
 
-    bpf_probe_read(&key.c, sizeof(key.c), (void *)PT_REGS_PARM1(ctx));
+    bpf_probe_read_user(&key.c, sizeof(key.c), (void *)PT_REGS_PARM1(ctx));
     // could also use `counts.increment(key)`
     val = counts.lookup_or_try_init(&key, &zero);
     if (val) {
@@ -620,7 +621,7 @@ int do_trace(struct pt_regs *ctx) {
     uint64_t addr;
     char path[128]={0};
     bpf_usdt_readarg(6, ctx, &addr);
-    bpf_probe_read(&path, sizeof(path), (void *)addr);
+    bpf_probe_read_user(&path, sizeof(path), (void *)addr);
     bpf_trace_printk("path:%s\\n", path);
     return 0;
 };
@@ -640,7 +641,7 @@ b = BPF(text=bpf_text, usdt_contexts=[u])
 Things to learn:
 
 1. ```bpf_usdt_readarg(6, ctx, &addr)```: Read the address of argument 6 from the USDT probe into ```addr```.
-1. ```bpf_probe_read(&path, sizeof(path), (void *)addr)```: Now the string ```addr``` points to into our ```path``` variable.
+1. ```bpf_probe_read_user(&path, sizeof(path), (void *)addr)```: Now the string ```addr``` points to into our ```path``` variable.
 1. ```u = USDT(pid=int(pid))```: Initialize USDT tracing for the given PID.
 1. ```u.enable_probe(probe="http__server__request", fn_name="do_trace")```: Attach our ```do_trace()``` BPF C function to the Node.js ```http__server__request``` USDT probe.
 1. ```b = BPF(text=bpf_text, usdt_contexts=[u])```: Need to pass in our USDT object, ```u```, to BPF object creation.
@@ -713,7 +714,7 @@ These programs can be found in the files [examples/tracing/task_switch.c](../exa
 
 For further study, see Sasha Goldshtein's [linux-tracing-workshop](https://github.com/goldshtn/linux-tracing-workshop), which contains additional labs. There are also many tools in bcc /tools to study.
 
-Please read [CONTRIBUTING-SCRIPTS.md](../CONTRIBUTING-SCRIPTS.md) if you wish to contrubite tools to bcc. At the bottom of the main [README.md](../README.md), you'll also find methods for contacting us. Good luck, and happy tracing!
+Please read [CONTRIBUTING-SCRIPTS.md](../CONTRIBUTING-SCRIPTS.md) if you wish to contribute tools to bcc. At the bottom of the main [README.md](../README.md), you'll also find methods for contacting us. Good luck, and happy tracing!
 
 ## Networking
 

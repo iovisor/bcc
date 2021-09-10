@@ -44,6 +44,7 @@ int bpf_lookup_elem(int fd, void *key, void *value);
 int bpf_delete_elem(int fd, void *key);
 int bpf_get_first_key(int fd, void *key, size_t key_size);
 int bpf_get_next_key(int fd, void *key, void *next_key);
+int bpf_lookup_and_delete(int fd, void *key, void *value);
 
 /*
  * Load a BPF program, and return the FD of the loaded program.
@@ -85,7 +86,7 @@ int bpf_detach_kprobe(const char *ev_name);
 
 int bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type,
                       const char *ev_name, const char *binary_path,
-                      uint64_t offset, pid_t pid);
+                      uint64_t offset, pid_t pid, uint32_t ref_ctr_offset);
 int bpf_detach_uprobe(const char *ev_name);
 
 int bpf_attach_tracepoint(int progfd, const char *tp_category,
@@ -94,9 +95,9 @@ int bpf_detach_tracepoint(const char *tp_category, const char *tp_name);
 
 int bpf_attach_raw_tracepoint(int progfd, const char *tp_name);
 
-int bpf_detach_kfunc(int prog_fd, char *func);
-
 int bpf_attach_kfunc(int prog_fd);
+
+int bpf_attach_lsm(int prog_fd);
 
 bool bpf_has_kernel_btf(void);
 
@@ -121,6 +122,17 @@ int bpf_open_perf_event(uint32_t type, uint64_t config, int pid, int cpu);
 
 int bpf_close_perf_event_fd(int fd);
 
+typedef int (*ring_buffer_sample_fn)(void *ctx, void *data, size_t size);
+
+struct ring_buffer;
+
+void * bpf_new_ringbuf(int map_fd, ring_buffer_sample_fn sample_cb, void *ctx);
+void bpf_free_ringbuf(struct ring_buffer *rb);
+int bpf_add_ringbuf(struct ring_buffer *rb, int map_fd,
+                    ring_buffer_sample_fn sample_cb, void *ctx);
+int bpf_poll_ringbuf(struct ring_buffer *rb, int timeout_ms);
+int bpf_consume_ringbuf(struct ring_buffer *rb);
+
 int bpf_obj_pin(int fd, const char *pathname);
 int bpf_obj_get(const char *pathname);
 int bpf_obj_get_info(int prog_map_fd, void *info, uint32_t *info_len);
@@ -131,6 +143,12 @@ int bpf_prog_get_next_id(uint32_t start_id, uint32_t *next_id);
 int bpf_prog_get_fd_by_id(uint32_t id);
 int bpf_map_get_fd_by_id(uint32_t id);
 int bpf_obj_get_info_by_fd(int prog_fd, void *info, uint32_t *info_len);
+
+int bcc_iter_attach(int prog_fd, union bpf_iter_link_info *link_info,
+                    uint32_t link_info_len);
+int bcc_iter_create(int link_fd);
+int bcc_make_parent_dir(const char *path);
+int bcc_check_bpffs_path(const char *path);
 
 #define LOG_BUF_SIZE 65536
 

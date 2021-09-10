@@ -34,7 +34,7 @@ MAX_AGE_SECONDS = 30       # max age entry in bpf_sessions map
 def toHex(s):
     lst = ""
     for ch in s:
-        hv = hex(ch).replace('0x', '')
+        hv = hex(ord(ch)).replace('0x', '')
         if len(hv) == 1:
             hv = '0' + hv
         lst = lst + hv

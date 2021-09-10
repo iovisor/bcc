@@ -287,8 +287,9 @@ int BPFModule::create_maps(std::map<std::string, std::pair<int, int>> &map_tids,
 
   for (auto map : fake_fd_map_) {
     int fd, fake_fd, map_type, key_size, value_size, max_entries, map_flags;
+    int pinned_id;
     const char *map_name;
-    unsigned int pinned_id;
+    const char *pinned;
     std::string inner_map_name;
     int inner_map_fd = 0;
 
@@ -317,32 +318,41 @@ int BPFModule::create_maps(std::map<std::string, std::pair<int, int>> &map_tids,
         inner_map_fd = inner_map_fds[inner_map_name];
     }
 
-    if (pinned_id) {
-        fd = bpf_map_get_fd_by_id(pinned_id);
+    if (pinned_id <= 0) {
+      struct bpf_create_map_attr attr = {};
+      attr.map_type = (enum bpf_map_type)map_type;
+      attr.name = map_name;
+      attr.key_size = key_size;
+      attr.value_size = value_size;
+      attr.max_entries = max_entries;
+      attr.map_flags = map_flags;
+      attr.map_ifindex = ifindex_;
+      attr.inner_map_fd = inner_map_fd;
+
+      if (map_tids.find(map_name) != map_tids.end()) {
+        attr.btf_fd = btf_->get_fd();
+        attr.btf_key_type_id = map_tids[map_name].first;
+        attr.btf_value_type_id = map_tids[map_name].second;
+      }
+
+      fd = bcc_create_map_xattr(&attr, allow_rlimit_);
     } else {
-        struct bpf_create_map_attr attr = {};
-        attr.map_type = (enum bpf_map_type)map_type;
-        attr.name = map_name;
-        attr.key_size = key_size;
-        attr.value_size = value_size;
-        attr.max_entries = max_entries;
-        attr.map_flags = map_flags;
-        attr.map_ifindex = ifindex_;
-        attr.inner_map_fd = inner_map_fd;
-
-        if (map_tids.find(map_name) != map_tids.end()) {
-          attr.btf_fd = btf_->get_fd();
-          attr.btf_key_type_id = map_tids[map_name].first;
-          attr.btf_value_type_id = map_tids[map_name].second;
-        }
-
-        fd = bcc_create_map_xattr(&attr, allow_rlimit_);
+      fd = bpf_map_get_fd_by_id(pinned_id);
     }
 
     if (fd < 0) {
       fprintf(stderr, "could not open bpf map: %s, error: %s\n",
               map_name, strerror(errno));
       return -1;
+    }
+
+    if (pinned_id == -1) {
+      pinned = get<8>(map.second).c_str();
+      if (bpf_obj_pin(fd, pinned)) {
+        fprintf(stderr, "failed to pin map: %s, error: %s\n",
+                pinned, strerror(errno));
+        return -1;
+      }
     }
 
     if (for_inner_map)
@@ -446,10 +456,18 @@ int BPFModule::finalize() {
       *sections_p;
 
   mod->setTargetTriple("bpf-pc-linux");
+#if LLVM_MAJOR_VERSION >= 11
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+  mod->setDataLayout("e-m:e-p:64:64-i64:64-i128:128-n32:64-S128");
+#else
+  mod->setDataLayout("E-m:e-p:64:64-i64:64-i128:128-n32:64-S128");
+#endif
+#else
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
   mod->setDataLayout("e-m:e-p:64:64-i64:64-n32:64-S128");
 #else
   mod->setDataLayout("E-m:e-p:64:64-i64:64-n32:64-S128");
+#endif
 #endif
   sections_p = rw_engine_enabled_ ? &sections_ : &tmp_sections;
 
@@ -458,7 +476,9 @@ int BPFModule::finalize() {
   builder.setErrorStr(&err);
   builder.setMCJITMemoryManager(ebpf::make_unique<MyMemoryManager>(sections_p));
   builder.setMArch("bpf");
+#if LLVM_MAJOR_VERSION <= 11
   builder.setUseOrcMCJITReplacement(false);
+#endif
   engine_ = unique_ptr<ExecutionEngine>(builder.create());
   if (!engine_) {
     fprintf(stderr, "Could not create ExecutionEngine: %s\n", err.c_str());
@@ -897,7 +917,7 @@ int BPFModule::bcc_func_load(int prog_type, const char *name,
                 const struct bpf_insn *insns, int prog_len,
                 const char *license, unsigned kern_version,
                 int log_level, char *log_buf, unsigned log_buf_size,
-                const char *dev_name) {
+                const char *dev_name, unsigned flags) {
   struct bpf_load_program_attr attr = {};
   unsigned func_info_cnt, line_info_cnt, finfo_rec_size, linfo_rec_size;
   void *func_info = NULL, *line_info = NULL;
@@ -911,6 +931,7 @@ int BPFModule::bcc_func_load(int prog_type, const char *name,
       attr.prog_type != BPF_PROG_TYPE_EXT) {
     attr.kern_version = kern_version;
   }
+  attr.prog_flags = flags;
   attr.log_level = log_level;
   if (dev_name)
     attr.prog_ifindex = if_nametoindex(dev_name);

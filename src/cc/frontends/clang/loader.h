@@ -20,6 +20,8 @@
 #include <memory>
 #include <string>
 
+#include <clang/Frontend/CompilerInvocation.h>
+
 #include "table_storage.h"
 
 namespace llvm {
@@ -69,6 +71,10 @@ class ClangLoader {
                  const std::string &maps_ns,
                  fake_fd_map_def &fake_fd_map,
                  std::map<std::string, std::vector<std::string>> &perf_events);
+  void add_remapped_includes(clang::CompilerInvocation& invocation);
+  void add_main_input(clang::CompilerInvocation& invocation,
+                      const std::string& main_path,
+                      llvm::MemoryBuffer *main_buf);
 
  private:
   std::map<std::string, std::unique_ptr<llvm::MemoryBuffer>> remapped_headers_;

@@ -54,7 +54,7 @@ Event message filter is useful while you only interesting the specific event.
 Like the program open thousands file and you only want to see the "temp" file
 and print stack.
 
-# trace 'do_sys_open "%s", arg2' -UK -f temp
+# trace 'do_sys_open "%s", arg2@user' -UK -f temp
 PID     TID     COMM            FUNC             -
 9557    9557    a.out           do_sys_open      temp.1
         do_sys_open+0x1 [kernel]
@@ -71,7 +71,7 @@ PID     TID     COMM            FUNC             -
 
 Process name filter is porting from tools/opensnoop
 
-# trace 'do_sys_open "%s", arg2' -UK -n out
+# trace 'do_sys_open "%s", arg2@user' -UK -n out
 PID     TID     COMM            FUNC             -
 9557    9557    a.out           do_sys_open      temp.1
         do_sys_open+0x1 [kernel]
@@ -241,7 +241,7 @@ so it always includes this header file.
 As a final example, let's trace open syscalls for a specific process. By
 default, tracing is system-wide, but the -p switch overrides this:
 
-# trace -p 2740 'do_sys_open "%s", arg2' -T
+# trace -p 2740 'do_sys_open "%s", arg2@user' -T
 TIME     PID    COMM         FUNC             -
 05:36:16 15872  ls           do_sys_open      /etc/ld.so.cache
 05:36:16 15872  ls           do_sys_open      /lib64/libselinux.so.1
@@ -287,7 +287,52 @@ STRCMP helper in binary mode (--bin_cmp flag) to compare optval array
 against int value of 108 (parametr of setsockopt call) in hex representation
 (little endian format)
 
+For advanced users there is a possibility to insert the kprobes or uprobes
+after a certain offset, rather than the start of the function call
+This is useful for tracing register values at different places of the
+execution of a function. Lets consider the following example:
 
+int main()
+{
+	int val = 0xdead;
+	printf("%d\n", val);
+	val = 0xbeef;
+	printf("%d\n", val);
+}
+
+After compiling the code with -O3 optimization the object code looks
+like the following (with GCC 10 and x86_64 architecture):
+
+objdump --disassemble=main --prefix-addresses a.out
+
+0000000000001060 <main> endbr64
+0000000000001064 <main+0x4> sub    $0x8,%rsp
+0000000000001068 <main+0x8> mov    $0xdead,%edx
+000000000000106d <main+0xd> mov    $0x1,%edi
+0000000000001072 <main+0x12> xor    %eax,%eax
+0000000000001074 <main+0x14> lea    0xf89(%rip),%rsi
+000000000000107b <main+0x1b> callq  0000000000001050 <__printf_chk@plt>
+0000000000001080 <main+0x20> mov    $0xbeef,%edx
+0000000000001085 <main+0x25> lea    0xf78(%rip),%rsi
+000000000000108c <main+0x2c> xor    %eax,%eax
+000000000000108e <main+0x2e> mov    $0x1,%edi
+0000000000001093 <main+0x33> callq  0000000000001050 <__printf_chk@plt>
+0000000000001098 <main+0x38> xor    %eax,%eax
+000000000000109a <main+0x3a> add    $0x8,%rsp
+000000000000109e <main+0x3e> retq
+
+The 0xdead and later the 0xbeef values are moved into the edx register.
+As the disassembly shows the edx register contains the 0xdead value
+after the 0xd offset and 0xbeef after the 0x25 offset. To verify this
+with trace lets insert probes to those offsets. The following
+command inserts two uprobe one after the 0xd offset and another one
+after the 0x25 offset of the main function. The probe print the
+value of the edx register which will show us the correct values.
+
+trace 'p:/tmp/a.out:main+0xd "%x", ctx->dx' 'p:/tmp/a.out:main+0x25 "%x", ctx->dx'
+PID     TID     COMM            FUNC             -
+25754   25754   a.out           main             dead
+25754   25754   a.out           main             beef
 
 
 USAGE message:
@@ -335,11 +380,16 @@ EXAMPLES:
 
 trace do_sys_open
         Trace the open syscall and print a default trace message when entered
-trace 'do_sys_open "%s", arg2'
-        Trace the open syscall and print the filename being opened
-trace 'do_sys_open "%s", arg2' -n main
+trace kfree_skb+0x12
+        Trace the kfree_skb kernel function after the instruction on the 0x12 offset
+trace 'do_sys_open "%s", arg2@user'
+        Trace the open syscall and print the filename being opened. @user is
+        added to arg2 in kprobes to ensure that char * should be copied from
+        the userspace stack to the bpf stack. If not specified, previous
+        behaviour is expected.
+trace 'do_sys_open "%s", arg2@user' -n main
         Trace the open syscall and only print event that process names containing "main"
-trace 'do_sys_open "%s", arg2' -f config
+trace 'do_sys_open "%s", arg2@user' -f config
         Trace the open syscall and print the filename being opened filtered by "config"
 trace 'sys_read (arg3 > 20000) "read %d bytes", arg3'
         Trace the read syscall and print a message for reads >20000 bytes

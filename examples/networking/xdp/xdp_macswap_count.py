@@ -31,7 +31,7 @@ if len(sys.argv) == 2:
 if len(sys.argv) == 3:
     if "-S" in sys.argv:
         # XDP_FLAGS_SKB_MODE
-        flags |= 2 << 0
+        flags |= BPF.XDP_FLAGS_SKB_MODE
 
     if "-S" == sys.argv[1]:
         device = sys.argv[2]
@@ -50,7 +50,6 @@ else:
 
 # load BPF program
 b = BPF(text = """
-#define KBUILD_MODNAME "foo"
 #include <uapi/linux/bpf.h>
 #include <linux/in.h>
 #include <linux/if_ether.h>
@@ -60,7 +59,7 @@ b = BPF(text = """
 #include <linux/ipv6.h>
 
 
-BPF_TABLE("percpu_array", uint32_t, long, dropcnt, 256);
+BPF_PERCPU_ARRAY(dropcnt, long, 256);
 
 static inline int parse_ipv4(void *data, u64 nh_off, void *data_end) {
     struct iphdr *iph = data + nh_off;
@@ -181,7 +180,7 @@ while 1:
         time.sleep(1)
     except KeyboardInterrupt:
         print("Removing filter from device")
-        break;
+        break
 
 if mode == BPF.XDP:
     b.remove_xdp(device, flags)

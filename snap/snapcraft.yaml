@@ -28,6 +28,14 @@ assumes: [snapd2.37]
 base: core18
 adopt-info: bcc
 
+architectures:
+    - build-on: s390x
+    - build-on: ppc64el
+    - build-on: arm64
+    - build-on: armhf
+    - build-on: amd64
+    - build-on: i386
+
 parts:
     bcc:
         plugin: cmake
@@ -99,6 +107,8 @@ apps:
         command: bcc-wrapper bashreadline
     biolatency:
         command: bcc-wrapper biolatency
+    biolatpcts:
+        command: bcc-wrapper biolatpcts
     biosnoop:
         command: bcc-wrapper biosnoop
     biotop:
@@ -125,6 +135,8 @@ apps:
         command: bcc-wrapper cpudist
     cpuunclaimed:
         command: bcc-wrapper cpuunclaimed
+    criticalstat:
+        command: bcc-wrapper criticalstat
     dbslower:
         command: bcc-wrapper dbslower
     dbstat:
@@ -135,10 +147,14 @@ apps:
         command: bcc-wrapper dcstat
     deadlock:
         command: bcc-wrapper deadlock
+    dirtop:
+        command: bcc-wrapper dirtop
     drsnoop:
         command: bcc-wrapper drsnoop
     execsnoop:
         command: bcc-wrapper execsnoop
+    exitsnoop:
+        command: bcc-wrapper exitsnoop
     ext4dist:
         command: bcc-wrapper ext4dist
     ext4slower:
@@ -151,6 +167,8 @@ apps:
         command: bcc-wrapper filetop
     funccount:
         command: bcc-wrapper funccount
+    funcinterval:
+        command: bcc-wrapper funcinterval
     funclatency:
         command: bcc-wrapper funclatency
     funcslower:
@@ -159,6 +177,8 @@ apps:
         command: bcc-wrapper gethostlatency
     hardirqs:
         command: bcc-wrapper hardirqs
+    inject:
+        command: bcc-wrapper inject
     javacalls:
         command: bcc-wrapper javacalls
     javaflow:
@@ -185,6 +205,8 @@ apps:
         command: bcc-wrapper mountsnoop
     mysqld-qslower:
         command: bcc-wrapper mysqld_qslower
+    netqtop:
+        command: bcc-wrapper netqtop
     nfsdist:
         command: bcc-wrapper nfsdist
     nfsslower:
@@ -207,20 +229,16 @@ apps:
         command: bcc-wrapper perlflow
     perlstat:
         command: bcc-wrapper perlstat
-    shmsnoop:
-        command: bcc-wrapper shmsnoop
-    sofdsnoop:
-        command: bcc-wrapper sofdsnoop
+    pidpersec:
+        command: bcc-wrapper pidpersec
+    profile:
+        command: bcc-wrapper profile
     phpcalls:
         command: bcc-wrapper phpcalls
     phpflow:
         command: bcc-wrapper phpflow
     phpstat:
         command: bcc-wrapper phpstat
-    pidpersec:
-        command: bcc-wrapper pidpersec
-    profile:
-        command: bcc-wrapper profile
     pythoncalls:
         command: bcc-wrapper pythoncalls
     pythonflow:
@@ -229,6 +247,10 @@ apps:
         command: bcc-wrapper pythongc
     pythonstat:
         command: bcc-wrapper pythonstat
+    readahead:
+        command: bcc-wrapper readahead
+    reset-trace:
+        command: bcc-wrapper reset-trace
     rubycalls:
         command: bcc-wrapper rubycalls
     rubyflow:
@@ -243,8 +265,14 @@ apps:
         command: bcc-wrapper runqlat
     runqlen:
         command: bcc-wrapper runqlen
+    runqslower:
+        command: bcc-wrapper runqslower
+    shmsnoop:
+        command: bcc-wrapper shmsnoop
     slabratetop:
         command: bcc-wrapper slabratetop
+    sofdsnoop:
+        command: bcc-wrapper sofdsnoop
     softirqs:
         command: bcc-wrapper softirqs
     solisten:
@@ -255,24 +283,46 @@ apps:
         command: bcc-wrapper stackcount
     statsnoop:
         command: bcc-wrapper statsnoop
+    swapin:
+        command: bcc-wrapper swapin
     syncsnoop:
         command: bcc-wrapper syncsnoop
     syscount:
         command: bcc-wrapper syscount
+    tclcalls:
+        command: bcc-wrapper tclcalls
+    tclflow:
+        command: bcc-wrapper tclflow
+    tclobjnew:
+        command: bcc-wrapper tclobjnew
+    tclstat:
+        command: bcc-wrapper tclstat
     tcpaccept:
         command: bcc-wrapper tcpaccept
     tcpconnect:
         command: bcc-wrapper tcpconnect
     tcpconnlat:
         command: bcc-wrapper tcpconnlat
+    tcpdrop:
+        command: bcc-wrapper tcpdrop
     tcplife:
         command: bcc-wrapper tcplife
     tcpretrans:
         command: bcc-wrapper tcpretrans
+    tcprtt:
+        command: bcc-wrapper tcprtt
+    tcpstates:
+        command: bcc-wrapper tcpstates
+    tcpsubnet:
+        command: bcc-wrapper tcpsubnet
+    tcpsynbl:
+        command: bcc-wrapper tcpsynbl
     tcptop:
         command: bcc-wrapper tcptop
     tcptracer:
         command: bcc-wrapper tcptracer
+    threadsnoop:
+        command: bcc-wrapper threadsnoop
     tplist:
         command: bcc-wrapper tplist
     trace:

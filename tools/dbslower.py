@@ -127,12 +127,12 @@ Trace only packets with enum_server_command == COM_QUERY
     tmp.timestamp = bpf_ktime_get_ns();
 
 #if defined(MYSQL56)
-    bpf_probe_read(&tmp.query, sizeof(tmp.query), (void*) PT_REGS_PARM3(ctx));
+    bpf_probe_read_user(&tmp.query, sizeof(tmp.query), (void*) PT_REGS_PARM3(ctx));
 #elif defined(MYSQL57)
     void* st = (void*) PT_REGS_PARM2(ctx);
     char* query;
-    bpf_probe_read(&query, sizeof(query), st);
-    bpf_probe_read(&tmp.query, sizeof(tmp.query), query);
+    bpf_probe_read_user(&query, sizeof(query), st);
+    bpf_probe_read_user(&tmp.query, sizeof(tmp.query), query);
 #else //USDT
     bpf_usdt_readarg(1, ctx, &tmp.query);
 #endif
@@ -157,7 +157,13 @@ int query_end(struct pt_regs *ctx) {
         data.pid = pid >> 32;   // only process id
         data.timestamp = tempp->timestamp;
         data.duration = delta;
-        bpf_probe_read(&data.query, sizeof(data.query), tempp->query);
+#if defined(MYSQL56) || defined(MYSQL57)
+	// We already copied string to the bpf stack. Hence use bpf_probe_read_kernel()
+        bpf_probe_read_kernel(&data.query, sizeof(data.query), tempp->query);
+#else
+	// USDT - we didnt copy string to the bpf stack before.
+        bpf_probe_read_user(&data.query, sizeof(data.query), tempp->query);
+#endif
         events.perf_submit(ctx, &data, sizeof(data));
 #ifdef THRESHOLD
     }
@@ -188,7 +194,7 @@ else:
             args.pids = map(int, subprocess.check_output(
                                             "pidof postgres".split()).split())
 
-    usdts = map(lambda pid: USDT(pid=pid), args.pids)
+    usdts = list(map(lambda pid: USDT(pid=pid), args.pids))
     for usdt in usdts:
         usdt.enable_probe("query__start", "query_start")
         usdt.enable_probe("query__done", "query_end")

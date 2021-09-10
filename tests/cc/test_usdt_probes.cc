@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <linux/version.h>
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -33,6 +34,17 @@ static int a_probed_function() {
   free(a_pointer);
   return an_int;
 }
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0)
+FOLLY_SDT_DEFINE_SEMAPHORE(libbcc_test, sample_probe_2)
+static int a_probed_function_with_sem() {
+  int an_int = 23 + getpid();
+  void *a_pointer = malloc(4);
+  FOLLY_SDT_WITH_SEMAPHORE(libbcc_test, sample_probe_2, an_int, a_pointer);
+  free(a_pointer);
+  return an_int;
+}
+#endif // linux version  >= 4.20
 
 extern "C" int lib_probed_function();
 
@@ -62,6 +74,16 @@ TEST_CASE("test finding a probe in our own process", "[usdt]") {
   }
 }
 
+TEST_CASE("test probe's attributes with C++ API", "[usdt]") {
+    const ebpf::USDT u("/proc/self/exe", "libbcc_test", "sample_probe_1", "on_event");
+
+    REQUIRE(u.binary_path() == "/proc/self/exe");
+    REQUIRE(u.pid() == -1);
+    REQUIRE(u.provider() == "libbcc_test");
+    REQUIRE(u.name() == "sample_probe_1");
+    REQUIRE(u.probe_func() == "on_event");
+}
+
 TEST_CASE("test fine a probe in our own binary with C++ API", "[usdt]") {
     ebpf::BPF bpf;
     ebpf::USDT u("/proc/self/exe", "libbcc_test", "sample_probe_1", "on_event");
@@ -74,6 +96,20 @@ TEST_CASE("test fine a probe in our own binary with C++ API", "[usdt]") {
 
     res = bpf.detach_usdt(u);
     REQUIRE(res.code() == 0);
+}
+
+TEST_CASE("test fine probes in our own binary with C++ API", "[usdt]") {
+    ebpf::BPF bpf;
+    ebpf::USDT u("/proc/self/exe", "libbcc_test", "sample_probe_1", "on_event");
+
+    auto res = bpf.init("int on_event() { return 0; }", {}, {u});
+    REQUIRE(res.ok());
+
+    res = bpf.attach_usdt_all();
+    REQUIRE(res.ok());
+
+    res = bpf.detach_usdt_all();
+    REQUIRE(res.ok());
 }
 
 TEST_CASE("test fine a probe in our Process with C++ API", "[usdt]") {
@@ -370,3 +406,26 @@ TEST_CASE("test probing running Ruby process in namespaces",
     REQUIRE(std::string(sym.module).find(pid_root, 1) == std::string::npos);
   }
 }
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0)
+TEST_CASE("Test uprobe refcnt semaphore activation", "[usdt]") {
+    ebpf::BPF bpf;
+
+    REQUIRE(!FOLLY_SDT_IS_ENABLED(libbcc_test, sample_probe_2));
+
+    ebpf::USDT u("/proc/self/exe", "libbcc_test", "sample_probe_2", "on_event");
+
+    auto res = bpf.init("int on_event() { return 0; }", {}, {u});
+    REQUIRE(res.code() == 0);
+
+    res = bpf.attach_usdt(u);
+    REQUIRE(res.code() == 0);
+
+    REQUIRE(FOLLY_SDT_IS_ENABLED(libbcc_test, sample_probe_2));
+
+    res = bpf.detach_usdt(u);
+    REQUIRE(res.code() == 0);
+
+    REQUIRE(a_probed_function_with_sem() != 0);
+}
+#endif // linux version  >= 4.20

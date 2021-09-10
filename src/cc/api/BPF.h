@@ -78,14 +78,17 @@ class BPF {
                             uint64_t symbol_addr = 0,
                             bpf_probe_attach_type attach_type = BPF_PROBE_ENTRY,
                             pid_t pid = -1,
-                            uint64_t symbol_offset = 0);
+                            uint64_t symbol_offset = 0,
+                            uint32_t ref_ctr_offset = 0);
   StatusTuple detach_uprobe(const std::string& binary_path,
                             const std::string& symbol, uint64_t symbol_addr = 0,
                             bpf_probe_attach_type attach_type = BPF_PROBE_ENTRY,
                             pid_t pid = -1,
                             uint64_t symbol_offset = 0);
   StatusTuple attach_usdt(const USDT& usdt, pid_t pid = -1);
+  StatusTuple attach_usdt_all();
   StatusTuple detach_usdt(const USDT& usdt, pid_t pid = -1);
+  StatusTuple detach_usdt_all();
 
   StatusTuple attach_tracepoint(const std::string& tracepoint,
                                 const std::string& probe_func);
@@ -174,6 +177,14 @@ class BPF {
     return BPFPercpuCgStorageTable<ValueType>({});
   }
 
+  template <class ValueType>
+  BPFQueueStackTable<ValueType> get_queuestack_table(const std::string& name) {
+    TableStorage::iterator it;
+    if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
+      return BPFQueueStackTable<ValueType>(it->second);
+    return BPFQueueStackTable<ValueType>({});
+  }
+
   void* get_bsymcache(void) {
     if (bsymcache_ == NULL) {
       bsymcache_ = bcc_buildsymcache_new();
@@ -200,8 +211,13 @@ class BPF {
   BPFStackBuildIdTable get_stackbuildid_table(const std::string &name,
                                               bool use_debug_file = true,
                                               bool check_debug_file_crc = true);
-
-  BPFMapInMapTable get_map_in_map_table(const std::string& name);
+  template <class KeyType>
+  BPFMapInMapTable<KeyType> get_map_in_map_table(const std::string& name){
+      TableStorage::iterator it;
+      if (bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
+        return BPFMapInMapTable<KeyType>(it->second);
+      return BPFMapInMapTable<KeyType>({});
+  }
 
   bool add_module(std::string module);
 
@@ -231,7 +247,7 @@ class BPF {
   int poll_perf_buffer(const std::string& name, int timeout_ms = -1);
 
   StatusTuple load_func(const std::string& func_name, enum bpf_prog_type type,
-                        int& fd);
+                        int& fd, unsigned flags = 0);
   StatusTuple unload_func(const std::string& func_name);
 
   StatusTuple attach_func(int prog_fd, int attachable_fd,
@@ -247,6 +263,9 @@ class BPF {
                                bpf_probe_attach_type type);
   std::string get_uprobe_event(const std::string& binary_path, uint64_t offset,
                                bpf_probe_attach_type type, pid_t pid);
+
+  StatusTuple attach_usdt_without_validation(const USDT& usdt, pid_t pid);
+  StatusTuple detach_usdt_without_validation(const USDT& usdt, pid_t pid);
 
   StatusTuple detach_kprobe_event(const std::string& event, open_probe_t& attr);
   StatusTuple detach_uprobe_event(const std::string& event, open_probe_t& attr);
@@ -324,6 +343,12 @@ class USDT {
        const std::string& name, const std::string& probe_func);
   USDT(const USDT& usdt);
   USDT(USDT&& usdt) noexcept;
+
+  const std::string &binary_path() const { return binary_path_; }
+  pid_t pid() const { return pid_; }
+  const std::string &provider() const { return provider_; }
+  const std::string &name() const { return name_; }
+  const std::string &probe_func() const { return probe_func_; }
 
   StatusTuple init();
 

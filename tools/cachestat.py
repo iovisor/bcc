@@ -81,7 +81,7 @@ int do_count(struct pt_regs *ctx) {
     u64 ip;
 
     key.ip = PT_REGS_IP(ctx);
-    counts.increment(key); // update counter
+    counts.atomic_increment(key); // update counter
     return 0;
 }
 

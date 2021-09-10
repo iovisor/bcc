@@ -17,6 +17,7 @@
 
 from __future__ import print_function
 from bcc import ArgString, BPF
+from bcc.containers import filter_by_containers
 from bcc.utils import printb
 import argparse
 from datetime import datetime, timedelta
@@ -35,7 +36,8 @@ examples = """examples:
     ./opensnoop -n main   # only print process names containing "main"
     ./opensnoop -e        # show extended fields
     ./opensnoop -f O_WRONLY -f O_RDWR  # only print calls for writing
-    ./opensnoop --cgroupmap ./mappath  # only trace cgroups in this BPF map
+    ./opensnoop --cgroupmap mappath  # only trace cgroups in this BPF map
+    ./opensnoop --mntnsmap mappath   # only trace mount namespaces in the map
 """
 parser = argparse.ArgumentParser(
     description="Trace open() syscalls",
@@ -53,6 +55,8 @@ parser.add_argument("-t", "--tid",
     help="trace this TID only")
 parser.add_argument("--cgroupmap",
     help="trace cgroups in this BPF map only")
+parser.add_argument("--mntnsmap",
+    help="trace mount namespaces in this BPF map only")
 parser.add_argument("-u", "--uid",
     help="trace this UID only")
 parser.add_argument("-d", "--duration",
@@ -102,41 +106,11 @@ struct data_t {
     int flags; // EXTENDED_STRUCT_MEMBER
 };
 
-#if CGROUPSET
-BPF_TABLE_PINNED("hash", u64, u64, cgroupset, 1024, "CGROUPPATH");
-#endif
 BPF_PERF_OUTPUT(events);
 """
 
 bpf_text_kprobe = """
 BPF_HASH(infotmp, u64, struct val_t);
-
-int trace_entry(struct pt_regs *ctx, int dfd, const char __user *filename, int flags)
-{
-    struct val_t val = {};
-    u64 id = bpf_get_current_pid_tgid();
-    u32 pid = id >> 32; // PID is higher part
-    u32 tid = id;       // Cast and get the lower part
-    u32 uid = bpf_get_current_uid_gid();
-
-    PID_TID_FILTER
-    UID_FILTER
-    FLAGS_FILTER
-#if CGROUPSET
-    u64 cgroupid = bpf_get_current_cgroup_id();
-    if (cgroupset.lookup(&cgroupid) == NULL) {
-      return 0;
-    }
-#endif
-    if (bpf_get_current_comm(&val.comm, sizeof(val.comm)) == 0) {
-        val.id = id;
-        val.fname = filename;
-        val.flags = flags; // EXTENDED_STRUCT_MEMBER
-        infotmp.update(&id, &val);
-    }
-
-    return 0;
-};
 
 int trace_return(struct pt_regs *ctx)
 {
@@ -151,8 +125,8 @@ int trace_return(struct pt_regs *ctx)
         // missed entry
         return 0;
     }
-    bpf_probe_read(&data.comm, sizeof(data.comm), valp->comm);
-    bpf_probe_read(&data.fname, sizeof(data.fname), (void *)valp->fname);
+    bpf_probe_read_kernel(&data.comm, sizeof(data.comm), valp->comm);
+    bpf_probe_read_user(&data.fname, sizeof(data.fname), (void *)valp->fname);
     data.id = valp->id;
     data.ts = tsp / 1000;
     data.uid = bpf_get_current_uid_gid();
@@ -166,9 +140,25 @@ int trace_return(struct pt_regs *ctx)
 }
 """
 
-bpf_text_kfunc= """
-KRETFUNC_PROBE(do_sys_open, int dfd, const char *filename, int flags, int mode, int ret)
+bpf_text_kprobe_header_open = """
+int syscall__trace_entry_open(struct pt_regs *ctx, const char __user *filename, int flags)
 {
+"""
+
+bpf_text_kprobe_header_openat = """
+int syscall__trace_entry_openat(struct pt_regs *ctx, int dfd, const char __user *filename, int flags)
+{
+"""
+
+bpf_text_kprobe_header_openat2 = """
+#include <uapi/linux/openat2.h>
+int syscall__trace_entry_openat2(struct pt_regs *ctx, int dfd, const char __user *filename, struct open_how *how)
+{
+    int flags = how->flags;
+"""
+
+bpf_text_kprobe_body = """
+    struct val_t val = {};
     u64 id = bpf_get_current_pid_tgid();
     u32 pid = id >> 32; // PID is higher part
     u32 tid = id;       // Cast and get the lower part
@@ -177,19 +167,85 @@ KRETFUNC_PROBE(do_sys_open, int dfd, const char *filename, int flags, int mode, 
     PID_TID_FILTER
     UID_FILTER
     FLAGS_FILTER
-#if CGROUPSET
-    u64 cgroupid = bpf_get_current_cgroup_id();
-    if (cgroupset.lookup(&cgroupid) == NULL) {
-      return 0;
+
+    if (container_should_be_filtered()) {
+        return 0;
     }
+
+    if (bpf_get_current_comm(&val.comm, sizeof(val.comm)) == 0) {
+        val.id = id;
+        val.fname = filename;
+        val.flags = flags; // EXTENDED_STRUCT_MEMBER
+        infotmp.update(&id, &val);
+    }
+
+    return 0;
+};
+"""
+
+bpf_text_kfunc_header_open = """
+#if defined(CONFIG_ARCH_HAS_SYSCALL_WRAPPER) && !defined(__s390x__)
+KRETFUNC_PROBE(FNNAME, struct pt_regs *regs, int ret)
+{
+    const char __user *filename = (char *)PT_REGS_PARM1(regs);
+    int flags = PT_REGS_PARM2(regs);
+#else
+KRETFUNC_PROBE(FNNAME, const char __user *filename, int flags, int ret)
+{
 #endif
+"""
+
+bpf_text_kfunc_header_openat = """
+#if defined(CONFIG_ARCH_HAS_SYSCALL_WRAPPER) && !defined(__s390x__)
+KRETFUNC_PROBE(FNNAME, struct pt_regs *regs, int ret)
+{
+    int dfd = PT_REGS_PARM1(regs);
+    const char __user *filename = (char *)PT_REGS_PARM2(regs);
+    int flags = PT_REGS_PARM3(regs);
+#else
+KRETFUNC_PROBE(FNNAME, int dfd, const char __user *filename, int flags, int ret)
+{
+#endif
+"""
+
+bpf_text_kfunc_header_openat2 = """
+#include <uapi/linux/openat2.h>
+#if defined(CONFIG_ARCH_HAS_SYSCALL_WRAPPER) && !defined(__s390x__)
+KRETFUNC_PROBE(FNNAME, struct pt_regs *regs, int ret)
+{
+    int dfd = PT_REGS_PARM1(regs);
+    const char __user *filename = (char *)PT_REGS_PARM2(regs);
+    struct open_how __user how;
+    int flags;
+
+    bpf_probe_read_user(&how, sizeof(struct open_how), (struct open_how*)PT_REGS_PARM3(regs));
+    flags = how.flags;
+#else
+KRETFUNC_PROBE(FNNAME, int dfd, const char __user *filename, struct open_how __user *how, int ret)
+{
+    int flags = how->flags;
+#endif
+"""
+
+bpf_text_kfunc_body = """
+    u64 id = bpf_get_current_pid_tgid();
+    u32 pid = id >> 32; // PID is higher part
+    u32 tid = id;       // Cast and get the lower part
+    u32 uid = bpf_get_current_uid_gid();
+
+    PID_TID_FILTER
+    UID_FILTER
+    FLAGS_FILTER
+    if (container_should_be_filtered()) {
+        return 0;
+    }
 
     struct data_t data = {};
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
 
     u64 tsp = bpf_ktime_get_ns();
 
-    bpf_probe_read(&data.fname, sizeof(data.fname), (void *)filename);
+    bpf_probe_read_user(&data.fname, sizeof(data.fname), (void *)filename);
     data.id    = id;
     data.ts    = tsp / 1000;
     data.uid   = bpf_get_current_uid_gid();
@@ -197,14 +253,42 @@ KRETFUNC_PROBE(do_sys_open, int dfd, const char *filename, int flags, int mode, 
     data.ret   = ret;
 
     events.perf_submit(ctx, &data, sizeof(data));
+
+    return 0;
 }
 """
 
+b = BPF(text='')
+# open and openat are always in place since 2.6.16
+fnname_open = b.get_syscall_prefix().decode() + 'open'
+fnname_openat = b.get_syscall_prefix().decode() + 'openat'
+fnname_openat2 = b.get_syscall_prefix().decode() + 'openat2'
+if b.ksymname(fnname_openat2) == -1:
+    fnname_openat2 = None
+
 is_support_kfunc = BPF.support_kfunc()
 if is_support_kfunc:
-    bpf_text += bpf_text_kfunc
+    bpf_text += bpf_text_kfunc_header_open.replace('FNNAME', fnname_open)
+    bpf_text += bpf_text_kfunc_body
+
+    bpf_text += bpf_text_kfunc_header_openat.replace('FNNAME', fnname_openat)
+    bpf_text += bpf_text_kfunc_body
+
+    if fnname_openat2:
+        bpf_text += bpf_text_kfunc_header_openat2.replace('FNNAME', fnname_openat2)
+        bpf_text += bpf_text_kfunc_body
 else:
     bpf_text += bpf_text_kprobe
+
+    bpf_text += bpf_text_kprobe_header_open
+    bpf_text += bpf_text_kprobe_body
+
+    bpf_text += bpf_text_kprobe_header_openat
+    bpf_text += bpf_text_kprobe_body
+
+    if fnname_openat2:
+        bpf_text += bpf_text_kprobe_header_openat2
+        bpf_text += bpf_text_kprobe_body
 
 if args.tid:  # TID trumps PID
     bpf_text = bpf_text.replace('PID_TID_FILTER',
@@ -219,11 +303,7 @@ if args.uid:
         'if (uid != %s) { return 0; }' % args.uid)
 else:
     bpf_text = bpf_text.replace('UID_FILTER', '')
-if args.cgroupmap:
-    bpf_text = bpf_text.replace('CGROUPSET', '1')
-    bpf_text = bpf_text.replace('CGROUPPATH', args.cgroupmap)
-else:
-    bpf_text = bpf_text.replace('CGROUPSET', '0')
+bpf_text = filter_by_containers(args) + bpf_text
 if args.flag_filter:
     bpf_text = bpf_text.replace('FLAGS_FILTER',
         'if (!(flags & %d)) { return 0; }' % flag_filter_mask)
@@ -240,8 +320,15 @@ if debug or args.ebpf:
 # initialize BPF
 b = BPF(text=bpf_text)
 if not is_support_kfunc:
-    b.attach_kprobe(event="do_sys_open", fn_name="trace_entry")
-    b.attach_kretprobe(event="do_sys_open", fn_name="trace_return")
+    b.attach_kprobe(event=fnname_open, fn_name="syscall__trace_entry_open")
+    b.attach_kretprobe(event=fnname_open, fn_name="trace_return")
+
+    b.attach_kprobe(event=fnname_openat, fn_name="syscall__trace_entry_openat")
+    b.attach_kretprobe(event=fnname_openat, fn_name="trace_return")
+
+    if fnname_openat2:
+        b.attach_kprobe(event=fnname_openat2, fn_name="syscall__trace_entry_openat2")
+        b.attach_kretprobe(event=fnname_openat2, fn_name="trace_return")
 
 initial_ts = 0
 

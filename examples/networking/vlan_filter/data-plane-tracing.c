@@ -44,7 +44,7 @@ int vlan_filter(struct __sk_buff *skb) {
     			default: goto DROP;
   		}
 
-	//keep the packet and send it to userspace retruning -1
+	//keep the packet and send it to userspace returning -1
 	KEEP:
 		return -1;
 

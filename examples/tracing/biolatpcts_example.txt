@@ -1,0 +1,17 @@
+Demonstrations of biolatpcts.py, the Linux eBPF/bcc version.
+
+
+This traces block I/O and uses layered percpu arrays to bucket the completion
+latencies. Latency percentiles are calculated periodically from the buckets.
+
+# ./biolatpcts.py
+p50=595.0us p75=685.0us p90=1500.0us p99=2500.0us
+p50=55.0us p75=95.0us p90=305.0us p99=2500.0us
+p50=385.0us p75=655.0us p90=1500.0us p99=2500.0us
+[...]
+
+The latency is measured from I/O request to the device, to the device
+completion. This excludes latency spent queued in the OS.
+
+This is a simplified example to demonstrate the calculation of latency
+percentiles. See tools/biolatpcts.py for the full utility.

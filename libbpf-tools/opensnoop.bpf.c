@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (c) 2019 Facebook
 // Copyright (c) 2020 Netflix
-#include "vmlinux.h"
+#include <vmlinux.h>
 #include <bpf/bpf_helpers.h>
 #include "opensnoop.h"
 
-#define TASK_RUNNING 0
+#define TASK_RUNNING	0
 
 const volatile __u64 min_us = 0;
 const volatile pid_t targ_pid = 0;
 const volatile pid_t targ_tgid = 0;
-const volatile pid_t targ_uid = 0;
+const volatile uid_t targ_uid = 0;
 const volatile bool targ_failed = false;
 
 struct {
@@ -26,23 +26,27 @@ struct {
 	__uint(value_size, sizeof(u32));
 } events SEC(".maps");
 
+static __always_inline bool valid_uid(uid_t uid) {
+	return uid != INVALID_UID;
+}
+
 static __always_inline
-int trace_filtered(u32 tgid, u32 pid)
+bool trace_allowed(u32 tgid, u32 pid)
 {
 	u32 uid;
 
 	/* filters */
 	if (targ_tgid && targ_tgid != tgid)
-		return 1;
+		return false;
 	if (targ_pid && targ_pid != pid)
-		return 1;
-	if (targ_uid) {
-		uid = bpf_get_current_uid_gid();
+		return false;
+	if (valid_uid(targ_uid)) {
+		uid = (u32)bpf_get_current_uid_gid();
 		if (targ_uid != uid) {
-			return 1;
+			return false;
 		}
 	}
-	return 0;
+	return true;
 }
 
 SEC("tracepoint/syscalls/sys_enter_open")
@@ -54,7 +58,7 @@ int tracepoint__syscalls__sys_enter_open(struct trace_event_raw_sys_enter* ctx)
 	u32 pid = id;
 
 	/* store arg info for later lookup */
-	if (!trace_filtered(tgid, pid)) {
+	if (trace_allowed(tgid, pid)) {
 		struct args_t args = {};
 		args.fname = (const char *)ctx->args[0];
 		args.flags = (int)ctx->args[1];
@@ -72,7 +76,7 @@ int tracepoint__syscalls__sys_enter_openat(struct trace_event_raw_sys_enter* ctx
 	u32 pid = id;
 
 	/* store arg info for later lookup */
-	if (!trace_filtered(tgid, pid)) {
+	if (trace_allowed(tgid, pid)) {
 		struct args_t args = {};
 		args.fname = (const char *)ctx->args[1];
 		args.flags = (int)ctx->args[2];
@@ -100,7 +104,7 @@ int trace_exit(struct trace_event_raw_sys_exit* ctx)
 	event.pid = bpf_get_current_pid_tgid() >> 32;
 	event.uid = bpf_get_current_uid_gid();
 	bpf_get_current_comm(&event.comm, sizeof(event.comm));
-	bpf_probe_read_str(&event.fname, sizeof(event.fname), ap->fname);
+	bpf_probe_read_user_str(&event.fname, sizeof(event.fname), ap->fname);
 	event.flags = ap->flags;
 	event.ret = ret;
 

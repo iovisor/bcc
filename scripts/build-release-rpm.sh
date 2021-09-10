@@ -12,7 +12,7 @@ trap cleanup EXIT
 
 mkdir $TMP/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
-llvmver=3.7.1
+llvmver=7.0.1
 
 # populate submodules
 git submodule update --init --recursive

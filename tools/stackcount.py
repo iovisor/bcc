@@ -129,7 +129,7 @@ int trace_count(void *ctx) {
     key.tgid = GET_TGID;
     STORE_COMM
     %s
-    counts.increment(key);
+    counts.atomic_increment(key);
     return 0;
 }
         """

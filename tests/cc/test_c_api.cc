@@ -205,8 +205,8 @@ TEST_CASE("resolve symbol addresses for a given PID", "[c_api]") {
     .use_debug_file = 1,
     .check_debug_file_crc = 1,
     .lazy_symbolize = 1,
-#if defined(__powerpc64__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    .use_symbol_type = BCC_SYM_ALL_TYPES | (1 << STT_PPC64LE_SYM_LEP),
+#if defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
+    .use_symbol_type = BCC_SYM_ALL_TYPES | (1 << STT_PPC64_ELFV2_SYM_LEP),
 #else
     .use_symbol_type = BCC_SYM_ALL_TYPES,
 #endif

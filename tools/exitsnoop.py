@@ -27,6 +27,7 @@ _examples = """examples:
     exitsnoop --utc          # include timestamps (UTC)
     exitsnoop -p 181         # only trace PID 181
     exitsnoop --label=exit   # label each output line with 'exit'
+    exitsnoop --per-thread   # trace per thread termination
 """
 """
   Exit status (from <include/sysexits.h>):
@@ -62,6 +63,7 @@ def _getParser():
     a("-p", "--pid",                            help="trace this PID only")
     a("--label",                                help="label each line")
     a("-x", "--failed",    action="store_true", help="trace only fails, exclude exit(0)")
+    a("--per-thread",      action="store_true", help="trace per thread termination")
     # print the embedded C program and exit, for debugging
     a("--ebpf",            action="store_true", help=argparse.SUPPRESS)
     # RHEL 7.6 keeps task->start_time as struct timespec, convert to u64 nanoseconds
@@ -140,11 +142,20 @@ def _embedded_c(args):
     extern int bpf_static_assert[(condition) ? 1 : -1]
     #endif
     """
+
+    if Global.args.pid:
+        if Global.args.per_thread:
+            filter_pid = "task->tgid != %s" % Global.args.pid
+        else:
+            filter_pid = "!(task->tgid == %s && task->pid == task->tgid)" % Global.args.pid
+    else:
+        filter_pid = '0' if Global.args.per_thread else 'task->pid != task->tgid'
+
     code_substitutions = [
         ('EBPF_COMMENT', '' if not Global.args.ebpf else _ebpf_comment()),
         ("BPF_STATIC_ASSERT_DEF", bpf_static_assert_def),
         ("CTYPES_SIZEOF_DATA", str(ct.sizeof(Data))),
-        ('FILTER_PID', '0' if not Global.args.pid else "task->tgid != %s" % Global.args.pid),
+        ('FILTER_PID', filter_pid),
         ('FILTER_EXIT_CODE', '0' if not Global.args.failed else 'task->exit_code == 0'),
         ('PROCESS_START_TIME_NS', 'task->start_time' if not Global.args.timespec else
              '(task->start_time.tv_sec * 1000000000L) + task->start_time.tv_nsec'),

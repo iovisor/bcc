@@ -39,6 +39,12 @@ bpf_text="""
 #include <uapi/linux/ptrace.h>
 #include <linux/blkdev.h>
 
+// for saving the timestamp and __data_len of each request
+struct start_req_t {
+    u64 ts;
+    u64 data_len;
+};
+
 struct val_t {
     u64 ts;
     u32 pid;
@@ -57,7 +63,7 @@ struct data_t {
     char name[TASK_COMM_LEN];
 };
 
-BPF_HASH(start, struct request *);
+BPF_HASH(start, struct request *, struct start_req_t);
 BPF_HASH(infobyreq, struct request *, struct val_t);
 BPF_PERF_OUTPUT(events);
 
@@ -80,45 +86,47 @@ int trace_pid_start(struct pt_regs *ctx, struct request *req)
 // time block I/O
 int trace_req_start(struct pt_regs *ctx, struct request *req)
 {
-    u64 ts;
-    ts = bpf_ktime_get_ns();
-    start.update(&req, &ts);
+    struct start_req_t start_req = {
+        .ts = bpf_ktime_get_ns(),
+        .data_len = req->__data_len
+    };
+    start.update(&req, &start_req);
     return 0;
 }
 
 // output
 int trace_req_completion(struct pt_regs *ctx, struct request *req)
 {
-    u64 *tsp;
+    struct start_req_t *startp;
     struct val_t *valp;
     struct data_t data = {};
     u64 ts;
 
     // fetch timestamp and calculate delta
-    tsp = start.lookup(&req);
-    if (tsp == 0) {
+    startp = start.lookup(&req);
+    if (startp == 0) {
         // missed tracing issue
         return 0;
     }
     ts = bpf_ktime_get_ns();
-    data.delta = ts - *tsp;
+    data.delta = ts - startp->ts;
     data.ts = ts / 1000;
     data.qdelta = 0;
 
     valp = infobyreq.lookup(&req);
+    data.len = startp->data_len;
     if (valp == 0) {
-        data.len = req->__data_len;
-        strcpy(data.name, "?");
+        data.name[0] = '?';
+        data.name[1] = 0;
     } else {
         if (##QUEUE##) {
-            data.qdelta = *tsp - valp->ts;
+            data.qdelta = startp->ts - valp->ts;
         }
         data.pid = valp->pid;
-        data.len = req->__data_len;
         data.sector = req->__sector;
-        bpf_probe_read(&data.name, sizeof(data.name), valp->name);
+        bpf_probe_read_kernel(&data.name, sizeof(data.name), valp->name);
         struct gendisk *rq_disk = req->rq_disk;
-        bpf_probe_read(&data.disk_name, sizeof(data.disk_name),
+        bpf_probe_read_kernel(&data.disk_name, sizeof(data.disk_name),
                        rq_disk->disk_name);
     }
 
@@ -159,7 +167,7 @@ b.attach_kprobe(event="blk_account_io_start", fn_name="trace_pid_start")
 if BPF.get_kprobe_functions(b'blk_start_request'):
     b.attach_kprobe(event="blk_start_request", fn_name="trace_req_start")
 b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_req_start")
-b.attach_kprobe(event="blk_account_io_completion",
+b.attach_kprobe(event="blk_account_io_done",
     fn_name="trace_req_completion")
 
 # header

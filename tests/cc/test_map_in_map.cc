@@ -30,7 +30,7 @@ TEST_CASE("test hash of maps", "[hash_of_maps]") {
       BPF_ARRAY(ex1, int, 1024);
       BPF_ARRAY(ex2, int, 1024);
       BPF_ARRAY(ex3, u64, 1024);
-      BPF_HASH_OF_MAPS(maps_hash, "ex1", 10);
+      BPF_HASH_OF_MAPS(maps_hash, int, "ex1", 10);
 
       int syscall__getuid(void *ctx) {
          int key = 0, data, *val, cntl_val;
@@ -63,7 +63,7 @@ TEST_CASE("test hash of maps", "[hash_of_maps]") {
     res = bpf.init(BPF_PROGRAM);
     REQUIRE(res.code() == 0);
 
-    auto t = bpf.get_map_in_map_table("maps_hash");
+    auto t = bpf.get_map_in_map_table<int>("maps_hash");
     auto ex1_table = bpf.get_array_table<int>("ex1");
     auto ex2_table = bpf.get_array_table<int>("ex2");
     auto ex3_table = bpf.get_array_table<unsigned long long>("ex3");
@@ -115,6 +115,119 @@ TEST_CASE("test hash of maps", "[hash_of_maps]") {
   }
 }
 
+TEST_CASE("test hash of maps using custom key", "[hash_of_maps_custom_key]") {
+  {
+    const std::string BPF_PROGRAM = R"(
+        struct custom_key {
+          int value_1;
+          int value_2;
+        };
+
+        BPF_ARRAY(cntl, int, 1);
+        BPF_TABLE("hash", int, int, ex1, 1024);
+        BPF_TABLE("hash", int, int, ex2, 1024);
+        BPF_HASH_OF_MAPS(maps_hash, struct custom_key, "ex1", 10);
+
+        int syscall__getuid(void *ctx) {
+          struct custom_key hash_key = {1, 0};
+          int key = 0, data, *val, cntl_val;
+          void *inner_map;
+
+          val = cntl.lookup(&key);
+          if (!val || *val == 0)
+            return 0;
+
+          hash_key.value_2 = *val;
+          inner_map = maps_hash.lookup(&hash_key);
+          if (!inner_map)
+            return 0;
+
+          val = bpf_map_lookup_elem(inner_map, &key);
+          if (!val) {
+            data = 1;
+            bpf_map_update_elem(inner_map, &key, &data, 0);
+          } else {
+            data = 1 + *val;
+            bpf_map_update_elem(inner_map, &key, &data, 0);
+          }
+
+          return 0;
+        }
+    )";
+
+    struct custom_key {
+      int value_1;
+      int value_2;
+    };
+
+    ebpf::BPF bpf;
+    ebpf::StatusTuple res(0);
+    res = bpf.init(BPF_PROGRAM);
+    REQUIRE(res.code() == 0);
+
+    auto t = bpf.get_map_in_map_table<struct custom_key>("maps_hash");
+    auto ex1_table = bpf.get_hash_table<int, int>("ex1");
+    auto ex2_table = bpf.get_hash_table<int, int>("ex2");
+    auto cntl_table = bpf.get_array_table<int>("cntl");
+    int ex1_fd = ex1_table.get_fd();
+    int ex2_fd = ex2_table.get_fd();
+
+    // test effectiveness of map-in-map
+    std::string getuid_fnname = bpf.get_syscall_fnname("getuid");
+    res = bpf.attach_kprobe(getuid_fnname, "syscall__getuid");
+    REQUIRE(res.code() == 0);
+
+    struct custom_key hash_key = {1, 1};
+
+    res = t.update_value(hash_key, ex1_fd);
+    REQUIRE(res.code() == 0);
+
+    struct custom_key hash_key2 = {1, 2};
+    res = t.update_value(hash_key2, ex2_fd);
+    REQUIRE(res.code() == 0);
+
+    int key = 0, value = 0, value2 = 0;
+
+    // Can't get value when value didn't set.
+    res = ex1_table.get_value(key, value);
+    REQUIRE(res.code() != 0);
+    REQUIRE(value == 0);
+
+    // Call syscall__getuid, then set value to ex1_table
+    res = cntl_table.update_value(key, 1);
+    REQUIRE(res.code() == 0);
+    REQUIRE(getuid() >= 0);
+
+    // Now we can get value from ex1_table
+    res = ex1_table.get_value(key, value);
+    REQUIRE(res.code() == 0);
+    REQUIRE(value >= 1);
+
+    // Can't get value when value didn't set.
+    res = ex2_table.get_value(key, value2);
+    REQUIRE(res.code() != 0);
+    REQUIRE(value2 == 0);
+
+    // Call syscall__getuid, then set value to ex2_table
+    res = cntl_table.update_value(key, 2);
+    REQUIRE(res.code() == 0);
+    REQUIRE(getuid() >= 0);
+
+    // Now we can get value from ex2_table
+    res = ex2_table.get_value(key, value2);
+    REQUIRE(res.code() == 0);
+    REQUIRE(value > 0);
+
+    res = bpf.detach_kprobe(getuid_fnname);
+    REQUIRE(res.code() == 0);
+
+    res = t.remove_value(hash_key);
+    REQUIRE(res.code() == 0);
+    res = t.remove_value(hash_key2);
+    REQUIRE(res.code() == 0);
+  }
+}
+
 TEST_CASE("test array of maps", "[array_of_maps]") {
   {
     const std::string BPF_PROGRAM = R"(
@@ -158,7 +271,7 @@ TEST_CASE("test array of maps", "[array_of_maps]") {
     res = bpf.init(BPF_PROGRAM);
     REQUIRE(res.code() == 0);
 
-    auto t = bpf.get_map_in_map_table("maps_array");
+    auto t = bpf.get_map_in_map_table<int>("maps_array");
     auto ex1_table = bpf.get_hash_table<int, int>("ex1");
     auto ex2_table = bpf.get_hash_table<int, int>("ex2");
     auto ex3_table =

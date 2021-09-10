@@ -86,7 +86,7 @@ information. See PROBE SYNTAX below.
 .SH PROBE SYNTAX
 The general probe syntax is as follows:
 
-.B [{p,r}]:[library]:function[(signature)] [(predicate)] ["format string"[, arguments]]
+.B [{p,r}]:[library]:function[+offset][(signature)] [(predicate)] ["format string"[, arguments]]
 
 .B {t:category:event,u:library:probe} [(predicate)] ["format string"[, arguments]]
 .TP
@@ -107,6 +107,10 @@ The tracepoint category. For example, "sched" or "irq".
 .TP
 .B function
 The function to probe.
+.B offset
+The offset after the address of the function where the probe should injected.
+For example "kfree_skb+56" in decimal or hexadecimal "kfree_skb+0x38" format.
+Only works with kprobes and uprobes. Zero if omitted.
 .TP
 .B signature
 The optional signature of the function to probe. This can make it easier to

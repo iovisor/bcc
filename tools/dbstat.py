@@ -39,7 +39,7 @@ parser.add_argument("-m", "--threshold", type=int, default=0,
     help="trace queries slower than this threshold (ms)")
 parser.add_argument("-u", "--microseconds", action="store_true",
     help="display query latencies in microseconds (default: milliseconds)")
-parser.add_argument("-i", "--interval", type=int, default=99999999999,
+parser.add_argument("-i", "--interval", type=int, default=99999999,
     help="print summary at this interval (seconds)")
 args = parser.parse_args()
 
@@ -74,7 +74,7 @@ int probe_end(struct pt_regs *ctx) {
     u64 delta = bpf_ktime_get_ns() - *timestampp;
     FILTER
     delta /= SCALE;
-    latency.increment(bpf_log2l(delta));
+    latency.atomic_increment(bpf_log2l(delta));
     temp.delete(&pid);
     return 0;
 }
@@ -83,7 +83,7 @@ program = program.replace("SCALE", str(1000 if args.microseconds else 1000000))
 program = program.replace("FILTER", "" if args.threshold == 0 else
         "if (delta / 1000000 < %d) { return 0; }" % args.threshold)
 
-usdts = map(lambda pid: USDT(pid=pid), args.pids)
+usdts = list(map(lambda pid: USDT(pid=pid), args.pids))
 for usdt in usdts:
     usdt.enable_probe("query__start", "probe_start")
     usdt.enable_probe("query__done", "probe_end")

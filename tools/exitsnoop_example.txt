@@ -67,7 +67,7 @@ TIME-UTC     LABEL PCOMM            PID    PPID   TID    AGE(s)  EXIT_CODE
 USAGE message:
 
 # ./exitsnoop.py -h
-usage: exitsnoop.py [-h] [-t] [--utc] [-p PID] [--label LABEL] [-x]
+usage: exitsnoop.py [-h] [-t] [--utc] [-p PID] [--label LABEL] [-x] [--per-thread]
 
 Trace all process termination (exit, fatal signal)
 
@@ -78,6 +78,7 @@ optional arguments:
   -p PID, --pid PID  trace this PID only
   --label LABEL      label each line
   -x, --failed       trace only fails, exclude exit(0)
+  --per-thread       trace per thread termination
 
 examples:
     exitsnoop                # trace all process termination
@@ -86,6 +87,7 @@ examples:
     exitsnoop --utc          # include timestamps (UTC)
     exitsnoop -p 181         # only trace PID 181
     exitsnoop --label=exit   # label each output line with 'exit'
+    exitsnoop --per-thread   # trace per thread termination
 
 Exit status:
 

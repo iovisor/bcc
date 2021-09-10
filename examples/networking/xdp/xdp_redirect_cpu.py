@@ -30,7 +30,6 @@ if (cpu_id > max_cpu):
 
 # load BPF program
 b = BPF(text = """
-#define KBUILD_MODNAME "foo"
 #include <uapi/linux/bpf.h>
 #include <linux/in.h>
 #include <linux/if_ether.h>
@@ -61,10 +60,6 @@ int xdp_redirect_cpu(struct xdp_md *ctx) {
         *value += 1;
 
     return cpumap.redirect_map(*cpu, 0);
-}
-
-int xdp_dummy(struct xdp_md *ctx) {
-    return XDP_PASS;
 }
 """, cflags=["-w", "-D__MAX_CPU__=%u" % max_cpu], debug=0)
 

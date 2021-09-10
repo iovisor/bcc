@@ -68,4 +68,4 @@ EXAMPLES:
       --usage                Give a short usage message
   -V, --version              Print program version
 
-Report bugs to <ethercflow@gmail.com>.
+Report bugs to <bpf@vger.kernel.org>.

@@ -6,8 +6,10 @@
 
 struct event {
 	char task[TASK_COMM_LEN];
+	char prev_task[TASK_COMM_LEN];
 	__u64 delta_us;
 	pid_t pid;
+	pid_t prev_pid;
 };
 
 #endif /* __RUNQSLOWER_H */

@@ -1,0 +1,59 @@
+.TH readahead 8  "2020-08-20" "USER COMMANDS"
+.SH NAME
+readahead \- Show performance of read-ahead cache
+.SH SYNOPSIS
+.B readahead [-d DURATION]
+.SH DESCRIPTION
+The tool shows the performance of read-ahead caching on the system under a given load to investigate any 
+caching issues. It shows a count of unused pages in the cache and also prints a histogram showing how 
+long they have remained there.
+
+This tool traces the \fB__do_page_cache_readahead()\fR kernel function to track entry and exit in the
+readahead mechanism in the kernel and then uses \fB__page_cache_alloc()\fR and \fBmark_page_accessed()\fR 
+functions to calculate the age of the page in the cache as well as see how many are left unaccessed.
+
+Since this uses BPF, only the root user can use this tool.
+.SS NOTE ON KPROBES USAGE
+Since the tool uses Kprobes, depending on your linux kernel's compilation, these functions may be inlined 
+and hence not available for Kprobes. To see whether you have the functions available, check \fBvmlinux\fR 
+source and binary to confirm whether inlining is happening or not. You can also check \fB/proc/kallsyms\fR 
+on the host and verify if the target functions are present there before using this.
+.SH REQUIREMENTS
+CONFIG_BPF, bcc
+.SH OPTIONS
+\-h
+Print usage message
+.TP
+\-d DURATION
+Trace the read-ahead caching system for DURATION seconds 
+.SH EXAMPLES
+.TP
+Trace for 30 seconds and show  histogram of page age (ms) in read-ahead cache along with unused page count:
+#
+.B readahead -d 30
+.SH OVERHEAD
+The kernel functions instrumented by this program could be high-frequency depending on the profile of the 
+application (for example sequential IO). We advise the users to measure and monitor the overhead before leaving 
+this turned on in production environments.
+.SH SOURCE
+This originated as a bpftrace tool from the book "BPF Performance Tools",
+published by Addison Wesley (2019):
+.IP
+http://www.brendangregg.com/bpf-performance-tools-book.html
+.PP
+See the book for more documentation on this tool.
+.PP
+This version is in the BCC repository:
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Suchakra Sharma
+.SH SEE ALSO
+readahead(2), madvise(2)

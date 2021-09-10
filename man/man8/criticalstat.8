@@ -17,9 +17,10 @@ Since this uses BPF, only the root user can use this tool. Further, the kernel
 has to be built with certain CONFIG options enabled. See below.
 
 .SH REQUIREMENTS
-Enable CONFIG_PREEMPTIRQ_EVENTS and CONFIG_DEBUG_PREEMPT. Additionally, the
-following options should be DISABLED on older kernels: CONFIG_PROVE_LOCKING,
-CONFIG_LOCKDEP.
+Enable CONFIG_PREEMPT_TRACER, CONFIG_PREEMPTIRQ_EVENTS
+(CONFIG_PREEMPTIRQ_TRACEPOINTS in kernel 4.19 and later)
+and CONFIG_DEBUG_PREEMPT. Additionally, the following options
+should be DISABLED on older kernels: CONFIG_PROVE_LOCKING, CONFIG_LOCKDEP.
 .SH OPTIONS
 .TP
 \-h

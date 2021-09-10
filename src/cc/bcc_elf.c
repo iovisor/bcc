@@ -24,6 +24,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
+#ifdef HAVE_LIBDEBUGINFOD
+#include <elfutils/debuginfod.h>
+#endif
 
 #include <gelf.h>
 #include "bcc_elf.h"
@@ -58,6 +61,7 @@ static int openelf(const char *path, Elf **elf_out, int *fd_out) {
 }
 
 static const char *parse_stapsdt_note(struct bcc_elf_usdt *probe,
+                                      GElf_Shdr *probes_shdr,
                                       const char *desc, int elf_class) {
   if (elf_class == ELFCLASS32) {
     probe->pc = *((uint32_t *)(desc));
@@ -71,6 +75,13 @@ static const char *parse_stapsdt_note(struct bcc_elf_usdt *probe,
     desc = desc + 24;
   }
 
+  // Offset from start of file
+  if (probe->semaphore && probes_shdr)
+    probe->semaphore_offset =
+      probe->semaphore - probes_shdr->sh_addr + probes_shdr->sh_offset;
+  else
+    probe->semaphore_offset = 0;
+
   probe->provider = desc;
   desc += strlen(desc) + 1;
 
@@ -83,7 +94,7 @@ static const char *parse_stapsdt_note(struct bcc_elf_usdt *probe,
   return desc;
 }
 
-static int do_note_segment(Elf_Scn *section, int elf_class,
+static int do_note_segment(Elf_Scn *section, GElf_Shdr *probes_shdr, int elf_class,
                            bcc_elf_probecb callback, const char *binpath,
                            uint64_t first_inst_offset, void *payload) {
   Elf_Data *data = NULL;
@@ -110,7 +121,7 @@ static int do_note_segment(Elf_Scn *section, int elf_class,
       desc = (const char *)data->d_buf + desc_off;
       desc_end = desc + hdr.n_descsz;
 
-      if (parse_stapsdt_note(&probe, desc, elf_class) == desc_end) {
+      if (parse_stapsdt_note(&probe, probes_shdr, desc, elf_class) == desc_end) {
         if (probe.pc < first_inst_offset)
           fprintf(stderr,
                   "WARNING: invalid address 0x%lx for probe (%s,%s) in binary %s\n",
@@ -126,9 +137,11 @@ static int do_note_segment(Elf_Scn *section, int elf_class,
 static int listprobes(Elf *e, bcc_elf_probecb callback, const char *binpath,
                       void *payload) {
   Elf_Scn *section = NULL;
+  bool found_probes_shdr;
   size_t stridx;
   int elf_class = gelf_getclass(e);
   uint64_t first_inst_offset = 0;
+  GElf_Shdr probes_shdr = {};
 
   if (elf_getshdrstrndx(e, &stridx) != 0)
     return -1;
@@ -148,6 +161,18 @@ static int listprobes(Elf *e, bcc_elf_probecb callback, const char *binpath,
     }
   }
 
+  found_probes_shdr = false;
+  while ((section = elf_nextscn(e, section)) != 0) {
+    if (!gelf_getshdr(section, &probes_shdr))
+      continue;
+
+    char *name = elf_strptr(e, stridx, probes_shdr.sh_name);
+    if (name && !strcmp(name, ".probes")) {
+      found_probes_shdr = true;
+      break;
+    }
+  }
+
   while ((section = elf_nextscn(e, section)) != 0) {
     GElf_Shdr header;
     char *name;
@@ -160,7 +185,8 @@ static int listprobes(Elf *e, bcc_elf_probecb callback, const char *binpath,
 
     name = elf_strptr(e, stridx, header.sh_name);
     if (name && !strcmp(name, ".note.stapsdt")) {
-      if (do_note_segment(section, elf_class, callback, binpath,
+      GElf_Shdr *shdr_ptr = found_probes_shdr ? &probes_shdr : NULL;
+      if (do_note_segment(section, shdr_ptr, elf_class, callback, binpath,
                           first_inst_offset, payload) < 0)
         return -1;
     }
@@ -257,16 +283,8 @@ static int list_in_scn(Elf *e, Elf_Scn *section, size_t stridx, size_t symsize,
         continue;
 
 #ifdef __powerpc64__
-#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-      if (opddata && sym.st_shndx == opdidx) {
-        size_t offset = sym.st_value - opdshdr.sh_addr;
-        /* Find the function descriptor */
-        uint64_t *descr = opddata->d_buf + offset;
-        /* Read the actual entry point address from the descriptor */
-        sym.st_value = *descr;
-      }
-#elif __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-      if (option->use_symbol_type & (1 << STT_PPC64LE_SYM_LEP)) {
+#if defined(_CALL_ELF) && _CALL_ELF == 2
+      if (option->use_symbol_type & (1 << STT_PPC64_ELFV2_SYM_LEP)) {
         /*
          * The PowerPC 64-bit ELF v2 ABI says that the 3 most significant bits
          * in the st_other field of the symbol table specifies the number of
@@ -286,6 +304,14 @@ static int list_in_scn(Elf *e, Elf_Scn *section, size_t stridx, size_t symsize,
           /* If 6, LEP is 16 instructions past the GEP */
           case 6: sym.st_value += 64; break;
         }
+      }
+#else
+      if (opddata && sym.st_shndx == opdidx) {
+        size_t offset = sym.st_value - opdshdr.sh_addr;
+        /* Find the function descriptor */
+        uint64_t *descr = opddata->d_buf + offset;
+        /* Read the actual entry point address from the descriptor */
+        sym.st_value = *descr;
       }
 #endif
 #endif
@@ -562,6 +588,10 @@ static char *find_debug_via_symfs(Elf *e, const char* path) {
 
   check_build_id = find_buildid(e, buildid);
 
+  int ns_prefix_length = 0;
+  sscanf(path, "/proc/%*u/root/%n", &ns_prefix_length);
+  path += ns_prefix_length;
+
   snprintf(fullpath, sizeof(fullpath), "%s/%s", symfs, path);
   if (access(fullpath, F_OK) == -1)
     goto out;
@@ -594,6 +624,54 @@ out:
   return result;
 }
 
+#ifdef HAVE_LIBDEBUGINFOD
+static char *find_debug_via_debuginfod(Elf *e){
+  char buildid[128];
+  char *debugpath = NULL;
+  int fd = -1;
+
+  if (!find_buildid(e, buildid))
+    return NULL;
+
+  debuginfod_client *client = debuginfod_begin();
+  if (!client)
+    return NULL;
+
+  // In case of an error, the function returns a negative error code and
+  // debugpath stays NULL.
+  fd = debuginfod_find_debuginfo(client, (const unsigned char *) buildid, 0,
+                                 &debugpath);
+  if (fd >= 0)
+    close(fd);
+
+  debuginfod_end(client);
+  return debugpath;
+}
+#endif
+
+static char *find_debug_file(Elf* e, const char* path, int check_crc) {
+  char *debug_file = NULL;
+
+  // If there is a separate debuginfo file, try to locate and read it, first
+  // using symfs, then using the build-id section, finally using the debuglink
+  // section. These rules are what perf and gdb follow.
+  // See:
+  // - https://github.com/torvalds/linux/blob/v5.2/tools/perf/Documentation/perf-report.txt#L325
+  // - https://sourceware.org/gdb/onlinedocs/gdb/Separate-Debug-Files.html
+  debug_file = find_debug_via_symfs(e, path);
+  if (!debug_file)
+    debug_file = find_debug_via_buildid(e);
+  if (!debug_file)
+    debug_file = find_debug_via_debuglink(e, path, check_crc);
+#ifdef HAVE_LIBDEBUGINFOD
+  if (!debug_file)
+    debug_file = find_debug_via_debuginfod(e);
+#endif
+
+  return debug_file;
+}
+
+
 static int foreach_sym_core(const char *path, bcc_elf_symcb callback,
                             bcc_elf_symcb_lazy callback_lazy,
                             struct bcc_symbol_option *option, void *payload,
@@ -608,21 +686,11 @@ static int foreach_sym_core(const char *path, bcc_elf_symcb callback,
   if (openelf(path, &e, &fd) < 0)
     return -1;
 
-  // If there is a separate debuginfo file, try to locate and read it, first
-  // using symfs, then using the build-id section, finally using the debuglink
-  // section. These rules are what perf and gdb follow.
-  // See:
-  // - https://github.com/torvalds/linux/blob/v5.2/tools/perf/Documentation/perf-report.txt#L325
-  // - https://sourceware.org/gdb/onlinedocs/gdb/Separate-Debug-Files.html
   if (option->use_debug_file && !is_debug_file) {
     // The is_debug_file argument helps avoid infinitely resolving debuginfo
     // files for debuginfo files and so on.
-    debug_file = find_debug_via_symfs(e, path);
-    if (!debug_file)
-      debug_file = find_debug_via_buildid(e);
-    if (!debug_file)
-      debug_file = find_debug_via_debuglink(e, path,
-                                            option->check_debug_file_crc);
+    debug_file = find_debug_file(e, path,
+                                 option->check_debug_file_crc);
     if (debug_file) {
       foreach_sym_core(debug_file, callback, callback_lazy, option, payload, 1);
       free(debug_file);
@@ -998,10 +1066,7 @@ int bcc_elf_symbol_str(const char *path, size_t section_idx,
     return -1;
 
   if (debugfile) {
-    debug_file = find_debug_via_buildid(e);
-    if (!debug_file)
-      debug_file = find_debug_via_debuglink(e, path, 0); // No crc for speed
-
+    debug_file = find_debug_file(e, path, 0);
     if (!debug_file) {
       err = -1;
       goto exit;

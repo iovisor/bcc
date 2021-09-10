@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/resource.h>
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
@@ -16,6 +15,7 @@
 #include <bpf/bpf.h>
 #include "opensnoop.h"
 #include "opensnoop.skel.h"
+#include "trace_helpers.h"
 
 /* Tune the buffer size and wakeup rate. These settings cope with roughly
  * 50k opens/sec.
@@ -39,10 +39,13 @@ static struct env {
 	bool extended;
 	bool failed;
 	char *name;
-} env = {};
+} env = {
+	.uid = INVALID_UID
+};
 
 const char *argp_program_version = "opensnoop 0.1";
-const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
+const char *argp_program_bug_address =
+	"https://github.com/iovisor/bcc/tree/master/libbpf-tools";
 const char argp_program_doc[] =
 "Trace open family syscalls\n"
 "\n"
@@ -79,7 +82,7 @@ static const struct argp_option opts[] = {
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
 	static int pos_args;
-	int pid, uid, duration;
+	long int pid, uid, duration;
 
 	switch (key) {
 	case 'e':
@@ -134,7 +137,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	case 'u':
 		errno = 0;
 		uid = strtol(arg, NULL, 10);
-		if (errno || uid <= 0) {
+		if (errno || uid < 0 || uid >= INVALID_UID) {
 			fprintf(stderr, "Invalid UID %s\n", arg);
 			argp_usage(state);
 		}
@@ -160,16 +163,6 @@ int libbpf_print_fn(enum libbpf_print_level level,
 	if (level == LIBBPF_DEBUG && !env.verbose)
 		return 0;
 	return vfprintf(stderr, format, args);
-}
-
-static int bump_memlock_rlimit(void)
-{
-	struct rlimit rlim_new = {
-		.rlim_cur	= RLIM_INFINITY,
-		.rlim_max	= RLIM_INFINITY,
-	};
-
-	return setrlimit(RLIMIT_MEMLOCK, &rlim_new);
 }
 
 void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
@@ -212,13 +205,6 @@ void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 	fprintf(stderr, "Lost %llu events on CPU #%d!\n", lost_cnt, cpu);
 }
 
-__u64 gettimens()
-{
-	struct timespec ts = {};
-	clock_gettime(CLOCK_MONOTONIC, &ts);
-	return (ts.tv_sec * NSEC_PER_SEC + ts.tv_nsec);
-}
-
 int main(int argc, char **argv)
 {
 	static const struct argp argp = {
@@ -246,7 +232,7 @@ int main(int argc, char **argv)
 
 	obj = opensnoop_bpf__open();
 	if (!obj) {
-		fprintf(stderr, "failed to open and/or load BPF object\n");
+		fprintf(stderr, "failed to open BPF object\n");
 		return 1;
 	}
 
@@ -255,6 +241,16 @@ int main(int argc, char **argv)
 	obj->rodata->targ_pid = env.tid;
 	obj->rodata->targ_uid = env.uid;
 	obj->rodata->targ_failed = env.failed;
+
+#ifdef __aarch64__
+	/* aarch64 has no open syscall, only openat variants.
+	 * Disable associated tracepoints that do not exist. See #3344.
+	 */
+	bpf_program__set_autoload(
+		obj->progs.tracepoint__syscalls__sys_enter_open, false);
+	bpf_program__set_autoload(
+		obj->progs.tracepoint__syscalls__sys_exit_open, false);
+#endif
 
 	err = opensnoop_bpf__load(obj);
 	if (err) {
@@ -292,18 +288,15 @@ int main(int argc, char **argv)
 
 	/* setup duration */
 	if (env.duration)
-		time_end = gettimens() + env.duration * NSEC_PER_SEC;
+		time_end = get_ktime_ns() + env.duration * NSEC_PER_SEC;
 
 	/* main: poll */
 	while (1) {
 		usleep(PERF_BUFFER_TIME_MS * 1000);
 		if ((err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS)) < 0)
 			break;
-		if (env.duration) {
-			if (gettimens() > time_end) {
-				goto cleanup;
-			}
-		}
+		if (env.duration && get_ktime_ns() > time_end)
+			goto cleanup;
 	}
 	printf("Error polling perf buffer: %d\n", err);
 

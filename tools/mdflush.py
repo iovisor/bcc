@@ -32,7 +32,7 @@ BPF_PERF_OUTPUT(events);
 int kprobe__md_flush_request(struct pt_regs *ctx, void *mddev, struct bio *bio)
 {
     struct data_t data = {};
-    u32 pid = bpf_get_current_pid_tgid();
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
     data.pid = pid;
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
 /*
@@ -47,7 +47,7 @@ int kprobe__md_flush_request(struct pt_regs *ctx, void *mddev, struct bio *bio)
 #else
     struct gendisk *bi_disk = bio->bi_bdev->bd_disk;
 #endif
-    bpf_probe_read(&data.disk, sizeof(data.disk), bi_disk->disk_name);
+    bpf_probe_read_kernel(&data.disk, sizeof(data.disk), bi_disk->disk_name);
     events.perf_submit(ctx, &data, sizeof(data));
     return 0;
 }

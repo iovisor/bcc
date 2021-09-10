@@ -5,11 +5,12 @@
 #
 # USAGE: argdist [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL] [-n COUNT] [-v]
 #                [-c] [-T TOP] [-C specifier] [-H specifier] [-I header]
+#                [-t TID]
 #
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
 
-from bcc import BPF, USDT
+from bcc import BPF, USDT, StrcmpRewrite
 from time import sleep, strftime
 import argparse
 import re
@@ -41,6 +42,10 @@ class Probe(object):
                         param_type = param[0:index + 1].strip()
                         param_name = param[index + 1:].strip()
                         self.param_types[param_name] = param_type
+                        # Maintain list of user params. Then later decide to
+                        # switch to bpf_probe_read_kernel or bpf_probe_read_user.
+                        if "__user" in param_type.split():
+                                self.probe_user_list.add(param_name)
 
         def _generate_entry(self):
                 self.entry_probe_func = self.probe_func_name + "_entry"
@@ -51,6 +56,7 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
         u32 __pid      = __pid_tgid;        // lower 32 bits
         u32 __tgid     = __pid_tgid >> 32;  // upper 32 bits
         PID_FILTER
+        TID_FILTER
         COLLECT
         return 0;
 }
@@ -59,6 +65,7 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
                 text = text.replace("SIGNATURE",
                      "" if len(self.signature) == 0 else ", " + self.signature)
                 text = text.replace("PID_FILTER", self._generate_pid_filter())
+                text = text.replace("TID_FILTER", self._generate_tid_filter())
                 collect = ""
                 for pname in self.args_to_probe:
                         param_hash = self.hashname_prefix + pname
@@ -180,8 +187,11 @@ u64 __time = bpf_ktime_get_ns();
                 self.usdt_ctx = None
                 self.streq_functions = ""
                 self.pid = tool.args.pid
+                self.tid = tool.args.tid
                 self.cumulative = tool.args.cumulative or False
                 self.raw_spec = specifier
+                self.probe_user_list = set()
+                self.bin_cmp = False
                 self._validate_specifier()
 
                 spec_and_label = specifier.split('#')
@@ -250,32 +260,16 @@ u64 __time = bpf_ktime_get_ns();
                 self.usdt_ctx.enable_probe(
                         self.function, self.probe_func_name)
 
-        def _generate_streq_function(self, string):
-                fname = "streq_%d" % Probe.streq_index
-                Probe.streq_index += 1
-                self.streq_functions += """
-static inline bool %s(char const *ignored, char const *str) {
-        char needle[] = %s;
-        char haystack[sizeof(needle)];
-        bpf_probe_read(&haystack, sizeof(haystack), (void *)str);
-        for (int i = 0; i < sizeof(needle) - 1; ++i) {
-                if (needle[i] != haystack[i]) {
-                        return false;
-                }
-        }
-        return true;
-}
-                """ % (fname, string)
-                return fname
-
         def _substitute_exprs(self):
                 def repl(expr):
                         expr = self._substitute_aliases(expr)
-                        matches = re.finditer('STRCMP\\(("[^"]+\\")', expr)
-                        for match in matches:
-                                string = match.group(1)
-                                fname = self._generate_streq_function(string)
-                                expr = expr.replace("STRCMP", fname, 1)
+                        rdict = StrcmpRewrite.rewrite_expr(expr,
+                                self.bin_cmp, self.library,
+                                self.probe_user_list, self.streq_functions,
+                                Probe.streq_index)
+                        expr = rdict["expr"]
+                        self.streq_functions = rdict["streq_functions"]
+                        Probe.streq_index = rdict["probeid"]
                         return expr.replace("$retval", "PT_REGS_RC(ctx)")
                 for i in range(0, len(self.exprs)):
                         self.exprs[i] = repl(self.exprs[i])
@@ -305,9 +299,14 @@ static inline bool %s(char const *ignored, char const *str) {
         def _generate_field_assignment(self, i):
                 text = self._generate_usdt_arg_assignment(i)
                 if self._is_string(self.expr_types[i]):
-                        return (text + "        bpf_probe_read(&__key.v%d.s," +
+                        if self.is_user or \
+                            self.exprs[i] in self.probe_user_list:
+                                probe_readfunc = "bpf_probe_read_user"
+                        else:
+                                probe_readfunc = "bpf_probe_read_kernel"
+                        return (text + "        %s(&__key.v%d.s," +
                                 " sizeof(__key.v%d.s), (void *)%s);\n") % \
-                                (i, i, self.exprs[i])
+                                (probe_readfunc, i, i, self.exprs[i])
                 else:
                         return text + "        __key.v%d = %s;\n" % \
                                (i, self.exprs[i])
@@ -339,16 +338,23 @@ static inline bool %s(char const *ignored, char const *str) {
 
         def _generate_hash_update(self):
                 if self.type == "hist":
-                        return "%s.increment(bpf_log2l(__key));" % \
+                        return "%s.atomic_increment(bpf_log2l(__key));" % \
                                 self.probe_hash_name
                 else:
-                        return "%s.increment(__key);" % self.probe_hash_name
+                        return "%s.atomic_increment(__key);" % \
+                                self.probe_hash_name
 
         def _generate_pid_filter(self):
                 # Kernel probes need to explicitly filter pid, because the
                 # attach interface doesn't support pid filtering
                 if self.pid is not None and not self.is_user:
                         return "if (__tgid != %d) { return 0; }" % self.pid
+                else:
+                        return ""
+
+        def _generate_tid_filter(self):
+                if self.tid is not None and not self.is_user:
+                        return "if (__pid != %d) { return 0; }" % self.tid
                 else:
                         return ""
 
@@ -366,9 +372,10 @@ DATA_DECL
         u32 __pid      = __pid_tgid;        // lower 32 bits
         u32 __tgid     = __pid_tgid >> 32;  // upper 32 bits
         PID_FILTER
+        TID_FILTER
         PREFIX
-        if (!(FILTER)) return 0;
         KEY_EXPR
+        if (!(FILTER)) return 0;
         COLLECT
         return 0;
 }
@@ -395,6 +402,8 @@ DATA_DECL
                 program = program.replace("SIGNATURE", signature)
                 program = program.replace("PID_FILTER",
                                           self._generate_pid_filter())
+                program = program.replace("TID_FILTER",
+                                          self._generate_tid_filter())
 
                 decl = self._generate_hash_decl()
                 key_expr = self._generate_key_assignment()
@@ -606,6 +615,8 @@ argdist -I 'kernel/sched/sched.h' \\
                   epilog=Tool.examples)
                 parser.add_argument("-p", "--pid", type=int,
                   help="id of the process to trace (optional)")
+                parser.add_argument("-t", "--tid", type=int,
+                  help="id of the thread to trace (optional)")
                 parser.add_argument("-z", "--string-size", default=80,
                   type=int,
                   help="maximum string size to read from char* arguments")

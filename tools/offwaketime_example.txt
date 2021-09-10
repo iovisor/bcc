@@ -307,7 +307,7 @@ USAGE message:
 # ./offwaketime -h
 usage: offwaketime [-h] [-p PID | -t TID | -u | -k] [-U | -K] [-d] [-f]
                    [--stack-storage-size STACK_STORAGE_SIZE]
-                   [-m MIN_BLOCK_TIME] [-M MAX_BLOCK_TIME]
+                   [-m MIN_BLOCK_TIME] [-M MAX_BLOCK_TIME] [--state STATE]
                    [duration]
 
 Summarize blocked time by kernel stack trace + waker stack
@@ -317,8 +317,10 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -p PID, --pid PID     trace this PID only
-  -t TID, --tid TID     trace this TID only
+  -p PID, --pid PID     trace these PIDS only. Can be a comma separated list of
+  					    PID.
+  -t TID, --tid TID     trace these TIDS only. Can be a comma separated list of
+  						TIDS.
   -u, --user-threads-only
                         user threads only (no kernel threads)
   -k, --kernel-threads-only
@@ -340,6 +342,8 @@ optional arguments:
   -M MAX_BLOCK_TIME, --max-block-time MAX_BLOCK_TIME
                         the amount of time in microseconds under which we
                         store traces (default U64_MAX)
+  --state STATE         filter on this thread state bitmask (eg, 2 ==
+                        TASK_UNINTERRUPTIBLE) see include/linux/sched.h
 
 examples:
     ./offwaketime             # trace off-CPU + waker stack time until Ctrl-C

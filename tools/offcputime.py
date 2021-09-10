@@ -13,7 +13,7 @@
 from __future__ import print_function
 from bcc import BPF
 from sys import stderr
-from time import sleep, strftime
+from time import strftime
 import argparse
 import errno
 import signal
@@ -126,6 +126,14 @@ BPF_HASH(counts, struct key_t);
 BPF_HASH(start, u32);
 BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE);
 
+struct warn_event_t {
+    u32 pid;
+    u32 tgid;
+    u32 t_start;
+    u32 t_end;
+};
+BPF_PERF_OUTPUT(warn_events);
+
 int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
     u32 pid = prev->pid;
     u32 tgid = prev->tgid;
@@ -146,8 +154,20 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
     }
 
     // calculate current thread's delta time
-    u64 delta = bpf_ktime_get_ns() - *tsp;
+    u64 t_start = *tsp;
+    u64 t_end = bpf_ktime_get_ns();
     start.delete(&pid);
+    if (t_start > t_end) {
+        struct warn_event_t event = {
+            .pid = pid,
+            .tgid = tgid,
+            .t_start = t_start,
+            .t_end = t_end,
+        };
+        warn_events.perf_submit(ctx, &event, sizeof(event));
+        return 0;
+    }
+    u64 delta = t_end - t_start;
     delta = delta / 1000;
     if ((delta < MINBLOCK_US) || (delta > MAXBLOCK_US)) {
         return 0;
@@ -231,7 +251,8 @@ if debug or args.ebpf:
 
 # initialize BPF
 b = BPF(text=bpf_text)
-b.attach_kprobe(event="finish_task_switch", fn_name="oncpu")
+b.attach_kprobe(event_re="^finish_task_switch$|^finish_task_switch\.isra\.\d$",
+                fn_name="oncpu")
 matched = b.num_open_kprobes()
 if matched == 0:
     print("error: 0 functions traced. Exiting.", file=stderr)
@@ -246,8 +267,23 @@ if not folded:
     else:
         print("... Hit Ctrl-C to end.")
 
+
+def print_warn_event(cpu, data, size):
+    event = b["warn_events"].event(data)
+    # See https://github.com/iovisor/bcc/pull/3227 for those wondering how can this happen.
+    print("WARN: Skipped an event with negative duration: pid:%d, tgid:%d, off-cpu:%d, on-cpu:%d"
+          % (event.pid, event.tgid, event.t_start, event.t_end),
+          file=stderr)
+
+b["warn_events"].open_perf_buffer(print_warn_event)
 try:
-    sleep(duration)
+    duration_ms = duration * 1000
+    start_time_ms = int(BPF.monotonic_time() / 1000000)
+    while True:
+        elapsed_ms = int(BPF.monotonic_time() / 1000000) - start_time_ms
+        if elapsed_ms >= duration_ms:
+            break
+        b.perf_buffer_poll(timeout=duration_ms - elapsed_ms)
 except KeyboardInterrupt:
     # as cleanup can take many seconds, trap Ctrl-C:
     signal.signal(signal.SIGINT, signal_ignore)
@@ -303,7 +339,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
                 print("    [Missed Kernel Stack]")
             else:
                 for addr in kernel_stack:
-                    print("    %s" % b.ksym(addr))
+                    print("    %s" % b.ksym(addr).decode('utf-8', 'replace'))
         if not args.kernel_stacks_only:
             if need_delimiter and k.user_stack_id >= 0 and k.kernel_stack_id >= 0:
                 print("    --")
@@ -311,7 +347,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
                 print("    [Missed User Stack]")
             else:
                 for addr in user_stack:
-                    print("    %s" % b.sym(addr, k.tgid))
+                    print("    %s" % b.sym(addr, k.tgid).decode('utf-8', 'replace'))
         print("    %-16s %s (%d)" % ("-", k.name.decode('utf-8', 'replace'), k.pid))
         print("        %d\n" % v.value)
 

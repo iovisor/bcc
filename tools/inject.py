@@ -225,7 +225,7 @@ class Probe:
          * If this is the only call in the chain and predicate passes
          */
         if (%s == 1 && %s && overridden < %s) {
-                count.increment(zero);
+                count.atomic_increment(zero);
                 bpf_override_return(ctx, %s);
                 return 0;
         }
@@ -240,7 +240,7 @@ class Probe:
          * If all conds have been met and predicate passes
          */
         if (p->conds_met == %s && %s && overridden < %s) {
-                count.increment(zero);
+                count.atomic_increment(zero);
                 bpf_override_return(ctx, %s);
         }
         return 0;

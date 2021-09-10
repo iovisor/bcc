@@ -5,20 +5,9 @@
 import bcc
 import unittest
 from time import sleep
-import distutils.version
+from utils import kernel_version_ge
 import os
 import subprocess
-
-def kernel_version_ge(major, minor):
-    # True if running kernel is >= X.Y
-    version = distutils.version.LooseVersion(os.uname()[2]).version
-    if version[0] > major:
-        return True
-    if version[0] < major:
-        return False
-    if minor and version[1] < minor:
-        return False
-    return True
 
 @unittest.skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
 class TestTracepoint(unittest.TestCase):

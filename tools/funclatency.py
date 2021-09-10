@@ -12,16 +12,16 @@
 # The pattern is a string with optional '*' wildcards, similar to file
 # globbing. If you'd prefer to use regular expressions, use the -r option.
 #
-# Currently nested or recursive functions are not supported properly, and
-# timestamps will be overwritten, creating dubious output. Try to match single
-# functions, or groups of functions that run at the same stack layer, and
-# don't ultimately call each other.
+# Without the '-l' option, only the innermost calls will be recorded.
+# Use '-l LEVEL' to record the outermost n levels of nested/recursive functions.
 #
 # Copyright (c) 2015 Brendan Gregg.
+# Copyright (c) 2021 Chenyue Zhou.
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 20-Sep-2015   Brendan Gregg       Created this.
 # 06-Oct-2016   Sasha Goldshtein    Added user function support.
+# 14-Apr-2021   Chenyue Zhou        Added nested or recursive function support.
 
 from __future__ import print_function
 from bcc import BPF
@@ -62,6 +62,8 @@ parser.add_argument("-F", "--function", action="store_true",
     help="show a separate histogram per function")
 parser.add_argument("-r", "--regexp", action="store_true",
     help="use regular expressions. Default is \"*\" wildcards only.")
+parser.add_argument("-l", "--level", type=int,
+    help="set the level of nested or recursive functions")
 parser.add_argument("-v", "--verbose", action="store_true",
     help="print the BPF program (for debugging purposes)")
 parser.add_argument("pattern",
@@ -110,8 +112,11 @@ typedef struct hist_key {
     u64 slot;
 } hist_key_t;
 
-BPF_HASH(start, u32);
+TYPEDEF
+
+BPF_ARRAY(avg, u64, 2);
 STORAGE
+FUNCTION
 
 int trace_func_entry(struct pt_regs *ctx)
 {
@@ -122,7 +127,6 @@ int trace_func_entry(struct pt_regs *ctx)
 
     FILTER
     ENTRYSTORE
-    start.update(&pid, &ts);
 
     return 0;
 }
@@ -135,12 +139,13 @@ int trace_func_return(struct pt_regs *ctx)
     u32 tgid = pid_tgid >> 32;
 
     // calculate delta time
-    tsp = start.lookup(&pid);
-    if (tsp == 0) {
-        return 0;   // missed start
-    }
-    delta = bpf_ktime_get_ns() - *tsp;
-    start.delete(&pid);
+    CALCULATE
+
+    u32 lat = 0;
+    u32 cnt = 1;
+    avg.atomic_increment(lat, delta);
+    avg.atomic_increment(cnt);
+
     FACTOR
 
     // store as histogram
@@ -169,14 +174,134 @@ else:
     bpf_text = bpf_text.replace('FACTOR', '')
     label = "nsecs"
 if need_key:
-    bpf_text = bpf_text.replace('STORAGE', 'BPF_HASH(ipaddr, u32);\n' +
-        'BPF_HISTOGRAM(dist, hist_key_t);')
-    # stash the IP on entry, as on return it's kretprobe_trampoline:
-    bpf_text = bpf_text.replace('ENTRYSTORE',
-        'u64 ip = PT_REGS_IP(ctx); ipaddr.update(&pid, &ip);')
     pid = '-1' if not library else 'tgid'
-    bpf_text = bpf_text.replace('STORE',
-        """
+
+    if args.level and args.level > 1:
+        bpf_text = bpf_text.replace('TYPEDEF',
+            """
+#define STACK_DEPTH %s
+
+typedef struct {
+    u64 ip;
+    u64 start_ts;
+} func_cache_t;
+
+/* LIFO */
+typedef struct {
+    u32          head;
+    func_cache_t cache[STACK_DEPTH];
+} func_stack_t;
+            """ % args.level)
+
+        bpf_text = bpf_text.replace('STORAGE',
+            """
+BPF_HASH(func_stack, u32, func_stack_t);
+BPF_HISTOGRAM(dist, hist_key_t);
+            """)
+
+        bpf_text = bpf_text.replace('FUNCTION',
+            """
+static inline int stack_pop(func_stack_t *stack, func_cache_t *cache) {
+    if (stack->head <= 0) {
+        return -1;
+    }
+
+    u32 index = --stack->head;
+    if (index < STACK_DEPTH) {
+        /* bound check */
+        cache->ip       = stack->cache[index].ip;
+        cache->start_ts = stack->cache[index].start_ts;
+    }
+
+    return 0;
+}
+
+static inline int stack_push(func_stack_t *stack, func_cache_t *cache) {
+    u32 index = stack->head;
+
+    if (index > STACK_DEPTH - 1) {
+        /* bound check */
+        return -1;
+    }
+
+    stack->head++;
+    stack->cache[index].ip       = cache->ip;
+    stack->cache[index].start_ts = cache->start_ts;
+
+    return 0;
+}
+            """)
+
+        bpf_text = bpf_text.replace('ENTRYSTORE',
+            """
+    u64 ip = PT_REGS_IP(ctx);
+    func_cache_t cache = {
+        .ip       = ip,
+        .start_ts = ts,
+    };
+
+    func_stack_t *stack = func_stack.lookup(&pid);
+    if (!stack) {
+        func_stack_t new_stack = {
+            .head = 0,
+        };
+
+        if (!stack_push(&new_stack, &cache)) {
+            func_stack.update(&pid, &new_stack);
+        }
+
+        return 0;
+    }
+
+    if (!stack_push(stack, &cache)) {
+        func_stack.update(&pid, stack);
+    }
+            """)
+
+        bpf_text = bpf_text.replace('CALCULATE',
+            """
+    u64 ip, start_ts;
+    func_stack_t *stack = func_stack.lookup(&pid);
+    if (!stack) {
+        /* miss start */
+        return 0;
+    }
+
+    func_cache_t cache = {};
+    if (stack_pop(stack, &cache)) {
+        func_stack.delete(&pid);
+
+        return 0;
+    }
+    ip       = cache.ip;
+    start_ts = cache.start_ts;
+    delta    = bpf_ktime_get_ns() - start_ts;
+            """)
+
+        bpf_text = bpf_text.replace('STORE',
+            """
+    hist_key_t key;
+    key.key.ip  = ip;
+    key.key.pid = %s;
+    key.slot    = bpf_log2l(delta);
+    dist.atomic_increment(key);
+
+    if (stack->head == 0) {
+        /* empty */
+        func_stack.delete(&pid);
+    }
+            """ % pid)
+
+    else:
+        bpf_text = bpf_text.replace('STORAGE', 'BPF_HASH(ipaddr, u32);\n'\
+            'BPF_HISTOGRAM(dist, hist_key_t);\n'\
+            'BPF_HASH(start, u32);')
+        # stash the IP on entry, as on return it's kretprobe_trampoline:
+        bpf_text = bpf_text.replace('ENTRYSTORE',
+            'u64 ip = PT_REGS_IP(ctx); ipaddr.update(&pid, &ip);'\
+            ' start.update(&pid, &ts);')
+        bpf_text = bpf_text.replace('STORE',
+                """
     u64 ip, *ipp = ipaddr.lookup(&pid);
     if (ipp) {
         ip = *ipp;
@@ -184,15 +309,29 @@ if need_key:
         key.key.ip = ip;
         key.key.pid = %s;
         key.slot = bpf_log2l(delta);
-        dist.increment(key);
+        dist.atomic_increment(key);
         ipaddr.delete(&pid);
     }
-        """ % pid)
+                """ % pid)
 else:
-    bpf_text = bpf_text.replace('STORAGE', 'BPF_HISTOGRAM(dist);')
-    bpf_text = bpf_text.replace('ENTRYSTORE', '')
+    bpf_text = bpf_text.replace('STORAGE', 'BPF_HISTOGRAM(dist);\n'\
+                                           'BPF_HASH(start, u32);')
+    bpf_text = bpf_text.replace('ENTRYSTORE', 'start.update(&pid, &ts);')
     bpf_text = bpf_text.replace('STORE',
-        'dist.increment(bpf_log2l(delta));')
+        'dist.atomic_increment(bpf_log2l(delta));')
+
+bpf_text = bpf_text.replace('TYPEDEF', '')
+bpf_text = bpf_text.replace('FUNCTION', '')
+bpf_text = bpf_text.replace('CALCULATE',
+                """
+    tsp = start.lookup(&pid);
+    if (tsp == 0) {
+        return 0;   // missed start
+    }
+    delta = bpf_ktime_get_ns() - *tsp;
+    start.delete(&pid);
+                """)
+
 if args.verbose or args.ebpf:
     print(bpf_text)
     if args.ebpf:
@@ -255,7 +394,19 @@ while (1):
             bucket_fn=lambda k: (k.ip, k.pid))
     else:
         dist.print_log2_hist(label)
+
+    total  = b['avg'][0].value
+    counts = b['avg'][1].value
+    if counts > 0:
+        if label == 'msecs':
+            total /= 1000000
+        elif label == 'usecs':
+            total /= 1000
+        avg = total/counts
+        print("\navg = %ld %s, total: %ld %s, count: %ld\n" %(total/counts, label, total, label, counts))
+
     dist.clear()
+    b['avg'].clear()
 
     if exiting:
         print("Detaching...")

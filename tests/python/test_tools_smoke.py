@@ -7,20 +7,9 @@ import subprocess
 import os
 import re
 from unittest import main, skipUnless, TestCase
-from utils import mayFail
+from utils import mayFail, kernel_version_ge
 
 TOOLS_DIR = "../../tools/"
-
-def kernel_version_ge(major, minor):
-    # True if running kernel is >= X.Y
-    version = distutils.version.LooseVersion(os.uname()[2]).version
-    if version[0] > major:
-        return True
-    if version[0] < major:
-        return False
-    if minor and version[1] < minor:
-        return False
-    return True
 
 @skipUnless(kernel_version_ge(4,1), "requires kernel >= 4.1")
 class SmokeTests(TestCase):
@@ -195,6 +184,7 @@ class SmokeTests(TestCase):
     def test_gethostlatency(self):
         self.run_with_int("gethostlatency.py")
 
+    @skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
     def test_hardirqs(self):
         self.run_with_duration("hardirqs.py 1 1")
 

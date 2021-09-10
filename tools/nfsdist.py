@@ -68,21 +68,26 @@ BPF_HISTOGRAM(dist, dist_key_t);
 // time operation
 int trace_entry(struct pt_regs *ctx)
 {
-    u32 pid = bpf_get_current_pid_tgid();
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 pid = pid_tgid >> 32;
+    u32 tid = (u32)pid_tgid;
+
     if (FILTER_PID)
         return 0;
     u64 ts = bpf_ktime_get_ns();
-    start.update(&pid, &ts);
+    start.update(&tid, &ts);
     return 0;
 }
 
 static int trace_return(struct pt_regs *ctx, const char *op)
 {
     u64 *tsp;
-    u32 pid = bpf_get_current_pid_tgid();
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 pid = pid_tgid >> 32;
+    u32 tid = (u32)pid_tgid;
 
     // fetch timestamp and calculate delta
-    tsp = start.lookup(&pid);
+    tsp = start.lookup(&tid);
     if (tsp == 0) {
         return 0;   // missed start or filtered
     }
@@ -91,9 +96,9 @@ static int trace_return(struct pt_regs *ctx, const char *op)
     // store as histogram
     dist_key_t key = {.slot = bpf_log2l(delta)};
     __builtin_memcpy(&key.op, op, sizeof(key.op));
-    dist.increment(key);
+    dist.atomic_increment(key);
 
-    start.delete(&pid);
+    start.delete(&tid);
     return 0;
 }
 
@@ -137,15 +142,20 @@ b = BPF(text=bpf_text)
 # common file functions
 b.attach_kprobe(event="nfs_file_read", fn_name="trace_entry")
 b.attach_kprobe(event="nfs_file_write", fn_name="trace_entry")
-b.attach_kprobe(event="nfs4_file_open", fn_name="trace_entry")
 b.attach_kprobe(event="nfs_file_open", fn_name="trace_entry")
 b.attach_kprobe(event="nfs_getattr", fn_name="trace_entry")
 
 b.attach_kretprobe(event="nfs_file_read", fn_name="trace_read_return")
 b.attach_kretprobe(event="nfs_file_write", fn_name="trace_write_return")
-b.attach_kretprobe(event="nfs4_file_open", fn_name="trace_open_return")
 b.attach_kretprobe(event="nfs_file_open", fn_name="trace_open_return")
 b.attach_kretprobe(event="nfs_getattr", fn_name="trace_getattr_return")
+
+if BPF.get_kprobe_functions(b'nfs4_file_open'):
+    b.attach_kprobe(event="nfs4_file_open", fn_name="trace_entry")
+    b.attach_kretprobe(event="nfs4_file_open", fn_name="trace_open_return")
+else:
+    b.attach_kprobe(event="nfs_file_open", fn_name="trace_entry")
+    b.attach_kretprobe(event="nfs_file_open", fn_name="trace_open_return")
 
 print("Tracing NFS operation latency... Hit Ctrl-C to end.")
 

@@ -136,7 +136,7 @@ def handle_loop(stdscr, args):
     stdscr.nodelay(1)
     # set default sorting field
     sort_field = FIELDS.index(DEFAULT_FIELD)
-    sort_reverse = False
+    sort_reverse = True
 
     # load BPF program
     bpf_text = """
@@ -157,8 +157,8 @@ def handle_loop(stdscr, args):
         u32 uid = bpf_get_current_uid_gid();
 
         key.ip = PT_REGS_IP(ctx);
-        key.pid = pid & 0xFFFFFFFF;
-        key.uid = uid & 0xFFFFFFFF;
+        key.pid = pid >> 32;
+        key.uid = uid;
         bpf_get_current_comm(&(key.comm), 16);
 
         counts.increment(key);

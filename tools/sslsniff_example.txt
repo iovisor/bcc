@@ -9,8 +9,8 @@ text.  Useful, for example, to sniff HTTP before encrypted with SSL.
 Output of tool executing in other shell "curl https://example.com"
 
 % sudo python sslsniff.py
-FUNC         TIME(s)            COMM             PID    LEN   
-WRITE/SEND   0.000000000        curl             12915  75    
+FUNC         TIME(s)            COMM             PID    LEN
+WRITE/SEND   0.000000000        curl             12915  75
 ----- DATA -----
 GET / HTTP/1.1
 Host: example.com
@@ -20,7 +20,7 @@ Accept: */*
 
 ----- END DATA -----
 
-READ/RECV    0.127144585        curl             12915  333   
+READ/RECV    0.127144585        curl             12915  333
 ----- DATA -----
 HTTP/1.1 200 OK
 Cache-Control: max-age=604800
@@ -38,7 +38,7 @@ Content-Length: 1270
 
 ----- END DATA -----
 
-READ/RECV    0.129967972        curl             12915  1270  
+READ/RECV    0.129967972        curl             12915  1270
 ----- DATA -----
 <!doctype html>
 <html>
@@ -54,18 +54,58 @@ READ/RECV    0.129967972        curl             12915  1270
         margin: 0;
         padding: 0;
         font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
-        
+
     }
     div {
         w
 ----- END DATA (TRUNCATED, 798 bytes lost) -----
 
+Using the --hexdump option you will get the exact same output, only the lines
+between DATA and END DATA will differ. Those will be replaced with a 16 byte
+(32 characters) wide hex-dump, an example of a block of output from sslsniff
+called with that option is
 
+READ/RECV    7.405609173        curl             201942 1256
+----- DATA -----
+3c21646f63747970652068746d6c3e0a
+3c68746d6c3e0a3c686561643e0a2020
+20203c7469746c653e4578616d706c65
+20446f6d61696e3c2f7469746c653e0a
+0a202020203c6d657461206368617273
+65743d227574662d3822202f3e0a2020
+20203c6d65746120687474702d657175
+69763d22436f6e74656e742d74797065
+2220636f6e74656e743d22746578742f
+68746d6c3b20636861727365743d7574
+662d3822202f3e0a202020203c6d6574
+61206e616d653d2276696577706f7274
+2220636f6e74656e743d227769647468
+3d6465766963652d77696474682c2069
+6e697469616c2d7363616c653d312220
+2f3e0a202020203c7374796c65207479
+70653d22746578742f637373223e0a20
+202020626f6479207b0a202020202020
+20206261636b67726f756e642d636f6c
+6f723a20236630663066323b0a202020
+20202020206d617267696e3a20303b0a
+202020202020202070616464696e673a
+20303b0a2020202020202020666f6e74
+2d66616d696c793a202d6170706c652d
+73797374656d2c2073797374656d2d75
+692c20426c696e6b4d61635379737465
+6d466f6e742c20225365676f65205549
+222c20224f70656e2053616e73222c20
+2248656c766574696361204e65756522
+----- END DATA (TRUNCATED, 792 bytes lost) -----
+
+This is useful to sniff binary protocols where the UTF-8 decode might insert a
+lot of characters that are not printable or even Unicode replacement
+characters.
 
 
 USAGE message:
 
-usage: sslsniff.py [-h] [-p PID] [-c COMM] [-o] [-g] [-n] [-d]
+usage: sslsniff.py [-h] [-p PID] [-c COMM] [-o] [-g] [-n] [-d] [--hexdump]
 
 Sniff SSL data
 
@@ -77,6 +117,8 @@ optional arguments:
   -g, --no-gnutls       do not show GnuTLS calls.
   -n, --no-nss          do not show NSS calls.
   -d, --debug           debug mode.
+  --hexdump             show data as hexdump instead of trying to decode it as
+                        UTF-8
 
 examples:
     ./sslsniff              # sniff OpenSSL and GnuTLS functions
@@ -85,3 +127,4 @@ examples:
     ./sslsniff --no-openssl # don't show OpenSSL calls
     ./sslsniff --no-gnutls  # don't show GnuTLS calls
     ./sslsniff --no-nss     # don't show NSS calls
+    ./sslsniff --hexdump    # show data as hex instead of trying to decode it as UTF-8

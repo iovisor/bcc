@@ -10,6 +10,17 @@ function cleanup() {
 }
 trap cleanup EXIT
 
+# install python dependencies for test
+if [ -f os-release ]; then
+    . os-release
+fi
+if [[ $VERSION_ID -lt 30 ]]; then
+  PKGS="python3-cachetools python-cachetools"
+else
+  PKGS="python3-cachetools"
+fi
+sudo dnf install -y $PKGS
+
 mkdir $TMP/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
 llvmver=3.7.1

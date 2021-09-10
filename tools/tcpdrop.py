@@ -7,7 +7,7 @@
 # This provides information such as packet details, socket state, and kernel
 # stack trace for packets/segments that were dropped via tcp_drop().
 #
-# USAGE: tcpdrop [-h]
+# USAGE: tcpdrop [-4 | -6] [-h]
 #
 # This uses dynamic tracing of kernel functions, and will need to be updated
 # to match kernel changes.
@@ -29,11 +29,18 @@ from bcc import tcp
 # arguments
 examples = """examples:
     ./tcpdrop           # trace kernel TCP drops
+    ./tcpdrop -4        # trace IPv4 family only
+    ./tcpdrop -6        # trace IPv6 family only
 """
 parser = argparse.ArgumentParser(
     description="Trace TCP drops by the kernel",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
+group = parser.add_mutually_exclusive_group()
+group.add_argument("-4", "--ipv4", action="store_true",
+    help="trace IPv4 family only")
+group.add_argument("-6", "--ipv6", action="store_true",
+    help="trace IPv6 family only")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
@@ -97,7 +104,7 @@ int trace_tcp_drop(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb)
 {
     if (sk == NULL)
         return 0;
-    u32 pid = bpf_get_current_pid_tgid();
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
 
     // pull in details from the packet headers and the sock struct
     u16 family = sk->__sk_common.skc_family;
@@ -111,6 +118,8 @@ int trace_tcp_drop(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb)
     sport = ntohs(sport);
     dport = ntohs(dport);
 
+    FILTER_FAMILY
+    
     if (family == AF_INET) {
         struct ipv4_data_t data4 = {};
         data4.pid = pid;
@@ -128,10 +137,12 @@ int trace_tcp_drop(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb)
         struct ipv6_data_t data6 = {};
         data6.pid = pid;
         data6.ip = 6;
-        bpf_probe_read(&data6.saddr, sizeof(data6.saddr),
-            sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
-        bpf_probe_read(&data6.daddr, sizeof(data6.daddr),
+        // The remote address (skc_v6_daddr) was the source
+        bpf_probe_read_kernel(&data6.saddr, sizeof(data6.saddr),
             sk->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
+        // The local address (skc_v6_rcv_saddr) was the destination
+        bpf_probe_read_kernel(&data6.daddr, sizeof(data6.daddr),
+            sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
         data6.dport = dport;
         data6.sport = sport;
         data6.state = state;
@@ -149,11 +160,19 @@ if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
         exit()
+if args.ipv4:
+    bpf_text = bpf_text.replace('FILTER_FAMILY',
+        'if (family != AF_INET) { return 0; }')
+elif args.ipv6:
+    bpf_text = bpf_text.replace('FILTER_FAMILY',
+        'if (family != AF_INET6) { return 0; }')
+else:
+    bpf_text = bpf_text.replace('FILTER_FAMILY', '')
 
 # process event
 def print_ipv4_event(cpu, data, size):
     event = b["ipv4_events"].event(data)
-    print("%-8s %-6d %-2d %-20s > %-20s %s (%s)" % (
+    print("%-8s %-7d %-2d %-20s > %-20s %s (%s)" % (
         strftime("%H:%M:%S"), event.pid, event.ip,
         "%s:%d" % (inet_ntop(AF_INET, pack('I', event.saddr)), event.sport),
         "%s:%s" % (inet_ntop(AF_INET, pack('I', event.daddr)), event.dport),
@@ -165,7 +184,7 @@ def print_ipv4_event(cpu, data, size):
 
 def print_ipv6_event(cpu, data, size):
     event = b["ipv6_events"].event(data)
-    print("%-8s %-6d %-2d %-20s > %-20s %s (%s)" % (
+    print("%-8s %-7d %-2d %-20s > %-20s %s (%s)" % (
         strftime("%H:%M:%S"), event.pid, event.ip,
         "%s:%d" % (inet_ntop(AF_INET6, event.saddr), event.sport),
         "%s:%d" % (inet_ntop(AF_INET6, event.daddr), event.dport),
@@ -186,7 +205,7 @@ else:
 stack_traces = b.get_table("stack_traces")
 
 # header
-print("%-8s %-6s %-2s %-20s > %-20s %s (%s)" % ("TIME", "PID", "IP",
+print("%-8s %-7s %-2s %-20s > %-20s %s (%s)" % ("TIME", "PID", "IP",
     "SADDR:SPORT", "DADDR:DPORT", "STATE", "FLAGS"))
 
 # read events

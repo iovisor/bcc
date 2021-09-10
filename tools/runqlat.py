@@ -236,12 +236,12 @@ elif args.pidnss:
         'BPF_HISTOGRAM(dist, pidns_key_t);')
     bpf_text = bpf_text.replace('STORE', 'pidns_key_t key = ' +
         '{.id = prev->nsproxy->pid_ns_for_children->ns.inum, ' +
-        '.slot = bpf_log2l(delta)}; dist.increment(key);')
+        '.slot = bpf_log2l(delta)}; dist.atomic_increment(key);')
 else:
     section = ""
     bpf_text = bpf_text.replace('STORAGE', 'BPF_HISTOGRAM(dist);')
     bpf_text = bpf_text.replace('STORE',
-        'dist.increment(bpf_log2l(delta));')
+        'dist.atomic_increment(bpf_log2l(delta));')
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
@@ -252,7 +252,8 @@ b = BPF(text=bpf_text)
 if not is_support_raw_tp:
     b.attach_kprobe(event="ttwu_do_wakeup", fn_name="trace_ttwu_do_wakeup")
     b.attach_kprobe(event="wake_up_new_task", fn_name="trace_wake_up_new_task")
-    b.attach_kprobe(event="finish_task_switch", fn_name="trace_run")
+    b.attach_kprobe(event_re="^finish_task_switch$|^finish_task_switch\.isra\.\d$",
+                    fn_name="trace_run")
 
 print("Tracing run queue latency... Hit Ctrl-C to end.")
 
