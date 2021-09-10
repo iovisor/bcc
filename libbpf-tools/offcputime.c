@@ -272,11 +272,11 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 	if (env.user_threads_only && env.kernel_threads_only) {
-		fprintf(stderr, "user_threads_only, kernel_threads_only cann't be used together.\n");
+		fprintf(stderr, "user_threads_only and kernel_threads_only cannot be used together.\n");
 		return 1;
 	}
 	if (env.min_block_time >= env.max_block_time) {
-		fprintf(stderr, "min_block_time should smaller than max_block_time\n");
+		fprintf(stderr, "min_block_time should be smaller than max_block_time\n");
 		return 1;
 	}
 
