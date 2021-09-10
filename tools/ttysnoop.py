@@ -138,9 +138,20 @@ KFUNC_PROBE(tty_write, struct kiocb *iocb, struct iov_iter *from)
 
     if (iocb->ki_filp->f_inode->i_ino != PTS)
         return 0;
-
+/**
+ * commit 8cd54c1c8480 iov_iter: separate direction from flavour 
+ * `type` is represented by iter_type and data_source seperately
+ */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0)
     if (from->type != (ITER_IOVEC + WRITE))
         return 0;
+#else
+    if (from->iter_type != ITER_IOVEC)
+        return 0;
+    if (from->data_source != WRITE)
+        return 0;
+#endif
+
 
     kvec  = from->kvec;
     buf   = kvec->iov_base;
