@@ -13,6 +13,7 @@
   - [Amazon Linux 2](#amazon-linux-2---binary)
   - [Alpine](#alpine---binary)
 * [Source](#source)
+  - [libbpf Submodule](#libbpf-submodule)
   - [Debian](#debian---source)
   - [Ubuntu](#ubuntu---source)
   - [Fedora](#fedora---source)
