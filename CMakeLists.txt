@@ -17,13 +17,21 @@ enable_testing()
 if(NOT CMAKE_USE_LIBBPF_PACKAGE)
    if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/cc/libbpf/src)
 	execute_process(COMMAND git submodule update --init --recursive
-                  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+                  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                  RESULT_VARIABLE UPDATE_RESULT)
+  if(UPDATE_RESULT AND NOT UPDATE_RESULT EQUAL 0)
+    message(WARNING "Failed to update submodule libbpf")
+  endif()
    else()
 	execute_process(COMMAND git diff --shortstat ${CMAKE_CURRENT_SOURCE_DIR}/src/cc/libbpf/
 		OUTPUT_VARIABLE DIFF_STATUS)
 	if("${DIFF_STATUS}" STREQUAL "")
 		execute_process(COMMAND git submodule update --init --recursive
-			WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                    RESULT_VARIABLE UPDATE_RESULT)
+  if(UPDATE_RESULT AND NOT UPDATE_RESULT EQUAL 0)
+    message(WARNING "Failed to update submodule libbpf")
+  endif()
 	else()
 		message(WARNING "submodule libbpf dirty, so no sync")
 	endif()
