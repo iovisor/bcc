@@ -41,6 +41,7 @@
 /tcpconnect
 /tcpconnlat
 /tcprtt
+/ttysnoop
 /vfsstat
 /xfsdist
 /xfsslower
