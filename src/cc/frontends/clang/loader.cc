@@ -180,6 +180,9 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts,
   }
 
   // If all attempts to obtain kheaders fail, check for kheaders.tar.xz in sysfs
+  // Checking just for kpath existence is unsufficient, since it can refer to
+  // leftover build directory without headers present anymore.
+  // See https://github.com/iovisor/bcc/pull/3588 for more details.
   if (!is_file(kpath + "/include/linux/kconfig.h")) {
     int ret = get_proc_kheaders(tmpdir);
     if (!ret) {
