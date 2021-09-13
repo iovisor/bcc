@@ -185,9 +185,7 @@ if args.timestamp:
     print("%-9s" % ("TIME(s)"), end="")
 
 print("%-6s %-12s" % ("PID", "COMM"), end="")
-print()
 
-print()
 start_ts = 0
 
 # read events
