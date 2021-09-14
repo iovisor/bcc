@@ -115,6 +115,16 @@ bool is_dir(const string& path)
   return S_ISDIR(buf.st_mode);
 }
 
+bool is_file(const string& path)
+{
+  struct stat buf;
+
+  if (::stat (path.c_str (), &buf) < 0)
+    return false;
+
+  return S_ISREG(buf.st_mode);
+}
+
 std::pair<bool, string> get_kernel_path_info(const string kdir)
 {
   if (is_dir(kdir + "/build") && is_dir(kdir + "/source"))
@@ -170,7 +180,10 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts,
   }
 
   // If all attempts to obtain kheaders fail, check for kheaders.tar.xz in sysfs
-  if (!is_dir(kpath)) {
+  // Checking just for kpath existence is unsufficient, since it can refer to
+  // leftover build directory without headers present anymore.
+  // See https://github.com/iovisor/bcc/pull/3588 for more details.
+  if (!is_file(kpath + "/include/linux/kconfig.h")) {
     int ret = get_proc_kheaders(tmpdir);
     if (!ret) {
       kpath = tmpdir;
