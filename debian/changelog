@@ -1,3 +1,15 @@
+bcc (0.22.0-1) unstable; urgency=low
+
+  * Support for kernel up to 5.14
+  * add ipv4/ipv6 filter support for tcp trace tools
+  * add python interface to attach raw perf events
+  * fix tcpstates for incorrect display of dport
+  * new options for bcc tools runqslower, argdist
+  * new libbpf-tools: filetop, exitsnoop, tcprtt
+  * doc update, bug fixes and other tools improvement
+
+ -- Yonghong Song <ys114321@gmail.com>  Wed, 15 Sep 2021 17:00:00 +0000
+
 bcc (0.21.0-1) unstable; urgency=low
 
   * Support for kernel up to 5.13
