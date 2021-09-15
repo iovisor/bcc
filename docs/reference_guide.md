@@ -18,8 +18,10 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [8. system call tracepoints](#8-system-call-tracepoints)
         - [9. kfuncs](#9-kfuncs)
         - [10. kretfuncs](#10-kretfuncs)
-        - [11. lsm probes](#11-lsm-probes)
-        - [12. bpf iterators](#12-bpf-iterators)
+        - [11. fentry](#11-fentry)
+        - [12. fexit](#12-fexit)
+        - [13. lsm probes](#13-lsm-probes)
+        - [14. bpf iterators](#14-bpf-iterators)
     - [Data](#data)
         - [1. bpf_probe_read_kernel()](#1-bpf_probe_read_kernel)
         - [2. bpf_probe_read_kernel_str()](#2-bpf_probe_read_kernel_str)
@@ -401,8 +403,55 @@ accessible as standard argument values together with its return value.
 Examples in situ:
 [search /tools](https://github.com/iovisor/bcc/search?q=KRETFUNC_PROBE+path%3Atools&type=Code)
 
+### 11. fentry
 
-### 11. LSM Probes
+Syntax: FENTRY_PROBE(*function*, typeof(arg1) arg1, typeof(arg2) arge ...)
+
+This is a macro that instruments the kernel function via trampoline
+*before* the function is executed. It's defined by *function* name and
+the function arguments defined as *argX*.
+
+FENTRY_PROBE is an alias to KFUNC_PROBE.
+
+For example:
+```C
+FENTRY_PROBE(do_sys_open, int dfd, const char *filename, int flags, int mode)
+{
+    ...
+```
+
+This instruments the do_sys_open kernel function and make its arguments
+accessible as standard argument values.
+
+Examples in situ:
+[search /tools](https://github.com/iovisor/bcc/search?q=FENTRY_PROBE+path%3Atools&type=Code)
+
+### 12. fexit
+
+Syntax: FEXIT_PROBE(*event*, typeof(arg1) arg1, typeof(arg2) arge ..., int ret)
+
+This is a macro that instruments the kernel function via trampoline
+*after* the function is executed. It's defined by *function* name and
+the function arguments defined as *argX*.
+
+The last argument of the probe is the return value of the instrumented function.
+
+FEXIT_PROBE is an alias to KRETFUNC_PROBE.
+
+For example:
+```C
+FEXIT_PROBE(do_sys_open, int dfd, const char *filename, int flags, int mode, int ret)
+{
+    ...
+```
+
+This instruments the do_sys_open kernel function and make its arguments
+accessible as standard argument values together with its return value.
+
+Examples in situ:
+[search /tools](https://github.com/iovisor/bcc/search?q=FEXIT_PROBE+path%3Atools&type=Code)
+
+### 13. LSM Probes
 
 Syntax: LSM_PROBE(*hook*, typeof(arg1) arg1, typeof(arg2) arg2 ...)
 
@@ -440,7 +489,7 @@ LSM probes require at least a 5.7+ kernel with the following configuation option
 Examples in situ:
 [search /tests](https://github.com/iovisor/bcc/search?q=LSM_PROBE+path%3Atests&type=Code)
 
-### 12. BPF ITERATORS
+### 14. BPF ITERATORS
 
 Syntax: BPF_ITER(target)
 
