@@ -34,6 +34,7 @@ static enum log_level log_level = WARN;
 
 static __u32 filter_pid;
 static bool stack_mode;
+static bool verbose_mode;
 
 #define libbpf_errstr(val)	strerror(-libbpf_get_error(val))
 
@@ -72,7 +73,8 @@ static int cmd_help(int argc, char **argv)
 		"	OPTIONS	:= { {-d|--debug} | {-V|--version} |\n"
 		"                    {-p|--pid filter_pid}|\n"
 		"                    {-P|--pages nr_pages} }\n"
-		"                    {-s|--stack}\n",
+		"                    {-s|--stack}\n"
+		"                    {-v|--verbose}\n",
 		bin_name);
 	fprintf(stderr,
 		"Examples:\n"
@@ -707,9 +709,14 @@ static void trace_handler(void *ctx, int cpu, void *data, __u32 size)
 			size, sizeof(trace) - MAX_TRACE_BUF);
 		return;
 	}
-	printf("%16lld %4d %8u %s(\n", trace->time, trace->cpu, trace->pid,
-	       trace->func.name);
 
+	if (verbose_mode) {
+		printf("%16lld %4d %8u %8u %16s %32s(\n", trace->time, trace->cpu,
+			trace->pid_ns_id, trace->pid, trace->comm, trace->func.name);
+	} else {
+		printf("%16lld %4d %8u %s(\n", trace->time, trace->cpu, trace->pid,
+			trace->func.name);
+	}
 	for (i = 0, shown = 0; i < trace->nr_traces; i++) {
 		DECLARE_LIBBPF_OPTS(btf_dump_type_data_opts, opts);
 		bool entry = trace->data_flags & KSNOOP_F_ENTRY;
@@ -724,7 +731,7 @@ static void trace_handler(void *ctx, int cpu, void *data, __u32 size)
 		 * the latter case is if we stashed data; in such cases we
 		 * want to see it as it's a mix of entry/return data with
 		 * predicates.
- 		 */
+		 */
 		if ((entry && !base_arg_is_entry(val->base_arg)) ||
 		    (!entry && base_arg_is_entry(val->base_arg) &&
 		     !(trace->flags & KSNOOP_F_STASH)))
@@ -885,7 +892,12 @@ static int cmd_trace(int argc, char **argv)
 		return 1;
 	}
 
-	printf("%16s %4s %8s %s\n", "TIME", "CPU", "PID", "FUNCTION/ARGS");
+	if (verbose_mode) {
+		printf("%16s %4s %8s %8s %16s %32s\n", "TIME", "CPU", "NAMESPACE",
+			"PID", "COMM", "FUNCTION/ARGS");
+	} else {
+		printf("%16s %4s %8s %s\n", "TIME", "CPU", "PID", "FUNCTION/ARGS");
+	}
 
 	while (1) {
 		ret = perf_buffer__poll(pb, 1);
@@ -936,6 +948,7 @@ int main(int argc, char *argv[])
 		{ "debug",	no_argument,		NULL,	'd' },
 		{ "help",	no_argument,		NULL,	'h' },
 		{ "version",	no_argument,		NULL,	'V' },
+		{ "verbose",	no_argument,		NULL,	'v' },
 		{ "pages",	required_argument,	NULL,	'P' },
 		{ "pid",	required_argument,	NULL,	'p' },
 		{ 0 }
@@ -944,7 +957,7 @@ int main(int argc, char *argv[])
 
 	bin_name = argv[0];
 
-	while ((opt = getopt_long(argc, argv, "dhp:P:sV", options,
+	while ((opt = getopt_long(argc, argv, "dhp:P:sVv", options,
 				  NULL)) >= 0) {
 		switch (opt) {
 		case 'd':
@@ -963,6 +976,9 @@ int main(int argc, char *argv[])
 			break;
 		case 's':
 			stack_mode = true;
+			break;
+		case 'v':
+			verbose_mode = true;
 			break;
 		default:
 			p_err("unrecognized option '%s'", argv[optind - 1]);

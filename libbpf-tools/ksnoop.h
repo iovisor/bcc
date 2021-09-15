@@ -90,6 +90,7 @@ struct trace_data {
 };
 
 #define MAX_TRACE_BUF	(MAX_TRACES * MAX_TRACE_DATA)
+#define TASK_COMM_LEN 16
 
 struct trace {
 	/* initial values are readonly in tracing context */
@@ -104,7 +105,9 @@ struct trace {
 	__u64 flags;
 	/* values below this point are set or modified in tracing context */
 	__u64 task;
+	__u32 pid_ns_id;
 	__u32 pid;
+	char comm[TASK_COMM_LEN];
 	__u32 cpu;
 	__u64 time;
 	__u64 data_flags;
