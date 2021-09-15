@@ -1086,6 +1086,10 @@ class BPF(object):
         return False
 
     @staticmethod
+    def support_fentry():
+        return BPF.support_kfunc()
+
+    @staticmethod
     def support_lsm():
         if not lib.bpf_has_kernel_btf():
             return False
@@ -1139,6 +1143,18 @@ class BPF(object):
             raise Exception("Failed to attach BPF to exit kernel func")
         self.kfunc_exit_fds[fn_name] = fd
         return self
+
+    def detach_fentry(self, fn_name=b""):
+        return self.detach_kfunc(fn_name)
+
+    def detach_fexit(self, fn_name=b""):
+        return self.detach_kretfunc(fn_name)
+
+    def attach_fentry(self, fn_name=b""):
+        return self.attach_kfunc(fn_name)
+
+    def attach_fexit(self, fn_name=b""):
+        return self.attach_kretfunc(fn_name)
 
     def detach_lsm(self, fn_name=b""):
         fn_name = _assert_is_bytes(fn_name)
