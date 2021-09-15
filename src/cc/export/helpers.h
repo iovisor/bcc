@@ -898,6 +898,8 @@ static long (*bpf_timer_start)(struct bpf_timer *timer, __u64 nsecs, __u64 flags
 static long (*bpf_timer_cancel)(struct bpf_timer *timer) = (void *)BPF_FUNC_timer_cancel;
 
 static __u64 (*bpf_get_func_ip)(void *ctx) = (void *)BPF_FUNC_get_func_ip;
+static __u64 (*bpf_get_attach_cookie)(void *ctx) = (void *)BPF_FUNC_get_attach_cookie;
+static long (*bpf_task_pt_regs)(struct task_struct *task) = (void *)BPF_FUNC_task_pt_regs;
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions

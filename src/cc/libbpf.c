@@ -278,6 +278,8 @@ static struct bpf_helper helpers[] = {
   {"timer_start", "5.15"},
   {"timer_cancel", "5.15"},
   {"get_func_ip", "5.15"},
+  {"get_attach_cookie", "5.15"},
+  {"task_pt_regs", "5.15"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
