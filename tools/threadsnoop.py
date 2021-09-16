@@ -38,7 +38,12 @@ void do_entry(struct pt_regs *ctx) {
     events.perf_submit(ctx, &data, sizeof(data));
 };
 """)
-b.attach_uprobe(name="pthread", sym="pthread_create", fn_name="do_entry")
+
+# Since version 2.34, pthread features are integrated in libc
+try:
+    b.attach_uprobe(name="pthread", sym="pthread_create", fn_name="do_entry")
+except Exception:
+    b.attach_uprobe(name="c", sym="pthread_create", fn_name="do_entry")
 
 print("%-10s %-6s %-16s %s" % ("TIME(ms)", "PID", "COMM", "FUNC"))
 
