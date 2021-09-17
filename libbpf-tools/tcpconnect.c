@@ -17,6 +17,8 @@
 
 #define warn(...) fprintf(stderr, __VA_ARGS__)
 
+static volatile sig_atomic_t exiting = 0;
+
 const char *argp_program_version = "tcpconnect 0.1";
 const char *argp_program_bug_address =
 	"https://github.com/iovisor/bcc/tree/master/libbpf-tools";
@@ -192,11 +194,9 @@ static int libbpf_print_fn(enum libbpf_print_level level,
 	return vfprintf(stderr, format, args);
 }
 
-static volatile sig_atomic_t hang_on = 1;
-
 static void sig_int(int signo)
 {
-	hang_on = 0;
+	exiting = 1;
 }
 
 static void print_count_ipv4(int map_fd)
@@ -261,7 +261,7 @@ static void print_count(int map_fd_ipv4, int map_fd_ipv6)
 {
 	static const char *header_fmt = "\n%-25s %-25s %-20s %-10s\n";
 
-	while (hang_on)
+	while (!exiting)
 		pause();
 
 	printf(header_fmt, "LADDR", "RADDR", "RPORT", "CONNECTS");
@@ -341,12 +341,14 @@ static void print_events(int perf_map_fd)
 	}
 
 	print_events_header();
-	while (hang_on) {
+	while (!exiting) {
 		err = perf_buffer__poll(pb, 100);
 		if (err < 0 && errno != EINTR) {
-			warn("Error polling perf buffer: %d\n", err);
+			warn("error polling perf buffer: %s\n", strerror(errno));
 			goto cleanup;
 		}
+		/* reset err to return 0 if exiting */
+		err = 0;
 	}
 
 cleanup:
@@ -408,7 +410,8 @@ int main(int argc, char **argv)
 	}
 
 	if (signal(SIGINT, sig_int) == SIG_ERR) {
-		warn("can't set signal handler: %s\n", strerror(-errno));
+		warn("can't set signal handler: %s\n", strerror(errno));
+		err = 1;
 		goto cleanup;
 	}
 

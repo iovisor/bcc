@@ -25,6 +25,7 @@
 #define warn(...) fprintf(stderr, __VA_ARGS__)
 
 static volatile sig_atomic_t exiting = 0;
+
 static pid_t target_pid = 0;
 static const char *libc_path = NULL;
 
@@ -264,20 +265,23 @@ int main(int argc, char **argv)
 	}
 
 	if (signal(SIGINT, sig_int) == SIG_ERR) {
-		warn("can't set signal handler: %s\n", strerror(-errno));
+		warn("can't set signal handler: %s\n", strerror(errno));
+		err = 1;
 		goto cleanup;
 	}
 
 	printf("%-8s %-7s %-16s %-10s %-s\n",
 	       "TIME", "PID", "COMM", "LATms", "HOST");
 
-	while (1) {
-		if ((err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS)) < 0)
-			break;
-		if (exiting)
+	while (!exiting) {
+		err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS);
+		if (err < 0 && errno != EINTR) {
+			warn("error polling perf buffer: %s\n", strerror(errno));
 			goto cleanup;
+		}
+		/* reset err to return 0 if exiting */
+		err = 0;
 	}
-	warn("error polling perf buffer: %d\n", err);
 
 cleanup:
 	perf_buffer__free(pb);

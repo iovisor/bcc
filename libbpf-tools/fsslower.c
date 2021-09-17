@@ -76,7 +76,7 @@ static char file_op[] = {
 	[FSYNC] = 'F',
 };
 
-static volatile sig_atomic_t exiting;
+static volatile sig_atomic_t exiting = 0;
 
 /* options */
 static enum fs_type fs_type = NONE;
@@ -188,7 +188,7 @@ static int libbpf_print_fn(enum libbpf_print_level level,
 	return vfprintf(stderr, format, args);
 }
 
-static void sig_handler(int sig)
+static void sig_int(int signo)
 {
 	exiting = 1;
 }
@@ -429,8 +429,6 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	signal(SIGINT, sig_handler);
-
 	pb_opts.sample_cb = handle_event;
 	pb_opts.lost_cb = handle_lost_events;
 	pb = perf_buffer__new(bpf_map__fd(skel->maps.events), PERF_BUFFER_PAGES,
@@ -447,13 +445,24 @@ int main(int argc, char **argv)
 	if (duration)
 		time_end = get_ktime_ns() + duration * NSEC_PER_SEC;
 
-	while (1) {
-		if ((err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS)) < 0)
-			break;
+	if (signal(SIGINT, sig_int) == SIG_ERR) {
+		warn("can't set signal handler: %s\n", strerror(errno));
+		err = 1;
+		goto cleanup;
+	}
+
+	/* main: poll */
+	while (!exiting) {
+		err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS);
+		if (err < 0 && errno != EINTR) {
+			fprintf(stderr, "error polling perf buffer: %s\n", strerror(errno));
+			goto cleanup;
+		}
 		if (duration && get_ktime_ns() > time_end)
 			goto cleanup;
+		/* reset err to return 0 if exiting */
+		err = 0;
 	}
-	warn("failed with polling perf buffer: %d\n", err);
 
 cleanup:
 	perf_buffer__free(pb);

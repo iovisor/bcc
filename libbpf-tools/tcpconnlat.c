@@ -5,6 +5,7 @@
 // 11-Jul-2020   Wenbo Zhang   Created this.
 #include <argp.h>
 #include <arpa/inet.h>
+#include <signal.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <time.h>
@@ -16,6 +17,8 @@
 
 #define PERF_BUFFER_PAGES	16
 #define PERF_POLL_TIMEOUT_MS	100
+
+static volatile sig_atomic_t exiting = 0;
 
 static struct env {
 	__u64 min_us;
@@ -94,6 +97,11 @@ int libbpf_print_fn(enum libbpf_print_level level,
 	if (level == LIBBPF_DEBUG && !env.verbose)
 		return 0;
 	return vfprintf(stderr, format, args);
+}
+
+static void sig_int(int signo)
+{
+	exiting = 1;
 }
 
 void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
@@ -196,14 +204,25 @@ int main(int argc, char **argv)
 	printf("%-6s %-12s %-2s %-16s %-16s %-5s %s\n",
 		"PID", "COMM", "IP", "SADDR", "DADDR", "DPORT", "LAT(ms)");
 
-	/* main: poll */
-	while (1) {
-		if ((err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS)) < 0)
-			break;
+	if (signal(SIGINT, sig_int) == SIG_ERR) {
+		fprintf(stderr, "can't set signal handler: %s\n", strerror(errno));
+		err = 1;
+		goto cleanup;
 	}
-	printf("error polling perf buffer: %d\n", err);
+
+	/* main: poll */
+	while (!exiting) {
+		err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS);
+		if (err < 0 && errno != EINTR) {
+			fprintf(stderr, "error polling perf buffer: %s\n", strerror(errno));
+			goto cleanup;
+		}
+		/* reset err to return 0 if exiting */
+		err = 0;
+	}
 
 cleanup:
+	perf_buffer__free(pb);
 	tcpconnlat_bpf__destroy(obj);
 
 	return err != 0;

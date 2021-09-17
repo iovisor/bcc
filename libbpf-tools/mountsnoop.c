@@ -282,7 +282,8 @@ int main(int argc, char **argv)
 	}
 
 	if (signal(SIGINT, sig_int) == SIG_ERR) {
-		warn("can't set signal handler: %s\n", strerror(-errno));
+		warn("can't set signal handler: %s\n", strerror(errno));
+		err = 1;
 		goto cleanup;
 	}
 
@@ -292,13 +293,15 @@ int main(int argc, char **argv)
 		printf("%-16s %-7s %-7s %-11s %s\n", "COMM", "PID", "TID", "MNT_NS", "CALL");
 	}
 
-	while (1) {
-		if ((err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS)) < 0)
-			break;
-		if (exiting)
+	while (!exiting) {
+		err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS);
+		if (err < 0 && errno != EINTR) {
+			fprintf(stderr, "error polling perf buffer: %s\n", strerror(errno));
 			goto cleanup;
+		}
+		/* reset err to return 0 if exiting */
+		err = 0;
 	}
-	warn("error polling perf buffer: %d\n", err);
 
 cleanup:
 	perf_buffer__free(pb);

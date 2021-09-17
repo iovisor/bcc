@@ -4,6 +4,7 @@
 // Based on runqslower(8) from BCC by Ivan Babrou.
 // 11-Feb-2020   Andrii Nakryiko   Created this.
 #include <argp.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,6 +14,8 @@
 #include "runqslower.h"
 #include "runqslower.skel.h"
 #include "trace_helpers.h"
+
+static volatile sig_atomic_t exiting = 0;
 
 struct env {
 	pid_t pid;
@@ -110,6 +113,11 @@ int libbpf_print_fn(enum libbpf_print_level level,
 	return vfprintf(stderr, format, args);
 }
 
+static void sig_int(int signo)
+{
+	exiting = 1;
+}
+
 void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	const struct event *e = data;
@@ -194,9 +202,21 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	while ((err = perf_buffer__poll(pb, 100)) >= 0)
-		;
-	printf("Error polling perf buffer: %d\n", err);
+	if (signal(SIGINT, sig_int) == SIG_ERR) {
+		fprintf(stderr, "can't set signal handler: %s\n", strerror(errno));
+		err = 1;
+		goto cleanup;
+	}
+
+	while (!exiting) {
+		err = perf_buffer__poll(pb, 100);
+		if (err < 0 && errno != EINTR) {
+			fprintf(stderr, "error polling perf buffer: %s\n", strerror(errno));
+			goto cleanup;
+		}
+		/* reset err to return 0 if exiting */
+		err = 0;
+	}
 
 cleanup:
 	perf_buffer__free(pb);

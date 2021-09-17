@@ -1,6 +1,7 @@
 // Based on execsnoop(8) from BCC by Brendan Gregg and others.
 //
 #include <argp.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,8 +15,11 @@
 #include "trace_helpers.h"
 
 #define PERF_BUFFER_PAGES   64
+#define PERF_POLL_TIMEOUT_MS	100
 #define NSEC_PRECISION (NSEC_PER_SEC / 1000)
 #define MAX_ARGS_KEY 259
+
+static volatile sig_atomic_t exiting = 0;
 
 static struct env {
 	bool time;
@@ -135,6 +139,11 @@ static int libbpf_print_fn(enum libbpf_print_level level,
 	if (level == LIBBPF_DEBUG && !env.verbose)
 		return 0;
 	return vfprintf(stderr, format, args);
+}
+
+static void sig_int(int signo)
+{
+	exiting = 1;
 }
 
 static void time_since_start()
@@ -319,10 +328,22 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
+	if (signal(SIGINT, sig_int) == SIG_ERR) {
+		fprintf(stderr, "can't set signal handler: %s\n", strerror(errno));
+		err = 1;
+		goto cleanup;
+	}
+
 	/* main: poll */
-	while ((err = perf_buffer__poll(pb, 100)) >= 0)
-		;
-	printf("Error polling perf buffer: %d\n", err);
+	while (!exiting) {
+		err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS);
+		if (err < 0 && errno != EINTR) {
+			fprintf(stderr, "error polling perf buffer: %s\n", strerror(errno));
+			goto cleanup;
+		}
+		/* reset err to return 0 if exiting */
+		err = 0;
+	}
 
 cleanup:
 	perf_buffer__free(pb);
