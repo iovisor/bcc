@@ -23,6 +23,7 @@
 /gethostlatency
 /hardirqs
 /ksnoop
+/kvmexit
 /llcstat
 /nfsdist
 /nfsslower

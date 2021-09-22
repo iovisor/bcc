@@ -36,6 +36,7 @@ APPS = \
 	gethostlatency \
 	hardirqs \
 	ksnoop \
+	kvmexit \
 	llcstat \
 	mountsnoop \
 	numamove \
