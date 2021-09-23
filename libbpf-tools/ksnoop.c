@@ -4,7 +4,6 @@
 #include <ctype.h>
 #include <errno.h>
 #include <getopt.h>
-#include <linux/bpf.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
