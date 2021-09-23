@@ -28,12 +28,11 @@
 
 
 from __future__ import print_function
-from time import sleep, strftime
+from time import sleep
 from bcc import BPF
 import argparse
 import multiprocessing
 import os
-import signal
 import subprocess
 
 #
@@ -323,15 +322,11 @@ if duration < 99999999:
     print(" after sleeping %d secs." % duration)
 else:
     print("... Hit Ctrl-C to end.")
-print("%s%-35s %s" % (header_format, "KVM_EXIT_REASON", "COUNT"))
 
-# signal handler
-def signal_ignore(signal, frame):
-        print()
 try:
     sleep(duration)
 except KeyboardInterrupt:
-    signal.signal(signal.SIGINT, signal_ignore)
+    print()
 
 
 # Currently, sort multiple tids in descending order is not supported.
@@ -341,6 +336,8 @@ if (args.pid or args.tid):
         tgid_exit = [0 for i in range(len(exit_reasons))]
 
 # output
+print("%s%-35s %s" % (header_format, "KVM_EXIT_REASON", "COUNT"))
+
 pcpu_kvm_stat = b["pcpu_kvm_stat"]
 pcpu_cache = b["pcpu_cache"]
 for k, v in pcpu_kvm_stat.items():
