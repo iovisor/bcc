@@ -4,6 +4,7 @@
 // Based on filelife(8) from BCC by Brendan Gregg & Allan McAleavy.
 // 20-Mar-2020   Wenbo Zhang   Created this.
 #include <argp.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,6 +18,8 @@
 
 #define PERF_BUFFER_PAGES	16
 #define PERF_POLL_TIMEOUT_MS	100
+
+static volatile sig_atomic_t exiting = 0;
 
 static struct env {
 	pid_t pid;
@@ -74,6 +77,11 @@ int libbpf_print_fn(enum libbpf_print_level level,
 	if (level == LIBBPF_DEBUG && !env.verbose)
 		return 0;
 	return vfprintf(stderr, format, args);
+}
+
+static void sig_int(int signo)
+{
+	exiting = 1;
 }
 
 void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
@@ -155,9 +163,21 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	while ((err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS)) >= 0)
-		;
-	fprintf(stderr, "error polling perf buffer: %d\n", err);
+	if (signal(SIGINT, sig_int) == SIG_ERR) {
+		fprintf(stderr, "can't set signal handler: %s\n", strerror(errno));
+		err = 1;
+		goto cleanup;
+	}
+
+	while (!exiting) {
+		err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS);
+		if (err < 0 && errno != EINTR) {
+			fprintf(stderr, "error polling perf buffer: %s\n", strerror(errno));
+			goto cleanup;
+		}
+		/* reset err to return 0 if exiting */
+		err = 0;
+	}
 
 cleanup:
 	perf_buffer__free(pb);

@@ -4,6 +4,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <getopt.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,6 +19,8 @@
 #ifndef KSNOOP_VERSION
 #define KSNOOP_VERSION	"0.1"
 #endif
+
+static volatile sig_atomic_t exiting = 0;
 
 static struct btf *vmlinux_btf;
 static const char *bin_name;
@@ -773,6 +776,11 @@ static void lost_handler(void *ctx, int cpu, __u64 cnt)
 	p_err("\t/* lost %llu events */", cnt);
 }
 
+static void sig_int(int signo)
+{
+	exiting = 1;
+}
+
 static int add_traces(struct bpf_map *func_map, struct trace *traces,
 		      int nr_traces)
 {
@@ -886,14 +894,23 @@ static int cmd_trace(int argc, char **argv)
 
 	printf("%16s %4s %8s %s\n", "TIME", "CPU", "PID", "FUNCTION/ARGS");
 
-	while (1) {
-		ret = perf_buffer__poll(pb, 1);
-		if (ret < 0 && ret != -EINTR) {
-			p_err("Polling failed: %s", strerror(-ret));
-			break;
-		}
+	if (signal(SIGINT, sig_int) == SIG_ERR) {
+		fprintf(stderr, "can't set signal handler: %s\n", strerror(errno));
+		ret = 1;
+		goto cleanup;
 	}
 
+	while (!exiting) {
+		ret = perf_buffer__poll(pb, 1);
+		if (ret < 0 && errno != EINTR) {
+			fprintf(stderr, "error polling perf buffer: %s\n", strerror(errno));
+			goto cleanup;
+		}
+		/* reset ret to return 0 if exiting */
+		ret = 0;
+	}
+
+cleanup:
 	perf_buffer__free(pb);
 	ksnoop_bpf__destroy(skel);
 
