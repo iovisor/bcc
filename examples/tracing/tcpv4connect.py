@@ -98,7 +98,7 @@ while 1:
 	    exit()
 
 	# Ignore messages from other tracers
-	if _tag != "trace_tcp4connect":
+	if _tag.decode() != "trace_tcp4connect":
 	    continue
 
 	printb(b"%-6d %-12.12s %-16s %-16s %-4s" % (pid, task,
