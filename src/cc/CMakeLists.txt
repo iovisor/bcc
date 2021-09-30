@@ -89,6 +89,7 @@ set_target_properties(bcc-shared PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0
 set_target_properties(bcc-shared PROPERTIES OUTPUT_NAME bcc)
 
 if(ENABLE_USDT)
+  add_definitions(-DEXPORT_USDT)
   set(bcc_usdt_sources usdt/usdt.cc usdt/usdt_args.cc)
   # else undefined
 endif()
