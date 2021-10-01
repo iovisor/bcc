@@ -551,7 +551,7 @@ if args.count:
 else:
     # header
     if args.containersmap:
-        print("%-16s %-16s %-16s %-16s" % ("NODE", "NAMESPACE", "PODNAME", "CONTAINERNAME"), end="")
+        print("%-16s %-16s %-16s %-16s" % ("NODE", "NAMESPACE", "POD", "CONTAINER"), end="")
     if args.timestamp:
         print("%-9s " % ("TIME(s)"), end="")
     if args.print_uid:

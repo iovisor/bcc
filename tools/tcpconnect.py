@@ -190,7 +190,7 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
     u16 dport = skp->__sk_common.skc_dport;
 
     FILTER_PORT
-    
+
     FILTER_FAMILY
 
     if (ipver == 4) {
@@ -585,7 +585,7 @@ if args.count:
 else:
     # header
     if args.containersmap:
-        print("%-16s %-16s %-16s %-16s" % ("NODE", "NAMESPACE", "PODNAME", "CONTAINERNAME"), end="")
+        print("%-16s %-16s %-16s %-16s" % ("NODE", "NAMESPACE", "POD", "CONTAINER"), end="")
     if args.timestamp:
         print("%-9s" % ("TIME(s)"), end="")
     if args.print_uid:

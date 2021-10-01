@@ -265,7 +265,7 @@ int main(int argc, char **argv)
 	}
 
 	if (containersmap) {
-		printf("%-16s %-16s %-16s %-16s", "NODE", "NAMESPACE", "PODNAME", "CONTAINERNAME");
+		printf("%-16s %-16s %-16s %-16s", "NODE", "NAMESPACE", "POD", "CONTAINER");
 	}
 
 	if (emit_timestamp)

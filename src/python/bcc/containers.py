@@ -136,9 +136,9 @@ BUFFER_SIZE = 256
 class ContainerC(ct.Structure):
     _fields_ = [
         ("ContainerID", ct.c_char*BUFFER_SIZE ),
-        ("KubernetesNamespace", ct.c_char*BUFFER_SIZE),
-        ("KubernetesPod", ct.c_char*BUFFER_SIZE),
-        ("KubernetesContainer", ct.c_char*BUFFER_SIZE),
+        ("Namespace", ct.c_char*BUFFER_SIZE),
+        ("Pod", ct.c_char*BUFFER_SIZE),
+        ("Container", ct.c_char*BUFFER_SIZE),
     ]
 
 
@@ -169,16 +169,16 @@ class ContainersMap:
         if int(ret) != 0:
             return container
 
-        container.Namespace = containerC.KubernetesNamespace
-        container.PodName = containerC.KubernetesPod
-        container.ContainerName = containerC.KubernetesContainer
+        container.Namespace = containerC.Namespace
+        container.PodName = containerC.Pod
+        container.ContainerName = containerC.Container
 
         return container
 
     def enrich_json_event(self, eventJ, mntnsid):
         container = self.get_container(mntnsid)
 
-        eventJ["node_name"] = container.NodeName
-        eventJ["pod_name"] = container.PodName
-        eventJ["container_name"] = container.ContainerName
+        eventJ["node"] = container.NodeName
+        eventJ["pod"] = container.PodName
+        eventJ["container"] = container.ContainerName
         eventJ["namespace"] = container.Namespace

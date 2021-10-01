@@ -729,7 +729,7 @@ print("Tracing TCP established connections. Ctrl-C to end.")
 
 # header
 if args.containersmap:
-    print("%-16s %-16s %-16s %-16s" % ("NODE", "NAMESPACE", "PODNAME", "CONTAINERNAME"), end="")
+    print("%-16s %-16s %-16s %-16s" % ("NODE", "NAMESPACE", "POD", "CONTAINER"), end="")
 if args.verbose:
     if args.timestamp:
         print("%-14s" % ("TIME(ns)"), end="")
