@@ -14,9 +14,11 @@ from __future__ import print_function
 import argparse
 import bcc
 from bcc.containers import filter_by_containers, ContainersMap, generate_container_info_code, print_container_info_header
+from bcc.utils import disable_stdout
 import ctypes
 import errno
 import functools
+import json
 import sys
 
 
@@ -368,7 +370,7 @@ else:
         return '"{}"'.format(''.join(escape_character(c) for c in s))
 
 
-def print_event(mounts, umounts, containers_map, parent, cpu, data, size):
+def print_event(mounts, umounts, containers_map, stdout, parent, cpu, data, size):
     event = ctypes.cast(data, ctypes.POINTER(Event)).contents
 
     try:
@@ -436,6 +438,15 @@ def print_event(mounts, umounts, containers_map, parent, cpu, data, size):
                 print('{:16} {:<7} {:<7} {:<11} {}'.format(
                     syscall['comm'].decode('utf-8', 'replace'), syscall['tgid'],
                     syscall['pid'], syscall['mnt_ns'], call))
+
+            if stdout:
+                eventJ = syscall
+
+                if containers_map:
+                    containers_map.enrich_json_event(eventJ, event.mntnsid)
+
+                json.dump(eventJ, stdout)
+                stdout.write("\n")
     except KeyError:
         # This might happen if we lost an event.
         pass
@@ -455,6 +466,8 @@ def main():
         help="trace mount namespaces in this BPF map only")
     parser.add_argument("--containersmap",
         help="print additional information about the containers where the events are executed")
+    parser.add_argument("--json", action="store_true",
+        help="output the events in json format")
     args = parser.parse_args()
 
     mounts = {}
@@ -469,6 +482,12 @@ def main():
     if args.ebpf:
         print(bpf_text)
         exit()
+
+    stdout = None
+    # disable sys.stdout when --json is passed
+    if args.json:
+        stdout, _ = disable_stdout()
+
     b = bcc.BPF(text=bpf_text)
     mount_fnname = b.get_syscall_fnname("mount")
     b.attach_kprobe(event=mount_fnname, fn_name="syscall__mount")
@@ -477,7 +496,7 @@ def main():
     b.attach_kprobe(event=umount_fnname, fn_name="syscall__umount")
     b.attach_kretprobe(event=umount_fnname, fn_name="do_ret_sys_umount")
     b['events'].open_perf_buffer(
-        functools.partial(print_event, mounts, umounts, containers_map, args.parent_process))
+        functools.partial(print_event, mounts, umounts, containers_map, stdout, args.parent_process))
 
     if args.containersmap:
         print_container_info_header()
