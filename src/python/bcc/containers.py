@@ -133,6 +133,14 @@ def print_container_info():
 # keep synchronized with definition in gadget tracer manager
 BUFFER_SIZE = 256
 
+NODE_HEADER = "NODE";
+NAMESPACE_HEADER = "NAMESPACE";
+POD_HEADER = "POD";
+CONTAINER_HEADER = "CONTAINER";
+
+def print_additional_info_header():
+	print('{:16} {:16} {:16} {:16}'.format(NODE_HEADER, NAMESPACE_HEADER, POD_HEADER, CONTAINER_HEADER), end = '')
+
 class ContainerC(ct.Structure):
     _fields_ = [
         ("ContainerID", ct.c_char*BUFFER_SIZE ),
