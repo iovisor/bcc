@@ -287,7 +287,7 @@ static void print_count(int map_fd_ipv4, int map_fd_ipv6)
 static void print_events_header()
 {
 	if (env.containersmap)
-		printf("%-16s %-16s %-16s %-16s", "NODE", "NAMESPACE", "POD", "CONTAINER");
+		print_container_info_header();
 	if (env.print_timestamp)
 		printf("%-9s", "TIME(s)");
 	if (env.print_uid)

@@ -347,7 +347,7 @@ int main(int argc, char **argv)
 	}
 	/* print headers */
 	if (env.containersmap) {
-		printf("%-16s %-16s %-16s %-16s", "NODE", "NAMESPACE", "POD", "CONTAINER");
+		print_container_info_header();
 	}
 	if (env.time) {
 		printf("%-9s", "TIME");
