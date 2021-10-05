@@ -16,7 +16,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 from __future__ import print_function
 from bcc import BPF
-from bcc.containers import filter_by_containers, ContainersMap, print_container_info
+from bcc.containers import filter_by_containers, ContainersMap, print_container_info, print_container_info_header
 from bcc.utils import disable_stdout
 
 import argparse as ap
@@ -729,7 +729,7 @@ print("Tracing TCP established connections. Ctrl-C to end.")
 
 # header
 if args.containersmap:
-    print("%-16s %-16s %-16s %-16s" % ("NODE", "NAMESPACE", "POD", "CONTAINER"), end="")
+    print_container_info_header()
 if args.verbose:
     if args.timestamp:
         print("%-14s" % ("TIME(ns)"), end="")

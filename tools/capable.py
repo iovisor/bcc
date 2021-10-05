@@ -15,7 +15,7 @@ from __future__ import print_function
 from os import getpid
 from functools import partial
 from bcc import BPF
-from bcc.containers import filter_by_containers, ContainersMap, print_container_info
+from bcc.containers import filter_by_containers, ContainersMap, print_container_info, print_container_info_header
 from bcc.utils import disable_stdout
 import errno
 import argparse
@@ -262,7 +262,7 @@ if args.json:
 
 # header
 if args.containersmap:
-    print("%-16s %-16s %-16s %-16s" % ("NODE", "NAMESPACE", "POD", "CONTAINER"), end="")
+    print_container_info_header()
 
 if args.extra:
     print("%-9s %-6s %-6s %-6s %-16s %-4s %-20s %-6s %s" % (
