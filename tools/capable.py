@@ -262,7 +262,7 @@ if args.json:
 
 # header
 if args.containersmap:
-    print("%-16s %-16s %-16s %-16s" % ("NODE", "NAMESPACE", "PODNAME", "CONTAINERNAME"), end="")
+    print("%-16s %-16s %-16s %-16s" % ("NODE", "NAMESPACE", "POD", "CONTAINER"), end="")
 
 if args.extra:
     print("%-9s %-6s %-6s %-6s %-16s %-4s %-20s %-6s %s" % (
