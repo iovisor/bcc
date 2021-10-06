@@ -19,7 +19,7 @@
 
 from __future__ import print_function
 from bcc import BPF
-from bcc.containers import filter_by_containers, ContainersMap, print_container_info, print_container_info_header
+from bcc.containers import filter_by_containers, ContainersMap, generate_container_info_code, print_container_info_header
 from bcc.utils import ArgString, printb, disable_stdout
 import bcc.utils as utils
 import argparse
@@ -232,7 +232,7 @@ else:
     bpf_text = bpf_text.replace('UID_FILTER', '')
 
 if args.containersmap:
-    bpf_text = print_container_info() + bpf_text
+    bpf_text = generate_container_info_code() + bpf_text
 
 bpf_text = filter_by_containers(args) + bpf_text
 

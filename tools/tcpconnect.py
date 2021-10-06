@@ -23,7 +23,7 @@
 
 from __future__ import print_function
 from bcc import BPF
-from bcc.containers import filter_by_containers, ContainersMap, print_container_info, print_container_info_header
+from bcc.containers import filter_by_containers, ContainersMap, generate_container_info_code, print_container_info_header
 from bcc.utils import printb, disable_stdout
 import argparse
 import json
@@ -372,7 +372,7 @@ if args.uid:
     bpf_text = bpf_text.replace('FILTER_UID',
         'if (uid != %s) { return 0; }' % args.uid)
 if args.containersmap:
-    bpf_text = print_container_info() + bpf_text
+    bpf_text = generate_container_info_code() + bpf_text
 bpf_text = filter_by_containers(args) + bpf_text
 
 bpf_text = bpf_text.replace('FILTER_PID', '')

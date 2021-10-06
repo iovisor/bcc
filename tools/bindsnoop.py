@@ -28,7 +28,7 @@
 
 from __future__ import print_function, absolute_import, unicode_literals
 from bcc import BPF, DEBUG_SOURCE
-from bcc.containers import filter_by_containers, ContainersMap, print_container_info, print_container_info_header
+from bcc.containers import filter_by_containers, ContainersMap, generate_container_info_code, print_container_info_header
 from bcc.utils import printb, disable_stdout
 import argparse
 import json
@@ -369,7 +369,7 @@ if args.uid:
 if args.errors:
     bpf_text = bpf_text.replace('FILTER_ERRORS', 'ignore_errors = 0;')
 if args.containersmap:
-    bpf_text = print_container_info() + bpf_text
+    bpf_text = generate_container_info_code() + bpf_text
 bpf_text = filter_by_containers(args) + bpf_text
 bpf_text = bpf_text.replace('FILTER_PID', '')
 bpf_text = bpf_text.replace('FILTER_PORT', '')

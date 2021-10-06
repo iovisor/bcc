@@ -126,7 +126,7 @@ def filter_by_containers(args):
 
     return cgroupmap_text + mntnsmap_text + filter_by_containers_text
 
-def print_container_info():
+def generate_container_info_code():
     return """
     #define PRINT_CONTAINER_INFO
     """ + get_mntns_id_text
