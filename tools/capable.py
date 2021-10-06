@@ -297,8 +297,7 @@ def print_event(bpf, cpu, data, size):
     else:
         name = "?"
     if args.containersmap:
-        container = containers_map.get_container(event.mntnsid)
-        print("%-16s %-16s %-16s %-16s" % (container.NodeName, container.Namespace, container.PodName, container.ContainerName), end="")
+        containers_map.print_container_info(event.mntnsid)
 
     if args.extra:
         print("%-9s %-6d %-6d %-6d %-16s %-4d %-20s %-6d %s" % (strftime("%H:%M:%S"),

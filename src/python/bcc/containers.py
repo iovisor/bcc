@@ -191,3 +191,17 @@ class ContainersMap:
         eventJ["pod"] = container.PodName
         eventJ["container"] = container.ContainerName
         eventJ["namespace"] = container.Namespace
+
+    def print_container_info(self, mntnsid):
+        """
+        Print container information like its node, namespace, pod and name.
+
+        If no container exists for the given argument, "<>" will be printed
+        instead of the information.
+
+        :param mntnsid: The mount namespace identifier of the container we want
+        to print information.
+        """
+        container = self.get_container(mntnsid)
+
+        print("{:16} {:16} {:16} {:16}".format(container.NodeName, container.Namespace, container.PodName, container.ContainerName), end = '')

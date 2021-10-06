@@ -602,8 +602,7 @@ def print_ipv4_event(cpu, data, size):
     global start_ts
 
     if args.containersmap:
-        container = containers_map.get_container(event.mntnsid)
-        print("%-16s %-16s %-16s %-16s" % (container.NodeName, container.Namespace, container.PodName, container.ContainerName), end="")
+        containers_map.print_container_info(event.mntnsid)
 
     if args.timestamp:
         if start_ts == 0:
@@ -646,8 +645,7 @@ def print_ipv6_event(cpu, data, size):
     event = b["tcp_ipv6_event"].event(data)
     global start_ts
     if args.containersmap:
-        container = containers_map.get_container(event.mntnsid)
-        print("%-16s %-16s %-16s %-16s" % (container.NodeName, container.Namespace, container.PodName, container.ContainerName), end="")
+        containers_map.print_container_info(event.mntnsid)
     if args.timestamp:
         if start_ts == 0:
             start_ts = event.ts_ns

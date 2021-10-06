@@ -394,8 +394,7 @@ def print_event(cpu, data, size):
         return
 
     if args.containersmap:
-        container = containers_map.get_container(event.mntnsid)
-        printb("%-16s %-16s %-16s %-16s" % (container.NodeName, container.Namespace, container.PodName, container.ContainerName), nl="")
+        containers_map.print_container_info(event.mntnsid)
 
     if args.timestamp:
         delta = event.ts - initial_ts
