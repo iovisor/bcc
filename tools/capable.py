@@ -15,7 +15,7 @@ from __future__ import print_function
 from os import getpid
 from functools import partial
 from bcc import BPF
-from bcc.containers import filter_by_containers, ContainersMap, print_container_info
+from bcc.containers import filter_by_containers, ContainersMap, generate_container_info_code, print_container_info_header
 from bcc.utils import disable_stdout
 import errno
 import argparse
@@ -244,7 +244,7 @@ bpf_text = bpf_text.replace('FILTER2', '')
 bpf_text = bpf_text.replace('FILTER3',
     'if (pid == %s) { return 0; }' % getpid())
 if args.containersmap:
-    bpf_text = print_container_info() + bpf_text
+    bpf_text = generate_container_info_code() + bpf_text
 bpf_text = filter_by_containers(args) + bpf_text
 if args.unique:
     bpf_text = bpf_text.replace('UNIQUESET', '1')
@@ -262,7 +262,7 @@ if args.json:
 
 # header
 if args.containersmap:
-    print("%-16s %-16s %-16s %-16s" % ("NODE", "NAMESPACE", "POD", "CONTAINER"), end="")
+    print_container_info_header()
 
 if args.extra:
     print("%-9s %-6s %-6s %-6s %-16s %-4s %-20s %-6s %s" % (
@@ -297,8 +297,7 @@ def print_event(bpf, cpu, data, size):
     else:
         name = "?"
     if args.containersmap:
-        container = containers_map.get_container(event.mntnsid)
-        print("%-16s %-16s %-16s %-16s" % (container.NodeName, container.Namespace, container.PodName, container.ContainerName), end="")
+        containers_map.print_container_info(event.mntnsid)
 
     if args.extra:
         print("%-9s %-6d %-6d %-6d %-16s %-4d %-20s %-6d %s" % (strftime("%H:%M:%S"),

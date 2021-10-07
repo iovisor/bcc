@@ -16,7 +16,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 from __future__ import print_function
 from bcc import BPF
-from bcc.containers import filter_by_containers, ContainersMap, print_container_info
+from bcc.containers import filter_by_containers, ContainersMap, generate_container_info_code, print_container_info_header
 from bcc.utils import disable_stdout
 
 import argparse as ap
@@ -602,8 +602,7 @@ def print_ipv4_event(cpu, data, size):
     global start_ts
 
     if args.containersmap:
-        container = containers_map.get_container(event.mntnsid)
-        print("%-16s %-16s %-16s %-16s" % (container.NodeName, container.Namespace, container.PodName, container.ContainerName), end="")
+        containers_map.print_container_info(event.mntnsid)
 
     if args.timestamp:
         if start_ts == 0:
@@ -646,8 +645,7 @@ def print_ipv6_event(cpu, data, size):
     event = b["tcp_ipv6_event"].event(data)
     global start_ts
     if args.containersmap:
-        container = containers_map.get_container(event.mntnsid)
-        print("%-16s %-16s %-16s %-16s" % (container.NodeName, container.Namespace, container.PodName, container.ContainerName), end="")
+        containers_map.print_container_info(event.mntnsid)
     if args.timestamp:
         if start_ts == 0:
             start_ts = event.ts_ns
@@ -701,7 +699,7 @@ bpf_text = bpf_text.replace('##FILTER_FAMILY##', '')
 bpf_text = bpf_text.replace('##FILTER_PID##', pid_filter)
 bpf_text = bpf_text.replace('##FILTER_NETNS##', netns_filter)
 if args.containersmap:
-    bpf_text = print_container_info() + bpf_text
+    bpf_text = generate_container_info_code() + bpf_text
 bpf_text = filter_by_containers(args) + bpf_text
 
 if args.ebpf:
@@ -729,7 +727,7 @@ print("Tracing TCP established connections. Ctrl-C to end.")
 
 # header
 if args.containersmap:
-    print("%-16s %-16s %-16s %-16s" % ("NODE", "NAMESPACE", "POD", "CONTAINER"), end="")
+    print_container_info_header()
 if args.verbose:
     if args.timestamp:
         print("%-14s" % ("TIME(ns)"), end="")

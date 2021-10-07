@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import print_function
 from bcc.libbcc import lib
 import ctypes as ct
 import os
@@ -125,13 +126,21 @@ def filter_by_containers(args):
 
     return cgroupmap_text + mntnsmap_text + filter_by_containers_text
 
-def print_container_info():
+def generate_container_info_code():
     return """
     #define PRINT_CONTAINER_INFO
     """ + get_mntns_id_text
 
 # keep synchronized with definition in gadget tracer manager
 BUFFER_SIZE = 256
+
+NODE_HEADER = "NODE"
+NAMESPACE_HEADER = "NAMESPACE"
+POD_HEADER = "POD"
+CONTAINER_HEADER = "CONTAINER"
+
+def print_container_info_header():
+    print('{:16} {:16} {:16} {:16}'.format(NODE_HEADER, NAMESPACE_HEADER, POD_HEADER, CONTAINER_HEADER), end = '')
 
 class ContainerC(ct.Structure):
     _fields_ = [
@@ -182,3 +191,17 @@ class ContainersMap:
         eventJ["pod"] = container.PodName
         eventJ["container"] = container.ContainerName
         eventJ["namespace"] = container.Namespace
+
+    def print_container_info(self, mntnsid):
+        """
+        Print container information like its node, namespace, pod and name.
+
+        If no container exists for the given argument, "<>" will be printed
+        instead of the information.
+
+        :param mntnsid: The mount namespace identifier of the container we want
+        to print information.
+        """
+        container = self.get_container(mntnsid)
+
+        print("{:16} {:16} {:16} {:16}".format(container.NodeName, container.Namespace, container.PodName, container.ContainerName), end = '')

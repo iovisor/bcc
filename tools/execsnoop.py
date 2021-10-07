@@ -19,7 +19,7 @@
 
 from __future__ import print_function
 from bcc import BPF
-from bcc.containers import filter_by_containers, ContainersMap, print_container_info
+from bcc.containers import filter_by_containers, ContainersMap, generate_container_info_code, print_container_info_header
 from bcc.utils import ArgString, printb, disable_stdout
 import bcc.utils as utils
 import argparse
@@ -232,7 +232,7 @@ else:
     bpf_text = bpf_text.replace('UID_FILTER', '')
 
 if args.containersmap:
-    bpf_text = print_container_info() + bpf_text
+    bpf_text = generate_container_info_code() + bpf_text
 
 bpf_text = filter_by_containers(args) + bpf_text
 
@@ -252,7 +252,7 @@ if args.json:
 
 # header
 if args.containersmap:
-    print("%-16s %-16s %-16s %-16s" % ("NODE", "NAMESPACE", "POD", "CONTAINER"), end="")
+    print_container_info_header()
 if args.time:
     print("%-9s" % ("TIME"), end="")
 if args.timestamp:
@@ -308,8 +308,7 @@ def print_event(cpu, data, size):
 
         if not skip:
             if args.containersmap:
-                container = containers_map.get_container(event.mntnsid)
-                printb("%-16s %-16s %-16s %-16s" % (container.NodeName, container.Namespace, container.PodName, container.ContainerName), nl="")
+                containers_map.print_container_info(event.mntnsid)
             if args.time:
                 printb(b"%-9s" % strftime("%H:%M:%S").encode('ascii'), nl="")
             if args.timestamp:

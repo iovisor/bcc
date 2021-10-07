@@ -28,7 +28,7 @@
 
 from __future__ import print_function, absolute_import, unicode_literals
 from bcc import BPF, DEBUG_SOURCE
-from bcc.containers import filter_by_containers, ContainersMap, print_container_info
+from bcc.containers import filter_by_containers, ContainersMap, generate_container_info_code, print_container_info_header
 from bcc.utils import printb, disable_stdout
 import argparse
 import json
@@ -369,7 +369,7 @@ if args.uid:
 if args.errors:
     bpf_text = bpf_text.replace('FILTER_ERRORS', 'ignore_errors = 0;')
 if args.containersmap:
-    bpf_text = print_container_info() + bpf_text
+    bpf_text = generate_container_info_code() + bpf_text
 bpf_text = filter_by_containers(args) + bpf_text
 bpf_text = bpf_text.replace('FILTER_PID', '')
 bpf_text = bpf_text.replace('FILTER_PORT', '')
@@ -465,8 +465,7 @@ def print_ipv4_bind_event(cpu, data, size):
     event = b["ipv4_bind_events"].event(data)
     global start_ts
     if args.containersmap:
-        container = containers_map.get_container(event.mntnsid)
-        printb("%-16s %-16s %-16s %-16s" % (container.NodeName, container.Namespace, container.PodName, container.ContainerName), nl="")
+        containers_map.print_container_info(event.mntnsid)
     if args.timestamp:
         if start_ts == 0:
             start_ts = event.ts_us
@@ -490,8 +489,7 @@ def print_ipv6_bind_event(cpu, data, size):
     event = b["ipv6_bind_events"].event(data)
     global start_ts
     if args.containersmap:
-        container = containers_map.get_container(event.mntnsid)
-        printb("%-16s %-16s %-16s %-16s" % (container.NodeName, container.Namespace, container.PodName, container.ContainerName), nl="")
+        containers_map.print_container_info(event.mntnsid)
     if args.timestamp:
         if start_ts == 0:
             start_ts = event.ts_us
@@ -551,7 +549,7 @@ if args.count:
 else:
     # header
     if args.containersmap:
-        print("%-16s %-16s %-16s %-16s" % ("NODE", "NAMESPACE", "POD", "CONTAINER"), end="")
+        print_container_info_header()
     if args.timestamp:
         print("%-9s " % ("TIME(s)"), end="")
     if args.print_uid:
