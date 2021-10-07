@@ -37,3 +37,9 @@ void print_container_info_header(void) {
 	printf("%-16s %-16s %-16s %-16s ", NODE_HEADER, NAMESPACE_HEADER,
 	       POD_HEADER, CONTAINER_HEADER);
 }
+
+void print_container_info(int map_fd, uint64_t mtnnsid) {
+	struct container c = get_container_info(map_fd, mtnnsid);
+	printf("%-16s %-16s %-16s %-16s ", c.node, c.kubernetes_namespace,
+	       c.kubernetes_pod, c.kubernetes_container);
+}

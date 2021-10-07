@@ -255,8 +255,7 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
 
 	if (env.containersmap) {
-		struct container c = get_container_info(containers_map_fd, e->mntns_id);
-		printf("%-16s %-16s %-16s %-16s", c.node, c.kubernetes_namespace, c.kubernetes_pod, c.kubernetes_container);
+		print_container_info(containers_map_fd, e->mntns_id);
 	}
 
 	if (env.time) {

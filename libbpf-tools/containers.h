@@ -19,5 +19,6 @@ struct container {
 struct container get_container_info(int map_fd, uint64_t mtnnsid);
 
 void print_container_info_header(void);
+void print_container_info(int map_fd, uint64_t mtnnsid);
 
 #endif /* __CONTAINERS_H */
