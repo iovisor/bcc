@@ -345,7 +345,7 @@ int main(int argc, char **argv)
 	}
 
 	if (signal(SIGINT, sig_handler) == SIG_ERR || signal(SIGTERM, sig_handler) == SIG_ERR) {
-		warn("can't set signal handler: %s\n", strerror(-errno));
+		warn("can't set signal handler: %s\n", strerror(errno));
 		err = 1;
 		goto cleanup;
 	}
