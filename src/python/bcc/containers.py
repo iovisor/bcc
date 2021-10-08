@@ -140,7 +140,7 @@ POD_HEADER = "POD"
 CONTAINER_HEADER = "CONTAINER"
 
 def print_container_info_header():
-    print('{:16} {:16} {:16} {:16}'.format(NODE_HEADER, NAMESPACE_HEADER, POD_HEADER, CONTAINER_HEADER), end = '')
+    print('{:16} {:16} {:16} {:16} '.format(NODE_HEADER, NAMESPACE_HEADER, POD_HEADER, CONTAINER_HEADER), end = '')
 
 class ContainerC(ct.Structure):
     _fields_ = [
@@ -204,4 +204,4 @@ class ContainersMap:
         """
         container = self.get_container(mntnsid)
 
-        print("{:16} {:16} {:16} {:16}".format(container.NodeName, container.Namespace, container.PodName, container.ContainerName), end = '')
+        print("{:16} {:16} {:16} {:16} ".format(container.NodeName, container.Namespace, container.PodName, container.ContainerName), end = '')
