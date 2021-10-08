@@ -13,10 +13,12 @@
 from __future__ import print_function
 import argparse
 import bcc
-from bcc.containers import filter_by_containers
+from bcc.containers import filter_by_containers, ContainersMap, generate_container_info_code, print_container_info_header
+from bcc.utils import disable_stdout
 import ctypes
 import errno
 import functools
+import json
 import sys
 
 
@@ -61,7 +63,7 @@ struct mnt_namespace {
  * argument as we can. Our stack space is limited, and we need to leave some
  * headroom for the rest of the function, so this should be a decent value.
  */
-#define MAX_STR_LEN 412
+#define MAX_STR_LEN 404
 
 enum event_type {
     EVENT_MOUNT,
@@ -96,6 +98,9 @@ struct data_t {
         /* EVENT_MOUNT_RET, EVENT_UMOUNT_RET */
         int retval;
     };
+#ifdef PRINT_CONTAINER_INFO
+    u64 mntnsid;
+#endif
 };
 
 BPF_PERF_OUTPUT(events);
@@ -158,6 +163,9 @@ int do_ret_sys_mount(struct pt_regs *ctx)
     event.pid = bpf_get_current_pid_tgid() & 0xffffffff;
     event.tgid = bpf_get_current_pid_tgid() >> 32;
     event.retval = PT_REGS_RC(ctx);
+#ifdef PRINT_CONTAINER_INFO
+    event.mntnsid = get_mntns_id();
+#endif
     events.perf_submit(ctx, &event, sizeof(event));
 
     return 0;
@@ -204,6 +212,9 @@ int do_ret_sys_umount(struct pt_regs *ctx)
     event.pid = bpf_get_current_pid_tgid() & 0xffffffff;
     event.tgid = bpf_get_current_pid_tgid() >> 32;
     event.retval = PT_REGS_RC(ctx);
+#ifdef PRINT_CONTAINER_INFO
+    event.mntnsid = get_mntns_id();
+#endif
     events.perf_submit(ctx, &event, sizeof(event));
 
     return 0;
@@ -250,7 +261,7 @@ UMOUNT_FLAGS = [
 
 
 TASK_COMM_LEN = 16  # linux/sched.h
-MAX_STR_LEN = 412
+MAX_STR_LEN = 404
 
 
 class EventType(object):
@@ -289,6 +300,7 @@ class Event(ctypes.Structure):
         ('pid', ctypes.c_uint),
         ('tgid', ctypes.c_uint),
         ('union', DataUnion),
+        ('mntnsid', ctypes.c_ulonglong),
     ]
 
 
@@ -358,7 +370,7 @@ else:
         return '"{}"'.format(''.join(escape_character(c) for c in s))
 
 
-def print_event(mounts, umounts, parent, cpu, data, size):
+def print_event(mounts, umounts, containers_map, stdout, parent, cpu, data, size):
     event = ctypes.cast(data, ctypes.POINTER(Event)).contents
 
     try:
@@ -371,6 +383,7 @@ def print_event(mounts, umounts, parent, cpu, data, size):
                 'flags': event.union.enter.flags,
                 'ppid': event.union.enter.ppid,
                 'pcomm': event.union.enter.pcomm,
+                'mntnsid': event.mntnsid,
             }
         elif event.type == EventType.EVENT_MOUNT_SOURCE:
             mounts[event.pid]['source'] = event.union.str
@@ -390,6 +403,7 @@ def print_event(mounts, umounts, parent, cpu, data, size):
                 'flags': event.union.enter.flags,
                 'ppid': event.union.enter.ppid,
                 'pcomm': event.union.enter.pcomm,
+                'mntnsid': event.mntnsid,
             }
         elif event.type == EventType.EVENT_UMOUNT_TARGET:
             umounts[event.pid]['target'] = event.union.str
@@ -411,6 +425,10 @@ def print_event(mounts, umounts, parent, cpu, data, size):
                     target=decode_mount_string(syscall['target']),
                     flags=decode_umount_flags(syscall['flags']),
                     retval=decode_errno(event.union.retval))
+
+            if containers_map:
+                containers_map.print_container_info(event.mntnsid)
+
             if parent:
                 print('{:16} {:<7} {:<7} {:16} {:<7} {:<11} {}'.format(
                     syscall['comm'].decode('utf-8', 'replace'), syscall['tgid'],
@@ -420,6 +438,15 @@ def print_event(mounts, umounts, parent, cpu, data, size):
                 print('{:16} {:<7} {:<7} {:<11} {}'.format(
                     syscall['comm'].decode('utf-8', 'replace'), syscall['tgid'],
                     syscall['pid'], syscall['mnt_ns'], call))
+
+            if stdout:
+                eventJ = syscall
+
+                if containers_map:
+                    containers_map.enrich_json_event(eventJ, event.mntnsid)
+
+                json.dump(eventJ, stdout)
+                stdout.write("\n")
     except KeyError:
         # This might happen if we lost an event.
         pass
@@ -437,15 +464,30 @@ def main():
         help="trace cgroups in this BPF map only")
     parser.add_argument("--mntnsmap",
         help="trace mount namespaces in this BPF map only")
+    parser.add_argument("--containersmap",
+        help="print additional information about the containers where the events are executed")
+    parser.add_argument("--json", action="store_true",
+        help="output the events in json format")
     args = parser.parse_args()
 
     mounts = {}
     umounts = {}
     global bpf_text
     bpf_text = filter_by_containers(args) + bpf_text
+
+    containers_map = None
+    if args.containersmap:
+        bpf_text = generate_container_info_code() + bpf_text
+        containers_map = ContainersMap(args.containersmap)
     if args.ebpf:
         print(bpf_text)
         exit()
+
+    stdout = None
+    # disable sys.stdout when --json is passed
+    if args.json:
+        stdout, _ = disable_stdout()
+
     b = bcc.BPF(text=bpf_text)
     mount_fnname = b.get_syscall_fnname("mount")
     b.attach_kprobe(event=mount_fnname, fn_name="syscall__mount")
@@ -454,7 +496,10 @@ def main():
     b.attach_kprobe(event=umount_fnname, fn_name="syscall__umount")
     b.attach_kretprobe(event=umount_fnname, fn_name="do_ret_sys_umount")
     b['events'].open_perf_buffer(
-        functools.partial(print_event, mounts, umounts, args.parent_process))
+        functools.partial(print_event, mounts, umounts, containers_map, stdout, args.parent_process))
+
+    if args.containersmap:
+        print_container_info_header()
 
     if args.parent_process:
         print('{:16} {:<7} {:<7} {:16} {:<7} {:<11} {}'.format(
