@@ -84,7 +84,7 @@ const char argp_program_doc[] =
 "\n"
 "EXAMPLES:\n"
 "    mountsnoop         # trace mount and umount syscalls\n"
-"    mountsnoop -v      # output vertically(one line per column value)\n"
+"    mountsnoop -d      # detailed output (one line per column value)\n"
 "    mountsnoop -p 1216 # only trace PID 1216\n";
 
 static const struct argp_option opts[] = {
