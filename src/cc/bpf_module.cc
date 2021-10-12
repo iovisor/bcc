@@ -428,7 +428,7 @@ int BPFModule::load_maps(sec_map_def &sections) {
   // update instructions
   for (auto section : sections) {
     auto sec_name = section.first;
-    if (strncmp(".bpf.fn.", sec_name.c_str(), 8) == 0) {
+    if (strncmp(BPF_FN_PREFIX, sec_name.c_str(), 8) == 0) {
       uint8_t *addr = get<0>(section.second);
       uintptr_t size = get<1>(section.second);
       struct bpf_insn *insns = (struct bpf_insn *)addr;
@@ -903,7 +903,7 @@ int BPFModule::bcc_func_load(int prog_type, const char *name,
     int btf_fd = btf_->get_fd();
     char secname[256];
 
-    ::snprintf(secname, sizeof(secname), ".bpf.fn.%s", name);
+    ::snprintf(secname, sizeof(secname), "%s%s", BPF_FN_PREFIX, name);
     ret = btf_->get_btf_info(secname, &func_info, &func_info_cnt,
                              &finfo_rec_size, &line_info,
                              &line_info_cnt, &linfo_rec_size);
