@@ -59,14 +59,13 @@ class TableDesc;
 class TableStorage;
 class BLoader;
 class ClangLoader;
-class FuncSource;
+class ProgFuncInfo;
 class BTF;
 
 bool bpf_module_rw_engine_enabled(void);
 
 class BPFModule {
  private:
-  static const std::string FN_PREFIX;
   int init_engine();
   void initialize_rw_engine();
   void cleanup_rw_engine();
@@ -74,6 +73,7 @@ class BPFModule {
   int finalize();
   int annotate();
   void annotate_light();
+  void finalize_prog_func_info();
   std::unique_ptr<llvm::ExecutionEngine> finalize_rw(std::unique_ptr<llvm::Module> mod);
   std::string make_reader(llvm::Module *mod, llvm::Type *type);
   std::string make_writer(llvm::Module *mod, llvm::Type *type);
@@ -162,11 +162,10 @@ class BPFModule {
   std::unique_ptr<llvm::ExecutionEngine> engine_;
   std::unique_ptr<llvm::ExecutionEngine> rw_engine_;
   std::unique_ptr<llvm::Module> mod_;
-  std::unique_ptr<FuncSource> func_src_;
+  std::unique_ptr<ProgFuncInfo> prog_func_info_;
   sec_map_def sections_;
   std::vector<TableDesc *> tables_;
   std::map<std::string, size_t> table_names_;
-  std::vector<std::string> function_names_;
   std::map<llvm::Type *, std::string> readers_;
   std::map<llvm::Type *, std::string> writers_;
   std::string id_;

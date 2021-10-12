@@ -16,13 +16,18 @@
 
 #pragma once
 
+#include <clang/Frontend/CompilerInvocation.h>
+
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
 
-#include <clang/Frontend/CompilerInvocation.h>
-
 #include "table_storage.h"
+#include "vendor/optional.hpp"
+
+using std::experimental::nullopt;
+using std::experimental::optional;
 
 namespace llvm {
 class Module;
@@ -32,21 +37,33 @@ class MemoryBuffer;
 
 namespace ebpf {
 
-class FuncSource {
-  class SourceCode {
-   public:
-    SourceCode(const std::string& s1 = "", const std::string& s2 = ""): src_(s1), src_rewritten_(s2) {}
-    std::string src_;
-    std::string src_rewritten_;
-  };
-  std::map<std::string, SourceCode> funcs_;
+struct FuncInfo {
+  uint8_t *start_ = nullptr;
+  size_t size_ = 0;
+  std::string section_;
+  std::string src_;
+  std::string src_rewritten_;
+  // dummy constructor so emplace() works
+  FuncInfo(int i) {}
+};
+
+class ProgFuncInfo {
  public:
-  FuncSource() {}
-  void clear() { funcs_.clear(); }
-  const char * src(const std::string& name);
-  const char * src_rewritten(const std::string& name);
-  void set_src(const std::string& name, const std::string& src);
-  void set_src_rewritten(const std::string& name, const std::string& src);
+  ProgFuncInfo() {}
+  void clear() {
+    funcs_.clear();
+    func_idx_.clear();
+  }
+  optional<FuncInfo &> get_func(std::string name);
+  optional<FuncInfo &> get_func(size_t id);
+  optional<std::string &> func_name(size_t id);
+  optional<FuncInfo &> add_func(std::string name);
+  size_t num_funcs() { return funcs_.size(); }
+  void for_each_func(std::function<void(std::string, FuncInfo &)> cb);
+
+ private:
+  std::map<std::string, FuncInfo> funcs_;
+  std::map<uint32_t, std::string> func_idx_;
 };
 
 class ClangLoader {
@@ -55,7 +72,7 @@ class ClangLoader {
   ~ClangLoader();
   int parse(std::unique_ptr<llvm::Module> *mod, TableStorage &ts,
             const std::string &file, bool in_memory, const char *cflags[],
-            int ncflags, const std::string &id, FuncSource &func_src,
+            int ncflags, const std::string &id, ProgFuncInfo &prog_func_info,
             std::string &mod_src, const std::string &maps_ns,
             fake_fd_map_def &fake_fd_map,
             std::map<std::string, std::vector<std::string>> &perf_events);
@@ -66,10 +83,9 @@ class ClangLoader {
                  const std::vector<const char *> &flags_cstr_rem,
                  const std::string &main_path,
                  const std::unique_ptr<llvm::MemoryBuffer> &main_buf,
-                 const std::string &id, FuncSource &func_src,
+                 const std::string &id, ProgFuncInfo &prog_func_info,
                  std::string &mod_src, bool use_internal_bpfh,
-                 const std::string &maps_ns,
-                 fake_fd_map_def &fake_fd_map,
+                 const std::string &maps_ns, fake_fd_map_def &fake_fd_map,
                  std::map<std::string, std::vector<std::string>> &perf_events);
   void add_remapped_includes(clang::CompilerInvocation& invocation);
   void add_main_input(clang::CompilerInvocation& invocation,

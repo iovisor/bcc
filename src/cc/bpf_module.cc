@@ -13,38 +13,43 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <fcntl.h>
-#include <map>
-#include <string>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <vector>
-#include <set>
-#include <linux/bpf.h>
-#include <net/if.h>
+#include "bpf_module.h"
 
+#include <fcntl.h>
+#include <linux/bpf.h>
+#include <llvm-c/Transforms/IPO.h>
 #include <llvm/ExecutionEngine/MCJIT.h>
 #include <llvm/ExecutionEngine/SectionMemoryManager.h>
 #include <llvm/IR/IRPrintingPasses.h>
-#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Verifier.h>
+#include <llvm/Object/ObjectFile.h>
+#include <llvm/Object/ELFObjectFile.h>
+#include <llvm/Object/SymbolSize.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Transforms/IPO.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
-#include <llvm-c/Transforms/IPO.h>
+#include <net/if.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
-#include "common.h"
+#include <map>
+#include <set>
+#include <string>
+#include <iostream>
+#include <vector>
+
+#include "bcc_btf.h"
 #include "bcc_debug.h"
 #include "bcc_elf.h"
-#include "frontends/clang/loader.h"
-#include "frontends/clang/b_frontend_action.h"
-#include "bpf_module.h"
-#include "exported_files.h"
-#include "libbpf.h"
-#include "bcc_btf.h"
 #include "bcc_libbpf_inc.h"
+#include "common.h"
+#include "exported_files.h"
+#include "frontends/clang/b_frontend_action.h"
+#include "frontends/clang/loader.h"
+#include "libbpf.h"
 
 namespace ebpf {
 
@@ -58,15 +63,11 @@ using std::unique_ptr;
 using std::vector;
 using namespace llvm;
 
-const string BPFModule::FN_PREFIX = BPF_FN_PREFIX;
-
 // Snooping class to remember the sections as the JIT creates them
 class MyMemoryManager : public SectionMemoryManager {
  public:
-
-  explicit MyMemoryManager(sec_map_def *sections)
-      : sections_(sections) {
-  }
+  explicit MyMemoryManager(sec_map_def *sections, ProgFuncInfo *prog_func_info)
+      : sections_(sections), prog_func_info_(prog_func_info) {}
 
   virtual ~MyMemoryManager() {}
   uint8_t *allocateCodeSection(uintptr_t Size, unsigned Alignment,
@@ -74,8 +75,6 @@ class MyMemoryManager : public SectionMemoryManager {
                                StringRef SectionName) override {
     // The programs need to change from fake fd to real map fd, so not allocate ReadOnly regions.
     uint8_t *Addr = SectionMemoryManager::allocateDataSection(Size, Alignment, SectionID, SectionName, false);
-    //printf("allocateDataSection: %s Addr %p Size %ld Alignment %d SectionID %d\n",
-    //       SectionName.str().c_str(), (void *)Addr, Size, Alignment, SectionID);
     (*sections_)[SectionName.str()] = make_tuple(Addr, Size, SectionID);
     return Addr;
   }
@@ -85,12 +84,38 @@ class MyMemoryManager : public SectionMemoryManager {
     // The lines in .BTF.ext line_info, if corresponding to remapped files, will have empty source line.
     // The line_info will be fixed in place, so not allocate ReadOnly regions.
     uint8_t *Addr = SectionMemoryManager::allocateDataSection(Size, Alignment, SectionID, SectionName, false);
-    //printf("allocateDataSection: %s Addr %p Size %ld Alignment %d SectionID %d\n",
-    //       SectionName.str().c_str(), (void *)Addr, Size, Alignment, SectionID);
     (*sections_)[SectionName.str()] = make_tuple(Addr, Size, SectionID);
     return Addr;
   }
+
+  void notifyObjectLoaded(ExecutionEngine *EE,
+                          const object::ObjectFile &o) override {
+    auto sizes = llvm::object::computeSymbolSizes(o);
+    for (auto ss : sizes) {
+      auto maybe_name = ss.first.getName();
+      if (!maybe_name)
+        continue;
+
+      std::string name = maybe_name->str();
+      auto info = prog_func_info_->get_func(name);
+      if (!info)
+        continue;
+
+      auto section = ss.first.getSection();
+      if (!section)
+        continue;
+
+      auto sec_name = section.get()->getName();
+      if (!sec_name)
+        continue;
+
+      info->section_ = sec_name->str();
+      info->size_ = ss.second;
+    }
+  }
+
   sec_map_def *sections_;
+  ProgFuncInfo *prog_func_info_;
 };
 
 BPFModule::BPFModule(unsigned flags, TableStorage *ts, bool rw_engine_enabled,
@@ -120,7 +145,7 @@ BPFModule::BPFModule(unsigned flags, TableStorage *ts, bool rw_engine_enabled,
     local_ts_ = createSharedTableStorage();
     ts_ = &*local_ts_;
   }
-  func_src_ = ebpf::make_unique<FuncSource>();
+  prog_func_info_ = ebpf::make_unique<ProgFuncInfo>();
 }
 
 static StatusTuple unimplemented_sscanf(const char *, void *) {
@@ -139,14 +164,18 @@ BPFModule::~BPFModule() {
   }
 
   if (!rw_engine_enabled_) {
-    for (auto section : sections_)
-      delete[] get<0>(section.second);
+    prog_func_info_->for_each_func(
+        [&](std::string name, FuncInfo &info) {
+      if (!info.start_)
+        return;
+      delete[] info.start_;
+    });
   }
 
   engine_.reset();
   cleanup_rw_engine();
   ctx_.reset();
-  func_src_.reset();
+  prog_func_info_.reset();
 
   if (btf_)
     delete btf_;
@@ -162,7 +191,8 @@ int BPFModule::free_bcc_memory() {
 int BPFModule::load_cfile(const string &file, bool in_memory, const char *cflags[], int ncflags) {
   ClangLoader clang_loader(&*ctx_, flags_);
   if (clang_loader.parse(&mod_, *ts_, file, in_memory, cflags, ncflags, id_,
-                         *func_src_, mod_src_, maps_ns_, fake_fd_map_, perf_events_))
+                         *prog_func_info_, mod_src_, maps_ns_, fake_fd_map_,
+                         perf_events_))
     return -1;
   return 0;
 }
@@ -175,8 +205,9 @@ int BPFModule::load_cfile(const string &file, bool in_memory, const char *cflags
 int BPFModule::load_includes(const string &text) {
   ClangLoader clang_loader(&*ctx_, flags_);
   const char *cflags[] = {"-DB_WORKAROUND"};
-  if (clang_loader.parse(&mod_, *ts_, text, true, cflags, 1, "", *func_src_,
-                         mod_src_, "", fake_fd_map_, perf_events_))
+  if (clang_loader.parse(&mod_, *ts_, text, true, cflags, 1, "",
+                         *prog_func_info_, mod_src_, "", fake_fd_map_,
+                         perf_events_))
     return -1;
   return 0;
 }
@@ -426,26 +457,19 @@ int BPFModule::load_maps(sec_map_def &sections) {
   }
 
   // update instructions
-  for (auto section : sections) {
-    auto sec_name = section.first;
-    if (strncmp(BPF_FN_PREFIX, sec_name.c_str(), 8) == 0) {
-      uint8_t *addr = get<0>(section.second);
-      uintptr_t size = get<1>(section.second);
-      struct bpf_insn *insns = (struct bpf_insn *)addr;
-      int i, num_insns;
-
-      num_insns = size/sizeof(struct bpf_insn);
-      for (i = 0; i < num_insns; i++) {
-        if (insns[i].code == (BPF_LD | BPF_DW | BPF_IMM)) {
-          // change map_fd is it is a ld_pseudo */
-          if (insns[i].src_reg == BPF_PSEUDO_MAP_FD &&
-              map_fds.find(insns[i].imm) != map_fds.end())
-            insns[i].imm = map_fds[insns[i].imm];
-          i++;
-        }
+  prog_func_info_->for_each_func([&](std::string name, FuncInfo &info) {
+    struct bpf_insn *insns = (struct bpf_insn *)info.start_;
+    uint32_t i, num_insns = info.size_ / sizeof(struct bpf_insn);
+    for (i = 0; i < num_insns; i++) {
+      if (insns[i].code == (BPF_LD | BPF_DW | BPF_IMM)) {
+        // change map_fd is it is a ld_pseudo
+        if (insns[i].src_reg == BPF_PSEUDO_MAP_FD &&
+            map_fds.find(insns[i].imm) != map_fds.end())
+          insns[i].imm = map_fds[insns[i].imm];
+        i++;
       }
     }
-  }
+  });
 
   return 0;
 }
@@ -474,7 +498,8 @@ int BPFModule::finalize() {
   string err;
   EngineBuilder builder(move(mod_));
   builder.setErrorStr(&err);
-  builder.setMCJITMemoryManager(ebpf::make_unique<MyMemoryManager>(sections_p));
+  builder.setMCJITMemoryManager(
+      ebpf::make_unique<MyMemoryManager>(sections_p, &*prog_func_info_));
   builder.setMArch("bpf");
 #if LLVM_MAJOR_VERSION <= 11
   builder.setUseOrcMCJITReplacement(false);
@@ -485,20 +510,19 @@ int BPFModule::finalize() {
     return -1;
   }
 
-#if LLVM_MAJOR_VERSION >= 9
   engine_->setProcessAllSections(true);
-#else
-  if (flags_ & DEBUG_SOURCE)
-    engine_->setProcessAllSections(true);
-#endif
 
   if (int rc = run_pass_manager(*mod))
     return rc;
 
   engine_->finalizeObject();
+  prog_func_info_->for_each_func([&](std::string name, FuncInfo &info) {
+    info.start_ = (uint8_t *)engine_->getFunctionAddress(name);
+  });
+  finalize_prog_func_info();
 
   if (flags_ & DEBUG_SOURCE) {
-    SourceDebugger src_debugger(mod, *sections_p, FN_PREFIX, mod_src_,
+    SourceDebugger src_debugger(mod, *sections_p, *prog_func_info_, mod_src_,
                                 src_dbg_fmap_);
     src_debugger.dump();
   }
@@ -521,51 +545,74 @@ int BPFModule::finalize() {
       }
       sections_[fname] = make_tuple(tmp_p, size, get<2>(section.second));
     }
+
+    prog_func_info_->for_each_func([](std::string name, FuncInfo &info) {
+      uint8_t *tmp_p = new uint8_t[info.size_];
+      memcpy(tmp_p, info.start_, info.size_);
+      info.start_ = tmp_p;
+    });
     engine_.reset();
     ctx_.reset();
   }
 
-  // give functions an id
-  for (auto section : sections_)
-    if (!strncmp(FN_PREFIX.c_str(), section.first.c_str(), FN_PREFIX.size()))
-      function_names_.push_back(section.first);
-
   return 0;
 }
 
-size_t BPFModule::num_functions() const {
-  return function_names_.size();
+void BPFModule::finalize_prog_func_info() {
+  // prog_func_info_'s FuncInfo data is gradually populated (first in frontend
+  // action, then bpf_module). It's possible for a FuncInfo to have been
+  // created by FrontendAction but no corresponding start location found in
+  // bpf_module - filter out these functions
+  //
+  // The numeric function ids in the new prog_func_info_ are considered
+  // canonical
+  std::unique_ptr<ProgFuncInfo> finalized = ebpf::make_unique<ProgFuncInfo>();
+  prog_func_info_->for_each_func([&](std::string name, FuncInfo &info) {
+    if(info.start_) {
+      auto i = finalized->add_func(name);
+      if (i) { // should always be true
+        *i = info;
+      }
+    }
+  });
+  prog_func_info_.swap(finalized);
 }
 
+size_t BPFModule::num_functions() const { return prog_func_info_->num_funcs(); }
+
 const char * BPFModule::function_name(size_t id) const {
-  if (id >= function_names_.size())
-    return nullptr;
-  return function_names_[id].c_str() + FN_PREFIX.size();
+  auto name = prog_func_info_->func_name(id);
+  if (name)
+    return name->c_str();
+  return nullptr;
 }
 
 uint8_t * BPFModule::function_start(size_t id) const {
-  if (id >= function_names_.size())
-    return nullptr;
-  auto section = sections_.find(function_names_[id]);
-  if (section == sections_.end())
-    return nullptr;
-  return get<0>(section->second);
+  auto fn = prog_func_info_->get_func(id);
+  if (fn)
+    return fn->start_;
+  return nullptr;
 }
 
 uint8_t * BPFModule::function_start(const string &name) const {
-  auto section = sections_.find(FN_PREFIX + name);
-  if (section == sections_.end())
-    return nullptr;
-
-  return get<0>(section->second);
+  auto fn = prog_func_info_->get_func(name);
+  if (fn)
+    return fn->start_;
+  return nullptr;
 }
 
 const char * BPFModule::function_source(const string &name) const {
-  return func_src_->src(name);
+  auto fn = prog_func_info_->get_func(name);
+  if (fn)
+    return fn->src_.c_str();
+  return "";
 }
 
 const char * BPFModule::function_source_rewritten(const string &name) const {
-  return func_src_->src_rewritten(name);
+  auto fn = prog_func_info_->get_func(name);
+  if (fn)
+    return fn->src_rewritten_.c_str();
+  return "";
 }
 
 int BPFModule::annotate_prog_tag(const string &name, int prog_fd,
@@ -637,20 +684,17 @@ int BPFModule::annotate_prog_tag(const string &name, int prog_fd,
 }
 
 size_t BPFModule::function_size(size_t id) const {
-  if (id >= function_names_.size())
-    return 0;
-  auto section = sections_.find(function_names_[id]);
-  if (section == sections_.end())
-    return 0;
-  return get<1>(section->second);
+  auto fn = prog_func_info_->get_func(id);
+  if (fn)
+    return fn->size_;
+  return 0;
 }
 
 size_t BPFModule::function_size(const string &name) const {
-  auto section = sections_.find(FN_PREFIX + name);
-  if (section == sections_.end())
-    return 0;
-
-  return get<1>(section->second);
+  auto fn = prog_func_info_->get_func(name);
+  if (fn)
+    return fn->size_;
+  return 0;
 }
 
 char * BPFModule::license() const {
