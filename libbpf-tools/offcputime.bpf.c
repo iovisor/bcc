@@ -5,6 +5,7 @@
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_tracing.h>
 #include "offcputime.h"
+#include "core_fixes.bpf.h"
 
 #define PF_KTHREAD		0x00200000	/* I am a kernel thread */
 #define MAX_ENTRIES		10240
@@ -51,7 +52,7 @@ static bool allow_record(struct task_struct *t)
 		return false;
 	else if (kernel_threads_only && !(t->flags & PF_KTHREAD))
 		return false;
-	if (state != -1 && t->state != state)
+	if (state != -1 && get_task_state(t) != state)
 		return false;
 	return true;
 }
