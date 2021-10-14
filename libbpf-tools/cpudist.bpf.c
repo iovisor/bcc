@@ -6,6 +6,7 @@
 #include <bpf/bpf_tracing.h>
 #include "cpudist.h"
 #include "bits.bpf.h"
+#include "core_fixes.bpf.h"
 
 #define TASK_RUNNING	0
 
@@ -88,7 +89,7 @@ int BPF_PROG(sched_switch, bool preempt, struct task_struct *prev,
 		store_start(prev_tgid, prev_pid, ts);
 		update_hist(next, tgid, pid, ts);
 	} else {
-		if (prev->state == TASK_RUNNING)
+		if (get_task_state(prev) == TASK_RUNNING)
 			update_hist(prev, prev_tgid, prev_pid, ts);
 		store_start(tgid, pid, ts);
 	}

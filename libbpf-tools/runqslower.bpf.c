@@ -3,6 +3,7 @@
 #include <vmlinux.h>
 #include <bpf/bpf_helpers.h>
 #include "runqslower.h"
+#include "core_fixes.bpf.h"
 
 #define TASK_RUNNING	0
 
@@ -69,11 +70,10 @@ int handle__sched_switch(u64 *ctx)
 	struct task_struct *next = (struct task_struct *)ctx[2];
 	struct event event = {};
 	u64 *tsp, delta_us;
-	long state;
 	u32 pid;
 
 	/* ivcsw: treat like an enqueue event and store timestamp */
-	if (prev->state == TASK_RUNNING)
+	if (get_task_state(prev) == TASK_RUNNING)
 		trace_enqueue(prev->tgid, prev->pid);
 
 	pid = next->pid;
