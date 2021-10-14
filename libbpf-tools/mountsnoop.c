@@ -17,6 +17,7 @@
 
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
+#include "containers.h"
 #include "mountsnoop.h"
 #include "mountsnoop.skel.h"
 #include "trace_helpers.h"
@@ -24,6 +25,7 @@
 #define PERF_BUFFER_PAGES	64
 #define PERF_POLL_TIMEOUT_MS	100
 #define warn(...) fprintf(stderr, __VA_ARGS__)
+#define CONTAINERS_MAP_KEY 260
 
 /* https://www.gnu.org/software/gnulib/manual/html_node/strerrorname_005fnp.html */
 #if !defined(__GLIBC__) || __GLIBC__ < 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ < 32)
@@ -38,6 +40,8 @@ static volatile sig_atomic_t exiting = 0;
 static pid_t target_pid = 0;
 static bool emit_timestamp = false;
 static bool output_vertically = false;
+static char *mntnsmap = NULL;
+static char *containersmap = NULL;
 static const char *flag_names[] = {
 	[0] = "MS_RDONLY",
 	[1] = "MS_NOSUID",
@@ -73,6 +77,7 @@ static const char *flag_names[] = {
 	[31] = "MS_NOUSER",
 };
 static const int flag_count = sizeof(flag_names) / sizeof(flag_names[0]);
+static int containers_map_fd;
 
 const char *argp_program_version = "mountsnoop 0.1";
 const char *argp_program_bug_address =
@@ -91,6 +96,9 @@ static const struct argp_option opts[] = {
 	{ "pid", 'p', "PID", 0, "Process ID to trace" },
 	{ "timestamp", 't', NULL, 0, "Include timestamp on output" },
 	{ "detailed", 'd', NULL, 0, "Output result in detail mode" },
+	{ "mntnsmap", 'm', "mountnspath", 0, "Trace mount namespaces in this BPF map only" },
+	{ "containersmap", CONTAINERS_MAP_KEY, "CONTAINERSMAP", 0, "Print additional information about containers using this map" },
+	{ "json", 'j', NULL, 0, "Output using json format" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
@@ -118,6 +126,15 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	case 'h':
 		argp_state_help(state, stderr, ARGP_HELP_STD_HELP);
 		break;
+	case 'm':
+		mntnsmap = arg;
+		break;
+	case CONTAINERS_MAP_KEY:
+		containersmap = arg;
+		break;
+	case 'j':
+		fprintf(stderr, "--json is not supported\n");
+		return ENOSYS;
 	default:
 		return ARGP_ERR_UNKNOWN;
 	}
@@ -204,6 +221,9 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		indent = "";
 	}
 	if (!output_vertically) {
+		if (containersmap) {
+			print_container_info(containers_map_fd, e->mnt_ns);
+		}
 		printf("%-16s %-7d %-7d %-11u %s\n",
 		       e->comm, e->pid, e->tid, e->mnt_ns, gen_call(e));
 		return;
@@ -260,10 +280,29 @@ int main(int argc, char **argv)
 
 	obj->rodata->target_pid = target_pid;
 
+	if (mntnsmap != NULL) {
+		obj->rodata->filter_by_mnt_ns = true;
+
+		/* TODO: is there a way to avoid creating this map? */
+		err = bpf_map__set_pin_path(obj->maps.mount_ns_set, mntnsmap);
+		if (err) {
+			warn("failed to set pin path for mntnsmap: %d\n", err);
+			goto cleanup;
+		}
+	}
+
 	err = mountsnoop_bpf__load(obj);
 	if (err) {
 		warn("failed to load BPF object: %d\n", err);
 		goto cleanup;
+	}
+
+	if (containersmap) {
+		containers_map_fd = bpf_obj_get(containersmap);
+		if (containers_map_fd < 0) {
+			warn("failed to open containers map %s: %d\n", containersmap, err);
+			goto cleanup;
+		}
 	}
 
 	err = mountsnoop_bpf__attach(obj);
@@ -290,6 +329,11 @@ int main(int argc, char **argv)
 	if (!output_vertically) {
 		if (emit_timestamp)
 			printf("%-8s ", "TIME");
+
+		/* print headers */
+		if (containersmap) {
+			print_container_info_header();
+		}
 		printf("%-16s %-7s %-7s %-11s %s\n", "COMM", "PID", "TID", "MNT_NS", "CALL");
 	}
 
