@@ -419,11 +419,12 @@ static char *type_id_to_str(struct btf *btf, __s32 type_id, char *str)
 				name = btf__str_by_offset(btf, type->name_off);
 				break;
 			case BTF_KIND_UNION:
-				prefix = "union";
+				prefix = "union ";
 				name = btf__str_by_offset(btf, type->name_off);
 				break;
 			case BTF_KIND_ENUM:
 				prefix = "enum ";
+				name = btf__str_by_offset(btf, type->name_off);
 				break;
 			case BTF_KIND_TYPEDEF:
 				name = btf__str_by_offset(btf, type->name_off);
@@ -445,7 +446,7 @@ static char *value_to_str(struct btf *btf, struct value *val, char *str)
 
 	str = type_id_to_str(btf, val->type_id, str);
 	if (val->flags & KSNOOP_F_PTR)
-		strncat(str, " * ", MAX_STR);
+		strncat(str, "*", MAX_STR);
 	if (strlen(val->name) > 0 &&
 	    strcmp(val->name, KSNOOP_RETURN_NAME) != 0)
 		strncat(str, val->name, MAX_STR);
@@ -680,7 +681,7 @@ static int cmd_info(int argc, char **argv)
 	for (i = 0; i < nr_traces; i++) {
 		struct func *func = &traces[i].func;
 
-		printf("%s %s(",
+		printf("%s%s(",
 		       value_to_str(traces[i].btf, &func->args[KSNOOP_RETURN],
 				    str),
 		       func->name);
