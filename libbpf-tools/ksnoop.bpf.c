@@ -221,15 +221,13 @@ static void output_stashed_traces(struct pt_regs *ctx,
 {
 	struct func_stack *func_stack;
 	struct trace *trace = NULL;
-	__u8 stack_depth, i;
+	__u8 i;
 	__u64 task = 0;
 
 	task = bpf_get_current_task();
 	func_stack = bpf_map_lookup_elem(&ksnoop_func_stack, &task);
 	if (!func_stack)
 		return;
-
-	stack_depth = func_stack->stack_depth;
 
 	if (entry) {
 		/* iterate from bottom to top of stack, outputting stashed
@@ -294,9 +292,7 @@ static int ksnoop(struct pt_regs *ctx, bool entry)
 {
 	void *data_ptr = NULL;
 	struct trace *trace;
-	struct func *func;
-	__u16 trace_len;
-	__u64 data, pg;
+	__u64 data;
 	__u32 currpid;
 	int ret;
 	__u8 i;
@@ -304,8 +300,6 @@ static int ksnoop(struct pt_regs *ctx, bool entry)
 	trace = get_trace(ctx, entry);
 	if (!trace)
 		return 0;
-
-	func = &trace->func;
 
 	/* make sure we want events from this pid */
 	currpid = bpf_get_current_pid_tgid();
@@ -399,7 +393,7 @@ static int ksnoop(struct pt_regs *ctx, bool entry)
 			if (!ok) {
 				clear_trace(trace);
 				return 0;
-			}	
+			}
 		}
 
 		if (currtrace->flags & (KSNOOP_F_PTR | KSNOOP_F_MEMBER))

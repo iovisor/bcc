@@ -57,7 +57,6 @@ int BPF_KPROBE(vfs_unlink, struct inode *dir, struct dentry *dentry)
 	const u8 *qs_name_ptr;
 	u32 tgid = id >> 32;
 	u64 *tsp, delta_ns;
-	u32 qs_len;
 
 	tsp = bpf_map_lookup_elem(&start, &dentry);
 	if (!tsp)
@@ -67,7 +66,6 @@ int BPF_KPROBE(vfs_unlink, struct inode *dir, struct dentry *dentry)
 	bpf_map_delete_elem(&start, &dentry);
 
 	qs_name_ptr = BPF_CORE_READ(dentry, d_name.name);
-	qs_len = BPF_CORE_READ(dentry, d_name.len);
 	bpf_probe_read_kernel_str(&event.file, sizeof(event.file), qs_name_ptr);
 	bpf_get_current_comm(&event.task, sizeof(event.task));
 	event.delta_ns = delta_ns;

@@ -126,7 +126,7 @@ SEC("tp_btf/block_rq_complete")
 int BPF_PROG(block_rq_complete, struct request *rq, int error,
 	     unsigned int nr_bytes)
 {
-	u64 slot, ts = bpf_ktime_get_ns();
+	u64 ts = bpf_ktime_get_ns();
 	struct piddata *piddatap;
 	struct event event = {};
 	struct stage *stagep;

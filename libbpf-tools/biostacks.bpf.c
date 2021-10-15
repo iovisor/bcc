@@ -84,7 +84,6 @@ int BPF_PROG(blk_account_io_done, struct request *rq)
 {
 	u64 slot, ts = bpf_ktime_get_ns();
 	struct internal_rqinfo *i_rqinfop;
-	struct rqinfo *rqinfop;
 	struct hist *histp;
 	s64 delta;
 

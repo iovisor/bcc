@@ -46,9 +46,7 @@ static int probe_entry(struct pt_regs *ctx)
 
 static int probe_return(struct pt_regs *ctx)
 {
-	__u64 pid_tgid = bpf_get_current_pid_tgid();
-	__u32 pid = pid_tgid >> 32;
-	__u32 tid = (__u32)pid_tgid;
+	__u32 tid = (__u32)bpf_get_current_pid_tgid();
 	struct event *eventp;
 
 	eventp = bpf_map_lookup_elem(&starts, &tid);

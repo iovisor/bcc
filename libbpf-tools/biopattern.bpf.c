@@ -19,7 +19,7 @@ struct {
 SEC("tracepoint/block/block_rq_complete")
 int handle__block_rq_complete(struct trace_event_raw_block_rq_complete *ctx)
 {
-	sector_t *last_sectorp,  sector = ctx->sector;
+	sector_t sector = ctx->sector;
 	struct counter *counterp, zero = {};
 	u32 nr_sector = ctx->nr_sector;
 	dev_t dev = ctx->dev;
