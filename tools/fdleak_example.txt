@@ -1,0 +1,136 @@
+Demonstrations of fdleak.
+
+Trace and display fd alloc/close to detect FD leaks in user-mode processes.
+
+If the survival time is longer than the minimum allowable survival time, 
+or EMFILE occurs, the tool will collects allocator user-stack,max fd number, 
+thread name, tid..
+
+`In UNIX, everything is a file`, file leakage problems may occur when 
+most resources are used improperly, eg:
+  file, socket, eventfd, pipe, ashmem, dmabuf, syncfence ...
+
+usage: fdleak [-h] [-p PID] [--lsof] [-i INTERVAL] [-m MIN_ALLOW] [-D]
+----
+For example:
+
+# ./fdleak 
+Trace and display fd alloc/close to detect FD leaks process, ctrl-c to exit.
+[17:36:24] stack id-1388 in 90 allocations from stack
+         PNAME-PID            LIMIT     MAX_SURVIVAL(s) MAX_FD   THREADs NAME-TID list
+         test_fd_leak-83278   unlimited 32              160      2       fdleak_2-49622 / fdleak_3-49604
+         Backtrace:
+         open+0xd4 [libpthread-2.31.so]
+         [unknown]
+[17:36:29] stack id-1388 in 105 allocations from stack
+         PNAME-PID            LIMIT     MAX_SURVIVAL(s) MAX_FD   THREADs NAME-TID list
+         test_fd_leak-83278   unlimited 37              175      2       fdleak_2-83280 / fdleak_3-83281
+         Backtrace:
+         open+0xd4 [libpthread-2.31.so]
+         [unknown]
+[17:36:34] stack id-1388 in 118 allocations from stack
+         PNAME-PID            LIMIT     MAX_SURVIVAL(s) MAX_FD   THREADs NAME-TID list
+         test_fd_leak-83278   unlimited 190              175      2       fdleak_2-83280 / fdleak_3-83281
+         Backtrace:
+         open+0xd4 [libpthread-2.31.so]
+         [unknown]
+^C
+
+---->
+^ 2 theads in `test_fd_leak-83278` triggered fd leak monitor
+----
+Simple info print is difficult to find the rootcause of file leakage . 
+you need to obtain the file type used by the defective process to help analysis.
+
+Use the '--lsof' switch:
+----
+# ./fdleak --lsof
+Trace and display over-threshold fds to detect FD leaks process, ctrl-c to exit.
+[17:49:11] stack id-9353 in 118 allocations from stack
+         PNAME-PID            LIMIT     MAX_SURVIVAL(s) MAX_FD   THREADs NAME-TID list
+         test_fd_leak-85485   unlimited 35              175      2       fdleak_2-85486 / fdleak_3-85491
+         Backtrace:
+         open+0xd4 [libpthread-2.31.so]
+         [unknown]
+total 0
+dr-x------ 2 vachel.yang vachel.yang  0 oct 16 17:49 .
+dr-xr-xr-x 9 vachel.yang vachel.yang  0 oct 16 17:48 ..
+lrwx------ 1 vachel.yang vachel.yang 64 oct 16 17:49 0 -> /dev/pts/1
+lrwx------ 1 vachel.yang vachel.yang 64 oct 16 17:49 1 -> /dev/pts/1
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 10 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 100 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 101 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 102 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 103 -> /usr/share/code/v8_context_snapshot.bin
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 104 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 105 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 106 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 107 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 108 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 109 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 11 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 110 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 111 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 112 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 113 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 114 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 115 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 116 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 117 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 118 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 119 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 12 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 120 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 121 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 122 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 123 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 124 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 125 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 126 -> /dev/null
+lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 127 -> /dev/null
+
+---->
+^ fdleak thread open too much `/dev/null`
+----
+Currently i don't know how to deal with the case that recycling program resources by system `do_exit` -> `exit_files` . 
+
+I found that the general program(not resideng)applied for FDs is less than NR_OPEN_DEFAULT,
+So the tool monitor that greater than NR_OPEN_DEFAULT fd's alloc/close can be solved the problem.
+
+You can use the `-p` option to filter the process you want to monitor, 
+The purpose is to know whether it is normal to call open/close in pairs during use..
+
+If you have a method to improve, pls contact me. thank you.
+
+Use the '-p' switch:
+# ./fdleak -p `pidof test_fd_leak`
+Trace and display fd alloc/close to detect FD leaks process, ctrl-c to exit.
+[21:17:59] stack id-6031 in 33 allocations from stack
+         PNAME-PID            LIMIT     MAX_SURVIVAL(s) MAX_FD   THREADs NAME-TID list
+         test_fd_leak-89710   unlimited 33              96       1       test_fd_leak-89710
+         Backtrace:
+         open+0x5b [libpthread-2.31.so]
+         [unknown]
+----
+USAGE message:
+usage: fdleak [-h] [-p PID] [--lsof] [-i INTERVAL] [-m MIN_ALLOW] [-D]
+
+Trace FD leak
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -p PID, --pid PID     trace this PID only
+  --lsof                list the files opened by the monitor process
+  -i INTERVAL, --interval INTERVAL
+                        interval (in seconds) to scan for outstanding
+                        allocations
+  -m MIN_ALLOW, --min_allow MIN_ALLOW
+                        minimum allowable survival time
+  -D, --debug           print debug message, only for developer
+
+examples:
+    ./fdleak                # trace all process alloc/close file descriptor
+    ./fdleak -p 181         # only trace PID 181
+    ./fdleak --lsof         # list the files opened by the monitor process
+    ./fdleak -i 10          # interval to scan for outstanding allocations (in seconds), default is 5s
+    ./fdleak -m 60          # minimum allowable survival time (in seconds), default is 30s
