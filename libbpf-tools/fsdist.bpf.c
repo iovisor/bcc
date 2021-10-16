@@ -37,9 +37,7 @@ static int probe_entry()
 
 static int probe_return(enum fs_file_op op)
 {
-	__u64 pid_tgid = bpf_get_current_pid_tgid();
-	__u32 pid = pid_tgid >> 32;
-	__u32 tid = (__u32)pid_tgid;
+	__u32 tid = (__u32)bpf_get_current_pid_tgid();
 	__u64 ts = bpf_ktime_get_ns();
 	__u64 *tsp, slot;
 	__s64 delta;
