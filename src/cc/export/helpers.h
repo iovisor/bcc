@@ -1309,16 +1309,16 @@ int name(unsigned long long *ctx)                               \
 static int ____##name(unsigned long long *ctx, ##args)
 
 #define KFUNC_PROBE(event, args...) \
-        BPF_PROG(kfunc__ ## event, args)
+        BPF_PROG(kfunc__ ## event, ##args)
 
 #define KRETFUNC_PROBE(event, args...) \
-        BPF_PROG(kretfunc__ ## event, args)
+        BPF_PROG(kretfunc__ ## event, ##args)
 
 #define KMOD_RET(event, args...) \
-        BPF_PROG(kmod_ret__ ## event, args)
+        BPF_PROG(kmod_ret__ ## event, ##args)
 
 #define LSM_PROBE(event, args...) \
-        BPF_PROG(lsm__ ## event, args)
+        BPF_PROG(lsm__ ## event, ##args)
 
 #define BPF_ITER(target) \
         int bpf_iter__ ## target (struct bpf_iter__ ## target *ctx)
