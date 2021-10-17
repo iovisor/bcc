@@ -93,7 +93,7 @@ int entry_mark_page_accessed(struct pt_regs *ctx) {
 """
 
 bpf_text_kfunc = """
-KFUNC_PROBE(RA_FUNC, void *unused)
+KFUNC_PROBE(RA_FUNC)
 {
     u32 pid = bpf_get_current_pid_tgid();
     u8 one = 1;
@@ -102,7 +102,7 @@ KFUNC_PROBE(RA_FUNC, void *unused)
     return 0;
 }
 
-KRETFUNC_PROBE(RA_FUNC, void *unused)
+KRETFUNC_PROBE(RA_FUNC)
 {
     u32 pid = bpf_get_current_pid_tgid();
     u8 zero = 0;
