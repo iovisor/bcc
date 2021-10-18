@@ -34,6 +34,7 @@ import argparse
 import multiprocessing
 import os
 import subprocess
+import re
 
 #
 # Process Arguments
@@ -81,7 +82,7 @@ duration = int(args.duration)
 bpf_text = """
 #include <linux/delay.h>
 
-#define REASON_NUM 69
+REASON_NUM_L
 #define TGID_NUM 1024
 
 struct exit_count {
@@ -163,90 +164,182 @@ FUNC_ENTRY {
 }
 """
 
-# format output
-exit_reasons = (
-    "EXCEPTION_NMI",
-    "EXTERNAL_INTERRUPT",
-    "TRIPLE_FAULT",
-    "INIT_SIGNAL",
-    "N/A",
-    "N/A",
-    "N/A",
-    "INTERRUPT_WINDOW",
-    "NMI_WINDOW",
-    "TASK_SWITCH",
-    "CPUID",
-    "N/A",
-    "HLT",
-    "INVD",
-    "INVLPG",
-    "RDPMC",
-    "RDTSC",
-    "N/A",
-    "VMCALL",
-    "VMCLEAR",
-    "VMLAUNCH",
-    "VMPTRLD",
-    "VMPTRST",
-    "VMREAD",
-    "VMRESUME",
-    "VMWRITE",
-    "VMOFF",
-    "VMON",
-    "CR_ACCESS",
-    "DR_ACCESS",
-    "IO_INSTRUCTION",
-    "MSR_READ",
-    "MSR_WRITE",
-    "INVALID_STATE",
-    "MSR_LOAD_FAIL",
-    "N/A",
-    "MWAIT_INSTRUCTION",
-    "MONITOR_TRAP_FLAG",
-    "N/A",
-    "MONITOR_INSTRUCTION",
-    "PAUSE_INSTRUCTION",
-    "MCE_DURING_VMENTRY",
-    "N/A",
-    "TPR_BELOW_THRESHOLD",
-    "APIC_ACCESS",
-    "EOI_INDUCED",
-    "GDTR_IDTR",
-    "LDTR_TR",
-    "EPT_VIOLATION",
-    "EPT_MISCONFIG",
-    "INVEPT",
-    "RDTSCP",
-    "PREEMPTION_TIMER",
-    "INVVPID",
-    "WBINVD",
-    "XSETBV",
-    "APIC_WRITE",
-    "RDRAND",
-    "INVPCID",
-    "VMFUNC",
-    "ENCLS",
-    "RDSEED",
-    "PML_FULL",
-    "XSAVES",
-    "XRSTORS",
-    "N/A",
-    "N/A",
-    "UMWAIT",
-    "TPAUSE"
+# format setting, hard code in case of no header files
+exit_reasons_Intel = (
+    "EXCEPTION_NMI 0",
+    "EXTERNAL_INTERRUPT 1",
+    "TRIPLE_FAULT 2",
+    "INIT_SIGNAL 3",
+    "INTERRUPT_WINDOW 7",
+    "NMI_WINDOW 8",
+    "TASK_SWITCH 9",
+    "CPUID 10",
+    "HLT 12",
+    "INVD 13",
+    "INVLPG 14",
+    "RDPMC 15",
+    "RDTSC 16",
+    "VMCALL 18",
+    "VMCLEAR 19",
+    "VMLAUNCH 20",
+    "VMPTRLD 21",
+    "VMPTRST 22",
+    "VMREAD 23",
+    "VMRESUME 24",
+    "VMWRITE 25",
+    "VMOFF 26",
+    "VMON 27",
+    "CR_ACCESS 28",
+    "DR_ACCESS 29",
+    "IO_INSTRUCTION 30",
+    "MSR_READ 31",
+    "MSR_WRITE 32",
+    "INVALID_STATE 33",
+    "MSR_LOAD_FAIL 34",
+    "MWAIT_INSTRUCTION 36",
+    "MONITOR_TRAP_FLAG 37",
+    "MONITOR_INSTRUCTION 39",
+    "PAUSE_INSTRUCTION 40",
+    "MCE_DURING_VMENTRY 41",
+    "TPR_BELOW_THRESHOLD 43",
+    "APIC_ACCESS 44",
+    "EOI_INDUCED 45",
+    "GDTR_IDTR 46",
+    "LDTR_TR 47",
+    "EPT_VIOLATION 48",
+    "EPT_MISCONFIG 49",
+    "INVEPT 50",
+    "RDTSCP 51",
+    "PREEMPTION_TIMER 52",
+    "INVVPID 53",
+    "WBINVD 54",
+    "XSETBV 55",
+    "APIC_WRITE 56",
+    "RDRAND 57",
+    "INVPCID 58",
+    "VMFUNC 59",
+    "ENCLS 60",
+    "RDSEED 61",
+    "PML_FULL 62",
+    "XSAVES 63",
+    "XRSTORS 64",
+    "UMWAIT 67",
+    "TPAUSE 68"
+)
+
+exit_reasons_AMD = (
+    "READ_CR0 0",
+    "READ_CR2 2",
+    "READ_CR3 3",
+    "READ_CR4 4",
+    "READ_CR8 8",
+    "WRITE_CR0 16",
+    "WRITE_CR2 18",
+    "WRITE_CR3 19",
+    "WRITE_CR4 20",
+    "WRITE_CR8 24",
+    "READ_DR0 32",
+    "READ_DR1 33",
+    "READ_DR2 34",
+    "READ_DR3 35",
+    "READ_DR4 36",
+    "READ_DR5 37",
+    "READ_DR6 38",
+    "READ_DR7 39",
+    "WRITE_DR0 48",
+    "WRITE_DR1 49",
+    "WRITE_DR2 50",
+    "WRITE_DR3 51",
+    "WRITE_DR4 52",
+    "WRITE_DR5 53",
+    "WRITE_DR6 54",
+    "WRITE_DR7 55",
+    "EXCP_BASE_DE 64",
+    "EXCP_BASE_DB 65",
+    "EXCP_BASE_BP 67",
+    "EXCP_BASE_OF 68",
+    "EXCP_BASE_BR 69",
+    "EXCP_BASE_UD 70",
+    "EXCP_BASE_NM 71",
+    "EXCP_BASE_DF 72",
+    "EXCP_BASE_TS 74",
+    "EXCP_BASE_NP 75",
+    "EXCP_BASE_SS 76",
+    "EXCP_BASE_GP 77",
+    "EXCP_BASE_PF 78",
+    "EXCP_BASE_MF 80",
+    "EXCP_BASE_AC 81",
+    "EXCP_BASE_MC 82",
+    "EXCP_BASE_XM 83",
+    "INTR 96",
+    "NMI 97",
+    "SMI 98",
+    "INIT 99",
+    "VINTR 100",
+    "CR0_SEL_WRITE 101",
+    "IDTR_READ 102",
+    "GDTR_READ 103",
+    "LDTR_READ 104",
+    "TR_READ 105",
+    "IDTR_WRITE 106",
+    "GDTR_WRITE 107",
+    "LDTR_WRITE 108",
+    "TR_WRITE 109",
+    "RDTSC 110",
+    "RDPMC 111",
+    "PUSHF 112",
+    "POPF 113",
+    "CPUID 114",
+    "RSM 115",
+    "IRET 116",
+    "SWINT 117",
+    "INVD 118",
+    "PAUSE 119",
+    "HLT 120",
+    "INVLPG 121",
+    "INVLPGA 122",
+    "IOIO 123",
+    "MSR 124",
+    "TASK_SWITCH 125",
+    "FERR_FREEZE 126",
+    "SHUTDOWN 127",
+    "VMRUN 128",
+    "VMMCALL 129",
+    "VMLOAD 130",
+    "VMSAVE 131",
+    "STGI 132",
+    "CLGI 133",
+    "SKINIT 134",
+    "RDTSCP 135",
+    "ICEBP 136",
+    "WBINVD 137",
+    "MONITOR 138",
+    "MWAIT 139",
+    "MWAIT_COND 140",
+    "XSETBV 141",
+    "RDPRU 142",
+    "NPF 1024",
+    "AVIC_INCOMPLETE_IPI 1025",
+    "AVIC_UNACCELERATED_ACCESS 1026",
 )
 
 #
 # Do some checks
 #
+is_INTEL = False
+is_AMD = False
 try:
-    # Currently, only adapte on intel architecture
+    # Currently, only adapte on Intel/AMD architecture
     cmd = "cat /proc/cpuinfo | grep vendor_id | head -n 1"
     arch_info = subprocess.check_output(cmd, shell=True).strip()
     if b"Intel" in arch_info:
+        is_INTEL = True
+        pass
+    elif b"AMD" in arch_info:
+        is_AMD = True
         pass
     else:
-        raise Exception("Currently we only support Intel architecture, please do expansion if needs more.")
+        raise Exception("Currently we only support Intel & AMD architecture, please do expansion if needs more.")
 
     # Check if kvm module is loaded
     if os.access("/dev/kvm", os.R_OK | os.W_OK):
@@ -268,6 +361,20 @@ try:
 except Exception as e:
     raise Exception("Failed to catch kvm exit reasons due to: %s" % e)
 
+# format output
+if is_INTEL:
+    exit_reason_header = exit_reasons_Intel
+else:
+    exit_reason_header = exit_reasons_AMD
+exit_reasons = dict()
+
+max_reason_num = 0
+for reason in exit_reason_header:
+    value, key = re.split(r"\s+", reason)
+    key = int(key, 10)
+    exit_reasons[key] = value
+    if key > max_reason_num:
+        max_reason_num = key
 
 def find_tid(tgt_dir, tgt_vcpu):
     for tid in os.listdir(tgt_dir):
@@ -313,6 +420,9 @@ bpf_text = bpf_text.replace('THREAD_FILTER', thread_filter)
 # For kernel >= 5.0, use RAW_TRACEPOINT_MODULE for performance consideration
 bpf_text = bpf_text.replace('FUNC_ENTRY', func_entry)
 bpf_text = bpf_text.replace('GET_ER', get_er)
+
+reasons_size= "#define REASON_NUM " + str(max_reason_num + 1)
+bpf_text = bpf_text.replace('REASON_NUM_L', reasons_size)
 b = BPF(text=bpf_text)
 
 
@@ -333,7 +443,7 @@ except KeyboardInterrupt:
 if (args.pid or args.tid):
     ct_reason = []
     if args.pid:
-        tgid_exit = [0 for i in range(len(exit_reasons))]
+        tgid_exit = [0 for i in range(max_reason_num + 1)]
 
 # output
 print("%s%-35s %s" % (header_format, "KVM_EXIT_REASON", "COUNT"))
@@ -343,7 +453,7 @@ pcpu_cache = b["pcpu_cache"]
 for k, v in pcpu_kvm_stat.items():
     tgid = k.value >> 32
     pid = k.value & 0xffffffff
-    for i in range(0, len(exit_reasons)):
+    for i in exit_reasons.keys():
         sum1 = 0
         for inner_cpu in range(0, multiprocessing.cpu_count()):
             cachePIDTGID = pcpu_cache[0][inner_cpu].cache_pid_tgid
@@ -377,7 +487,7 @@ for k, v in pcpu_kvm_stat.items():
 
 # Aggregate all tids' counts for this args.pid in descending sort
 if args.pid and need_collapse:
-    for i in range(0, len(exit_reasons)):
+    for i in exit_reasons.keys():
         ct_reason.append((tgid_exit[i], i))
     ct_reason.sort(reverse=True)
     for i in range(0, len(ct_reason)):
