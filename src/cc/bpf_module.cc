@@ -175,7 +175,8 @@ int BPFModule::load_cfile(const string &file, bool in_memory, const char *cflags
 // build an ExecutionEngine.
 int BPFModule::load_includes(const string &text) {
   ClangLoader clang_loader(&*ctx_, flags_);
-  if (clang_loader.parse(&mod_, *ts_, text, true, nullptr, 0, "", *func_src_,
+  const char *cflags[] = {"-DB_WORKAROUND"};
+  if (clang_loader.parse(&mod_, *ts_, text, true, cflags, 1, "", *func_src_,
                          mod_src_, "", fake_fd_map_, perf_events_))
     return -1;
   return 0;
