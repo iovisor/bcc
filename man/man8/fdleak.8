@@ -1,0 +1,91 @@
+.TH fdleak 8  "2021-10-18" "USER COMMANDS"
+.SH NAME
+fdleak \- Print a summary of outstanding allocations to detect
+file descriptor leaks. Uses Linux eBPF / bcc.
+.SH SYNOPSIS
+.B fdleak \[-h] \[-p PID] \[--lsof] \[-i INTERVAL] \[-m MIN_ALLOW] \[-D]
+.SH DESCRIPTION
+Trace and display fd alloc and close to detect FD leaks in user mode processes.
+
+The tool's purpose is to know whether it is normal to call open and close
+in pairs during use.
+
+If the survival time is longer than the minimum allowable survival time,
+and the fd number opened by the process is keeps growing,
+That will trigger fdleak to collect allocator information:
+    user stack, max fd number, thread name, tid.
+
+repr(In UNIX, everything is a file), file leakage problems may occur when
+most resources are used improperly, eg:
+    file, socket, eventfd, pipe, ashmem, dmabuf, syncfence ...
+
+fdleak may introduce significant overhead when tracing processes
+that open and close file descriptor very quickly.
+See the OVERHEAD section below.
+
+This tool only works on Linux 4.6 above.
+Stack traces are obtained using the new BPF_STACK_TRACE APIs.
+For kernels older than 4.6, fdleak is not ready.
+Pls refer to tools / old / memleak.py for more inspiration
+File descriptor allocations are intercepted through kprobe,
+which are available on Linux 4.1 above.
+
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-p PID
+Trace this process ID only.
+.TP
+\-\-lsof
+List the files opened by the monitored process
+.TP
+INTERVAL
+Scan a summary of outstanding allocations every INTERVAL seconds.
+The default interval is 5 seconds.
+.TP
+MIN_ALLOW
+Set the minimum survival time allowed for the opened file.
+Survival time refers to the time between opening and closing.
+.SH EXAMPLES
+.TP
+Trace all process alloc and close file descriptor
+#
+.B fdleak
+.TP
+Only trace PID 181
+#
+.B fdleak \- p 181
+.TP
+List the files opened by the monitor process.
+#
+.B fdleak \-\-lsof
+.TP
+Interval to scan for outstanding allocations \(in seconds\), default is 5s.
+#
+.B fdleak \- i 10
+.TP
+Minimum allowable survival time \(in seconds\), default is 30s
+#
+.B fdleak \- m 60
+.SH OVERHEAD
+fdleak can have significant overhead if the target process or kernel performs
+allocations at a very high rate.
+Most of the time, however, fdleak shouldn't cause a significant slowdown.
+You can use the PID switch to reduce the overhead of the filter pid.
+.SH SOURCE
+This is from bcc.
+.IP
+iovisor bcc
+.PP
+Also look in the bcc distribution for a companion fdleak_examples.txt file
+containing example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Vachel Yang

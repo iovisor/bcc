@@ -2,9 +2,11 @@ Demonstrations of fdleak.
 
 Trace and display fd alloc/close to detect FD leaks in user-mode processes.
 
+The tool's purpose is to know whether it is normal to call open/close in pairs during use..
+
 If the survival time is longer than the minimum allowable survival time, 
-or EMFILE occurs, the tool will collects allocator user-stack,max fd number, 
-thread name, tid..
+and the fd number opened by the process is keeps growing, That will trigger
+fdleak to collect allocator information: `user-stack`,`max fd number`,`thread name`, `tid`..
 
 `In UNIX, everything is a file`, file leakage problems may occur when 
 most resources are used improperly, eg:
@@ -93,9 +95,11 @@ lr-x------ 1 vachel.yang vachel.yang 64 oct 16 17:49 127 -> /dev/null
 ^ fdleak thread open too much `/dev/null`
 ----
 Currently i don't know how to deal with the case that recycling program resources by system `do_exit` -> `exit_files` . 
+As the fdtable cannot be accessed easily, in order to circumvent this problem,
+simply marking the pid of the exiting process is a workaround.
 
-I found that the general program(not resideng)applied for FDs is less than NR_OPEN_DEFAULT,
-So the tool monitor that greater than NR_OPEN_DEFAULT fd's alloc/close can be solved the problem.
+However,I found that the general program(not resideng)applied for FDs is less than NR_OPEN_DEFAULT,
+So the tool monitor that greater than NR_OPEN_DEFAULT fd's alloc/close let the probelm of tool self drop a lot.
 
 You can use the `-p` option to filter the process you want to monitor, 
 The purpose is to know whether it is normal to call open/close in pairs during use..
