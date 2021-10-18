@@ -19,6 +19,8 @@
  * data should be collected.
  */
 #define FUNC_MAX_STACK_DEPTH	16
+/* used to convince verifier we do not stray outside of array bounds */
+#define FUNC_STACK_DEPTH_MASK	(FUNC_MAX_STACK_DEPTH - 1)
 
 #ifndef ENOSPC
 #define ENOSPC			28
@@ -99,7 +101,9 @@ static struct trace *get_trace(struct pt_regs *ctx, bool entry)
 		    last_stack_depth < FUNC_MAX_STACK_DEPTH)
 			last_ip = func_stack->ips[last_stack_depth];
 		/* push ip onto stack. return will pop it. */
-		func_stack->ips[stack_depth++] = ip;
+		func_stack->ips[stack_depth] = ip;
+		/* mask used in case bounds checks are optimized out */
+		stack_depth = (stack_depth + 1) & FUNC_STACK_DEPTH_MASK;
 		func_stack->stack_depth = stack_depth;
 		/* rather than zero stack entries on popping, we zero the
 		 * (stack_depth + 1)'th entry when pushing the current
@@ -118,8 +122,13 @@ static struct trace *get_trace(struct pt_regs *ctx, bool entry)
 		if (last_stack_depth >= 0 &&
 		    last_stack_depth < FUNC_MAX_STACK_DEPTH)
 			last_ip = func_stack->ips[last_stack_depth];
-		if (stack_depth > 0)
-			stack_depth = stack_depth - 1;
+		if (stack_depth > 0) {
+			/* logical OR convinces verifier that we don't
+			 * end up with a < 0 value, translating to 0xff
+			 * and an outside of map element access.
+			 */
+			stack_depth = (stack_depth - 1) & FUNC_STACK_DEPTH_MASK;
+		}
 		/* retrieve ip from stack as IP in pt_regs is
 		 * bpf kretprobe trampoline address.
 		 */
