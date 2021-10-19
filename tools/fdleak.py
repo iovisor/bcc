@@ -1,14 +1,16 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 #
-# fdleak    Trace and display fd alloc/close to detect FD leaks in user-mode processes.
+# fdleak    Trace and display fd alloc/close to detect FD leaks in user-mode
+#           processes.
 #           For Linux, uses BCC,BPF. Embedded C.
 #
 # USAGE: fdleak [-h] [-p PID] [-w WARN] [--dumpstack] [--lsof] [-a]
 #
 # If the survival time is longer than the minimum allowable survival time,
 # and the fd number opened by the process is keeps growing,that will trigger
-# fdleak to collect allocator information: user stack, max fd number, thread name, tid.
+# fdleak to collect allocator information: user stack, max fd number,
+# thread name, tid.
 #
 # This tool only works on Linux 4.6+.
 #
@@ -16,8 +18,8 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 16-Oct-2021    Vachel.Yang    Created this.
-# 19-Oct-2021    Vachel.Yang    Add man8,readme which require by CONTRIBUTING-SCRIPTS
-# 19-Oct-2021    Vachel.Yang    Add `exit_files` monitor and judging top-fd growth
+# 19-Oct-2021    Vachel.Yang    Add man8,readme
+# 19-Oct-2021    Vachel.Yang    Add `exit_files` monitor and top-fd growth
 
 from ctypes import c_int
 from bcc import BPF
@@ -28,12 +30,21 @@ import sys
 import os
 
 # arguments
-examples = """examples:
-    ./fdleak                # trace all process alloc/close file descriptor
-    ./fdleak -p 181         # only trace PID 181
-    ./fdleak --lsof         # list the files opened by the monitor process
-    ./fdleak -i 10          # interval to scan for outstanding allocations (in seconds), default is 5s
-    ./fdleak -m 60          # minimum allowable survival time (in seconds), default is 30s
+examples = """
+EXAMPLES:
+
+./fdleak
+        Trace all process alloc/close file descriptor.
+        default internal inspection frequency is 5 seconds,
+        default minimim allowable survival time is 30 seconds.
+./fdleak -p $(pidof allocs)
+        Only monitor the allocation and close files of filtered pid
+./fdleak --lsof
+        List the files opened by the monitor process
+./fdleak -i 60
+        Set the internal inspection frequency to 60 seconds
+./fdleak -m 60
+        Set the minimum allowable survival time to 60 seconds
 """
 
 parser = argparse.ArgumentParser(
@@ -42,15 +53,15 @@ parser = argparse.ArgumentParser(
     epilog=examples)
 parser.add_argument("-p", "--pid", default=-1, help="trace this PID only")
 parser.add_argument("--lsof", default=False, action="store_true", dest="lsof",
-                    help="list the files opened by the monitor process")
+        help="list the files opened by the monitor process")
 parser.add_argument("-i", "--interval", default=5, type=int,
-                    help="interval (in seconds) to scan for outstanding allocations")
+        help="interval (in seconds) to scan for outstanding allocations")
 parser.add_argument("-m", "--min_allow", default=30, type=int,
-                    help="minimum allowable survival time")
+        help="minimum allowable survival time")
 parser.add_argument("-D", "--debug", default=False, action="store_true",
-                    help="print debug message, only for developer")
+        help="print debug message, only for developer")
 parser.add_argument("--ebpf", action="store_true",
-                    help=argparse.SUPPRESS)
+        help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 bpf_text = """
@@ -68,7 +79,8 @@ struct alloc_info_t {
 };
 
 struct combined_alloc_info_t {
-  u64 last_longest_survivor;//TODO Determine whether the same stack has different survival times
+  //TODO Determine whether the same stack has different survival times
+  u64 last_longest_survivor;
   int number_of_allocs;
 };
 
@@ -133,7 +145,8 @@ static inline int fd_alloc_return(struct pt_regs *ctx) {
   return 0;
 }
 
-static inline void update_statistics_del(int stack_id, u64 survivor_time_ns) {
+static inline void update_statistics_del(int stack_id,
+                                         u64 survivor_time_ns) {
   struct combined_alloc_info_t *existing_cinfo;
   struct combined_alloc_info_t cinfo = {0};
   existing_cinfo = combined_allocs_hash.lookup(&stack_id);
@@ -169,12 +182,14 @@ static inline int fd_close_enter(unsigned fd) {
 }
 
 // close fd
-// https://github.com/torvalds/linux/commit/8760c909f54a82aaa6e76da19afe798a0c77c3c3
+// https://github.com/torvalds/linux/commit/8760c90
 // file: Rename __close_fd to close_fd and remove the files parameter
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 11, 0)
-int kprobe____close_fd(struct pt_regs *ctx, struct files_struct *files, unsigned fd)
+int kprobe____close_fd(struct pt_regs *ctx, struct files_struct *files,
+                       unsigned fd)
 #else
-int kprobe__close_fd(struct pt_regs *ctx, struct files_struct *files, unsigned int fd)
+int kprobe__close_fd(struct pt_regs *ctx, struct files_struct *files,
+                     unsigned int fd)
 #endif
 {
   ##FILTER_PID##
@@ -201,14 +216,15 @@ int kprobe__exit_files(struct pt_regs* ctx){
 # parse arguments
 if args.pid != -1:
     bpf_text = bpf_text.replace('##FILTER_PID##',
-        'if (bpf_get_current_pid_tgid() >> 32 != %s) { return 0; }' % args.pid)
+        'if (bpf_get_current_pid_tgid() >> 32 != %s) { return 0; }'
+        % args.pid)
     print("start trace pid= %s" % args.pid)
 else:
     bpf_text = bpf_text.replace('##FILTER_PID##', '')
 
 interval = args.interval
 min_allow_survival = args.min_allow
-min_allow_survival_ns = min_allow_survival*1000000000
+min_allow_ns = min_allow_survival * 1000000000
 
 if args.debug:
     bpf_text = bpf_text.replace("##PRINT_DEBUG##", "if(1)")
@@ -244,14 +260,14 @@ class Allocation(object):
     def __init__(self, pid):
         self.thread = []
         self.pid = pid
-        self.p_name = get_pname(pid)+("-%d" % pid)
+        self.p_name = get_pname(pid) + ("-%d" % pid)
         self.fd = []
         self.max_survival_time = 0
         self.limit = self.get_file_limit()
         self.stack = []
 
     def update(self, tid, fd, survival_time):
-        t = get_tname(self.pid, tid)+"-"+str(tid)
+        t = get_tname(self.pid, tid) + "-" + str(tid)
         self.thread.append(t)
         self.fd.append(fd)
         self.max_survival_time = max(survival_time, self.max_survival_time)
@@ -315,10 +331,10 @@ def find_allocinfo_by_stack_id(in_stack_id):
 
     for k, alloc_info in pidfd_allocs_hash:
         if alloc_info.stack_id == in_stack_id:
-            if(BPF.monotonic_time() - alloc_info.timestamp_ns < min_allow_survival_ns):
+            if(BPF.monotonic_time() - alloc_info.timestamp_ns < min_allow_ns):
                 continue
-            survival_time = 1+((int)(BPF.monotonic_time()
-                                     - alloc_info.timestamp_ns)/1000000000)
+            survival_time = 1 + ((int)(
+                BPF.monotonic_time() - alloc_info.timestamp_ns) / 1000000000)
             tid = alloc_info.tid
             fd = alloc_info.fd
             pid = alloc_info.pid
@@ -331,7 +347,7 @@ def find_allocinfo_by_stack_id(in_stack_id):
             if pid not in process_alloc_dic:
                 process_alloc_dic[pid] = Allocation(pid)
             process_alloc_dic[pid].update(tid, fd, survival_time)
-    # Determine whether it is greater than the fd number of the last scan (by process)
+    # Determine whether it is greater than the fd number of the last scan
     for p, alloc in process_alloc_dic.items():
         if(p not in top_fd):
             process_alloc_dic.pop(p)
@@ -356,21 +372,28 @@ def print_outstanding_combined():
         if combined_info.number_of_allocs > 0:
             process_alloc_dic = find_allocinfo_by_stack_id(stack_id.value)
             if(process_alloc_dic):
-                print("[%s] stack id-%d in \033[1;31m%d\033[0m allocations from stack" %
-                      (datetime.now().strftime("%H:%M:%S"), stack_id.value, combined_info.number_of_allocs))
+                print("[%s] stack id-%d in \033[1;31m%d\033[0m allocations \
+                    from stack" %
+                      (datetime.now().strftime("%H:%M:%S"),
+                       stack_id.value, combined_info.number_of_allocs))
                 print("\t %-20s %-9s %-15s %-8s %-7s %s" %
                       ("PNAME-PID", "LIMIT",
-                       "MAX_SURVIVAL(s)", "MAX_FD", "THREADs", "NAME-TID list"))
+                       "MAX_SURVIVAL(s)", "MAX_FD", "THREADs",
+                       "NAME-TID list"))
                 for p, alloc in process_alloc_dic.items():
                     print(("\t %-20s %-9s %-15s %-8s %-7s %s\n\t Backtrace:"
-                           % (alloc.p_name, alloc.limit, alloc.max_survival_time, alloc.show_fd(),
-                              len(alloc.thread), " / ".join(str(t) for t in alloc.thread))))
-                    print("\t %s" % (b"\n\t ".join(alloc.stack).decode("ascii")))
+                           % (alloc.p_name, alloc.limit,
+                           alloc.max_survival_time, alloc.show_fd(),
+                           len(alloc.thread),
+                           " / ".join(str(t) for t in alloc.thread))))
+                    print("\t %s" % (b"\n\t "
+                           .join(alloc.stack).decode("ascii")))
                     if args.lsof:
                         print(list_open_file(p))
 
 
-print("Trace and display fd alloc/close to detect FD leaks process, ctrl-c to exit.")
+print(
+"Trace and display fd alloc/close to detect FD leaks process, ctrl-c to exit.")
 while True:
     try:
         sleep(interval)
