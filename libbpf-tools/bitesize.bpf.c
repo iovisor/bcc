@@ -75,10 +75,10 @@ int BPF_PROG(block_rq_issue)
 	 * from TP_PROTO(struct request_queue *q, struct request *rq)
 	 * to TP_PROTO(struct request *rq)
 	 */
-	if (LINUX_KERNEL_VERSION > KERNEL_VERSION(5, 10, 0))
-		return trace_rq_issue((void *)ctx[0]);
-	else
+	if (LINUX_KERNEL_VERSION < KERNEL_VERSION(5, 11, 0))
 		return trace_rq_issue((void *)ctx[1]);
+	else
+		return trace_rq_issue((void *)ctx[0]);
 }
 
 char LICENSE[] SEC("license") = "GPL";
