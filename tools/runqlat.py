@@ -71,6 +71,7 @@ bpf_text = """
 #include <linux/sched.h>
 #include <linux/nsproxy.h>
 #include <linux/pid_namespace.h>
+#include <linux/init_task.h>
 
 typedef struct pid_key {
     u64 id;    // work around
@@ -95,6 +96,45 @@ static int trace_enqueue(u32 tgid, u32 pid)
     u64 ts = bpf_ktime_get_ns();
     start.update(&pid, &ts);
     return 0;
+}
+
+static __always_inline unsigned int pid_namespace(struct task_struct *task)
+{
+
+/* pids[] was removed from task_struct since commit 2c4704756cab7cfa031ada4dab361562f0e357c0
+ * Using the macro INIT_PID_LINK as a conditional judgment.
+ */
+#ifdef INIT_PID_LINK
+    struct pid_link pids;
+    unsigned int level;
+    struct upid upid;
+    struct ns_common ns;
+
+    /*  get the pid namespace by following task_active_pid_ns(),
+     *  pid->numbers[pid->level].ns
+     */
+    bpf_probe_read_kernel(&pids, sizeof(pids), &task->pids[PIDTYPE_PID]);
+    bpf_probe_read_kernel(&level, sizeof(level), &pids.pid->level);
+    bpf_probe_read_kernel(&upid, sizeof(upid), &pids.pid->numbers[level]);
+    bpf_probe_read_kernel(&ns, sizeof(ns), &upid.ns->ns);
+
+    return ns.inum;
+#else
+    struct pid *pid;
+    unsigned int level;
+    struct upid upid;
+    struct ns_common ns;
+
+    /*  get the pid namespace by following task_active_pid_ns(),
+     *  pid->numbers[pid->level].ns
+     */
+    bpf_probe_read_kernel(&pid, sizeof(pid), &task->thread_pid);
+    bpf_probe_read_kernel(&level, sizeof(level), &pid->level);
+    bpf_probe_read_kernel(&upid, sizeof(upid), &pid->numbers[level]);
+    bpf_probe_read_kernel(&ns, sizeof(ns), &upid.ns->ns);
+
+    return ns.inum;
+#endif
 }
 """
 
@@ -235,7 +275,7 @@ elif args.pidnss:
     bpf_text = bpf_text.replace('STORAGE',
         'BPF_HISTOGRAM(dist, pidns_key_t);')
     bpf_text = bpf_text.replace('STORE', 'pidns_key_t key = ' +
-        '{.id = prev->nsproxy->pid_ns_for_children->ns.inum, ' +
+        '{.id = pid_namespace(prev), ' +
         '.slot = bpf_log2l(delta)}; dist.atomic_increment(key);')
 else:
     section = ""
