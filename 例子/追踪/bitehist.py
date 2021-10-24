@@ -7,7 +7,7 @@
 #
 # A Ctrl-C will print the gathered histogram then exit.
 #
-# Copyright (c) 2015 Brendan Gregg.
+# Copyright (c) 2021 guanlong huang.
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 15-Aug-2015	Brendan Gregg	Created this.
