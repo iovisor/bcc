@@ -32,6 +32,7 @@
 #                               process name from 'task_struct* next' in raw tp code.
 #                               bpf_get_current_comm() operates on the current task
 #                               which might already be different than 'next'.
+# 28-Oct-2021   Rong Tao    BUG fix: when kernel>=5.14, tsk->state turn to tsk->__state 
 
 from __future__ import print_function
 from bcc import BPF
