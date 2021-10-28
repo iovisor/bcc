@@ -188,6 +188,8 @@ RAW_TRACEPOINT_PROBE(sched_switch)
 //kernel>=5.14, tsk->state turn to tsk->__state                                                                              
 #if LINUX_VERSION_MAJOR>=5 && LINUX_VERSION_PATCHLEVEL>=14
 #define state __state
+#else
+#define state state
 #endif
     bpf_probe_read_kernel(&task_state, sizeof(long), (const void *)&prev->state);
 #undef state
