@@ -156,7 +156,7 @@ int trace_run(struct pt_regs *ctx, struct task_struct *prev)
     u32 pid, tgid;
 
     // ivcsw: treat like an enqueue event and store timestamp
-    if (prev->state == TASK_RUNNING) {
+    if (prev->STATE_FIELD == TASK_RUNNING) {
         tgid = prev->tgid;
         pid = prev->pid;
         if (!(FILTER || pid == 0)) {
@@ -210,7 +210,7 @@ RAW_TRACEPOINT_PROBE(sched_switch)
     u32 pid, tgid;
 
     // ivcsw: treat like an enqueue event and store timestamp
-    if (prev->state == TASK_RUNNING) {
+    if (prev->STATE_FIELD == TASK_RUNNING) {
         tgid = prev->tgid;
         pid = prev->pid;
         if (!(FILTER || pid == 0)) {
@@ -248,6 +248,10 @@ else:
     bpf_text += bpf_text_kprobe
 
 # code substitutions
+if BPF.kernel_struct_has_field(b'task_struct', b'__state') == 1:
+    bpf_text = bpf_text.replace('STATE_FIELD', '__state')
+else:
+    bpf_text = bpf_text.replace('STATE_FIELD', 'state')
 if args.pid:
     # pid from userspace point of view is thread group from kernel pov
     bpf_text = bpf_text.replace('FILTER', 'tgid != %s' % args.pid)
