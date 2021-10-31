@@ -118,7 +118,7 @@ int trace_run(struct pt_regs *ctx, struct task_struct *prev)
 
     // ivcsw: treat like an enqueue event and store timestamp
     prev_pid = prev->pid;
-    if (prev->state == TASK_RUNNING) {
+    if (prev->STATE_FIELD == TASK_RUNNING) {
         tgid = prev->tgid;
         u64 ts = bpf_ktime_get_ns();
         if (prev_pid != 0) {
@@ -185,7 +185,7 @@ RAW_TRACEPOINT_PROBE(sched_switch)
     long state;
 
     // ivcsw: treat like an enqueue event and store timestamp
-    bpf_probe_read_kernel(&state, sizeof(long), (const void *)&prev->state);
+    bpf_probe_read_kernel(&state, sizeof(long), (const void *)&prev->STATE_FIELD);
     bpf_probe_read_kernel(&prev_pid, sizeof(prev->pid), &prev->pid);
     if (state == TASK_RUNNING) {
         bpf_probe_read_kernel(&tgid, sizeof(prev->tgid), &prev->tgid);
@@ -234,6 +234,10 @@ else:
     bpf_text += bpf_text_kprobe
 
 # code substitutions
+if BPF.kernel_struct_has_field(b'task_struct', b'__state') == 1:
+    bpf_text = bpf_text.replace('STATE_FIELD', '__state')
+else:
+    bpf_text = bpf_text.replace('STATE_FIELD', 'state')
 if min_us == 0:
     bpf_text = bpf_text.replace('FILTER_US', '0')
 else:
