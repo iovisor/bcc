@@ -104,7 +104,6 @@ class SymbolCache(object):
             return -1
         return addr.value
 
-
 class PerfType:
     # From perf_type_id in uapi/linux/perf_event.h
     HARDWARE = 0
@@ -896,7 +895,6 @@ class BPF(object):
         else:
             self.detach_kprobe_event(ev_name)
 
-
     def detach_kretprobe(self, event, fn_name=None):
         event = _assert_is_bytes(event)
         ev_name = b"r_" + event.replace(b"+", b"_").replace(b".", b"_")
@@ -938,8 +936,6 @@ class BPF(object):
             errstr = os.strerror(ct.get_errno())
             raise Exception("Failed to detach BPF from device %s: %s"
                             % (dev, errstr))
-
-
 
     @classmethod
     def _check_path_symbol(cls, module, symname, addr, pid, sym_off=0):
@@ -1182,6 +1178,12 @@ class BPF(object):
                 if name == "bpf_trace_modules":
                     return True
             return False
+
+    @staticmethod
+    def kernel_struct_has_field(struct_name, field_name):
+        struct_name = _assert_is_bytes(struct_name)
+        field_name = _assert_is_bytes(field_name)
+        return lib.kernel_struct_has_field(struct_name, field_name)
 
     def detach_tracepoint(self, tp=b""):
         """detach_tracepoint(tp="")
