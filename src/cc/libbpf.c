@@ -280,6 +280,9 @@ static struct bpf_helper helpers[] = {
   {"get_func_ip", "5.15"},
   {"get_attach_cookie", "5.15"},
   {"task_pt_regs", "5.15"},
+  {"get_branch_snapshot", "5.16"},
+  {"trace_vprintk", "5.16"},
+  {"skc_to_unix_sock", "5.16"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
