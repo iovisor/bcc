@@ -907,6 +907,14 @@ static __u64 (*bpf_get_func_ip)(void *ctx) = (void *)BPF_FUNC_get_func_ip;
 static __u64 (*bpf_get_attach_cookie)(void *ctx) = (void *)BPF_FUNC_get_attach_cookie;
 static long (*bpf_task_pt_regs)(struct task_struct *task) = (void *)BPF_FUNC_task_pt_regs;
 
+static long (*bpf_get_branch_snapshot)(void *entries, __u32 size, __u64 flags) =
+  (void *)BPF_FUNC_get_branch_snapshot;
+static long (*bpf_trace_vprintk)(const char *fmt, __u32 fmt_size, const void *data,
+                                 __u32 data_len) =
+  (void *)BPF_FUNC_trace_vprintk;
+static struct unix_sock *(*bpf_skc_to_unix_sock)(void *sk) =
+  (void *)BPF_FUNC_skc_to_unix_sock;
+
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
  */
