@@ -35,6 +35,7 @@ APPS = \
 	funclatency \
 	gethostlatency \
 	hardirqs \
+	klockstat \
 	ksnoop \
 	llcstat \
 	mountsnoop \
