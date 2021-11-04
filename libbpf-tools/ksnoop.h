@@ -24,8 +24,8 @@ enum arg {
  */
 #define KSNOOP_ID_UNKNOWN		0xffffffff
 
-#define MAX_NAME			96	
-#define MAX_STR				256	
+#define MAX_NAME			96
+#define MAX_STR				256
 #define MAX_PATH			512
 #define MAX_VALUES			6
 #define MAX_ARGS			(MAX_VALUES - 1)
@@ -112,6 +112,7 @@ struct trace {
 	__u16 buf_len;
 	char buf[MAX_TRACE_BUF];
 	char buf_end[0];
+	struct bpf_link *links[2];
 };
 
 #define PAGES_DEFAULT	16
