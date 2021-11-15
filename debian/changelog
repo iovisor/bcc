@@ -1,3 +1,15 @@
+bcc (0.23.0-1) unstable; urgency=low
+
+  * Support for kernel up to 5.15
+  * bcc tools: update for kvmexit.py, tcpv4connect.py, cachetop.py, cachestat.py, etc.
+  * libbpf tools: update for update for mountsnoop, ksnoop, gethostlatency, etc.
+  * fix renaming of task_struct->state
+  * get pid namespace properly for a number of tools
+  * initial work for more libbpf utilization (less section names)
+  * doc update, bug fixes and other tools improvement
+
+ -- Yonghong Song <ys114321@gmail.com>  Wed, 15 Nov 2021 17:00:00 +0000
+
 bcc (0.22.0-1) unstable; urgency=low
 
   * Support for kernel up to 5.14
