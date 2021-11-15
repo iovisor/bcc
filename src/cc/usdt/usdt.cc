@@ -222,7 +222,7 @@ void Probe::add_location(uint64_t addr, const std::string &bin_path, const char 
 void Probe::finalize_locations() {
   std::sort(locations_.begin(), locations_.end(),
             [](const Location &a, const Location &b) {
-              return a.bin_path_ < b.bin_path_ || a.address_ < b.address_;
+              return std::tie(a.bin_path_, a.address_) < std::tie(b.bin_path_, b.address_);
             });
   auto last = std::unique(locations_.begin(), locations_.end(),
                           [](const Location &a, const Location &b) {
