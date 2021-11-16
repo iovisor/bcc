@@ -28,6 +28,11 @@
 
 namespace ebpf {
 
+  
+  
+  
+  
+  
 int32_t BTFStringTable::addString(std::string S) {
   // Check whether the string already exists.
   for (auto &OffsetM : OffsetToIdMap) {
