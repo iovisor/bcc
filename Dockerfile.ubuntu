@@ -41,3 +41,4 @@ RUN \
 
 # libbpf-tools
 COPY --from=builder /libbpf-tools/bin/* /bin/libbpf-tools/
+COPY --from=builder /root/bcc/libbpf-tools/.output/*.bpf.o /objs/
