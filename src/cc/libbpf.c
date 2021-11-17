@@ -283,6 +283,8 @@ static struct bpf_helper helpers[] = {
   {"get_branch_snapshot", "5.16"},
   {"trace_vprintk", "5.16"},
   {"skc_to_unix_sock", "5.16"},
+  {"kallsyms_lookup_name", "5.16"},
+  {"find_vma", "5.17"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
