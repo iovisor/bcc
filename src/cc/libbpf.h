@@ -151,6 +151,12 @@ int bcc_iter_attach(int prog_fd, union bpf_iter_link_info *link_info,
 int bcc_iter_create(int link_fd);
 int bcc_make_parent_dir(const char *path);
 int bcc_check_bpffs_path(const char *path);
+int bpf_lookup_batch(int fd, __u32 *in_batch, __u32 *out_batch, void *keys,
+                     void *values, __u32 *count);
+int bpf_delete_batch(int fd,  void *keys, __u32 *count);
+int bpf_update_batch(int fd, void *keys, void *values, __u32 *count);
+int bpf_lookup_and_delete_batch(int fd, __u32 *in_batch, __u32 *out_batch,
+                                void *keys, void *values, __u32 *count);
 
 #define LOG_BUF_SIZE 65536
 
