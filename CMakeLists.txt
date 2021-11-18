@@ -1,6 +1,7 @@
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 cmake_minimum_required(VERSION 2.8.7)
+cmake_policy(SET CMP0074 NEW)
 
 project(bcc)
 if(NOT CMAKE_BUILD_TYPE)
@@ -73,7 +74,7 @@ endif()
 
 if(NOT PYTHON_ONLY)
 find_package(LLVM REQUIRED CONFIG)
-message(STATUS "Found LLVM: ${LLVM_INCLUDE_DIRS} ${LLVM_PACKAGE_VERSION}")
+message(STATUS "Found LLVM: ${LLVM_INCLUDE_DIRS} ${LLVM_PACKAGE_VERSION} (Use LLVM_ROOT envronment variable for another version of LLVM)")
 
 if(ENABLE_CLANG_JIT)
 find_package(BISON)
