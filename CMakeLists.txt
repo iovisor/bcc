@@ -1,7 +1,10 @@
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 cmake_minimum_required(VERSION 2.8.7)
-cmake_policy(SET CMP0074 NEW)
+
+if (${CMAKE_VERSION} VERSION_EQUAL 3.12.0 OR ${CMAKE_VERSION} VERSION_GREATER 3.12.0)
+  cmake_policy(SET CMP0074 NEW)
+endif()
 
 project(bcc)
 if(NOT CMAKE_BUILD_TYPE)
