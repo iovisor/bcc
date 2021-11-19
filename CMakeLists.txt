@@ -2,6 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 cmake_minimum_required(VERSION 2.8.7)
 
+if (${CMAKE_VERSION} VERSION_EQUAL 3.12.0 OR ${CMAKE_VERSION} VERSION_GREATER 3.12.0)
+  cmake_policy(SET CMP0074 NEW)
+endif()
+
 project(bcc)
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
@@ -73,7 +77,7 @@ endif()
 
 if(NOT PYTHON_ONLY)
 find_package(LLVM REQUIRED CONFIG)
-message(STATUS "Found LLVM: ${LLVM_INCLUDE_DIRS} ${LLVM_PACKAGE_VERSION}")
+message(STATUS "Found LLVM: ${LLVM_INCLUDE_DIRS} ${LLVM_PACKAGE_VERSION} (Use LLVM_ROOT envronment variable for another version of LLVM)")
 
 if(ENABLE_CLANG_JIT)
 find_package(BISON)
