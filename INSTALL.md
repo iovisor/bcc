@@ -235,11 +235,9 @@ sudo yum install bcc
 
 ## Amazon Linux 2 - Binary
 Use case 1. Install BCC for your AMI's default kernel (no reboot required):
-   Tested on Amazon Linux AMI release 2020.03 (kernel 4.14.154-128.181.amzn2.x86_64)
+   Tested on Amazon Linux AMI release 2021.11 (kernel 5.10.75-79.358.amzn2.x86_64)
 ```
-sudo amazon-linux-extras enable BCC
-sudo yum install kernel-devel-$(uname -r)
-sudo yum install bcc
+sudo amazon-linux-extras install BCC
 ```
 
 ## Alpine - Binary
