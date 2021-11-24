@@ -1347,20 +1347,20 @@ static int ____##name(unsigned long long *ctx, ##args)
         do {                                                              \
             unsigned short __offset = args->data_loc_##field & 0xFFFF;    \
             bpf_probe_read((void *)dst, length, (char *)args + __offset); \
-        } while (0);
+        } while (0)
 
 #define TP_DATA_LOC_READ(dst, field)                                        \
         do {                                                                \
             unsigned short __offset = args->data_loc_##field & 0xFFFF;      \
             unsigned short __length = args->data_loc_##field >> 16;         \
             bpf_probe_read((void *)dst, __length, (char *)args + __offset); \
-        } while (0);
+        } while (0)
 
 #define TP_DATA_LOC_READ_STR(dst, field, length)                                \
         do {                                                                    \
             unsigned short __offset = args->data_loc_##field & 0xFFFF;          \
             bpf_probe_read_str((void *)dst, length, (char *)args + __offset);   \
-        } while (0);
+        } while (0)
 
 #endif
 )********"
