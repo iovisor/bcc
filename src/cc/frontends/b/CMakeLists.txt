@@ -13,3 +13,4 @@ endif()
 
 add_library(b_frontend STATIC loader.cc codegen_llvm.cc node.cc parser.cc printer.cc
   type_check.cc ${BISON_Parser_OUTPUTS} ${FLEX_Lexer_OUTPUTS})
+install(TARGETS b_frontend LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
