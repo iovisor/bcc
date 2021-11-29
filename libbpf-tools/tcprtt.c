@@ -10,7 +10,6 @@
 #include <signal.h>
 #include <unistd.h>
 #include <time.h>
-#include <arpa/inet.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 #include "tcprtt.h"
@@ -131,14 +130,14 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			fprintf(stderr, "invalid local address: %s\n", arg);
 			argp_usage(state);
 		}
-		env.laddr = htonl(addr.s_addr);
+		env.laddr = addr.s_addr;
 		break;
 	case 'A':
 		if (inet_aton(arg, &addr) < 0) {
 			fprintf(stderr, "invalid remote address: %s\n", arg);
 			argp_usage(state);
 		}
-		env.raddr = htonl(addr.s_addr);
+		env.raddr = addr.s_addr;
 		break;
 	case 'b':
 		env.laddr_hist = true;
@@ -186,7 +185,7 @@ static int print_map(struct bpf_map *map)
 		if (env.laddr_hist)
 			printf("Local Address = %s ", inet_ntoa(addr));
 		else if (env.raddr_hist)
-			printf("Remote Addres = %s ", inet_ntoa(addr));
+			printf("Remote Address = %s ", inet_ntoa(addr));
 		else
 			printf("All Addresses = ****** ");
 		if (env.extended)
