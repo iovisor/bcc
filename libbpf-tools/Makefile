@@ -49,6 +49,7 @@ APPS = \
 	solisten \
 	statsnoop \
 	syscount \
+	sysinjector \
 	tcpconnect \
 	tcpconnlat \
 	tcprtt \
