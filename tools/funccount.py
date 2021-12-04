@@ -28,7 +28,7 @@ import traceback
 debug = False
 
 def verify_limit(num):
-    probe_limit = 1000
+    probe_limit = BPF.get_probe_limit()
     if num > probe_limit:
         raise Exception("maximum of %d probes allowed, attempted %d" %
                         (probe_limit, num))

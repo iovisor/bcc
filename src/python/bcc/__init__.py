@@ -36,7 +36,7 @@ try:
 except NameError:  # Python 3
     basestring = str
 
-_probe_limit = 1000
+_default_probe_limit = 1000
 _num_open_probes = 0
 
 # for tests
@@ -751,8 +751,16 @@ class BPF(object):
 
     def _check_probe_quota(self, num_new_probes):
         global _num_open_probes
-        if _num_open_probes + num_new_probes > _probe_limit:
+        if _num_open_probes + num_new_probes > BPF.get_probe_limit():
             raise Exception("Number of open probes would exceed global quota")
+
+    @staticmethod
+    def get_probe_limit():
+        env_probe_limit = os.environ.get('BCC_PROBE_LIMIT')
+        if env_probe_limit and env_probe_limit.isdigit():
+            return int(env_probe_limit)
+        else:
+            return _default_probe_limit
 
     def _add_kprobe_fd(self, ev_name, fn_name, fd):
         global _num_open_probes
