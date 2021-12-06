@@ -84,9 +84,35 @@ BPF_HISTOGRAM(dist, irq_key_t);
 bpf_text_count = """
 TRACEPOINT_PROBE(irq, irq_handler_entry)
 {
-    irq_key_t key = {.slot = 0 /* ignore */};
-    TP_DATA_LOC_READ_STR(&key.name, name, sizeof(key.name));
-    dist.atomic_increment(key);
+    u32 tid = bpf_get_current_pid_tgid();
+    irq_name_t name = {};
+
+    TP_DATA_LOC_READ_STR(&name.name, name, sizeof(name));
+    irqnames.update(&tid, &name);
+    return 0;
+}
+
+TRACEPOINT_PROBE(irq, irq_handler_exit)
+{
+    u32 tid = bpf_get_current_pid_tgid();
+
+    // check ret value of irq handler is not IRQ_NONE to make sure
+    // the current event belong to this irq handler
+    if (args->ret != IRQ_NONE) {
+        irq_name_t *namep;
+
+        namep = irqnames.lookup(&tid);
+        if (namep == 0) {
+            return 0; // missed irq name
+        }
+        char *name = (char *)namep->name;
+        irq_key_t key = {.slot = 0 /* ignore */};
+
+        bpf_probe_read_kernel(&key.name, sizeof(key.name), name);
+        dist.atomic_increment(key);
+    }
+
+    irqnames.delete(&tid);
     return 0;
 }
 """
@@ -110,18 +136,22 @@ TRACEPOINT_PROBE(irq, irq_handler_exit)
     irq_name_t *namep;
     u32 tid = bpf_get_current_pid_tgid();
 
-    // fetch timestamp and calculate delta
-    tsp = start.lookup(&tid);
-    namep = irqnames.lookup(&tid);
-    if (tsp == 0 || namep == 0) {
-        return 0;   // missed start
+    // check ret value of irq handler is not IRQ_NONE to make sure
+    // the current event belong to this irq handler
+    if (args->ret != IRQ_NONE) {
+        // fetch timestamp and calculate delta
+        tsp = start.lookup(&tid);
+        namep = irqnames.lookup(&tid);
+        if (tsp == 0 || namep == 0) {
+            return 0;   // missed start
+        }
+
+        char *name = (char *)namep->name;
+        delta = bpf_ktime_get_ns() - *tsp;
+
+        // store as sum or histogram
+        STORE
     }
-
-    char *name = (char *)namep->name;
-    delta = bpf_ktime_get_ns() - *tsp;
-
-    // store as sum or histogram
-    STORE
 
     start.delete(&tid);
     irqnames.delete(&tid);
