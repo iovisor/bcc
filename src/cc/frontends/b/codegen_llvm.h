@@ -35,6 +35,7 @@ class Constant;
 class Instruction;
 class IRBuilderBase;
 class LLVMContext;
+class LoadInst;
 class Module;
 class StructType;
 class SwitchInst;
@@ -108,6 +109,8 @@ class CodegenLLVM : public Visitor {
                                  StructDeclStmtNode **decl = nullptr) const;
   llvm::CallInst *createCall(llvm::Value *Callee,
                              llvm::ArrayRef<llvm::Value *> Args);
+  llvm::LoadInst *createLoad(llvm::Value *Addr);
+  llvm::Value *createInBoundsGEP(llvm::Value *Ptr, llvm::ArrayRef<llvm::Value *> IdxList);
 
   template <typename... Args> void emit(const char *fmt, Args&&... params);
   void emit(const char *s);
