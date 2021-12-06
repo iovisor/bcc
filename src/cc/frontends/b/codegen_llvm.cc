@@ -123,6 +123,25 @@ CallInst *CodegenLLVM::createCall(Value *callee, ArrayRef<Value *> args)
 #endif
 }
 
+LoadInst *CodegenLLVM::createLoad(Value *addr)
+{
+#if LLVM_MAJOR_VERSION >= 14
+  return B.CreateLoad(addr->getType()->getPointerElementType(), addr);
+#else
+  return B.CreateLoad(addr);
+#endif
+}
+
+Value *CodegenLLVM::createInBoundsGEP(Value *ptr, ArrayRef<Value *>idxlist)
+{
+#if LLVM_MAJOR_VERSION >= 14
+  return B.CreateInBoundsGEP(ptr->getType()->getScalarType()->getPointerElementType(),
+                             ptr, idxlist);
+#else
+  return B.CreateInBoundsGEP(ptr, idxlist);
+#endif
+}
+
 StatusTuple CodegenLLVM::visit_block_stmt_node(BlockStmtNode *n) {
 
   // enter scope
@@ -278,17 +297,17 @@ StatusTuple CodegenLLVM::visit_ident_expr_node(IdentExprNode *n) {
           emit("%s%s->%s", n->decl_->scope_id(), n->c_str(), n->sub_name_.c_str());
           auto it = vars_.find(n->decl_);
           if (it == vars_.end()) return mkstatus_(n, "Cannot locate variable %s in vars_ table", n->c_str());
-          LoadInst *load_1 = B.CreateLoad(it->second);
+          LoadInst *load_1 = createLoad(it->second);
           vector<Value *> indices({B.getInt32(0), B.getInt32(n->sub_decl_->slot_)});
-          expr_ = B.CreateInBoundsGEP(load_1, indices);
+          expr_ = createInBoundsGEP(load_1, indices);
           if (!n->is_lhs())
-            expr_ = B.CreateLoad(pop_expr());
+            expr_ = createLoad(pop_expr());
         }
       }
     } else {
       auto it = vars_.find(n->decl_);
       if (it == vars_.end()) return mkstatus_(n, "Cannot locate variable %s in vars_ table", n->c_str());
-      expr_ = n->is_lhs() ? it->second : (Value *)B.CreateLoad(it->second);
+      expr_ = n->is_lhs() ? it->second : (Value *)createLoad(it->second);
     }
   } else {
     if (n->sub_name_.size()) {
@@ -298,7 +317,7 @@ StatusTuple CodegenLLVM::visit_ident_expr_node(IdentExprNode *n) {
       vector<Value *> indices({const_int(0), const_int(n->sub_decl_->slot_, 32)});
       expr_ = B.CreateGEP(nullptr, it->second, indices);
       if (!n->is_lhs())
-        expr_ = B.CreateLoad(pop_expr());
+        expr_ = createLoad(pop_expr());
     } else {
       if (n->bitop_) {
         // ident is holding a host endian number, don't use dext
@@ -315,7 +334,7 @@ StatusTuple CodegenLLVM::visit_ident_expr_node(IdentExprNode *n) {
         if (n->is_lhs() || n->decl_->is_struct())
           expr_ = it->second;
         else
-          expr_ = B.CreateLoad(it->second);
+          expr_ = createLoad(it->second);
       }
     }
   }
@@ -385,16 +404,16 @@ StatusTuple CodegenLLVM::visit_packet_expr_node(PacketExprNode *n) {
       }
       if (n->is_ref()) {
         // e.g.: @ip.hchecksum, return offset of the header within packet
-        LoadInst *offset_ptr = B.CreateLoad(offset_mem);
+        LoadInst *offset_ptr = createLoad(offset_mem);
         Value *skb_hdr_offset = B.CreateAdd(offset_ptr, B.getInt64(bit_offset >> 3));
         expr_ = B.CreateIntCast(skb_hdr_offset, B.getInt64Ty(), false);
       } else if (n->is_lhs()) {
         emit("bpf_dins_pkt(pkt, %s + %zu, %zu, %zu, ", n->id_->c_str(), bit_offset >> 3, bit_offset & 0x7, bit_width);
         Function *store_fn = mod_->getFunction("bpf_dins_pkt");
         if (!store_fn) return mkstatus_(n, "unable to find function bpf_dins_pkt");
-        LoadInst *skb_ptr = B.CreateLoad(skb_mem);
+        LoadInst *skb_ptr = createLoad(skb_mem);
         Value *skb_ptr8 = B.CreateBitCast(skb_ptr, B.getInt8PtrTy());
-        LoadInst *offset_ptr = B.CreateLoad(offset_mem);
+        LoadInst *offset_ptr = createLoad(offset_mem);
         Value *skb_hdr_offset = B.CreateAdd(offset_ptr, B.getInt64(bit_offset >> 3));
         Value *rhs = B.CreateIntCast(pop_expr(), B.getInt64Ty(), false);
         createCall(store_fn, vector<Value *>({skb_ptr8, skb_hdr_offset, B.getInt64(bit_offset & 0x7),
@@ -403,9 +422,9 @@ StatusTuple CodegenLLVM::visit_packet_expr_node(PacketExprNode *n) {
         emit("bpf_dext_pkt(pkt, %s + %zu, %zu, %zu)", n->id_->c_str(), bit_offset >> 3, bit_offset & 0x7, bit_width);
         Function *load_fn = mod_->getFunction("bpf_dext_pkt");
         if (!load_fn) return mkstatus_(n, "unable to find function bpf_dext_pkt");
-        LoadInst *skb_ptr = B.CreateLoad(skb_mem);
+        LoadInst *skb_ptr = createLoad(skb_mem);
         Value *skb_ptr8 = B.CreateBitCast(skb_ptr, B.getInt8PtrTy());
-        LoadInst *offset_ptr = B.CreateLoad(offset_mem);
+        LoadInst *offset_ptr = createLoad(offset_mem);
         Value *skb_hdr_offset = B.CreateAdd(offset_ptr, B.getInt64(bit_offset >> 3));
         expr_ = createCall(load_fn, vector<Value *>({skb_ptr8, skb_hdr_offset,
                                                       B.getInt64(bit_offset & 0x7), B.getInt64(bit_width)}));
@@ -758,7 +777,7 @@ StatusTuple CodegenLLVM::emit_incr_cksum(MethodCallExprNode *n, size_t sz) {
   VariableDeclStmtNode *skb_decl;
   Value *skb_mem;
   TRY2(lookup_var(n, "skb", scopes_->current_var(), &skb_decl, &skb_mem));
-  LoadInst *skb_ptr = B.CreateLoad(skb_mem);
+  LoadInst *skb_ptr = createLoad(skb_mem);
   Value *skb_ptr8 = B.CreateBitCast(skb_ptr, B.getInt8PtrTy());
 
   expr_ = createCall(csum_fn, vector<Value *>({skb_ptr8, offset, old_val, new_val, flags}));
@@ -882,13 +901,13 @@ StatusTuple CodegenLLVM::visit_table_index_expr_node(TableIndexExprNode *n) {
 
         B.SetInsertPoint(label_end);
         vector<Value *> indices({B.getInt32(0), B.getInt32(n->sub_decl_->slot_)});
-        expr_ = B.CreateInBoundsGEP(result, indices);
+        expr_ = createInBoundsGEP(result, indices);
       } else {
         B.CreateCondBr(B.CreateIsNotNull(result), label_then, label_end);
 
         B.SetInsertPoint(label_then);
         vector<Value *> indices({B.getInt32(0), B.getInt32(n->sub_decl_->slot_)});
-        Value *field = B.CreateInBoundsGEP(result, indices);
+        Value *field = createInBoundsGEP(result, indices);
         B.CreateBr(label_end);
 
         B.SetInsertPoint(label_end);
@@ -920,7 +939,7 @@ StatusTuple CodegenLLVM::visit_match_decl_stmt_node(MatchDeclStmtNode *n) {
   if (result == vars_.end()) return mkstatus_(n, "unable to find memory for _result built-in");
   vars_[leaf_n] = result->second;
 
-  Value *load_1 = B.CreateLoad(result->second);
+  Value *load_1 = createLoad(result->second);
   Value *is_null = B.CreateIsNotNull(load_1);
 
   Function *parent = B.GetInsertBlock()->getParent();
@@ -948,7 +967,7 @@ StatusTuple CodegenLLVM::visit_miss_decl_stmt_node(MissDeclStmtNode *n) {
   auto result = vars_.find(result_decl);
   if (result == vars_.end()) return mkstatus_(n, "unable to find memory for _result built-in");
 
-  Value *load_1 = B.CreateLoad(result->second);
+  Value *load_1 = createLoad(result->second);
   Value *is_null = B.CreateIsNull(load_1);
 
   Function *parent = B.GetInsertBlock()->getParent();
@@ -1259,7 +1278,7 @@ StatusTuple CodegenLLVM::visit_func_decl_stmt_node(FuncDeclStmtNode *n) {
 
     // always return something
     B.SetInsertPoint(label_return);
-    B.CreateRet(B.CreateLoad(retval_));
+    B.CreateRet(createLoad(retval_));
   }
 
   return StatusTuple::OK();
