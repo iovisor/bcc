@@ -56,14 +56,14 @@ int BLoader::parse(llvm::Module *mod, const string &filename, const string &prot
 
   ebpf::cc::TypeCheck type_check(parser_->scopes_.get(), proto_parser_->scopes_.get());
   auto ret = type_check.visit(parser_->root_node_);
-  if (ret.code() != 0 || ret.msg().size()) {
+  if (!ret.ok() || ret.msg().size()) {
     fprintf(stderr, "Type error @line=%d: %s\n", ret.code(), ret.msg().c_str());
     return -1;
   }
 
   codegen_ = ebpf::make_unique<ebpf::cc::CodegenLLVM>(mod, parser_->scopes_.get(), proto_parser_->scopes_.get());
   ret = codegen_->visit(parser_->root_node_, ts, id, maps_ns);
-  if (ret.code() != 0 || ret.msg().size()) {
+  if (!ret.ok() || ret.msg().size()) {
     fprintf(stderr, "Codegen error @line=%d: %s\n", ret.code(), ret.msg().c_str());
     return ret.code();
   }
