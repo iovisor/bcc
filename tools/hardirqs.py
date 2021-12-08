@@ -67,6 +67,14 @@ bpf_text = """
 #include <linux/irqdesc.h>
 #include <linux/interrupt.h>
 
+// Add cpu_id as part of key for irq entry event to handle the case which irq
+// is triggered while idle thread(swapper/x, tid=0) for each cpu core.
+// Please see more detail at pull request #2804, #3733.
+typedef struct entry_key {
+    u32 tid;
+    u32 cpu_id;
+} entry_key_t;
+
 typedef struct irq_key {
     char name[32];
     u64 slot;
@@ -76,32 +84,38 @@ typedef struct irq_name {
     char name[32];
 } irq_name_t;
 
-BPF_HASH(start, u32);
-BPF_HASH(irqnames, u32, irq_name_t);
+BPF_HASH(start, entry_key_t);
+BPF_HASH(irqnames, entry_key_t, irq_name_t);
 BPF_HISTOGRAM(dist, irq_key_t);
 """
 
 bpf_text_count = """
 TRACEPOINT_PROBE(irq, irq_handler_entry)
 {
-    u32 tid = bpf_get_current_pid_tgid();
+    struct entry_key key = {};
     irq_name_t name = {};
 
+    key.tid = bpf_get_current_pid_tgid();
+    key.cpu_id = bpf_get_smp_processor_id();
+
     TP_DATA_LOC_READ_STR(&name.name, name, sizeof(name));
-    irqnames.update(&tid, &name);
+    irqnames.update(&key, &name);
     return 0;
 }
 
 TRACEPOINT_PROBE(irq, irq_handler_exit)
 {
-    u32 tid = bpf_get_current_pid_tgid();
+    struct entry_key key = {};
+
+    key.tid = bpf_get_current_pid_tgid();
+    key.cpu_id = bpf_get_smp_processor_id();
 
     // check ret value of irq handler is not IRQ_NONE to make sure
     // the current event belong to this irq handler
     if (args->ret != IRQ_NONE) {
         irq_name_t *namep;
 
-        namep = irqnames.lookup(&tid);
+        namep = irqnames.lookup(&key);
         if (namep == 0) {
             return 0; // missed irq name
         }
@@ -112,7 +126,7 @@ TRACEPOINT_PROBE(irq, irq_handler_exit)
         dist.atomic_increment(key);
     }
 
-    irqnames.delete(&tid);
+    irqnames.delete(&key);
     return 0;
 }
 """
@@ -120,13 +134,16 @@ TRACEPOINT_PROBE(irq, irq_handler_exit)
 bpf_text_time = """
 TRACEPOINT_PROBE(irq, irq_handler_entry)
 {
-    u32 tid = bpf_get_current_pid_tgid();
     u64 ts = bpf_ktime_get_ns();
     irq_name_t name = {};
+    struct entry_key key = {};
+
+    key.tid = bpf_get_current_pid_tgid();
+    key.cpu_id = bpf_get_smp_processor_id();
 
     TP_DATA_LOC_READ_STR(&name.name, name, sizeof(name));
-    irqnames.update(&tid, &name);
-    start.update(&tid, &ts);
+    irqnames.update(&key, &name);
+    start.update(&key, &ts);
     return 0;
 }
 
@@ -134,14 +151,17 @@ TRACEPOINT_PROBE(irq, irq_handler_exit)
 {
     u64 *tsp, delta;
     irq_name_t *namep;
-    u32 tid = bpf_get_current_pid_tgid();
+    struct entry_key key = {};
+
+    key.tid = bpf_get_current_pid_tgid();
+    key.cpu_id = bpf_get_smp_processor_id();
 
     // check ret value of irq handler is not IRQ_NONE to make sure
     // the current event belong to this irq handler
     if (args->ret != IRQ_NONE) {
         // fetch timestamp and calculate delta
-        tsp = start.lookup(&tid);
-        namep = irqnames.lookup(&tid);
+        tsp = start.lookup(&key);
+        namep = irqnames.lookup(&key);
         if (tsp == 0 || namep == 0) {
             return 0;   // missed start
         }
@@ -153,8 +173,8 @@ TRACEPOINT_PROBE(irq, irq_handler_exit)
         STORE
     }
 
-    start.delete(&tid);
-    irqnames.delete(&tid);
+    start.delete(&key);
+    irqnames.delete(&key);
     return 0;
 }
 """
