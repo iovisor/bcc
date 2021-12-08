@@ -312,7 +312,7 @@ class BPFHashTable : public BPFTableBase<KeyType, ValueType> {
 
     while (true) {
       r = get_value(cur, value);
-      if (r.code() != 0)
+      if (!r.ok())
         break;
       res.emplace_back(cur, value);
       if (!this->next(&cur, &cur))
