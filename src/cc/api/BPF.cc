@@ -92,7 +92,7 @@ std::string sanitize_str(std::string str, bool (*validator)(char),
 StatusTuple BPF::init_usdt(const USDT& usdt) {
   USDT u(usdt);
   StatusTuple init_stp = u.init();
-  if (init_stp.code() != 0) {
+  if (!init_stp.ok()) {
     return init_stp;
   }
 
@@ -112,7 +112,7 @@ StatusTuple BPF::init(const std::string& bpf_program,
   usdt_.reserve(usdt.size());
   for (const auto& u : usdt) {
     StatusTuple init_stp = init_usdt(u);
-    if (init_stp.code() != 0) {
+    if (!init_stp.ok()) {
       init_fail_reset();
       return init_stp;
     }
@@ -134,7 +134,7 @@ StatusTuple BPF::init(const std::string& bpf_program,
 
 BPF::~BPF() {
   auto res = detach_all();
-  if (res.code() != 0)
+  if (!res.ok())
     std::cerr << "Failed to detach all probes on destruction: " << std::endl
               << res.msg() << std::endl;
   bcc_free_buildsymcache(bsymcache_);
@@ -147,7 +147,7 @@ StatusTuple BPF::detach_all() {
 
   for (auto& it : kprobes_) {
     auto res = detach_kprobe_event(it.first, it.second);
-    if (res.code() != 0) {
+    if (!res.ok()) {
       error_msg += "Failed to detach kprobe event " + it.first + ": ";
       error_msg += res.msg() + "\n";
       has_error = true;
@@ -156,7 +156,7 @@ StatusTuple BPF::detach_all() {
 
   for (auto& it : uprobes_) {
     auto res = detach_uprobe_event(it.first, it.second);
-    if (res.code() != 0) {
+    if (!res.ok()) {
       error_msg += "Failed to detach uprobe event " + it.first + ": ";
       error_msg += res.msg() + "\n";
       has_error = true;
@@ -165,7 +165,7 @@ StatusTuple BPF::detach_all() {
 
   for (auto& it : tracepoints_) {
     auto res = detach_tracepoint_event(it.first, it.second);
-    if (res.code() != 0) {
+    if (!res.ok()) {
       error_msg += "Failed to detach Tracepoint " + it.first + ": ";
       error_msg += res.msg() + "\n";
       has_error = true;
@@ -174,7 +174,7 @@ StatusTuple BPF::detach_all() {
 
   for (auto& it : raw_tracepoints_) {
     auto res = detach_raw_tracepoint_event(it.first, it.second);
-    if (res.code() != 0) {
+    if (!res.ok()) {
       error_msg += "Failed to detach Raw tracepoint " + it.first + ": ";
       error_msg += res.msg() + "\n";
       has_error = true;
@@ -183,7 +183,7 @@ StatusTuple BPF::detach_all() {
 
   for (auto& it : perf_buffers_) {
     auto res = it.second->close_all_cpu();
-    if (res.code() != 0) {
+    if (!res.ok()) {
       error_msg += "Failed to close perf buffer " + it.first + ": ";
       error_msg += res.msg() + "\n";
       has_error = true;
@@ -193,7 +193,7 @@ StatusTuple BPF::detach_all() {
 
   for (auto& it : perf_event_arrays_) {
     auto res = it.second->close_all_cpu();
-    if (res.code() != 0) {
+    if (!res.ok()) {
       error_msg += "Failed to close perf event array " + it.first + ": ";
       error_msg += res.msg() + "\n";
       has_error = true;
@@ -203,7 +203,7 @@ StatusTuple BPF::detach_all() {
 
   for (auto& it : perf_events_) {
     auto res = detach_perf_event_all_cpu(it.second);
-    if (res.code() != 0) {
+    if (!res.ok()) {
       error_msg += res.msg() + "\n";
       has_error = true;
     }
