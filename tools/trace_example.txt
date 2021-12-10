@@ -337,8 +337,10 @@ PID     TID     COMM            FUNC             -
 
 USAGE message:
 
-usage: trace [-h] [-b BUFFER_PAGES] [-p PID] [-L TID] [-v] [-Z STRING_SIZE]
-             [-S] [-M MAX_EVENTS] [-t] [-T] [-K] [-U] [-a] [-I header]
+usage: trace [-h] [-b BUFFER_PAGES] [-p PID] [-L TID] [--uid UID] [-v]
+             [-Z STRING_SIZE] [-S] [-M MAX_EVENTS] [-t] [-u] [-T] [-C]
+             [-c CGROUP_PATH] [-n NAME] [-f MSG_FILTER] [-B]
+             [-s SYM_FILE_LIST] [-K] [-U] [-a] [-I header]
              probe [probe ...]
 
 Attach to functions and print trace messages.
@@ -353,28 +355,35 @@ optional arguments:
                         (default: 64)
   -p PID, --pid PID     id of the process to trace (optional)
   -L TID, --tid TID     id of the thread to trace (optional)
+  --uid UID             id of the user to trace (optional)
   -v, --verbose         print resulting BPF program code before executing
   -Z STRING_SIZE, --string-size STRING_SIZE
                         maximum size to read from strings
-  -s SYM_FILE_LIST      when collecting stack trace in build id format,
-                        use the coma separated list for symbol resolution
   -S, --include-self    do not filter trace's own pid from the trace
   -M MAX_EVENTS, --max-events MAX_EVENTS
                         number of events to print before quitting
   -t, --timestamp       print timestamp column (offset from trace start)
+  -u, --unix-timestamp  print UNIX timestamp instead of offset from trace
+                        start, requires -t
   -T, --time            print time column
+  -C, --print_cpu       print CPU id
+  -c CGROUP_PATH, --cgroup-path CGROUP_PATH
+                        cgroup path
   -n NAME, --name NAME  only print process names containing this name
   -f MSG_FILTER, --msg-filter MSG_FILTER
-                        only print message of event containing this string
-  -C, --print_cpu       print CPU id
+                        only print the msg of event containing this string
   -B, --bin_cmp         allow to use STRCMP with binary values
+  -s SYM_FILE_LIST, --sym_file_list SYM_FILE_LIST
+                        coma separated list of symbol files to use for symbol
+                        resolution
   -K, --kernel-stack    output kernel stack trace
   -U, --user-stack      output user stack trace
   -a, --address         print virtual address in stacks
   -I header, --include header
                         additional header files to include in the BPF program
-                        as either full path, or relative to current working directory,
-                        or relative to default kernel header search path
+                        as either full path, or relative to current working
+                        directory, or relative to default kernel header search
+                        path
 
 EXAMPLES:
 
@@ -389,6 +398,8 @@ trace 'do_sys_open "%s", arg2@user'
         behaviour is expected.
 trace 'do_sys_open "%s", arg2@user' -n main
         Trace the open syscall and only print event that process names containing "main"
+trace 'do_sys_open "%s", arg2@user' --uid 1001
+        Trace the open syscall and only print event that processes with user ID 1001
 trace 'do_sys_open "%s", arg2@user' -f config
         Trace the open syscall and print the filename being opened filtered by "config"
 trace 'sys_read (arg3 > 20000) "read %d bytes", arg3'

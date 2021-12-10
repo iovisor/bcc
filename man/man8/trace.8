@@ -2,7 +2,7 @@
 .SH NAME
 trace \- Trace a function and print its arguments or return value, optionally evaluating a filter. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B trace [-h] [-b BUFFER_PAGES] [-p PID] [-L TID] [-v] [-Z STRING_SIZE] [-S] [-s SYM_FILE_LIST]
+.B trace [-h] [-b BUFFER_PAGES] [-p PID] [-L TID] [--uid UID] [-v] [-Z STRING_SIZE] [-S] [-s SYM_FILE_LIST]
          [-M MAX_EVENTS] [-t] [-u] [-T] [-C] [-K] [-U] [-a] [-I header]
          probe [probe ...]
 .SH DESCRIPTION
@@ -23,6 +23,9 @@ Trace only functions in the process PID.
 .TP
 \-L TID
 Trace only functions in the thread TID.
+.TP
+\--uid UID
+Trace only functions from user UID.
 .TP
 \-v
 Display the generated BPF program, for debugging purposes.
@@ -170,9 +173,9 @@ current process' pid and tgid; $uid, $gid to refer to the current user's
 uid and gid; $cpu to refer to the current processor number.
 .SH EXAMPLES
 .TP
-Trace all invocations of the open system call with the name of the file being opened:
+Trace all invocations of the open system call with the name of the file (from userspace) being opened:
 #
-.B trace '::do_sys_open """%s"", arg2'
+.B trace '::do_sys_open """%s"", arg2@user'
 .TP
 Trace all invocations of the read system call where the number of bytes requested is greater than 20,000:
 #

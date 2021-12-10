@@ -699,11 +699,17 @@ trace do_sys_open
         Trace the open syscall and print a default trace message when entered
 trace kfree_skb+0x12
         Trace the kfree_skb kernel function after the instruction on the 0x12 offset
-trace 'do_sys_open "%s", arg2'
-        Trace the open syscall and print the filename being opened
-trace 'do_sys_open "%s", arg2' -n main
+trace 'do_sys_open "%s", arg2@user'
+        Trace the open syscall and print the filename. being opened @user is
+        added to arg2 in kprobes to ensure that char * should be copied from
+        the userspace stack to the bpf stack. If not specified, previous
+        behaviour is expected.
+
+trace 'do_sys_open "%s", arg2@user' -n main
         Trace the open syscall and only print event that process names containing "main"
-trace 'do_sys_open "%s", arg2' -f config
+trace 'do_sys_open "%s", arg2@user' --uid 1001
+        Trace the open syscall and only print event that processes with user ID 1001
+trace 'do_sys_open "%s", arg2@user' -f config
         Trace the open syscall and print the filename being opened filtered by "config"
 trace 'sys_read (arg3 > 20000) "read %d bytes", arg3'
         Trace the read syscall and print a message for reads >20000 bytes
