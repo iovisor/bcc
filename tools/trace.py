@@ -37,6 +37,7 @@ class Probe(object):
         print_address = False
         tgid = -1
         pid = -1
+        uid = -1
         page_cnt = None
         build_id_enabled = False
 
@@ -53,6 +54,7 @@ class Probe(object):
                 cls.first_ts_real = time.time()
                 cls.tgid = args.tgid or -1
                 cls.pid = args.pid or -1
+                cls.uid = args.uid or -1
                 cls.page_cnt = args.buffer_pages
                 cls.bin_cmp = args.bin_cmp
                 cls.build_id_enabled = args.sym_file_list is not None
@@ -401,6 +403,7 @@ struct %s
 %s
 %s
 %s
+        u32 uid;
 };
 
 BPF_PERF_OUTPUT(%s);
@@ -485,6 +488,13 @@ BPF_PERF_OUTPUT(%s);
                 else:
                         pid_filter = ""
 
+                if Probe.uid != -1:
+                        uid_filter = """
+        if (__uid != %d) { return 0; }
+                """ % Probe.uid
+                else:
+                        uid_filter = ""
+
                 if self.cgroup_map_name is not None:
                         cgroup_filter = """
         if (%s.check_current_task(0) <= 0) { return 0; }
@@ -530,6 +540,8 @@ BPF_PERF_OUTPUT(%s);
         u64 __pid_tgid = bpf_get_current_pid_tgid();
         u32 __tgid = __pid_tgid >> 32;
         u32 __pid = __pid_tgid; // implicit cast to u32 for bottom half
+        u32 __uid = bpf_get_current_uid_gid();
+        %s
         %s
         %s
         %s
@@ -541,6 +553,7 @@ BPF_PERF_OUTPUT(%s);
         %s
         __data.tgid = __tgid;
         __data.pid = __pid;
+        __data.uid = __uid;
         bpf_get_current_comm(&__data.comm, sizeof(__data.comm));
 %s
 %s
@@ -548,7 +561,7 @@ BPF_PERF_OUTPUT(%s);
         return 0;
 }
 """
-                text = text % (pid_filter, cgroup_filter, prefix,
+                text = text % (pid_filter, uid_filter, cgroup_filter, prefix,
                                self._generate_usdt_filter_read(), self.filter,
                                self.struct_name, time_str, cpu_str, data_fields,
                                stack_trace, self.events_name, ctx_name)
@@ -750,6 +763,8 @@ trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
                   dest="tgid", help="id of the process to trace (optional)")
                 parser.add_argument("-L", "--tid", type=int, metavar="TID",
                   dest="pid", help="id of the thread to trace (optional)")
+                parser.add_argument("--uid", type=int, metavar="UID",
+                  dest="uid", help="id of the user to trace (optional)")
                 parser.add_argument("-v", "--verbose", action="store_true",
                   help="print resulting BPF program code before executing")
                 parser.add_argument("-Z", "--string-size", type=int,
