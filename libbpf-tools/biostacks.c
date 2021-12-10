@@ -178,6 +178,17 @@ int main(int argc, char **argv)
 
 	obj->rodata->targ_ms = env.milliseconds;
 
+	if (fentry_exists("__blk_account_io_start", NULL)) {
+		err = bpf_program__set_attach_target(obj->progs.blk_account_io_start, 0,
+						     "__blk_account_io_start");
+		err = err ?: bpf_program__set_attach_target(obj->progs.blk_account_io_done, 0,
+						     "__blk_account_io_done");
+		if (err) {
+			fprintf(stderr, "failed to set attach target: %d\n", err);
+			goto cleanup;
+		}
+	}
+
 	err = biostacks_bpf__load(obj);
 	if (err) {
 		fprintf(stderr, "failed to load BPF object: %d\n", err);
