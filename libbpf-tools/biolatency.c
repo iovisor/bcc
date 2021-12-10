@@ -7,6 +7,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <time.h>
 #include <bpf/libbpf.h>
 #include <sys/resource.h>
@@ -28,6 +29,8 @@ static struct env {
 	bool per_flag;
 	bool milliseconds;
 	bool verbose;
+	char *cgroupspath;
+	bool cg;
 } env = {
 	.interval = 99999999,
 	.times = 99999999,
@@ -41,7 +44,7 @@ const char *argp_program_bug_address =
 const char argp_program_doc[] =
 "Summarize block device I/O latency as a histogram.\n"
 "\n"
-"USAGE: biolatency [--help] [-T] [-m] [-Q] [-D] [-F] [-d DISK] [interval] [count]\n"
+"USAGE: biolatency [--help] [-T] [-m] [-Q] [-D] [-F] [-d DISK] [-c CG] [interval] [count]\n"
 "\n"
 "EXAMPLES:\n"
 "    biolatency              # summarize block I/O latency as a histogram\n"
@@ -50,7 +53,8 @@ const char argp_program_doc[] =
 "    biolatency -Q           # include OS queued time in I/O time\n"
 "    biolatency -D           # show each disk device separately\n"
 "    biolatency -F           # show I/O flags separately\n"
-"    biolatency -d sdc       # Trace sdc only\n";
+"    biolatency -d sdc       # Trace sdc only\n"
+"    biolatency -c CG        # Trace process under cgroupsPath CG\n";
 
 static const struct argp_option opts[] = {
 	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
@@ -60,6 +64,7 @@ static const struct argp_option opts[] = {
 	{ "flag", 'F', NULL, 0, "Print a histogram per set of I/O flags" },
 	{ "disk",  'd', "DISK",  0, "Trace this disk only" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
+	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path"},
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
@@ -89,6 +94,10 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'T':
 		env.timestamp = true;
+		break;
+	case 'c':
+		env.cgroupspath = arg;
+		env.cg = true;
 		break;
 	case 'd':
 		env.disk = arg;
@@ -240,6 +249,8 @@ int main(int argc, char **argv)
 	char ts[32];
 	time_t t;
 	int err;
+	int idx, cg_map_fd;
+	int cgfd = -1;
 
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
 	if (err)
@@ -278,11 +289,27 @@ int main(int argc, char **argv)
 	obj->rodata->targ_per_flag = env.per_flag;
 	obj->rodata->targ_ms = env.milliseconds;
 	obj->rodata->targ_queued = env.queued;
+	obj->rodata->filter_cg = env.cg;
 
 	err = biolatency_bpf__load(obj);
 	if (err) {
 		fprintf(stderr, "failed to load BPF object: %d\n", err);
 		goto cleanup;
+	}
+
+	/* update cgroup path fd to map */
+	if (env.cg) {
+		idx = 0;
+		cg_map_fd = bpf_map__fd(obj->maps.cgroup_map);
+		cgfd = open(env.cgroupspath, O_RDONLY);
+		if (cgfd < 0) {
+			fprintf(stderr, "Failed opening Cgroup path: %s", env.cgroupspath);
+			goto cleanup;
+		}
+		if (bpf_map_update_elem(cg_map_fd, &idx, &cgfd, BPF_ANY)) {
+			fprintf(stderr, "Failed adding target cgroup to map");
+			goto cleanup;
+		}
 	}
 
 	if (env.queued) {
@@ -336,6 +363,8 @@ int main(int argc, char **argv)
 cleanup:
 	biolatency_bpf__destroy(obj);
 	partitions__free(partitions);
+	if (cgfd > 0)
+		close(cgfd);
 
 	return err != 0;
 }
