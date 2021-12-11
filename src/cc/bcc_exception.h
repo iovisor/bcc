@@ -86,7 +86,7 @@ private:
 #define TRY2(CMD)                    \
   do {                               \
     ebpf::StatusTuple __stp = (CMD); \
-    if (!__stp.ok()) {         \
+    if (!__stp.ok()) {               \
       return __stp;                  \
     }                                \
   } while (0)
