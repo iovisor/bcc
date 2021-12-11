@@ -142,10 +142,29 @@ int main(int argc, char **argv)
 	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
 
-	obj = cachestat_bpf__open_and_load();
+	obj = cachestat_bpf__open();
 	if (!obj) {
-		fprintf(stderr, "failed to open and/or load BPF object\n");
+		fprintf(stderr, "failed to open BPF object\n");
 		return 1;
+	}
+
+	/**
+	 * account_page_dirtied was renamed to folio_account_dirtied
+	 * in kernel commit 203a31516616 ("mm/writeback: Add __folio_mark_dirty()")
+	 */
+	if (fentry_exists("folio_account_dirtied", NULL)) {
+		err = bpf_program__set_attach_target(obj->progs.account_page_dirtied, 0,
+						     "folio_account_dirtied");
+		if (err) {
+			fprintf(stderr, "failed to set attach target\n");
+			goto cleanup;
+		}
+	}
+
+	err = cachestat_bpf__load(obj);
+	if (err) {
+		fprintf(stderr, "failed to load BPF object\n");
+		goto cleanup;
 	}
 
 	if (!obj->bss) {
