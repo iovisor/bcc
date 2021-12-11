@@ -168,13 +168,18 @@ if debug or args.ebpf:
 # load BPF program
 b = BPF(text=bpf_text)
 if args.queued:
-    b.attach_kprobe(event="blk_account_io_start", fn_name="trace_req_start")
+    if BPF.get_kprobe_functions(b'__blk_account_io_start'):
+        b.attach_kprobe(event="__blk_account_io_start", fn_name="trace_req_start")
+    else:
+        b.attach_kprobe(event="blk_account_io_start", fn_name="trace_req_start")
 else:
     if BPF.get_kprobe_functions(b'blk_start_request'):
         b.attach_kprobe(event="blk_start_request", fn_name="trace_req_start")
     b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_req_start")
-b.attach_kprobe(event="blk_account_io_done",
-    fn_name="trace_req_done")
+if BPF.get_kprobe_functions(b'__blk_account_io_done'):
+    b.attach_kprobe(event="__blk_account_io_done", fn_name="trace_req_done")
+else:
+    b.attach_kprobe(event="blk_account_io_done", fn_name="trace_req_done")
 
 if not args.json:
     print("Tracing block device I/O... Hit Ctrl-C to end.")
@@ -277,4 +282,3 @@ while (1):
     countdown -= 1
     if exiting or countdown == 0:
         exit()
-
