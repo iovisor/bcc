@@ -87,14 +87,14 @@ struct info_t {
 int main() {
   ebpf::BPF bpf;
   auto res = bpf.init(BPF_PROGRAM);
-  if (res.code() != 0) {
+  if (!res.ok()) {
     std::cerr << res.msg() << std::endl;
     return 1;
   }
 
   int prog_fd;
   res = bpf.load_func("bpf_iter__task", BPF_PROG_TYPE_TRACING, prog_fd);
-  if (res.code() != 0) {
+  if (!res.ok()) {
     std::cerr << res.msg() << std::endl;
     return 1;
   }
