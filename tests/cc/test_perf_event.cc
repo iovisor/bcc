@@ -58,18 +58,18 @@ TEST_CASE("test read perf event", "[bpf_perf_event]") {
   res = bpf.init(
       BPF_PROGRAM,
       {"-DNUM_CPUS=" + std::to_string(sysconf(_SC_NPROCESSORS_ONLN))}, {});
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   res =
       bpf.open_perf_event("cnt", PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   std::string getuid_fnname = bpf.get_syscall_fnname("getuid");
   res = bpf.attach_kprobe(getuid_fnname, "on_sys_getuid");
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   REQUIRE(getuid() >= 0);
   res = bpf.detach_kprobe(getuid_fnname);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   res = bpf.close_perf_event("cnt");
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
 
   auto val = bpf.get_hash_table<int, uint64_t>("val");
   REQUIRE(val[0] >= 0);
@@ -113,13 +113,13 @@ TEST_CASE("test attach perf event", "[bpf_perf_event]") {
   ebpf::BPF bpf;
   ebpf::StatusTuple res(0);
   res = bpf.init(BPF_PROGRAM);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   res = bpf.attach_perf_event(PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK,
                               "on_event", 0, 1000);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   sleep(1);
   res = bpf.detach_perf_event(PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
 
   auto pid = bpf.get_hash_table<int, uint64_t>("pid");
   REQUIRE(pid[0] >= 0);

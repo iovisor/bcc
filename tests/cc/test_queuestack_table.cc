@@ -29,7 +29,7 @@ TEST_CASE("queue table", "[queue_table]") {
   ebpf::BPF bpf;
   ebpf::StatusTuple res(0);
   res = bpf.init(BPF_PROGRAM);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
 
   ebpf::BPFQueueStackTable<int> t = bpf.get_queuestack_table<int>("myqueue");
 
@@ -40,23 +40,23 @@ TEST_CASE("queue table", "[queue_table]") {
     // insert elements
     for (i=0; i<30; i++) {
       res = t.push_value(i);
-      REQUIRE(res.code() == 0);
+      REQUIRE(res.ok());
     }
 
     // checking head (peek)
     res = t.get_head(val);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     REQUIRE(val == 0);
 
     // retrieve elements
     for (i=0; i<30; i++) {
       res = t.pop_value(val);
-      REQUIRE(res.code() == 0);
+      REQUIRE(res.ok());
       REQUIRE(val == i);
     }
     // get non existing element
     res = t.pop_value(val);
-    REQUIRE(res.code() != 0);
+    REQUIRE(!res.ok());
   }
 }
 
@@ -68,7 +68,7 @@ TEST_CASE("stack table", "[stack_table]") {
   ebpf::BPF bpf;
   ebpf::StatusTuple res(0);
   res = bpf.init(BPF_PROGRAM);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
 
   ebpf::BPFQueueStackTable<int> t = bpf.get_queuestack_table<int>("mystack");
 
@@ -79,23 +79,23 @@ TEST_CASE("stack table", "[stack_table]") {
     // insert elements
     for (i=0; i<30; i++) {
       res = t.push_value(i);
-      REQUIRE(res.code() == 0);
+      REQUIRE(res.ok());
     }
 
     // checking head (peek)
     res = t.get_head(val);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     REQUIRE(val == 29);
 
     // retrieve elements
     for (i=0; i<30; i++) {
       res = t.pop_value(val);
-      REQUIRE(res.code() == 0);
+      REQUIRE(res.ok());
       REQUIRE( val == (30 - 1 - i));
     }
     // get non existing element
     res = t.pop_value(val);
-    REQUIRE(res.code() != 0);
+    REQUIRE(!res.ok());
   }
 }
 #endif

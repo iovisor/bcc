@@ -61,7 +61,7 @@ TEST_CASE("test hash of maps", "[hash_of_maps]") {
     ebpf::BPF bpf;
     ebpf::StatusTuple res(0);
     res = bpf.init(BPF_PROGRAM);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     auto t = bpf.get_map_in_map_table<int>("maps_hash");
     auto ex1_table = bpf.get_array_table<int>("ex1");
@@ -73,13 +73,13 @@ TEST_CASE("test hash of maps", "[hash_of_maps]") {
 
     int key = 0, value = 0;
     res = t.update_value(key, ex1_fd);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     // updating already-occupied slot will succeed.
     res = t.update_value(key, ex2_fd);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     res = t.update_value(key, ex1_fd);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     // an in-compatible map
     key = 1;
@@ -90,28 +90,28 @@ TEST_CASE("test hash of maps", "[hash_of_maps]") {
     // as hash table is not full.
     key = 10;
     res = t.update_value(key, ex2_fd);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     res = t.remove_value(key);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     // test effectiveness of map-in-map
     key = 0;
     std::string getuid_fnname = bpf.get_syscall_fnname("getuid");
     res = bpf.attach_kprobe(getuid_fnname, "syscall__getuid");
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     auto cntl_table = bpf.get_array_table<int>("cntl");
     cntl_table.update_value(0, 1);
     REQUIRE(getuid() >= 0);
     res = ex1_table.get_value(key, value);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     REQUIRE(value > 0);
 
     res = bpf.detach_kprobe(getuid_fnname);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     res = t.remove_value(key);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
   }
 }
 
@@ -163,7 +163,7 @@ TEST_CASE("test hash of maps using custom key", "[hash_of_maps_custom_key]") {
     ebpf::BPF bpf;
     ebpf::StatusTuple res(0);
     res = bpf.init(BPF_PROGRAM);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     auto t = bpf.get_map_in_map_table<struct custom_key>("maps_hash");
     auto ex1_table = bpf.get_hash_table<int, int>("ex1");
@@ -175,56 +175,56 @@ TEST_CASE("test hash of maps using custom key", "[hash_of_maps_custom_key]") {
     // test effectiveness of map-in-map
     std::string getuid_fnname = bpf.get_syscall_fnname("getuid");
     res = bpf.attach_kprobe(getuid_fnname, "syscall__getuid");
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     struct custom_key hash_key = {1, 1};
 
     res = t.update_value(hash_key, ex1_fd);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     struct custom_key hash_key2 = {1, 2};
     res = t.update_value(hash_key2, ex2_fd);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     int key = 0, value = 0, value2 = 0;
 
     // Can't get value when value didn't set.
     res = ex1_table.get_value(key, value);
-    REQUIRE(res.code() != 0);
+    REQUIRE(!res.ok());
     REQUIRE(value == 0);
 
     // Call syscall__getuid, then set value to ex1_table
     res = cntl_table.update_value(key, 1);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     REQUIRE(getuid() >= 0);
 
     // Now we can get value from ex1_table
     res = ex1_table.get_value(key, value);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     REQUIRE(value >= 1);
 
     // Can't get value when value didn't set.
     res = ex2_table.get_value(key, value2);
-    REQUIRE(res.code() != 0);
+    REQUIRE(!res.ok());
     REQUIRE(value2 == 0);
 
     // Call syscall__getuid, then set value to ex2_table
     res = cntl_table.update_value(key, 2);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     REQUIRE(getuid() >= 0);
 
     // Now we can get value from ex2_table
     res = ex2_table.get_value(key, value2);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     REQUIRE(value > 0);
 
     res = bpf.detach_kprobe(getuid_fnname);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     res = t.remove_value(hash_key);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     res = t.remove_value(hash_key2);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
   }
 }
 
@@ -269,7 +269,7 @@ TEST_CASE("test array of maps", "[array_of_maps]") {
     ebpf::BPF bpf;
     ebpf::StatusTuple res(0);
     res = bpf.init(BPF_PROGRAM);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     auto t = bpf.get_map_in_map_table<int>("maps_array");
     auto ex1_table = bpf.get_hash_table<int, int>("ex1");
@@ -282,13 +282,13 @@ TEST_CASE("test array of maps", "[array_of_maps]") {
 
     int key = 0, value = 0;
     res = t.update_value(key, ex1_fd);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     // updating already-occupied slot will succeed.
     res = t.update_value(key, ex2_fd);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     res = t.update_value(key, ex1_fd);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     // an in-compatible map
     key = 1;
@@ -304,14 +304,14 @@ TEST_CASE("test array of maps", "[array_of_maps]") {
     key = 0;
     std::string getuid_fnname = bpf.get_syscall_fnname("getuid");
     res = bpf.attach_kprobe(getuid_fnname, "syscall__getuid");
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     auto cntl_table = bpf.get_array_table<int>("cntl");
     cntl_table.update_value(0, 1);
 
     REQUIRE(getuid() >= 0);
     res = ex1_table.get_value(key, value);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     REQUIRE(value == 1);
 
     cntl_table.update_value(0, 2);
@@ -320,10 +320,10 @@ TEST_CASE("test array of maps", "[array_of_maps]") {
     REQUIRE(res.code() == -1);
 
     res = bpf.detach_kprobe(getuid_fnname);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     res = t.remove_value(key);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
   }
 }
 #endif

@@ -28,7 +28,7 @@ TEST_CASE("test hash table", "[hash_table]") {
   ebpf::BPF bpf;
   ebpf::StatusTuple res(0);
   res = bpf.init(BPF_PROGRAM);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
 
   ebpf::BPFHashTable<int, int> t = bpf.get_hash_table<int, int>("myhash");
 
@@ -47,36 +47,36 @@ TEST_CASE("test hash table", "[hash_table]") {
     v1 = 42;
     // create new element
     res = t.update_value(k, v1);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     res = t.get_value(k, v2);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     REQUIRE(v2 == 42);
 
     // update existing element
     v1 = 69;
     res = t.update_value(k, v1);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     res = t.get_value(k, v2);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     REQUIRE(v2 == 69);
 
     // remove existing element
     res = t.remove_value(k);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     // remove non existing element
     res = t.remove_value(k);
-    REQUIRE(res.code() != 0);
+    REQUIRE(!res.ok());
 
     // get non existing element
     res = t.get_value(k, v2);
-    REQUIRE(res.code() != 0);
+    REQUIRE(!res.ok());
   }
 
   SECTION("walk table") {
     for (int i = 1; i <= 10; i++) {
       res = t.update_value(i * 3, i);
-      REQUIRE(res.code() == 0);
+      REQUIRE(res.ok());
     }
     auto offline = t.get_table_offline();
     REQUIRE(offline.size() == 10);
@@ -101,7 +101,7 @@ TEST_CASE("percpu hash table", "[percpu_hash_table]") {
   ebpf::BPF bpf;
   ebpf::StatusTuple res(0);
   res = bpf.init(BPF_PROGRAM);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
 
   ebpf::BPFPercpuHashTable<int, uint64_t> t =
     bpf.get_percpu_hash_table<int, uint64_t>("myhash");
@@ -129,9 +129,9 @@ TEST_CASE("percpu hash table", "[percpu_hash_table]") {
 
     // create new element
     res = t.update_value(k, v1);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     res = t.get_value(k, v2);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     for (size_t j = 0; j < ncpus; j++) {
       REQUIRE(v2.at(j) == 42 * j);
     }
@@ -141,24 +141,24 @@ TEST_CASE("percpu hash table", "[percpu_hash_table]") {
       v1[j] = 69 * j;
     }
     res = t.update_value(k, v1);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     res = t.get_value(k, v2);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     for (size_t j = 0; j < ncpus; j++) {
       REQUIRE(v2.at(j) == 69 * j);
     }
 
     // remove existing element
     res = t.remove_value(k);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     // remove non existing element
     res = t.remove_value(k);
-    REQUIRE(res.code() != 0);
+    REQUIRE(!res.ok());
 
     // get non existing element
     res = t.get_value(k, v2);
-    REQUIRE(res.code() != 0);
+    REQUIRE(!res.ok());
   }
 
   SECTION("walk table") {
@@ -169,7 +169,7 @@ TEST_CASE("percpu hash table", "[percpu_hash_table]") {
         v[cpu] = k * cpu;
       }
       res = t.update_value(k, v);
-      REQUIRE(res.code() == 0);
+      REQUIRE(res.ok());
     }
 
     // get whole table

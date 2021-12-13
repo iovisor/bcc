@@ -33,7 +33,7 @@ TEST_CASE("test array table", "[array_table]") {
   ebpf::BPF bpf(0, nullptr, false);
   ebpf::StatusTuple res(0);
   res = bpf.init(BPF_PROGRAM);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
 
   ebpf::BPFArrayTable<int> t = bpf.get_array_table<int>("myarray");
 
@@ -52,24 +52,24 @@ TEST_CASE("test array table", "[array_table]") {
     v1 = 42;
     // update element
     res = t.update_value(i, v1);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     res = t.get_value(i, v2);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     REQUIRE(v2 == 42);
 
     // update another element
     i = 2;
     v1 = 69;
     res = t.update_value(i, v1);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     res = t.get_value(i, v2);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     REQUIRE(v2 == 69);
 
     // get non existing element
     i = 1024;
     res = t.get_value(i, v2);
-    REQUIRE(res.code() != 0);
+    REQUIRE(!res.ok());
   }
 
   SECTION("full table") {
@@ -84,7 +84,7 @@ TEST_CASE("test array table", "[array_table]") {
       int v = dist(rng);
 
       res = t.update_value(i, v);
-      REQUIRE(res.code() == 0);
+      REQUIRE(res.ok());
 
       // save it in the local table to compare later on
       localtable[i] = v;
@@ -105,7 +105,7 @@ TEST_CASE("percpu array table", "[percpu_array_table]") {
   ebpf::BPF bpf;
   ebpf::StatusTuple res(0);
   res = bpf.init(BPF_PROGRAM);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
 
   ebpf::BPFPercpuArrayTable<uint64_t> t = bpf.get_percpu_array_table<uint64_t>("myarray");
   size_t ncpus = ebpf::BPFTable::get_possible_cpu_count();
@@ -131,9 +131,9 @@ TEST_CASE("percpu array table", "[percpu_array_table]") {
     i = 1;
     // update element
     res = t.update_value(i, v1);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     res = t.get_value(i, v2);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     REQUIRE(v2.size() == ncpus);
     for (size_t j = 0; j < ncpus; j++) {
       REQUIRE(v2.at(j) == 42 * j);
@@ -142,7 +142,7 @@ TEST_CASE("percpu array table", "[percpu_array_table]") {
     // get non existing element
     i = 1024;
     res = t.get_value(i, v2);
-    REQUIRE(res.code() != 0);
+    REQUIRE(!res.ok());
   }
 }
 #endif
