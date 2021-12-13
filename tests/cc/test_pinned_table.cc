@@ -39,7 +39,7 @@ TEST_CASE("test pinned table", "[pinned_table]") {
     ebpf::BPF bpf;
     ebpf::StatusTuple res(0);
     res = bpf.init(BPF_PROGRAM);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     REQUIRE(bpf_obj_pin(bpf.get_hash_table<int, int>("ids").get_fd(), "/sys/fs/bpf/test_pinned_table") == 0);
   }
@@ -54,7 +54,7 @@ TEST_CASE("test pinned table", "[pinned_table]") {
     ebpf::StatusTuple res(0);
     res = bpf.init(BPF_PROGRAM);
     unlink("/sys/fs/bpf/test_pinned_table"); // can delete table here already
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     auto t = bpf.get_hash_table<int, int>("ids");
     int key, value;
@@ -63,7 +63,7 @@ TEST_CASE("test pinned table", "[pinned_table]") {
     key = 0x08;
     value = 0x43;
     res = t.update_value(key, value);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     REQUIRE(t[key] == value);
   }
 
@@ -76,7 +76,7 @@ TEST_CASE("test pinned table", "[pinned_table]") {
     ebpf::BPF bpf;
     ebpf::StatusTuple res(0);
     res = bpf.init(BPF_PROGRAM);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     unlink("/sys/fs/bpf/test_pinned_table");
   }
 
