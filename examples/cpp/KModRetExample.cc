@@ -100,7 +100,7 @@ static int modify_return(ebpf::BPF &bpf) {
   int prog_fd;
   auto res = bpf.load_func("kmod_ret____x64_sys_openat",
                            BPF_PROG_TYPE_TRACING, prog_fd, BPF_F_SLEEPABLE);
-  if (res.code() != 0) {
+  if (!res.ok()) {
     std::cerr << res.msg() << std::endl;
     return 1;
   }
@@ -122,7 +122,7 @@ static int modify_return(ebpf::BPF &bpf) {
   uint32_t key = 0;
   struct fname_buf val;
   res = fname_table.get_value(key, val);
-  if (res.code() != 0) {
+  if (!res.ok()) {
     close(attach_fd);
     std::cerr << res.msg() << std::endl;
     return 1;
@@ -138,7 +138,7 @@ static int not_modify_return(ebpf::BPF &bpf) {
   int prog_fd;
   auto res = bpf.load_func("kmod_ret__security_file_open",
                             BPF_PROG_TYPE_TRACING, prog_fd);
-  if (res.code() != 0) {
+  if (!res.ok()) {
     std::cerr << res.msg() << std::endl;
     return 1;
   }
@@ -159,7 +159,7 @@ static int not_modify_return(ebpf::BPF &bpf) {
   auto count_table = bpf.get_array_table<uint32_t>("count");
   uint32_t key = 0, val = 0;
   res = count_table.get_value(key, val);
-  if (res.code() != 0) {
+  if (!res.ok()) {
     close(attach_fd);
     std::cerr << res.msg() << std::endl;
     return 1;
@@ -173,7 +173,7 @@ static int not_modify_return(ebpf::BPF &bpf) {
 int main() {
   ebpf::BPF bpf;
   auto res = bpf.init(BPF_PROGRAM);
-  if (res.code() != 0) {
+  if (!res.ok()) {
     std::cerr << res.msg() << std::endl;
     return 1;
   }
@@ -181,7 +181,7 @@ int main() {
   uint32_t key = 0, val = getpid();
   auto pid_table = bpf.get_array_table<uint32_t>("target_pid");
   res = pid_table.update_value(key, val);
-  if (res.code() != 0) {
+  if (!res.ok()) {
     std::cerr << res.msg() << std::endl;
     return 1;
   }

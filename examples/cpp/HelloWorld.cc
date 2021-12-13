@@ -21,7 +21,7 @@ int on_sys_clone(void *ctx) {
 int main() {
   ebpf::BPF bpf;
   auto init_res = bpf.init(BPF_PROGRAM);
-  if (init_res.code() != 0) {
+  if (!init_res.ok()) {
     std::cerr << init_res.msg() << std::endl;
     return 1;
   }
@@ -31,7 +31,7 @@ int main() {
   std::string clone_fnname = bpf.get_syscall_fnname("clone");
 
   auto attach_res = bpf.attach_kprobe(clone_fnname, "on_sys_clone");
-  if (attach_res.code() != 0) {
+  if (!attach_res.ok()) {
     std::cerr << attach_res.msg() << std::endl;
     return 1;
   }
@@ -43,7 +43,7 @@ int main() {
       std::cout << line << std::endl;
       // Detach the probe if we got at least one line.
       auto detach_res = bpf.detach_kprobe(clone_fnname);
-      if (detach_res.code() != 0) {
+      if (!detach_res.ok()) {
         std::cerr << detach_res.msg() << std::endl;
         return 1;
       }

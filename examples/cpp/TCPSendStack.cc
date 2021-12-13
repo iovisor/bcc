@@ -58,13 +58,13 @@ struct stack_key_t {
 int main(int argc, char** argv) {
   ebpf::BPF bpf;
   auto init_res = bpf.init(BPF_PROGRAM);
-  if (init_res.code() != 0) {
+  if (!init_res.ok()) {
     std::cerr << init_res.msg() << std::endl;
     return 1;
   }
 
   auto attach_res = bpf.attach_kprobe("tcp_sendmsg", "on_tcp_send");
-  if (attach_res.code() != 0) {
+  if (!attach_res.ok()) {
     std::cerr << attach_res.msg() << std::endl;
     return 1;
   }
@@ -77,7 +77,7 @@ int main(int argc, char** argv) {
   sleep(probe_time);
 
   auto detach_res = bpf.detach_kprobe("tcp_sendmsg");
-  if (detach_res.code() != 0) {
+  if (!detach_res.ok()) {
     std::cerr << detach_res.msg() << std::endl;
     return 1;
   }

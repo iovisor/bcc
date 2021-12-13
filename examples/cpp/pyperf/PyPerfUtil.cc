@@ -171,7 +171,7 @@ PyPerfUtil::PyPerfResult PyPerfUtil::init() {
                       std::to_string(kPythonStackProgIdx));
 
   auto initRes = bpf_.init(PYPERF_BPF_PROGRAM, cflags);
-  if (initRes.code() != 0) {
+  if (!initRes.ok()) {
     std::fprintf(stderr, "Failed to compiled PyPerf BPF programs: %s\n",
                  initRes.msg().c_str());
     return PyPerfResult::INIT_FAIL;
@@ -180,7 +180,7 @@ PyPerfUtil::PyPerfResult PyPerfUtil::init() {
   int progFd = -1;
   auto loadRes =
       bpf_.load_func(kPythonStackFuncName, BPF_PROG_TYPE_PERF_EVENT, progFd);
-  if (loadRes.code() != 0) {
+  if (!loadRes.ok()) {
     std::fprintf(stderr, "Failed to load BPF program %s: %s\n",
                  kPythonStackFuncName.c_str(), loadRes.msg().c_str());
     return PyPerfResult::INIT_FAIL;
@@ -188,7 +188,7 @@ PyPerfUtil::PyPerfResult PyPerfUtil::init() {
 
   auto progTable = bpf_.get_prog_table(kProgsTableName);
   auto updateRes = progTable.update_value(kPythonStackProgIdx, progFd);
-  if (updateRes.code() != 0) {
+  if (!updateRes.ok()) {
     std::fprintf(stderr,
                  "Failed to set BPF program %s FD %d to program table: %s\n",
                  kPythonStackFuncName.c_str(), progFd, updateRes.msg().c_str());
@@ -216,7 +216,7 @@ PyPerfUtil::PyPerfResult PyPerfUtil::init() {
   auto openRes = bpf_.open_perf_buffer(
       kSamplePerfBufName, &handleSampleCallback, &handleLostSamplesCallback,
       this, kPerfBufSizePages);
-  if (openRes.code() != 0) {
+  if (!openRes.ok()) {
     std::fprintf(stderr, "Unable to open Perf Buffer: %s\n",
                  openRes.msg().c_str());
     return PyPerfResult::PERF_BUF_OPEN_FAIL;
@@ -245,7 +245,7 @@ PyPerfUtil::PyPerfResult PyPerfUtil::profile(int64_t sampleRate,
   // Attach to CPU cycles
   auto attachRes =
       bpf_.attach_perf_event(0, 0, kOnEventFuncName, sampleRate, 0);
-  if (attachRes.code() != 0) {
+  if (!attachRes.ok()) {
     std::fprintf(stderr, "Attach to CPU cycles event failed: %s\n",
                  attachRes.msg().c_str());
     return PyPerfResult::EVENT_ATTACH_FAIL;
@@ -269,7 +269,7 @@ PyPerfUtil::PyPerfResult PyPerfUtil::profile(int64_t sampleRate,
 
   // Detach the event
   auto detachRes = bpf_.detach_perf_event(0, 0);
-  if (detachRes.code() != 0) {
+  if (!detachRes.ok()) {
     std::fprintf(stderr, "Detach CPU cycles event failed: %s\n",
                  detachRes.msg().c_str());
     return PyPerfResult::EVENT_DETACH_FAIL;
