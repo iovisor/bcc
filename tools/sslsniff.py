@@ -5,7 +5,7 @@
 #           For Linux, uses BCC, eBPF.
 #
 # USAGE: sslsniff.py [-h] [-p PID] [-u UID] [-x] [-c COMM] [-o] [-g] [-n] [-d]
-#                    [--hexdump] [--max-buffer-size SIZE]
+#                    [--hexdump] [--max-buffer-size SIZE] [-v]
 #
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
@@ -31,6 +31,7 @@ examples = """examples:
     ./sslsniff --no-nss     # don't show NSS calls
     ./sslsniff --hexdump    # show data as hex instead of trying to decode it as UTF-8
     ./sslsniff -x           # show process UID and TID
+    ./sslsniff -v           # trace SSL handshake calls
 """
 parser = argparse.ArgumentParser(
     description="Sniff SSL data",
@@ -57,6 +58,8 @@ parser.add_argument("--hexdump", action="store_true", dest="hexdump",
                     help="show data as hexdump instead of trying to decode it as UTF-8")
 parser.add_argument('--max-buffer-size', type=int, default=8192,
                     help='Size of captured buffer')
+parser.add_argument("-v", "--verbose", action="store_true",
+                    help="trace SSL handshake calls.")
 args = parser.parse_args()
 
 
@@ -68,6 +71,7 @@ prog = """
 
 struct probe_SSL_data_t {
         u64 timestamp_ns;
+        u64 delta_ns;
         u32 pid;
         u32 tid;
         u32 uid;
@@ -83,6 +87,7 @@ struct probe_SSL_data_t {
 
 BPF_PERCPU_ARRAY(ssl_data, struct probe_SSL_data_t, 1);
 BPF_PERF_OUTPUT(perf_SSL_write);
+BPF_HASH(start_ns, u32);
 
 int probe_SSL_write(struct pt_regs *ctx, void *ssl, void *buf, int num) {
         int ret;
@@ -98,7 +103,11 @@ int probe_SSL_write(struct pt_regs *ctx, void *ssl, void *buf, int num) {
         if (!data)
                 return 0;
 
-        data->timestamp_ns = bpf_ktime_get_ns();
+        u64 ts = bpf_ktime_get_ns();
+        start_ns.update(&tid, &ts);
+
+        data->timestamp_ns = ts;
+        data->delta_ns = 0;
         data->pid = pid;
         data->tid = tid;
         data->uid = uid;
@@ -119,6 +128,43 @@ int probe_SSL_write(struct pt_regs *ctx, void *ssl, void *buf, int num) {
         return 0;
 }
 
+int probe_SSL_write_end(struct pt_regs *ctx, void *ssl, void *buf, int num) {
+        int ret;
+        u32 zero = 0;
+        u64 pid_tgid = bpf_get_current_pid_tgid();
+        u32 pid = pid_tgid >> 32;
+        u32 tid = (u32)pid_tgid;
+        u32 uid = bpf_get_current_uid_gid();
+        u64 ts = bpf_ktime_get_ns();
+
+        PID_FILTER
+        UID_FILTER
+        struct probe_SSL_data_t *data = ssl_data.lookup(&zero);
+        if (!data)
+                return 0;
+
+        ret = PT_REGS_RC(ctx);
+        if (ret < 0) // include write zero calls
+                return 0;
+
+        u64 *last_tsp = start_ns.lookup(&tid);
+        if (last_tsp == 0)
+                return 0;
+
+        data->timestamp_ns = ts;
+        data->delta_ns = ts - *last_tsp;
+        data->pid = pid;
+        data->tid = tid;
+        data->uid = uid;
+        data->len = (u32)ret;
+        data->buf_filled = 0;
+        bpf_get_current_comm(&data->comm, sizeof(data->comm));
+        start_ns.delete(&tid);
+
+        perf_SSL_write.perf_submit(ctx, data, EVENT_SIZE(0));
+        return 0;
+}
+
 BPF_PERF_OUTPUT(perf_SSL_read);
 
 BPF_HASH(bufs, u32, u64);
@@ -128,11 +174,13 @@ int probe_SSL_read_enter(struct pt_regs *ctx, void *ssl, void *buf, int num) {
         u32 pid = pid_tgid >> 32;
         u32 tid = (u32)pid_tgid;
         u32 uid = bpf_get_current_uid_gid();
+        u64 ts = bpf_ktime_get_ns();
 
         PID_FILTER
         UID_FILTER
 
         bufs.update(&tid, (u64*)&buf);
+        start_ns.update(&tid, &ts);
         return 0;
 }
 
@@ -142,6 +190,7 @@ int probe_SSL_read_exit(struct pt_regs *ctx, void *ssl, void *buf, int num) {
         u32 pid = pid_tgid >> 32;
         u32 tid = (u32)pid_tgid;
         u32 uid = bpf_get_current_uid_gid();
+        u64 ts = bpf_ktime_get_ns();
         int ret;
 
         PID_FILTER
@@ -149,6 +198,10 @@ int probe_SSL_read_exit(struct pt_regs *ctx, void *ssl, void *buf, int num) {
 
         u64 *bufp = bufs.lookup(&tid);
         if (bufp == 0)
+                return 0;
+
+        u64 *tsp = start_ns.lookup(&tid);
+        if (tsp == 0)
                 return 0;
 
         int len = PT_REGS_RC(ctx);
@@ -159,7 +212,8 @@ int probe_SSL_read_exit(struct pt_regs *ctx, void *ssl, void *buf, int num) {
         if (!data)
                 return 0;
 
-        data->timestamp_ns = bpf_ktime_get_ns();
+        data->timestamp_ns = ts;
+        data->delta_ns = ts - *tsp;
         data->pid = pid;
         data->tid = tid;
         data->uid = uid;
@@ -173,6 +227,7 @@ int probe_SSL_read_exit(struct pt_regs *ctx, void *ssl, void *buf, int num) {
                 ret = bpf_probe_read_user(&data->buf, buf_copy_size, (char *)*bufp);
 
         bufs.delete(&tid);
+        start_ns.delete(&tid);
 
         if (!ret)
                 data->buf_filled = 1;
@@ -180,6 +235,59 @@ int probe_SSL_read_exit(struct pt_regs *ctx, void *ssl, void *buf, int num) {
                 buf_copy_size = 0;
 
         perf_SSL_read.perf_submit(ctx, data, EVENT_SIZE(buf_copy_size));
+        return 0;
+}
+
+BPF_PERF_OUTPUT(perf_SSL_do_handshake);
+
+int probe_SSL_do_handshake_enter(struct pt_regs *ctx, void *ssl) {
+        u64 pid_tgid = bpf_get_current_pid_tgid();
+        u32 pid = pid_tgid >> 32;
+        u32 tid = (u32)pid_tgid;
+        u64 ts = bpf_ktime_get_ns();
+
+        PID_FILTER
+        UID_FILTER
+
+        start_ns.update(&tid, &ts);
+        return 0;
+}
+
+int probe_SSL_do_handshake_exit(struct pt_regs *ctx, void *ssl) {
+        u32 zero = 0;
+        u64 pid_tgid = bpf_get_current_pid_tgid();
+        u32 pid = pid_tgid >> 32;
+        u32 tid = (u32)pid_tgid;
+        u32 uid = bpf_get_current_uid_gid();
+        u64 ts = bpf_ktime_get_ns();
+        int ret;
+
+        PID_FILTER
+        UID_FILTER
+
+        u64 *tsp = start_ns.lookup(&tid);
+        if (tsp == 0)
+                return 0;
+
+        ret = PT_REGS_RC(ctx);
+        if (ret <= 0) // handshake failed
+                return 0;
+
+        struct probe_SSL_data_t *data = ssl_data.lookup(&zero);
+        if (!data)
+                return 0;
+
+        data->timestamp_ns = ts;
+        data->delta_ns = ts - *tsp;
+        data->pid = pid;
+        data->tid = tid;
+        data->uid = uid;
+        data->len = ret;
+        data->buf_filled = 0;
+        bpf_get_current_comm(&data->comm, sizeof(data->comm));
+        start_ns.delete(&tid);
+
+        perf_SSL_do_handshake.perf_submit(ctx, data, EVENT_SIZE(0));
         return 0;
 }
 """
@@ -215,6 +323,13 @@ if args.openssl:
                     pid=args.pid or -1)
     b.attach_uretprobe(name="ssl", sym="SSL_read",
                        fn_name="probe_SSL_read_exit", pid=args.pid or -1)
+    if args.verbose:
+        b.attach_uprobe(name="ssl", sym="SSL_do_handshake",
+                        fn_name="probe_SSL_do_handshake_enter", pid=args.pid or -1)
+        b.attach_uretprobe(name="ssl", sym="SSL_do_handshake",
+                           fn_name="probe_SSL_do_handshake_exit", pid=args.pid or -1)
+        b.attach_uretprobe(name="ssl", sym="SSL_write",
+                           fn_name="probe_SSL_write_end", pid=args.pid or -1)
 
 if args.gnutls:
     b.attach_uprobe(name="gnutls", sym="gnutls_record_send",
@@ -247,6 +362,9 @@ header = "%-12s %-18s %-16s %-7s %-6s" % ("FUNC", "TIME(s)", "COMM", "PID", "LEN
 if args.extra:
     header += " %-7s %-7s" % ("UID", "TID")
 
+if args.verbose:
+    header += " %-7s" % ("LATms")
+
 print(header)
 # process event
 start = 0
@@ -258,6 +376,10 @@ def print_event_write(cpu, data, size):
 
 def print_event_read(cpu, data, size):
     print_event(cpu, data, size, "READ/RECV", "perf_SSL_read")
+
+
+def print_event_handshake(cpu, data, size):
+    print_event(cpu, data, size, "HANDSHAKE", "perf_SSL_do_handshake")
 
 
 def print_event(cpu, data, size, rw, evt):
@@ -283,6 +405,8 @@ def print_event(cpu, data, size, rw, evt):
         start = event.timestamp_ns
     time_s = (float(event.timestamp_ns - start)) / 1000000000
 
+    lat_str = "%.3f" % (event.delta_ns / 1000000) if event.delta_ns else "N/A"
+
     s_mark = "-" * 5 + " DATA " + "-" * 5
 
     e_mark = "-" * 5 + " END DATA " + "-" * 5
@@ -297,6 +421,9 @@ def print_event(cpu, data, size, rw, evt):
     if args.extra:
         base_fmt += " %(uid)-7d %(tid)-7d"
 
+    if args.verbose:
+        base_fmt += " %(lat)-7s"
+
     fmt = ''.join([base_fmt, "\n%(begin)s\n%(data)s\n%(end)s\n\n"])
     if args.hexdump:
         unwrapped_data = binascii.hexlify(buf)
@@ -307,6 +434,7 @@ def print_event(cpu, data, size, rw, evt):
     fmt_data = {
         'func': rw,
         'time': time_s,
+        'lat': lat_str,
         'comm': event.comm.decode('utf-8', 'replace'),
         'pid': event.pid,
         'tid': event.tid,
@@ -317,11 +445,15 @@ def print_event(cpu, data, size, rw, evt):
         'data': data
     }
 
-    print(fmt % fmt_data)
-
+    # use base_fmt if no buf filled
+    if buf_size == 0:
+        print(base_fmt % fmt_data)
+    else:
+        print(fmt % fmt_data)
 
 b["perf_SSL_write"].open_perf_buffer(print_event_write)
 b["perf_SSL_read"].open_perf_buffer(print_event_read)
+b["perf_SSL_do_handshake"].open_perf_buffer(print_event_handshake)
 while 1:
     try:
         b.perf_buffer_poll()

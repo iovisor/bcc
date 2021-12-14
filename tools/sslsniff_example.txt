@@ -103,10 +103,36 @@ lot of characters that are not printable or even Unicode replacement
 characters.
 
 
+SSL handshake calls can be trace by -v or --verbose option. SSL crypto is
+CPU-intensive workload in server side especially for RSA key (elliptic-curve
+key optimized a lot). This is useful when analyzing CPU crypto acceleration
+features, crypto algorithms or openssl async SSL framework.
+
+Tracing output of https server when running "echo | openssl s_client -connect
+localhost:443" in another shell client. It takes 0.7ms for RSA 2K key exchange
+and 1.3ms for the whole handshake phase before SSL_write or SSL_read calls.
+
+FUNC         TIME(s)            COMM             PID     LEN    LATms
+WRITE/SEND   0.000000000        openssl          2741676 0      N/A
+HANDSHAKE    0.001301212        nginx            2235928 1      0.701
+WRITE/SEND   0.001319484        openssl          2741676 0      1.319
+WRITE/SEND   0.001435668        openssl          2741676 1      N/A
+----- DATA -----
+0a
+----- END DATA -----
+
+
+WRITE/SEND   0.001446787        openssl          2741676 1      0.011
+READ/RECV    0.001451482        nginx            2235928 1      0.004
+----- DATA -----
+0a
+----- END DATA -----
+
+
 USAGE message:
 
 usage: sslsniff.py [-h] [-p PID] [-u UID] [-x] [-c COMM] [-o] [-g] [-n] [-d]
-                   [--hexdump] [--max-buffer-size MAX_BUFFER_SIZE]
+                   [--hexdump] [--max-buffer-size MAX_BUFFER_SIZE] [-v]
 
 Sniff SSL data
 
@@ -124,6 +150,7 @@ optional arguments:
                         UTF-8
   --max-buffer-size MAX_BUFFER_SIZE
                         Size of captured buffer
+  -v, --verbose         trace SSL handshake calls.
 
 examples:
     ./sslsniff              # sniff OpenSSL and GnuTLS functions
@@ -135,3 +162,4 @@ examples:
     ./sslsniff --no-nss     # don't show NSS calls
     ./sslsniff --hexdump    # show data as hex instead of trying to decode it as UTF-8
     ./sslsniff -x           # show process UID and TID
+    ./sslsniff -v           # trace SSL handshake calls.
