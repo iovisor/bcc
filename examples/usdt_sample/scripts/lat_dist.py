@@ -13,7 +13,9 @@ parser = argparse.ArgumentParser(description="Trace the latency distribution of 
 parser.add_argument("-p", "--pid", type=int, help="The id of the process to trace.")
 parser.add_argument("-i", "--interval", type=int, help="The interval in seconds on which to report the latency distribution.")
 parser.add_argument("-f", "--filterstr", type=str, default="", help="The prefix filter for the operation input. If specified, only operations for which the input string starts with the filterstr are traced.")
-parser.add_argument("-v", "--verbose", dest="verbose", action="store_true", help="If true, will output verbose logging information.")
+parser.add_argument("-v", "--verbose", dest="verbose", action="store_true", help="If true, will output generated bpf program and verbose logging information.")
+parser.add_argument("-s", "--sdt", dest="sdt", action="store_true", help="If true, will use the probes, created by systemtap's dtrace.")
+
 parser.set_defaults(verbose=False)
 args = parser.parse_args()
 this_pid = int(args.pid)
@@ -67,25 +69,32 @@ int trace_operation_end(struct pt_regs* ctx)
     dist_key.slot = bpf_log2l(duration / 1000);
     start_hash.delete(&operation_id);
 
-    dist.increment(dist_key);
+    dist.atomic_increment(dist_key);
     return 0;
 }
 """
 
 bpf_text = bpf_text.replace("FILTER_STRING", this_filter)
 if this_filter:
-    bpf_text = bpf_text.replace("FILTER", "if (!filter(start_data.input)) { return 0; }")
+    bpf_text = bpf_text.replace("FILTER_STATEMENT", "if (!filter(start_data.input)) { return 0; }")
 else:
-    bpf_text = bpf_text.replace("FILTER", "")
+    bpf_text = bpf_text.replace("FILTER_STATEMENT", "")
 
 # Create USDT context
-print("Attaching probes to pid %d" % this_pid)
+print("lat_dist.py - Attaching probes to pid: %d; filter: %s" % (this_pid, this_filter))
 usdt_ctx = USDT(pid=this_pid)
-usdt_ctx.enable_probe(probe="operation_start", fn_name="trace_operation_start")
-usdt_ctx.enable_probe(probe="operation_end", fn_name="trace_operation_end")
+
+if args.sdt:
+    usdt_ctx.enable_probe(probe="usdt_sample_lib1_sdt:operation_start_sdt", fn_name="trace_operation_start")
+    usdt_ctx.enable_probe(probe="usdt_sample_lib1_sdt:operation_end_sdt", fn_name="trace_operation_end")
+else:
+    usdt_ctx.enable_probe(probe="usdt_sample_lib1:operation_start", fn_name="trace_operation_start")
+    usdt_ctx.enable_probe(probe="usdt_sample_lib1:operation_end", fn_name="trace_operation_end")
 
 # Create BPF context, load BPF program
 bpf_ctx = BPF(text=bpf_text, usdt_contexts=[usdt_ctx], debug=debugLevel)
+
+print("Tracing... Hit Ctrl-C to end.")
 
 start = 0
 dist = bpf_ctx.get_table("dist")
