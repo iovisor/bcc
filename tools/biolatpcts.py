@@ -142,7 +142,10 @@ bpf_source = bpf_source.replace('__MAJOR__', str(major))
 bpf_source = bpf_source.replace('__MINOR__', str(minor))
 
 bpf = BPF(text=bpf_source)
-bpf.attach_kprobe(event="blk_account_io_done", fn_name="kprobe_blk_account_io_done")
+if BPF.get_kprobe_functions(b'__blk_account_io_done'):
+    bpf.attach_kprobe(event="__blk_account_io_done", fn_name="kprobe_blk_account_io_done")
+else:
+    bpf.attach_kprobe(event="blk_account_io_done", fn_name="kprobe_blk_account_io_done")
 
 # times are in usecs
 MSEC = 1000
