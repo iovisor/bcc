@@ -11,6 +11,24 @@ from utils import mayFail, kernel_version_ge
 
 TOOLS_DIR = "../../tools/"
 
+def _helpful_rc_msg(rc, allow_early, kill):
+    s = "rc was %d\n" % rc
+    if rc == 0:
+        s += "\tMeaning: command returned successfully before test timeout\n"
+    elif rc == 124:
+        s += "\tMeaning: command was killed by INT signal\n"
+    elif rc == 137:
+        s += "\tMeaning: command was killed by KILL signal\n"
+
+    s += "Command was expected to do one of:\n"
+    s += "\tBe killed by SIGINT\n"
+    if kill:
+        s += "\tBe killed by SIGKILL\n"
+    if allow_early:
+        s += "\tSuccessfully return before being killed\n"
+
+    return s
+
 @skipUnless(kernel_version_ge(4,1), "requires kernel >= 4.1")
 class SmokeTests(TestCase):
     # Use this for commands that have a built-in timeout, so they only need
@@ -39,7 +57,8 @@ class SmokeTests(TestCase):
         #   3. The script timed out and was killed by the SIGKILL signal, and
         #      this was what we asked for using kill=True.
         self.assertTrue((rc == 0 and allow_early) or rc == 124
-                        or (rc == 137 and kill), "rc was %d" % rc)
+                        or (rc == 137 and kill), _helpful_rc_msg(rc,
+                        allow_early, kill))
 
     def kmod_loaded(self, mod):
         with open("/proc/modules", "r") as mods:
