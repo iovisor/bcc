@@ -4,7 +4,7 @@ Demonstrations of capable, the Linux eBPF/bcc version.
 capable traces calls to the kernel cap_capable() function, which does security
 capability checks, and prints details for each call. For example:
 
-# ./capable.py 
+# ./capable.py
 TIME      UID    PID    COMM             CAP  NAME                 AUDIT
 22:11:23  114    2676   snmpd            12   CAP_NET_ADMIN        1
 22:11:23  0      6990   run              24   CAP_SYS_RESOURCE     1
@@ -32,6 +32,28 @@ TIME      UID    PID    COMM             CAP  NAME                 AUDIT
 22:11:25  0      7049   chmod            4    CAP_FSETID           1
 22:11:25  0      7051   chmod            4    CAP_FSETID           1
 22:11:25  0      7051   chmod            4    CAP_FSETID           1
+
+Checks where AUDIT is 0 are ignored by default, which can be changed
+with -v but is more verbose.
+
+We can show the TID and INSETID columns with -x.
+Since only a recent kernel version >= 5.1 reports the INSETID bit to cap_capable(),
+the fallback value "N/A" will be displayed on older kernels.
+
+# ./capable.py -x
+TIME      UID    PID    TID    COMM             CAP  NAME                 AUDIT  INSETID
+08:22:36  0      12869  12869  chown            0    CAP_CHOWN            1      0
+08:22:36  0      12869  12869  chown            0    CAP_CHOWN            1      0
+08:22:36  0      12869  12869  chown            0    CAP_CHOWN            1      0
+08:23:02  0      13036  13036  setuidgid        6    CAP_SETGID           1      0
+08:23:02  0      13036  13036  setuidgid        6    CAP_SETGID           1      0
+08:23:02  0      13036  13036  setuidgid        7    CAP_SETUID           1      1
+08:23:13  0      13085  13085  chmod            3    CAP_FOWNER           1      0
+08:23:13  0      13085  13085  chmod            4    CAP_FSETID           1      0
+08:23:13  0      13085  13085  chmod            3    CAP_FOWNER           1      0
+08:23:13  0      13085  13085  chmod            4    CAP_FSETID           1      0
+08:23:13  0      13085  13085  chmod            4    CAP_FSETID           1      0
+08:24:27  0      13522  13522  ping             13   CAP_NET_RAW          1      0
 [...]
 
 This can be useful for general debugging, and also security enforcement:
@@ -44,36 +66,70 @@ checking CAP_FOWNER, CAP_FSETID, etc.
 To see what each of these capabilities does, check the capabilities(7) man
 page and the kernel source.
 
+It is possible to include a kernel stack trace to the capable events by passing
+-K to the command:
 
-Sometimes capable catches itself starting up:
-
-# ./capable.py 
+# ./capable.py -K
 TIME      UID    PID    COMM             CAP  NAME                 AUDIT
-22:22:19  0      21949  capable.py       21   CAP_SYS_ADMIN        1
-22:22:19  0      21949  capable.py       21   CAP_SYS_ADMIN        1
-22:22:19  0      21949  capable.py       21   CAP_SYS_ADMIN        1
-22:22:19  0      21949  capable.py       21   CAP_SYS_ADMIN        1
-22:22:19  0      21949  capable.py       21   CAP_SYS_ADMIN        1
-22:22:19  0      21949  capable.py       21   CAP_SYS_ADMIN        1
-22:22:19  0      21952  run              24   CAP_SYS_RESOURCE     1
-[...]
+15:32:21  1000   10708  fetchmail        7    CAP_SETUID           1
+        cap_capable+0x1 [kernel]
+        ns_capable_common+0x7a [kernel]
+        __sys_setresuid+0xc8 [kernel]
+        do_syscall_64+0x56 [kernel]
+        entry_SYSCALL_64_after_hwframe+0x49 [kernel]
+15:32:21  1000   30047  procmail         6    CAP_SETGID           1
+        cap_capable+0x1 [kernel]
+        ns_capable_common+0x7a [kernel]
+        may_setgroups+0x2f [kernel]
+        __x64_sys_setgroups+0x18 [kernel]
+        do_syscall_64+0x56 [kernel]
+        entry_SYSCALL_64_after_hwframe+0x49 [kernel]
 
-These are capability checks from BPF and perf_events syscalls.
+Similarly, it is possible to include user-space stack with -U (or they can be
+used both at the same time to include user and kernel stack).
+
+Some processes can do a lot of security capability checks, generating a lot of
+ouput. In this case, the --unique option is useful to only print once the same
+set of capability, pid (or cgroup if --cgroupmap is used) and kernel/user
+stacks (if -K or -U are used).
+
+# ./capable.py -K -U --unique
+
+The --cgroupmap option filters based on a cgroup set. It is meant to be used
+with an externally created map.
+
+# ./capable.py --cgroupmap /sys/fs/bpf/test01
+
+For more details, see docs/special_filtering.md
 
 
 USAGE:
 
 # ./capable.py -h
-usage: capable.py [-h] [-v] [-p PID]
+usage: capable.py [-h] [-v] [-p PID] [-K] [-U] [-x] [--cgroupmap CGROUPMAP]
+                  [--mntnsmap MNTNSMAP] [--unique]
 
 Trace security capability checks
 
 optional arguments:
-  -h, --help         show this help message and exit
-  -v, --verbose      include non-audit checks
-  -p PID, --pid PID  trace this PID only
+  -h, --help            show this help message and exit
+  -v, --verbose         include non-audit checks
+  -p PID, --pid PID     trace this PID only
+  -K, --kernel-stack    output kernel stack trace
+  -U, --user-stack      output user stack trace
+  -x, --extra           show extra fields in TID and INSETID columns
+  --cgroupmap CGROUPMAP
+                        trace cgroups in this BPF map only
+  --mntnsmap MNTNSMAP   trace mount namespaces in this BPF map only
+  --unique              don't repeat stacks for the same pid or cgroup
 
 examples:
     ./capable             # trace capability checks
     ./capable -v          # verbose: include non-audit checks
     ./capable -p 181      # only trace PID 181
+    ./capable -K          # add kernel stacks to trace
+    ./capable -U          # add user-space stacks to trace
+    ./capable -x          # extra fields: show TID and INSETID columns
+    ./capable --unique    # don't repeat stacks for the same pid or cgroup
+    ./capable --cgroupmap mappath  # only trace cgroups in this BPF map
+    ./capable --mntnsmap mappath   # only trace mount namespaces in the map

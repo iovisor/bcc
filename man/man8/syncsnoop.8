@@ -11,8 +11,8 @@ be useful to know if they are happening and how frequently.
 This works by tracing the kernel sys_sync() function using dynamic tracing, and
 will need updating to match any changes to this function.
 
-This makes use of a Linux 4.5 feature (bpf_perf_event_output());
-for kernels older than 4.5, see the version under tools/old,
+This makes use of a Linux 4.4 feature (bpf_perf_event_output());
+for kernels older than 4.4, see the version under tools/old,
 which uses an older mechanism.
 
 This program is also a basic example of eBPF/bcc.

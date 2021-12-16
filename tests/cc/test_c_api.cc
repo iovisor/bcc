@@ -67,7 +67,7 @@ TEST_CASE("binary resolution with `which`", "[c_api]") {
   free(ld);
 }
 
-static void _test_ksym(const char *sym, uint64_t addr, void *_) {
+static void _test_ksym(const char *sym, const char *mod, uint64_t addr, void *_) {
   if (!strcmp(sym, "startup_64"))
     REQUIRE(addr != 0x0ull);
 }
@@ -104,7 +104,7 @@ TEST_CASE("resolve symbol name in external library using loaded libraries", "[c_
   struct bcc_symbol sym;
 
   REQUIRE(bcc_resolve_symname("bcc", "bcc_procutils_which", 0x0, getpid(), nullptr, &sym) == 0);
-  REQUIRE(string(sym.module).find("libbcc.so") != string::npos);
+  REQUIRE(string(sym.module).find(LIBBCC_NAME) != string::npos);
   REQUIRE(sym.module[0] == '/');
   REQUIRE(sym.offset != 0);
   bcc_procutils_free(sym.module);
@@ -200,9 +200,22 @@ extern int cmd_scanf(const char *cmd, const char *fmt, ...);
 
 TEST_CASE("resolve symbol addresses for a given PID", "[c_api]") {
   struct bcc_symbol sym;
+  struct bcc_symbol lazy_sym;
+  static struct bcc_symbol_option lazy_opt{
+    .use_debug_file = 1,
+    .check_debug_file_crc = 1,
+    .lazy_symbolize = 1,
+#if defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
+    .use_symbol_type = BCC_SYM_ALL_TYPES | (1 << STT_PPC64_ELFV2_SYM_LEP),
+#else
+    .use_symbol_type = BCC_SYM_ALL_TYPES,
+#endif
+  };
   void *resolver = bcc_symcache_new(getpid(), nullptr);
+  void *lazy_resolver = bcc_symcache_new(getpid(), &lazy_opt);
 
   REQUIRE(resolver);
+  REQUIRE(lazy_resolver);
 
   SECTION("resolve in our own binary memory space") {
     REQUIRE(bcc_symcache_resolve(resolver, (uint64_t)&_a_test_function, &sym) ==
@@ -213,18 +226,27 @@ TEST_CASE("resolve symbol addresses for a given PID", "[c_api]") {
     free(this_exe);
 
     REQUIRE(string("_a_test_function") == sym.name);
+
+    REQUIRE(bcc_symcache_resolve(lazy_resolver, (uint64_t)&_a_test_function, &lazy_sym) ==
+            0);
+    REQUIRE(string(lazy_sym.name) == sym.name);
+    REQUIRE(string(lazy_sym.module) == sym.module);
   }
 
-  SECTION("resolve in libbcc.so") {
-    void *libbcc = dlopen("libbcc.so", RTLD_LAZY | RTLD_NOLOAD);
+  SECTION("resolve in " LIBBCC_NAME) {
+    void *libbcc = dlopen(LIBBCC_NAME, RTLD_LAZY | RTLD_NOLOAD);
     REQUIRE(libbcc);
 
     void *libbcc_fptr = dlsym(libbcc, "bcc_resolve_symname");
     REQUIRE(libbcc_fptr);
 
     REQUIRE(bcc_symcache_resolve(resolver, (uint64_t)libbcc_fptr, &sym) == 0);
-    REQUIRE(string(sym.module).find("libbcc.so") != string::npos);
+    REQUIRE(string(sym.module).find(LIBBCC_NAME) != string::npos);
     REQUIRE(string("bcc_resolve_symname") == sym.name);
+
+    REQUIRE(bcc_symcache_resolve(lazy_resolver, (uint64_t)libbcc_fptr, &lazy_sym) == 0);
+    REQUIRE(string(lazy_sym.module) == sym.module);
+    REQUIRE(string(lazy_sym.name) == sym.name);
   }
 
   SECTION("resolve in libc") {
@@ -235,6 +257,10 @@ TEST_CASE("resolve symbol addresses for a given PID", "[c_api]") {
     REQUIRE(sym.module);
     REQUIRE(sym.module[0] == '/');
     REQUIRE(string(sym.module).find("libc") != string::npos);
+
+    REQUIRE(bcc_symcache_resolve(lazy_resolver, (uint64_t)libc_fptr, &lazy_sym) == 0);
+    REQUIRE(string(lazy_sym.module) == sym.module);
+    REQUIRE(string(lazy_sym.name) == sym.name);
 
     // In some cases, a symbol may have multiple aliases. Since
     // bcc_symcache_resolve() returns only the first alias of a
@@ -266,6 +292,7 @@ TEST_CASE("resolve symbol addresses for a given PID", "[c_api]") {
   SECTION("resolve in separate mount namespace") {
     pid_t child;
     uint64_t addr = 0;
+    uint64_t lazy_addr = 0;
 
     child = spawn_child(0, true, true, mntns_func);
     REQUIRE(child > 0);
@@ -276,6 +303,12 @@ TEST_CASE("resolve symbol addresses for a given PID", "[c_api]") {
     REQUIRE(bcc_symcache_resolve_name(resolver, "/tmp/libz.so.1", "zlibVersion",
         &addr) == 0);
     REQUIRE(addr != 0);
+
+    void *lazy_resolver = bcc_symcache_new(child, &lazy_opt);
+    REQUIRE(lazy_resolver);
+    REQUIRE(bcc_symcache_resolve_name(lazy_resolver, "/tmp/libz.so.1", "zlibVersion",
+        &lazy_addr) == 0);
+    REQUIRE(lazy_addr == addr);
   }
 }
 
@@ -439,6 +472,133 @@ TEST_CASE("resolve symbols using /tmp/perf-pid.map", "[c_api]") {
   munmap(map_addr, map_sz);
 }
 
+// must match exactly the defitinion of mod_search in bcc_syms.cc
+struct mod_search {
+  const char *name;
+  uint64_t inode;
+  uint64_t dev_major;
+  uint64_t dev_minor;
+  uint64_t addr;
+  uint8_t inode_match_only;
+
+  uint64_t start;
+  uint64_t file_offset;
+};
+
+TEST_CASE("searching for modules in /proc/[pid]/maps", "[c_api][!mayfail]") {
+  FILE *dummy_maps = fopen("dummy_proc_map.txt", "r");
+  REQUIRE(dummy_maps != NULL);
+
+  SECTION("name match") {
+    fseek(dummy_maps, 0, SEEK_SET);
+
+    struct mod_search search;
+    memset(&search, 0, sizeof(struct mod_search));
+    search.name = "/some/other/path/tolibs/lib/libutil-2.26.so";
+    search.addr = 0x1;
+    int res =  _procfs_maps_each_module(dummy_maps, 42, _bcc_syms_find_module,
+                                        &search);
+    REQUIRE(res == 0);
+    REQUIRE(search.start == 0x7f1515bad000);
+  }
+
+  SECTION("expected failure to match (name only search)") {
+    fseek(dummy_maps, 0, SEEK_SET);
+
+    struct mod_search search;
+    memset(&search, 0, sizeof(struct mod_search));
+    search.name = "/lib/that/isnt/in/maps/libdoesntexist.so";
+    search.addr = 0x1;
+    int res =  _procfs_maps_each_module(dummy_maps, 42, _bcc_syms_find_module,
+                                        &search);
+    REQUIRE(res == -1);
+  }
+
+  SECTION("inode+dev match, names different") {
+    fseek(dummy_maps, 0, SEEK_SET);
+
+    struct mod_search search;
+    memset(&search, 0, sizeof(struct mod_search));
+    search.name = "/proc/5/root/some/other/path/tolibs/lib/libz.so.1.2.8";
+    search.inode = 72809538;
+    search.dev_major = 0x00;
+    search.dev_minor = 0x1b;
+    search.addr = 0x2;
+    int res =  _procfs_maps_each_module(dummy_maps, 42, _bcc_syms_find_module,
+                                        &search);
+    REQUIRE(res == 0);
+    REQUIRE(search.start == 0x7f15164b5000);
+  }
+
+  SECTION("inode+dev don't match, names same") {
+    fseek(dummy_maps, 0, SEEK_SET);
+
+    struct mod_search search;
+    memset(&search, 0, sizeof(struct mod_search));
+    search.name = "/some/other/path/tolibs/lib/libutil-2.26.so";
+    search.inode = 9999999;
+    search.dev_major = 0x42;
+    search.dev_minor = 0x1b;
+    search.addr = 0x2;
+    int res =  _procfs_maps_each_module(dummy_maps, 42, _bcc_syms_find_module,
+                                        &search);
+    REQUIRE(res == -1);
+  }
+
+  SECTION("inodes match, dev_major/minor don't, expected failure") {
+    fseek(dummy_maps, 0, SEEK_SET);
+
+    struct mod_search search;
+    memset(&search, 0, sizeof(struct mod_search));
+    search.name = "/some/other/path/tolibs/lib/libutil-2.26.so";
+    search.inode = 72809526;
+    search.dev_major = 0x11;
+    search.dev_minor = 0x11;
+    search.addr = 0x2;
+    int res =  _procfs_maps_each_module(dummy_maps, 42, _bcc_syms_find_module,
+                                        &search);
+    REQUIRE(res == -1);
+  }
+
+  SECTION("inodes match, dev_major/minor don't, match inode only") {
+    fseek(dummy_maps, 0, SEEK_SET);
+
+    struct mod_search search;
+    memset(&search, 0, sizeof(struct mod_search));
+    search.name = "/some/other/path/tolibs/lib/libutil-2.26.so";
+    search.inode = 72809526;
+    search.dev_major = 0x11;
+    search.dev_minor = 0x11;
+    search.addr = 0x2;
+    search.inode_match_only = 1;
+    int res =  _procfs_maps_each_module(dummy_maps, 42, _bcc_syms_find_module,
+                                        &search);
+    REQUIRE(res == 0);
+    REQUIRE(search.start == 0x7f1515bad000);
+  }
+
+  fclose(dummy_maps);
+}
+
+TEST_CASE("resolve global addr in libc in this process", "[c_api][!mayfail]") {
+  int pid = getpid();
+  char *sopath = bcc_procutils_which_so("c", pid);
+  uint64_t local_addr = 0x15;
+  uint64_t global_addr;
+
+  struct mod_search search;
+  memset(&search, 0, sizeof(struct mod_search));
+  search.name = sopath;
+
+  int res = bcc_procutils_each_module(pid, _bcc_syms_find_module,
+                                      &search);
+  REQUIRE(res == 0);
+  REQUIRE(search.start != 0);
+
+  res = bcc_resolve_global_addr(pid, sopath, local_addr, 0, &global_addr);
+  REQUIRE(res == 0);
+  REQUIRE(global_addr == (search.start + local_addr - search.file_offset));
+}
 
 TEST_CASE("get online CPUs", "[c_api]") {
 	std::vector<int> cpus = ebpf::get_online_cpus();

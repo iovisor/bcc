@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
 # mountsnoop Trace mount() and umount syscalls.
 #            For Linux, uses BCC, eBPF. Embedded C.
@@ -13,6 +13,7 @@
 from __future__ import print_function
 import argparse
 import bcc
+from bcc.containers import filter_by_containers
 import ctypes
 import errno
 import functools
@@ -31,11 +32,22 @@ bpf_text = r"""
  * VFS and not installed in any kernel-devel packages. So, let's duplicate the
  * important part of the definition. There are actually more members in the
  * real struct, but we don't need them, and they're more likely to change.
+ *
+ * To add support for --selector option, we need to call filter_by_containers().
+ * But this function adds code which defines struct mnt_namespace.
+ * To avoid having this structure twice, we define MNT_NAMESPACE_DEFINED in
+ * filter_by_containers(), then here we check if macro is already defined before
+ * adding struct definition.
  */
+#ifndef MNT_NAMESPACE_DEFINED
 struct mnt_namespace {
+    // This field was removed in https://github.com/torvalds/linux/commit/1a7b8969e664d6af328f00fe6eb7aabd61a71d13
+    #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 11, 0)
     atomic_t count;
+    #endif
     struct ns_common ns;
 };
+#endif /* !MNT_NAMESPACE_DEFINED */
 
 /*
  * XXX: this could really use first-class string support in BPF. target is a
@@ -72,6 +84,8 @@ struct data_t {
             /* current->nsproxy->mnt_ns->ns.inum */
             unsigned int mnt_ns;
             char comm[TASK_COMM_LEN];
+            char pcomm[TASK_COMM_LEN];
+            pid_t ppid;
             unsigned long flags;
         } enter;
         /*
@@ -86,16 +100,18 @@ struct data_t {
 
 BPF_PERF_OUTPUT(events);
 
-int do_sys_mount(struct pt_regs *ctx, char __user *source,
+int syscall__mount(struct pt_regs *ctx, char __user *source,
                       char __user *target, char __user *type,
-                      unsigned long flags)
+                      unsigned long flags, char __user *data)
 {
-    /* sys_mount takes too many arguments */
-    char __user *data = (char __user *)PT_REGS_PARM5(ctx);
     struct data_t event = {};
     struct task_struct *task;
     struct nsproxy *nsproxy;
     struct mnt_namespace *mnt_ns;
+
+    if (container_should_be_filtered()) {
+        return 0;
+    }
 
     event.pid = bpf_get_current_pid_tgid() & 0xffffffff;
     event.tgid = bpf_get_current_pid_tgid() >> 32;
@@ -104,29 +120,31 @@ int do_sys_mount(struct pt_regs *ctx, char __user *source,
     bpf_get_current_comm(event.enter.comm, sizeof(event.enter.comm));
     event.enter.flags = flags;
     task = (struct task_struct *)bpf_get_current_task();
+    event.enter.ppid = task->real_parent->tgid;
+    bpf_probe_read_kernel_str(&event.enter.pcomm, TASK_COMM_LEN, task->real_parent->comm);
     nsproxy = task->nsproxy;
     mnt_ns = nsproxy->mnt_ns;
     event.enter.mnt_ns = mnt_ns->ns.inum;
     events.perf_submit(ctx, &event, sizeof(event));
 
     event.type = EVENT_MOUNT_SOURCE;
-    memset(event.str, 0, sizeof(event.str));
-    bpf_probe_read(event.str, sizeof(event.str), source);
+    __builtin_memset(event.str, 0, sizeof(event.str));
+    bpf_probe_read_user(event.str, sizeof(event.str), source);
     events.perf_submit(ctx, &event, sizeof(event));
 
     event.type = EVENT_MOUNT_TARGET;
-    memset(event.str, 0, sizeof(event.str));
-    bpf_probe_read(event.str, sizeof(event.str), target);
+    __builtin_memset(event.str, 0, sizeof(event.str));
+    bpf_probe_read_user(event.str, sizeof(event.str), target);
     events.perf_submit(ctx, &event, sizeof(event));
 
     event.type = EVENT_MOUNT_TYPE;
-    memset(event.str, 0, sizeof(event.str));
-    bpf_probe_read(event.str, sizeof(event.str), type);
+    __builtin_memset(event.str, 0, sizeof(event.str));
+    bpf_probe_read_user(event.str, sizeof(event.str), type);
     events.perf_submit(ctx, &event, sizeof(event));
 
     event.type = EVENT_MOUNT_DATA;
-    memset(event.str, 0, sizeof(event.str));
-    bpf_probe_read(event.str, sizeof(event.str), data);
+    __builtin_memset(event.str, 0, sizeof(event.str));
+    bpf_probe_read_user(event.str, sizeof(event.str), data);
     events.perf_submit(ctx, &event, sizeof(event));
 
     return 0;
@@ -145,12 +163,16 @@ int do_ret_sys_mount(struct pt_regs *ctx)
     return 0;
 }
 
-int do_sys_umount(struct pt_regs *ctx, char __user *target, int flags)
+int syscall__umount(struct pt_regs *ctx, char __user *target, int flags)
 {
     struct data_t event = {};
     struct task_struct *task;
     struct nsproxy *nsproxy;
     struct mnt_namespace *mnt_ns;
+
+    if (container_should_be_filtered()) {
+        return 0;
+    }
 
     event.pid = bpf_get_current_pid_tgid() & 0xffffffff;
     event.tgid = bpf_get_current_pid_tgid() >> 32;
@@ -159,14 +181,16 @@ int do_sys_umount(struct pt_regs *ctx, char __user *target, int flags)
     bpf_get_current_comm(event.enter.comm, sizeof(event.enter.comm));
     event.enter.flags = flags;
     task = (struct task_struct *)bpf_get_current_task();
+    event.enter.ppid = task->real_parent->tgid;
+    bpf_probe_read_kernel_str(&event.enter.pcomm, TASK_COMM_LEN, task->real_parent->comm);
     nsproxy = task->nsproxy;
     mnt_ns = nsproxy->mnt_ns;
     event.enter.mnt_ns = mnt_ns->ns.inum;
     events.perf_submit(ctx, &event, sizeof(event));
 
     event.type = EVENT_UMOUNT_TARGET;
-    memset(event.str, 0, sizeof(event.str));
-    bpf_probe_read(event.str, sizeof(event.str), target);
+    __builtin_memset(event.str, 0, sizeof(event.str));
+    bpf_probe_read_user(event.str, sizeof(event.str), target);
     events.perf_submit(ctx, &event, sizeof(event));
 
     return 0;
@@ -245,6 +269,8 @@ class EnterData(ctypes.Structure):
     _fields_ = [
         ('mnt_ns', ctypes.c_uint),
         ('comm', ctypes.c_char * TASK_COMM_LEN),
+        ('pcomm', ctypes.c_char * TASK_COMM_LEN),
+        ('ppid', ctypes.c_uint),
         ('flags', ctypes.c_ulong),
     ]
 
@@ -332,7 +358,7 @@ else:
         return '"{}"'.format(''.join(escape_character(c) for c in s))
 
 
-def print_event(mounts, umounts, cpu, data, size):
+def print_event(mounts, umounts, parent, cpu, data, size):
     event = ctypes.cast(data, ctypes.POINTER(Event)).contents
 
     try:
@@ -343,6 +369,8 @@ def print_event(mounts, umounts, cpu, data, size):
                 'mnt_ns': event.union.enter.mnt_ns,
                 'comm': event.union.enter.comm,
                 'flags': event.union.enter.flags,
+                'ppid': event.union.enter.ppid,
+                'pcomm': event.union.enter.pcomm,
             }
         elif event.type == EventType.EVENT_MOUNT_SOURCE:
             mounts[event.pid]['source'] = event.union.str
@@ -360,6 +388,8 @@ def print_event(mounts, umounts, cpu, data, size):
                 'mnt_ns': event.union.enter.mnt_ns,
                 'comm': event.union.enter.comm,
                 'flags': event.union.enter.flags,
+                'ppid': event.union.enter.ppid,
+                'pcomm': event.union.enter.pcomm,
             }
         elif event.type == EventType.EVENT_UMOUNT_TARGET:
             umounts[event.pid]['target'] = event.union.str
@@ -381,9 +411,15 @@ def print_event(mounts, umounts, cpu, data, size):
                     target=decode_mount_string(syscall['target']),
                     flags=decode_umount_flags(syscall['flags']),
                     retval=decode_errno(event.union.retval))
-            print('{:16} {:<7} {:<7} {:<11} {}'.format(
-                syscall['comm'].decode(), syscall['tgid'], syscall['pid'],
-                syscall['mnt_ns'], call))
+            if parent:
+                print('{:16} {:<7} {:<7} {:16} {:<7} {:<11} {}'.format(
+                    syscall['comm'].decode('utf-8', 'replace'), syscall['tgid'],
+                    syscall['pid'], syscall['pcomm'].decode('utf-8', 'replace'),
+                    syscall['ppid'], syscall['mnt_ns'], call))
+            else:
+                print('{:16} {:<7} {:<7} {:<11} {}'.format(
+                    syscall['comm'].decode('utf-8', 'replace'), syscall['tgid'],
+                    syscall['pid'], syscall['mnt_ns'], call))
     except KeyError:
         # This might happen if we lost an event.
         pass
@@ -395,26 +431,44 @@ def main():
     )
     parser.add_argument("--ebpf", action="store_true",
         help=argparse.SUPPRESS)
+    parser.add_argument("-P", "--parent_process", action="store_true",
+        help="also snoop the parent process")
+    parser.add_argument("--cgroupmap",
+        help="trace cgroups in this BPF map only")
+    parser.add_argument("--mntnsmap",
+        help="trace mount namespaces in this BPF map only")
     args = parser.parse_args()
 
     mounts = {}
     umounts = {}
+    global bpf_text
+    bpf_text = filter_by_containers(args) + bpf_text
     if args.ebpf:
         print(bpf_text)
         exit()
     b = bcc.BPF(text=bpf_text)
     mount_fnname = b.get_syscall_fnname("mount")
-    b.attach_kprobe(event=mount_fnname, fn_name="do_sys_mount")
+    b.attach_kprobe(event=mount_fnname, fn_name="syscall__mount")
     b.attach_kretprobe(event=mount_fnname, fn_name="do_ret_sys_mount")
     umount_fnname = b.get_syscall_fnname("umount")
-    b.attach_kprobe(event=umount_fnname, fn_name="do_sys_umount")
+    b.attach_kprobe(event=umount_fnname, fn_name="syscall__umount")
     b.attach_kretprobe(event=umount_fnname, fn_name="do_ret_sys_umount")
     b['events'].open_perf_buffer(
-        functools.partial(print_event, mounts, umounts))
-    print('{:16} {:<7} {:<7} {:<11} {}'.format(
-        'COMM', 'PID', 'TID', 'MNT_NS', 'CALL'))
+        functools.partial(print_event, mounts, umounts, args.parent_process))
+
+    if args.parent_process:
+        print('{:16} {:<7} {:<7} {:16} {:<7} {:<11} {}'.format(
+              'COMM', 'PID', 'TID', 'PCOMM', 'PPID', 'MNT_NS', 'CALL'))
+    else:
+        print('{:16} {:<7} {:<7} {:<11} {}'.format(
+            'COMM', 'PID', 'TID', 'MNT_NS', 'CALL'))
+
     while True:
-        b.perf_buffer_poll()
+        try:
+            b.perf_buffer_poll()
+        except KeyboardInterrupt:
+            exit()
+
 
 
 if __name__ == '__main__':

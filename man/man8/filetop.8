@@ -9,7 +9,7 @@ This is top for files.
 This traces file reads and writes, and prints a per-file summary every interval
 (by default, 1 second). By default the summary is sorted on the highest read
 throughput (Kbytes). Sorting order can be changed via -s option. By default only
-IO on regular files is shown. The -a option will list all file types (sokets,
+IO on regular files is shown. The -a option will list all file types (sockets,
 FIFOs, etc).
 
 This uses in-kernel eBPF maps to store per process summaries for efficiency.
@@ -90,6 +90,9 @@ Total write Kbytes during interval.
 .TP
 T
 Type of file: R == regular, S == socket, O == other (pipe, etc).
+.TP
+FILE
+Filename.
 .SH OVERHEAD
 Depending on the frequency of application reads and writes, overhead can become
 significant, in the worst case slowing applications by over 50%. Hopefully for

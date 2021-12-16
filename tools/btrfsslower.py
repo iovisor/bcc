@@ -4,7 +4,7 @@
 # btrfsslower  Trace slow btrfs operations.
 #              For Linux, uses BCC, eBPF.
 #
-# USAGE: btrfsslower [-h] [-j] [-p PID] [min_ms]
+# USAGE: btrfsslower [-h] [-j] [-p PID] [min_ms] [-d DURATION]
 #
 # This script traces common btrfs file operations: reads, writes, opens, and
 # syncs. It measures the time spent in these operations, and prints details
@@ -27,8 +27,8 @@
 from __future__ import print_function
 from bcc import BPF
 import argparse
+from datetime import datetime, timedelta
 from time import strftime
-import ctypes as ct
 
 # symbols
 kallsyms = "/proc/kallsyms"
@@ -40,6 +40,7 @@ examples = """examples:
     ./btrfsslower -j 1        # ... 1 ms, parsable output (csv)
     ./btrfsslower 0           # trace all operations (warning: verbose)
     ./btrfsslower -p 185      # trace PID 185 only
+    ./btrfsslower -d 10       # trace for 10 seconds only
 """
 parser = argparse.ArgumentParser(
     description="Trace common btrfs file operations slower than a threshold",
@@ -53,12 +54,16 @@ parser.add_argument("min_ms", nargs="?", default='10',
     help="minimum I/O duration to trace, in ms (default 10)")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-d", "--duration",
+    help="total duration of trace in seconds")
 args = parser.parse_args()
 min_ms = int(args.min_ms)
 pid = args.pid
 csv = args.csv
 debug = 0
-
+if args.duration:
+    args.duration = timedelta(seconds=int(args.duration))
+    
 # define BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
@@ -228,7 +233,7 @@ static int trace_return(struct pt_regs *ctx, int type)
     qs = de->d_name;
     if (qs.len == 0)
         return 0;
-    bpf_probe_read(&data.file, sizeof(data.file), (void *)qs.name);
+    bpf_probe_read_kernel(&data.file, sizeof(data.file), (void *)qs.name);
 
     // output
     events.perf_submit(ctx, &data, sizeof(data));
@@ -287,24 +292,9 @@ if debug or args.ebpf:
     if args.ebpf:
         exit()
 
-# kernel->user event data: struct data_t
-DNAME_INLINE_LEN = 32   # linux/dcache.h
-TASK_COMM_LEN = 16      # linux/sched.h
-class Data(ct.Structure):
-    _fields_ = [
-        ("ts_us", ct.c_ulonglong),
-        ("type", ct.c_ulonglong),
-        ("size", ct.c_ulonglong),
-        ("offset", ct.c_ulonglong),
-        ("delta_us", ct.c_ulonglong),
-        ("pid", ct.c_ulonglong),
-        ("task", ct.c_char * TASK_COMM_LEN),
-        ("file", ct.c_char * DNAME_INLINE_LEN)
-    ]
-
 # process event
 def print_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data)).contents
+    event = b["events"].event(data)
 
     type = 'R'
     if event.type == 1:
@@ -316,12 +306,14 @@ def print_event(cpu, data, size):
 
     if (csv):
         print("%d,%s,%d,%s,%d,%d,%d,%s" % (
-            event.ts_us, event.task.decode(), event.pid, type, event.size,
-            event.offset, event.delta_us, event.file.decode()))
+            event.ts_us, event.task.decode('utf-8', 'replace'), event.pid,
+            type, event.size, event.offset, event.delta_us,
+            event.file.decode('utf-8', 'replace')))
         return
     print("%-8s %-14.14s %-6s %1s %-7s %-8d %7.2f %s" % (strftime("%H:%M:%S"),
-        event.task.decode(), event.pid, type, event.size, event.offset / 1024,
-        float(event.delta_us) / 1000, event.file.decode()))
+        event.task.decode('utf-8', 'replace'), event.pid, type, event.size,
+        event.offset / 1024, float(event.delta_us) / 1000,
+        event.file.decode('utf-8', 'replace')))
 
 # initialize BPF
 b = BPF(text=bpf_text)
@@ -349,5 +341,9 @@ else:
 
 # read events
 b["events"].open_perf_buffer(print_event, page_cnt=64)
-while 1:
-    b.perf_buffer_poll()
+start_time = datetime.now()
+while not args.duration or datetime.now() - start_time < args.duration:
+    try:
+        b.perf_buffer_poll(timeout=1000)
+    except KeyboardInterrupt:
+        exit()

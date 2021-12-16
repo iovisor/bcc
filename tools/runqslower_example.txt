@@ -5,8 +5,15 @@ runqslower shows high latency scheduling times between tasks being
 ready to run and them running on CPU after that. For example:
 
 # runqslower
-Tracing run queue latency higher than 10000 us
-TIME     COMM             PID           LAT(us)
+
+Note: Showing TID (thread id) in the report column. The smallest
+execution unit becomes a TID when using the --pid flag as
+in that case the tool reports not only the parent pid but
+its children threads as well.
+
+Tracing run queue latency higher than 10000 us.
+
+TIME     COMM             TID           LAT(us)
 04:16:32 cc1              12924           12739
 04:16:32 sh               13640           12118
 04:16:32 make             13639           12730
@@ -25,25 +32,29 @@ TIME     COMM             PID           LAT(us)
 This shows various processes waiting for available CPU during a Linux kernel
 build. By default the output contains delays for more than 10ms.
 
-These daelays can be analyzed in depth with "perf sched" tool, see:
+These delays can be analyzed in depth with "perf sched" tool, see:
 
 * http://www.brendangregg.com/blog/2017-03-16/perf-sched.html
 
 USAGE message:
 
 # ./runqslower -h
-usage: runqslower.py [-h] [-p PID] [min_us]
+usage: runqslower.py [-h] [-p PID | -t TID] [min_us]
 
 Trace high run queue latency
 
 positional arguments:
-  min_us             minimum run queue latecy to trace, in ms (default 10000)
+  min_us             minimum run queue latency to trace, in us (default 10000)
 
 optional arguments:
   -h, --help         show this help message and exit
   -p PID, --pid PID  trace this PID only
+  -t TID, --tid TID  trace this TID only
+  -P, --previous     also show previous task name and TID
 
 examples:
     ./runqslower         # trace run queue latency higher than 10000 us (default)
     ./runqslower 1000    # trace run queue latency higher than 1000 us
-    ./runqslower -p 123  # trace pid 123 only
+    ./runqslower -p 123  # trace pid 123
+    ./runqslower -t 123  # trace tid 123 (use for threads only)
+    ./runqslower -P      # also show previous task comm and TID

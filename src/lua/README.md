@@ -24,33 +24,34 @@ benefit from such JIT compilation.
 
 ## Quickstart Guide
 
-The following instructions assume Ubuntu 14.04 LTS.
+The following instructions assume Ubuntu 18.04 LTS.
 
-1. Install a **very new kernel**. It has to be new and shiny for this to work. 4.3+
-
-    ```
-    VER=4.4.2-040402
-    PREFIX=http://kernel.ubuntu.com/~kernel-ppa/mainline/v4.4.2-wily/
-    REL=201602171633
-    wget ${PREFIX}/linux-headers-${VER}-generic_${VER}.${REL}_amd64.deb
-    wget ${PREFIX}/linux-headers-${VER}_${VER}.${REL}_all.deb
-    wget ${PREFIX}/linux-image-${VER}-generic_${VER}.${REL}_amd64.deb
-    sudo dpkg -i linux-*${VER}.${REL}*.deb
-    ```
-
-2. Install the `libbcc` binary packages and `luajit`
+1. Clone this repository
 
     ```
-    sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys D4284CDD
-    echo "deb https://repo.iovisor.org/apt trusty main" | sudo tee /etc/apt/sources.list.d/iovisor.list
-    sudo apt-get update
-    sudo apt-get install libbcc luajit
+    $ git clone https://github.com/iovisor/bcc.git
+    $ cd bcc/
     ```
 
-3. Test one of the examples to ensure `libbcc` is properly installed
+2. As per the [Ubuntu - Binary](https://github.com/iovisor/bcc/blob/master/INSTALL.md#ubuntu---binary) installation istructions, install the required upstream stable and signed packages
 
     ```
-    sudo ./bcc-probe examples/lua/task_switch.lua
+    $ sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 4052245BD4284CDD
+    $ echo "deb https://repo.iovisor.org/apt/$(lsb_release -cs) $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/iovisor.list
+    $ sudo apt-get update
+    $ sudo apt-get install bcc-tools libbcc-examples linux-headers-$(uname -r)
+    ```
+
+3. Install LuaJit and the corresponding development files
+
+    ```
+    $ sudo apt-get install luajit luajit-5.1-dev
+    ```
+
+4. Test one of the examples to ensure `libbcc` is properly installed
+
+    ```
+    $ sudo src/lua/bcc-probe examples/lua/task_switch.lua
     ```
 
 ## LuaJIT BPF compiler

@@ -4,7 +4,7 @@
 # uthreads  Trace thread creation/destruction events in high-level languages.
 #           For Linux, uses BCC, eBPF.
 #
-# USAGE: uthreads [-l {java}] [-v] pid
+# USAGE: uthreads [-l {c,java,none}] [-v] pid
 #
 # Copyright 2016 Sasha Goldshtein
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -18,11 +18,11 @@ import ctypes as ct
 import time
 import os
 
-languages = ["java"]
+languages = ["c", "java"]
 
 examples = """examples:
-    ./uthreads -l java 185   # trace Java threads in process 185
-    ./uthreads 12245         # trace only pthreads in process 12245
+    ./uthreads -l java 185    # trace Java threads in process 185
+    ./uthreads -l none 12245  # trace only pthreads in process 12245
 """
 parser = argparse.ArgumentParser(
     description="Trace thread creation/destruction events in " +
@@ -34,6 +34,8 @@ parser.add_argument("-l", "--language", choices=languages + ["none"],
 parser.add_argument("pid", type=int, help="process id to attach to")
 parser.add_argument("-v", "--verbose", action="store_true",
     help="verbose mode: print the BPF program (for debugging purposes)")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 usdt = USDT(pid=args.pid)
@@ -66,7 +68,10 @@ language = args.language
 if not language:
     language = utils.detect_language(languages, args.pid)
 
-if language == "java":
+if language == "c":
+    # Nothing to add
+    pass
+elif language == "java":
     template = """
 int %s(struct pt_regs *ctx) {
     char type[] = "%s";
@@ -75,7 +80,7 @@ int %s(struct pt_regs *ctx) {
     bpf_usdt_readarg(1, ctx, &nameptr);
     bpf_usdt_readarg(3, ctx, &id);
     bpf_usdt_readarg(4, ctx, &native_id);
-    bpf_probe_read(&te.name, sizeof(te.name), (void *)nameptr);
+    bpf_probe_read_user(&te.name, sizeof(te.name), (void *)nameptr);
     te.runtime_id = id;
     te.native_id = native_id;
     __builtin_memcpy(&te.type, type, sizeof(te.type));
@@ -88,9 +93,12 @@ int %s(struct pt_regs *ctx) {
     usdt.enable_probe_or_bail("thread__start", "trace_start")
     usdt.enable_probe_or_bail("thread__stop", "trace_stop")
 
-if args.verbose:
-    print(usdt.get_text())
+if args.ebpf or args.verbose:
+    if args.verbose:
+        print(usdt.get_text())
     print(program)
+    if args.ebpf:
+        exit()
 
 bpf = BPF(text=program, usdt_contexts=[usdt])
 print("Tracing thread events in process %d (language: %s)... Ctrl-C to quit." %
@@ -120,4 +128,7 @@ def print_event(cpu, data, size):
 
 bpf["threads"].open_perf_buffer(print_event)
 while 1:
-    bpf.perf_buffer_poll()
+    try:
+        bpf.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

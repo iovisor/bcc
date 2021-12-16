@@ -29,8 +29,7 @@ enum stat_types {
 BPF_ARRAY(stats, u64, S_MAXSTAT);
 
 static void stats_increment(int key) {
-    u64 *leaf = stats.lookup(&key);
-    if (leaf) (*leaf)++;
+    stats.atomic_increment(key);
 }
 
 void do_count(struct pt_regs *ctx) { stats_increment(S_COUNT); }

@@ -3,43 +3,57 @@ Maintainer: Brenden Blanco <bblanco@plumgrid.com>
 Section: misc
 Priority: optional
 Standards-Version: 3.9.5
-Build-Depends: debhelper (>= 9), cmake, libllvm3.7 | libllvm3.8,
-    llvm-3.7-dev | llvm-3.8-dev, libclang-3.7-dev | libclang-3.8-dev,
+Build-Depends: debhelper (>= 9), cmake,
+    libllvm9 | libllvm8 | libllvm6.0 | libllvm3.8 [!arm64] | libllvm3.7 [!arm64],
+    llvm-9-dev | llvm-8-dev | llvm-6.0-dev | llvm-3.8-dev [!arm64] | llvm-3.7-dev [!arm64],
+    libclang-9-dev | libclang-8-dev | libclang-6.0-dev | libclang-3.8-dev [!arm64] | libclang-3.7-dev [!arm64],
+    clang-format-9 | clang-format-8 | clang-format-6.0 | clang-format-3.8 [!arm64] | clang-format-3.7 [!arm64] | clang-format,
     libelf-dev, bison, flex, libfl-dev, libedit-dev, zlib1g-dev, git,
-    clang-format | clang-format-3.7 | clang-format-3.8, python (>= 2.7),
-    python-netaddr, python-pyroute2, luajit, libluajit-5.1-dev, arping,
-    inetutils-ping | iputils-ping, iperf, netperf, ethtool, devscripts,
-    python3
+    python (>= 2.7), python-netaddr, python-pyroute2 | python3-pyroute2, luajit,
+    libluajit-5.1-dev, arping, inetutils-ping | iputils-ping, iperf, netperf,
+    ethtool, devscripts, python3, dh-python
+# add 'libdebuginfod-dev' to Build-Depends for libdebuginfod support
 Homepage: https://github.com/iovisor/bcc
 
 Package: libbcc
-Architecture: amd64
+Architecture: any
+Provides: libbpfcc, libbpfcc-dev
+Conflicts: libbpfcc, libbpfcc-dev
 Depends: libc6, libstdc++6, libelf1
+# add 'libdebuginfod1' to Depends if built with libdebuginfod support
 Description: Shared Library for BPF Compiler Collection (BCC)
  Shared Library for BPF Compiler Collection to control BPF programs
  from userspace.
 
 Package: libbcc-examples
 Architecture: any
-Depends: libbcc
-Description: Shared Library for BPF Compiler Collection (BCC)
+Depends: libbcc (= ${binary:Version})
+Description: Examples for BPF Compiler Collection (BCC)
 
 Package: python-bcc
 Architecture: all
-Depends: libbcc, python, binutils
+Provides: python-bpfcc
+Conflicts: python-bpfcc
+Depends: libbcc (= ${binary:Version}), python, binutils
 Description: Python wrappers for BPF Compiler Collection (BCC)
 
 Package: python3-bcc
 Architecture: all
-Depends: libbcc, python3, binutils
+Provides: python3-bpfcc
+Conflicts: python3-bpfcc
+Depends: libbcc (= ${binary:Version}), python3, binutils
 Description: Python3 wrappers for BPF Compiler Collection (BCC)
 
 Package: bcc-tools
 Architecture: all
-Depends: python-bcc
+Provides: bpfcc-tools
+Conflicts: bpfcc-tools
+Depends: python-bcc (= ${binary:Version})
 Description: Command line tools for BPF Compiler Collection (BCC)
 
 Package: bcc-lua
 Architecture: all
-Depends: libbcc
+Provides: bpfcc-lua
+Conflicts: bpfcc-lua
+Depends: libbcc (= ${binary:Version})
 Description: Standalone tool to run BCC tracers written in Lua

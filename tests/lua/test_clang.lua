@@ -243,8 +243,10 @@ int kprobe__finish_task_switch(struct pt_regs *ctx, struct task_struct *prev) {
   key.curr_pid = bpf_get_current_pid_tgid();
   key.prev_pid = prev->pid;
 
-  val = stats.lookup_or_init(&key, &zero);
-  (*val)++;
+  val = stats.lookup_or_try_init(&key, &zero);
+  if (val) {
+    (*val)++;
+  }
   return 0;
 }
 ]]}

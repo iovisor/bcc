@@ -28,7 +28,7 @@ TEST_CASE("test hash table", "[hash_table]") {
   ebpf::BPF bpf;
   ebpf::StatusTuple res(0);
   res = bpf.init(BPF_PROGRAM);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
 
   ebpf::BPFHashTable<int, int> t = bpf.get_hash_table<int, int>("myhash");
 
@@ -47,36 +47,36 @@ TEST_CASE("test hash table", "[hash_table]") {
     v1 = 42;
     // create new element
     res = t.update_value(k, v1);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     res = t.get_value(k, v2);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     REQUIRE(v2 == 42);
 
     // update existing element
     v1 = 69;
     res = t.update_value(k, v1);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     res = t.get_value(k, v2);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     REQUIRE(v2 == 69);
 
     // remove existing element
     res = t.remove_value(k);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     // remove non existing element
     res = t.remove_value(k);
-    REQUIRE(res.code() != 0);
+    REQUIRE(!res.ok());
 
     // get non existing element
     res = t.get_value(k, v2);
-    REQUIRE(res.code() != 0);
+    REQUIRE(!res.ok());
   }
 
   SECTION("walk table") {
     for (int i = 1; i <= 10; i++) {
       res = t.update_value(i * 3, i);
-      REQUIRE(res.code() == 0);
+      REQUIRE(res.ok());
     }
     auto offline = t.get_table_offline();
     REQUIRE(offline.size() == 10);
@@ -84,20 +84,24 @@ TEST_CASE("test hash table", "[hash_table]") {
       REQUIRE(pair.first % 3 == 0);
       REQUIRE(pair.first / 3 == pair.second);
     }
+
+    // clear table
+    t.clear_table_non_atomic();
+    REQUIRE(t.get_table_offline().size() == 0);
   }
 }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0)
 TEST_CASE("percpu hash table", "[percpu_hash_table]") {
   const std::string BPF_PROGRAM = R"(
-    BPF_TABLE("percpu_hash", int, u64, myhash, 128);
-    BPF_TABLE("percpu_array", int, u64, myarray, 64);
+    BPF_PERCPU_HASH(myhash, int, u64, 128);
+    BPF_PERCPU_ARRAY(myarray, u64, 64);
   )";
 
   ebpf::BPF bpf;
   ebpf::StatusTuple res(0);
   res = bpf.init(BPF_PROGRAM);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
 
   ebpf::BPFPercpuHashTable<int, uint64_t> t =
     bpf.get_percpu_hash_table<int, uint64_t>("myhash");
@@ -125,9 +129,9 @@ TEST_CASE("percpu hash table", "[percpu_hash_table]") {
 
     // create new element
     res = t.update_value(k, v1);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     res = t.get_value(k, v2);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     for (size_t j = 0; j < ncpus; j++) {
       REQUIRE(v2.at(j) == 42 * j);
     }
@@ -137,24 +141,53 @@ TEST_CASE("percpu hash table", "[percpu_hash_table]") {
       v1[j] = 69 * j;
     }
     res = t.update_value(k, v1);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     res = t.get_value(k, v2);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     for (size_t j = 0; j < ncpus; j++) {
       REQUIRE(v2.at(j) == 69 * j);
     }
 
     // remove existing element
     res = t.remove_value(k);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     // remove non existing element
     res = t.remove_value(k);
-    REQUIRE(res.code() != 0);
+    REQUIRE(!res.ok());
 
     // get non existing element
     res = t.get_value(k, v2);
-    REQUIRE(res.code() != 0);
+    REQUIRE(!res.ok());
+  }
+
+  SECTION("walk table") {
+    std::vector<uint64_t> v(ncpus);
+
+    for (int k = 3; k <= 30; k+=3) {
+      for (size_t cpu = 0; cpu < ncpus; cpu++) {
+        v[cpu] = k * cpu;
+      }
+      res = t.update_value(k, v);
+      REQUIRE(res.ok());
+    }
+
+    // get whole table
+    auto offline = t.get_table_offline();
+    REQUIRE(offline.size() == 10);
+    for (int i = 0; i < 10; i++) {
+      // check the key
+      REQUIRE(offline.at(i).first % 3 == 0);
+
+      // check value
+      for (size_t cpu = 0; cpu < ncpus; cpu++) {
+        REQUIRE(offline.at(i).second.at(cpu) == cpu * offline.at(i).first);
+      }
+    }
+
+    // clear table
+    t.clear_table_non_atomic();
+    REQUIRE(t.get_table_offline().size() == 0);
   }
 }
 #endif

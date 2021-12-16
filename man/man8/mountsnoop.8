@@ -11,7 +11,7 @@ useful for troubleshooting system and container setup.
 This works by tracing the kernel sys_mount() and sys_umount() functions using
 dynamic tracing, and will need updating to match any changes to this function.
 
-This makes use of a Linux 4.4 feature (bpf_perf_event_output()).
+This makes use of a Linux 4.8 feature (bpf_get_current_task()).
 
 Since this uses BPF, only the root user can use this tool.
 .SH REQUIREMENTS

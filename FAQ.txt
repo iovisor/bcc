@@ -8,18 +8,34 @@ Q: hello_world.py fails with:
    OSError: libbcc.so: cannot open shared object file: No such file or directory
 A: make sure to 'make install' and add the directory
    where libbcc.so was installed into your LD_LIBRARY_PATH
-   export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+   export LD_LIBRARY_PATH=$(dirname `find /usr -name libbcc.so`):$LD_LIBRARY_PATH
 
 Q: hello_world.py fails with:
-   ImportError: No module named bpf
+   ImportError: No module named bcc
 A: checkout "sudo make install" output to find out bpf package installation site,
    add it to the PYTHONPATH env variable before running the program.
-   sudo bash -c 'PYTHONPATH=/usr/lib/python2.7/site-packages python examples/hello_world.py'
+   export PYTHONPATH=$(dirname `find /usr/lib -name bcc`):$PYTHONPATH
 
 Q: hello_world.py still fails with:
    bpf: Operation not permitted
    Exception: Failed to load BPF program hello
 A: sudo
+
+Q: hello_world.py fails with
+   bpf: Failed to load program: Operation not permitted
+   despite running as root, and strace shows each `bpf()` system call failing with an EPERM.
+A: The so-called Kernel lockdown might be the root cause. Try disabling it with the so-called
+   sysrq mechanism:
+       echo 1 > /proc/sys/kernel/sysrq
+       echo x > /proc/sysrq-trigger
+   Also see https://github.com/iovisor/bcc/issues/2525
+   
+   If you have Secure Boot enabled you need to press Alt-PrintScr-x on the keyboard instead:
+   ```
+   This sysrq operation is disabled from userspace.
+   sysrq: Disabling Secure Boot restrictions
+   Lifting lockdown
+   ```
 
 Q: How do I fulfill the Linux kernel version requirement?
 A: You need to obtain a recent version of the Linux source code

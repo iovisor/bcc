@@ -11,8 +11,8 @@ latency of the call (duration) in milliseconds, and the host string.
 This tool can be useful for identifying DNS latency, by identifying which
 remote host name lookups were slow, and by how much.
 
-This makes use of a Linux 4.5 feature (bpf_perf_event_output());
-for kernels older than 4.5, see the version under tools/old,
+This makes use of a Linux 4.4 feature (bpf_perf_event_output());
+for kernels older than 4.4, see the version under tools/old,
 which uses an older mechanism
 
 This tool currently uses dynamic tracing of user-level functions and registers,

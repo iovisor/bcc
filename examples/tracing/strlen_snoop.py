@@ -34,7 +34,7 @@ int printarg(struct pt_regs *ctx) {
         return 0;
 
     char str[80] = {};
-    bpf_probe_read(&str, sizeof(str), (void *)PT_REGS_PARM1(ctx));
+    bpf_probe_read_user(&str, sizeof(str), (void *)PT_REGS_PARM1(ctx));
     bpf_trace_printk("%s\\n", &str);
 
     return 0;

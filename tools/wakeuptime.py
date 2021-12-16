@@ -12,6 +12,7 @@
 
 from __future__ import print_function
 from bcc import BPF
+from bcc.utils import printb
 from time import sleep, strftime
 import argparse
 import signal
@@ -41,7 +42,7 @@ examples = """examples:
     ./wakeuptime 5           # trace for 5 seconds only
     ./wakeuptime -f 5        # 5 seconds, and output in folded format
     ./wakeuptime -u          # don't include kernel threads (user only)
-    ./wakeuptime -p 185      # trace fo PID 185 only
+    ./wakeuptime -p 185      # trace for PID 185 only
 """
 parser = argparse.ArgumentParser(
     description="Summarize sleep to wakeup time by waker kernel stack",
@@ -101,8 +102,10 @@ BPF_HASH(counts, struct key_t);
 BPF_HASH(start, u32);
 BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE);
 
-int offcpu(struct pt_regs *ctx) {
-    u32 pid = bpf_get_current_pid_tgid();
+static int offcpu_sched_switch() {
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 pid = pid_tgid >> 32;
+    u32 tid = (u32)pid_tgid;
     struct task_struct *p = (struct task_struct *) bpf_get_current_task();
     u64 ts;
 
@@ -110,18 +113,19 @@ int offcpu(struct pt_regs *ctx) {
         return 0;
 
     ts = bpf_ktime_get_ns();
-    start.update(&pid, &ts);
+    start.update(&tid, &ts);
     return 0;
 }
 
-int waker(struct pt_regs *ctx, struct task_struct *p) {
-    u32 pid = p->pid;
+static int wakeup(ARG0, struct task_struct *p) {
+    u32 pid = p->tgid;
+    u32 tid = p->pid;
     u64 delta, *tsp, ts;
 
-    tsp = start.lookup(&pid);
+    tsp = start.lookup(&tid);
     if (tsp == 0)
         return 0;        // missed start
-    start.delete(&pid);
+    start.delete(&tid);
 
     if (FILTER)
         return 0;
@@ -133,17 +137,47 @@ int waker(struct pt_regs *ctx, struct task_struct *p) {
         return 0;
 
     struct key_t key = {};
-    u64 zero = 0, *val;
 
-    key.w_k_stack_id = stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID);
-    bpf_probe_read(&key.target, sizeof(key.target), p->comm);
+    key.w_k_stack_id = stack_traces.get_stackid(ctx, 0);
+    bpf_probe_read_kernel(&key.target, sizeof(key.target), p->comm);
     bpf_get_current_comm(&key.waker, sizeof(key.waker));
 
-    val = counts.lookup_or_init(&key, &zero);
-    (*val) += delta;
+    counts.atomic_increment(key, delta);
     return 0;
 }
 """
+
+bpf_text_kprobe = """
+int offcpu(struct pt_regs *ctx) {
+    return offcpu_sched_switch();
+}
+
+int waker(struct pt_regs *ctx, struct task_struct *p) {
+    return wakeup(ctx, p);
+}
+"""
+
+bpf_text_raw_tp = """
+RAW_TRACEPOINT_PROBE(sched_switch)
+{
+    // TP_PROTO(bool preempt, struct task_struct *prev, struct task_struct *next)
+    return offcpu_sched_switch();
+}
+
+RAW_TRACEPOINT_PROBE(sched_wakeup)
+{
+    // TP_PROTO(struct task_struct *p)
+    struct task_struct *p = (struct task_struct *)ctx->args[0];
+    return wakeup(ctx, p);
+}
+"""
+
+is_supported_raw_tp = BPF.support_raw_tracepoint()
+if is_supported_raw_tp:
+    bpf_text += bpf_text_raw_tp
+else:
+    bpf_text += bpf_text_kprobe
+
 if args.pid:
     filter = 'pid != %s' % args.pid
 elif args.useronly:
@@ -151,6 +185,12 @@ elif args.useronly:
 else:
     filter = '0'
 bpf_text = bpf_text.replace('FILTER', filter)
+
+if is_supported_raw_tp:
+    arg0 = 'struct bpf_raw_tracepoint_args *ctx'
+else:
+    arg0 = 'struct pt_regs *ctx'
+bpf_text = bpf_text.replace('ARG0', arg0)
 
 # set stack storage size
 bpf_text = bpf_text.replace('STACK_STORAGE_SIZE', str(args.stack_storage_size))
@@ -164,12 +204,13 @@ if debug or args.ebpf:
 
 # initialize BPF
 b = BPF(text=bpf_text)
-b.attach_kprobe(event="schedule", fn_name="offcpu")
-b.attach_kprobe(event="try_to_wake_up", fn_name="waker")
-matched = b.num_open_kprobes()
-if matched == 0:
-    print("0 functions traced. Exiting.")
-    exit()
+if not is_supported_raw_tp:
+    b.attach_kprobe(event="schedule", fn_name="offcpu")
+    b.attach_kprobe(event="try_to_wake_up", fn_name="waker")
+    matched = b.num_open_kprobes()
+    if matched == 0:
+        print("0 functions traced. Exiting.")
+        exit()
 
 # header
 if not folded:
@@ -206,17 +247,17 @@ while (1):
         if folded:
             # print folded stack output
             line = \
-                [k.waker.decode()] + \
+                [k.waker] + \
                 [b.ksym(addr)
                     for addr in reversed(list(waker_kernel_stack))] + \
-                [k.target.decode()]
-            print("%s %d" % (";".join(line), v.value))
+                [k.target]
+            printb(b"%s %d" % (b";".join(line), v.value))
         else:
             # print default multi-line stack output
-            print("    %-16s %s" % ("target:", k.target.decode()))
+            printb(b"    %-16s %s" % (b"target:", k.target))
             for addr in waker_kernel_stack:
-                print("    %-16x %s" % (addr, b.ksym(addr)))
-            print("    %-16s %s" % ("waker:", k.waker.decode()))
+                printb(b"    %-16x %s" % (addr, b.ksym(addr)))
+            printb(b"    %-16s %s" % (b"waker:", k.waker))
             print("        %d\n" % v.value)
     counts.clear()
 

@@ -8,6 +8,9 @@ BPF_HASH(stats, struct Ptr, struct Counters, 1024);
 int count_sched(struct pt_regs *ctx) {
   struct Ptr key = {.ptr = PT_REGS_PARM1(ctx)};
   struct Counters zleaf = {0};
-  stats.lookup_or_init(&key, &zleaf)->stat1++;
+  struct Counters *val = stats.lookup_or_try_init(&key, &zleaf);
+  if (val) {
+    val->stat1++;
+  }
   return 0;
 }

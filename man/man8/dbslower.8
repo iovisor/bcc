@@ -2,7 +2,7 @@
 .SH NAME
 dbslower \- Trace MySQL/PostgreSQL server queries slower than a threshold.
 .SH SYNOPSIS
-.B dbslower [-v] [-p PID [PID ...]] [-m THRESHOLD] {mysql,postgres}
+.B dbslower [-v] [-p PID [PID ...]] [-x PATH] [-m THRESHOLD] {mysql,postgres}
 .SH DESCRIPTION
 This traces queries served by a MySQL or PostgreSQL server, and prints
 those that exceed a latency (query time) threshold. By default a threshold of
@@ -11,6 +11,8 @@ those that exceed a latency (query time) threshold. By default a threshold of
 This uses User Statically-Defined Tracing (USDT) probes, a feature added to
 MySQL and PostgreSQL for DTrace support, but which may not be enabled on a
 given installation. See requirements.
+Alternatively, MySQL queries can be traced without the USDT support using the
+-x option.
 
 Since this uses BPF, only the root user can use this tool.
 .SH REQUIREMENTS
@@ -24,6 +26,10 @@ Print usage message.
 \-p PID
 Trace this PID. If no PID is specified, the tool will attempt to automatically
 detect the MySQL or PostgreSQL processes running on the system.
+.TP
+\-x PATH
+Path to MySQL binary. This option allow to MySQL queries even when USDT probes
+aren't enabled on the MySQL server.
 .TP
 \-m THRESHOLD
 Minimum query latency (duration) to trace, in milliseconds. Default is 1 ms.

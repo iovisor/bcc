@@ -1,0 +1,179 @@
+.TH compactsnoop 8  "2019-11-1" "USER COMMANDS"
+.SH NAME
+compactstall \- Trace compact zone events. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B compactsnoop.py [\-h] [\-T] [\-p PID] [\-d DURATION] [\-K] [\-e]
+.SH DESCRIPTION
+compactsnoop traces the compact zone events, showing which processes are
+allocing pages with memory compaction. This can be useful for discovering
+when compact_stall (/proc/vmstat) continues to increase, whether it is
+caused by some critical processes or not.
+
+This works by tracing the compact zone events using raw_tracepoints and one
+kretprobe.
+
+For the Centos 7.6 (3.10.x kernel), see the version under tools/old, which 
+uses an older memory compaction mechanism.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-T
+Include a timestamp column.
+.TP
+\-p PID
+Trace this process ID only (filtered in-kernel).
+.TP
+\-d DURATION
+Total duration of trace in seconds.
+.TP
+\-K
+Output kernel stack trace
+.TP
+\-e
+Show extended fields.
+.SH EXAMPLES
+.TP
+Trace all compact zone events:
+#
+.B compactsnoop
+.TP
+Trace all compact zone events, for 10 seconds only:
+#
+.B compactsnoop -d 10
+.SH FIELDS
+.TP
+TIME(s)
+Time of the call, in seconds.
+.TP
+COMM
+Process name
+.TP
+PID
+Process ID
+.TP
+NODE
+Memory node
+.TP
+ZONE
+Zone of the node (such as DMA, DMA32, NORMAL eg)
+.TP
+ORDER
+Shows which order alloc cause memory compaction, -1 means all orders (eg: write
+to /proc/sys/vm/compact_memory)
+.TP
+MODE
+SYNC OR ASYNC
+.TP
+FRAGIDX (extra column)
+The FRAGIDX is short for fragmentation index, which only makes sense if an
+allocation of a requested size would fail. If that is true, the fragmentation
+index indicates whether external fragmentation or a lack of memory was the
+problem. The value can be used to determine if page reclaim or compaction
+should be used.
+.PP
+.in +8n
+Index is between 0 and 1 so return within 3 decimal places
+.PP
+.in +8n
+0 => allocation would fail due to lack of memory
+.PP
+.in +8n
+1 => allocation would fail due to fragmentation
+.TP
+MIN (extra column)
+The min watermark of the zone
+.TP
+LOW (extra column)
+The low watermark of the zone
+.TP
+HIGH (extra column)
+The high watermark of the zone
+.TP
+FREE (extra column)
+The nr_free_pages of the zone
+.TP
+LAT(ms)
+compact zone's latency
+.TP
+STATUS
+The compaction's result.
+.PP
+.in +8n
+For (CentOS 7.6's kernel), the status include:
+.PP
+.in +8n
+"skipped" (COMPACT_SKIPPED): compaction didn't start as it was not possible or 
+direct reclaim was more suitable
+.PP
+.in +8n
+"continue" (COMPACT_CONTINUE): compaction should continue to another pageblock
+.PP
+.in +8n
+"partial" (COMPACT_PARTIAL): direct compaction partially compacted a zone and 
+there are suitable pages
+.PP
+.in +8n
+"complete" (COMPACT_COMPLETE): The full zone was compacted
+.PP
+.in +8n
+For (kernel 4.7 and above):
+.PP
+.in +8n
+"not_suitable_zone" (COMPACT_NOT_SUITABLE_ZONE): For more detailed tracepoint 
+output - internal to compaction
+.PP
+.in +8n
+"skipped" (COMPACT_SKIPPED): compaction didn't start as it was not possible or 
+direct reclaim was more suitable
+.PP
+.in +8n
+"deferred" (COMPACT_DEFERRED): compaction didn't start as it was deferred due 
+to past failures
+.PP
+.in +8n
+"no_suitable_page" (COMPACT_NOT_SUITABLE_PAGE): For more detailed tracepoint 
+output - internal to compaction
+.PP
+.in +8n
+"continue" (COMPACT_CONTINUE): compaction should continue to another pageblock
+.PP
+.in +8n
+"complete" (COMPACT_COMPLETE): The full zone was compacted scanned but wasn't
+successful to compact suitable pages.
+.PP
+.in +8n
+"partial_skipped" (COMPACT_PARTIAL_SKIPPED): direct compaction has scanned part
+of the zone but wasn't successful to compact suitable pages.
+.PP
+.in +8n
+"contended" (COMPACT_CONTENDED): compaction terminated prematurely due to lock
+contentions
+.PP
+.in +8n
+"success" (COMPACT_SUCCESS): direct compaction terminated after concluding that 
+the allocation should now succeed
+.PP
+.in +8n
+.SH OVERHEAD
+This traces the kernel compact zone kprobe/kretprobe or raw_tracepoints and
+prints output for each event. As the rate of this is generally expected to be
+low (< 1000/s), the overhead is also expected to be negligible.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Wenbo Zhang

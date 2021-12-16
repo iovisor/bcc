@@ -26,8 +26,10 @@ class TestLru(unittest.TestCase):
         int hello_world(void *ctx) {
             u32 key=0;
             u32 value = 0, *val;
-            val = stats.lookup_or_init(&key, &value);
-            *val += 1;
+            val = stats.lookup_or_try_init(&key, &value);
+            if (val) {
+                *val += 1;
+            }
             return 0;
         }
         """
@@ -52,8 +54,8 @@ class TestLru(unittest.TestCase):
         sum = stats_map.sum(stats_map.Key(0))
         avg = stats_map.average(stats_map.Key(0))
         max = stats_map.max(stats_map.Key(0))
-        self.assertGreater(sum.value, 0L)
-        self.assertGreater(max.value, 0L)
+        self.assertGreater(sum.value, 0)
+        self.assertGreater(max.value, 0)
         b.detach_kprobe(event_name)
 
 if __name__ == "__main__":

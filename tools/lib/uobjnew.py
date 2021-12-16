@@ -4,7 +4,7 @@
 # uobjnew  Summarize object allocations in high-level languages.
 #          For Linux, uses BCC, eBPF.
 #
-# USAGE: uobjnew [-h] [-T TOP] [-v] {java,ruby,c} pid [interval]
+# USAGE: uobjnew [-h] [-T TOP] [-v] {c,java,ruby,tcl} pid [interval]
 #
 # Copyright 2016 Sasha Goldshtein
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -18,7 +18,7 @@ from time import sleep
 import os
 
 # C needs to be the last language.
-languages = ["java", "ruby", "c"]
+languages = ["c", "java", "ruby", "tcl"]
 
 examples = """examples:
     ./uobjnew -l java 145         # summarize Java allocations in process 145
@@ -41,6 +41,8 @@ parser.add_argument("-S", "--top-size", type=int,
     help="number of largest types by allocated bytes to print")
 parser.add_argument("-v", "--verbose", action="store_true",
     help="verbose mode: print the BPF program (for debugging purposes)")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 language = args.language
@@ -69,20 +71,41 @@ BPF_HASH(allocs, struct key_t, struct val_t);
 usdt = USDT(pid=args.pid)
 
 #
+# C
+#
+if language == "c":
+    program += """
+int alloc_entry(struct pt_regs *ctx, size_t size) {
+    struct key_t key = {};
+    struct val_t *valp, zero = {};
+    key.size = size;
+    valp = allocs.lookup_or_try_init(&key, &zero);
+    if (valp) {
+        valp->total_size += size;
+        valp->num_allocs += 1;
+    }
+    return 0;
+}
+    """
+#
 # Java
 #
-if language == "java":
+elif language == "java":
     program += """
 int alloc_entry(struct pt_regs *ctx) {
     struct key_t key = {};
     struct val_t *valp, zero = {};
     u64 classptr = 0, size = 0;
+    u32 length = 0;
     bpf_usdt_readarg(2, ctx, &classptr);
+    bpf_usdt_readarg(3, ctx, &length);
     bpf_usdt_readarg(4, ctx, &size);
-    bpf_probe_read(&key.name, sizeof(key.name), (void *)classptr);
-    valp = allocs.lookup_or_init(&key, &zero);
-    valp->total_size += size;
-    valp->num_allocs += 1;
+    bpf_probe_read_user(&key.name, min(sizeof(key.name), (size_t)length), (void *)classptr);
+    valp = allocs.lookup_or_try_init(&key, &zero);
+    if (valp) {
+        valp->total_size += size;
+        valp->num_allocs += 1;
+    }
     return 0;
 }
     """
@@ -97,9 +120,11 @@ int THETHING_alloc_entry(struct pt_regs *ctx) {
     struct val_t *valp, zero = {};
     u64 size = 0;
     bpf_usdt_readarg(1, ctx, &size);
-    valp = allocs.lookup_or_init(&key, &zero);
-    valp->total_size += size;
-    valp->num_allocs += 1;
+    valp = allocs.lookup_or_try_init(&key, &zero);
+    if (valp) {
+        valp->total_size += size;
+        valp->num_allocs += 1;
+    }
     return 0;
 }
     """
@@ -109,9 +134,11 @@ int object_alloc_entry(struct pt_regs *ctx) {
     struct val_t *valp, zero = {};
     u64 classptr = 0;
     bpf_usdt_readarg(1, ctx, &classptr);
-    bpf_probe_read(&key.name, sizeof(key.name), (void *)classptr);
-    valp = allocs.lookup_or_init(&key, &zero);
-    valp->num_allocs += 1;  // We don't know the size, unfortunately
+    bpf_probe_read_user(&key.name, sizeof(key.name), (void *)classptr);
+    valp = allocs.lookup_or_try_init(&key, &zero);
+    if (valp) {
+        valp->num_allocs += 1;  // We don't know the size, unfortunately
+    }
     return 0;
 }
     """
@@ -121,29 +148,32 @@ int object_alloc_entry(struct pt_regs *ctx) {
         usdt.enable_probe_or_bail("%s__create" % thing,
                                   "%s_alloc_entry" % thing)
 #
-# C
+# Tcl
 #
-elif language == "c":
+elif language == "tcl":
     program += """
-int alloc_entry(struct pt_regs *ctx, size_t size) {
-    struct key_t key = {};
+int alloc_entry(struct pt_regs *ctx) {
+    struct key_t key = { .name = "<ALL>" };
     struct val_t *valp, zero = {};
-    key.size = size;
-    valp = allocs.lookup_or_init(&key, &zero);
-    valp->total_size += size;
-    valp->num_allocs += 1;
+    valp = allocs.lookup_or_try_init(&key, &zero);
+    if (valp) {
+        valp->num_allocs += 1;
+    }
     return 0;
 }
     """
-
+    usdt.enable_probe_or_bail("obj__create", "alloc_entry")
 else:
     print("No language detected; use -l to trace a language.")
     exit(1)
 
 
-if args.verbose:
-    print(usdt.get_text())
+if args.ebpf or args.verbose:
+    if args.verbose:
+        print(usdt.get_text())
     print(program)
+    if args.ebpf:
+        exit()
 
 bpf = BPF(text=program, usdt_contexts=[usdt])
 if language == "c":
@@ -168,7 +198,7 @@ while True:
         data = data[-args.top_size:]
     else:
         data = sorted(data.items(), key=lambda kv: kv[1].total_size)
-    print("%-30s %8s %12s" % ("TYPE", "# ALLOCS", "# BYTES"))
+    print("%-30s %8s %12s" % ("NAME/TYPE", "# ALLOCS", "# BYTES"))
     for key, value in data:
         if language == "c":
             obj_type = "block size %d" % key.size

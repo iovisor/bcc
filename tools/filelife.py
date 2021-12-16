@@ -21,7 +21,6 @@ from __future__ import print_function
 from bcc import BPF
 import argparse
 from time import strftime
-import ctypes as ct
 
 # arguments
 examples = """examples:
@@ -58,7 +57,7 @@ BPF_PERF_OUTPUT(events);
 // trace file creation time
 int trace_create(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
 {
-    u32 pid = bpf_get_current_pid_tgid();
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
     FILTER
 
     u64 ts = bpf_ktime_get_ns();
@@ -71,7 +70,7 @@ int trace_create(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
 int trace_unlink(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
 {
     struct data_t data = {};
-    u32 pid = bpf_get_current_pid_tgid();
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
 
     FILTER
 
@@ -84,14 +83,14 @@ int trace_unlink(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
     delta = (bpf_ktime_get_ns() - *tsp) / 1000000;
     birth.delete(&dentry);
 
-    if (dentry->d_name.len == 0)
+    struct qstr d_name = dentry->d_name;
+    if (d_name.len == 0)
         return 0;
 
     if (bpf_get_current_comm(&data.comm, sizeof(data.comm)) == 0) {
         data.pid = pid;
         data.delta = delta;
-        bpf_probe_read(&data.fname, sizeof(data.fname),
-            (void *)dentry->d_name.name);
+        bpf_probe_read_kernel(&data.fname, sizeof(data.fname), d_name.name);
     }
 
     events.perf_submit(ctx, &data, sizeof(data));
@@ -99,17 +98,6 @@ int trace_unlink(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
     return 0;
 }
 """
-
-TASK_COMM_LEN = 16            # linux/sched.h
-DNAME_INLINE_LEN = 255        # linux/dcache.h
-
-class Data(ct.Structure):
-    _fields_ = [
-        ("pid", ct.c_uint),
-        ("delta", ct.c_ulonglong),
-        ("comm", ct.c_char * TASK_COMM_LEN),
-        ("fname", ct.c_char * DNAME_INLINE_LEN)
-    ]
 
 if args.pid:
     bpf_text = bpf_text.replace('FILTER',
@@ -134,10 +122,14 @@ print("%-8s %-6s %-16s %-7s %s" % ("TIME", "PID", "COMM", "AGE(s)", "FILE"))
 
 # process event
 def print_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data)).contents
+    event = b["events"].event(data)
     print("%-8s %-6d %-16s %-7.2f %s" % (strftime("%H:%M:%S"), event.pid,
-        event.comm.decode(), float(event.delta) / 1000, event.fname.decode()))
+        event.comm.decode('utf-8', 'replace'), float(event.delta) / 1000,
+        event.fname.decode('utf-8', 'replace')))
 
 b["events"].open_perf_buffer(print_event)
 while 1:
-    b.perf_buffer_poll()
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

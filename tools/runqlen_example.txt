@@ -36,7 +36,7 @@ of 8. This will cause run queue latency, which can be measured by the bcc
 runqlat tool.
 
 
-Here's an example of an issue that runqlen can indentify. Starting with the
+Here's an example of an issue that runqlen can identify. Starting with the
 system-wide summary:
 
 # ./runqlen.py 

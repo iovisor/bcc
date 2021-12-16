@@ -1,8 +1,8 @@
 .TH runqslower 8  "2016-02-07" "USER COMMANDS"
 .SH NAME
-runqlat \- Trace long process scheduling delays.
+runqslower \- Trace long process scheduling delays.
 .SH SYNOPSIS
-.B runqslower [\-p PID] [min_us]
+.B runqslower [\-p PID] [\-t TID] [-P] [min_us]
 .SH DESCRIPTION
 This measures the time a task spends waiting on a run queue (or equivalent
 scheduler data structure) for a turn on-CPU, and shows occurrences of time
@@ -38,8 +38,14 @@ Print usage message.
 \-p PID
 Only show this PID (filtered in kernel for efficiency).
 .TP
+\-t TID
+Only show this TID (filtered in kernel for efficiency).
+.TP
 min_us
 Minimum scheduling delay in microseconds to output.
+.TP
+\-P
+Also show previous task comm and TID.
 .SH EXAMPLES
 .TP
 Show scheduling delays longer than 10ms:
@@ -81,6 +87,7 @@ Linux
 .SH STABILITY
 Unstable - in development.
 .SH AUTHOR
-Ivan Babrou
+Ivan Babrou, original BCC Python version
+Andrii Nakryiko, CO-RE version
 .SH SEE ALSO
 runqlen(8), runqlat(8), pidstat(1)

@@ -67,3 +67,8 @@ Linux
 Unstable - in development.
 .SH AUTHOR
 Teng Qin
+.SH SEE ALSO
+.TP
+Perf can be used as a generic event counter tool. An example for LLC:
+#
+.B perf top -e cache-misses -e cache-references -a -ns pid,cpu,comm

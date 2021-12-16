@@ -1,0 +1,149 @@
+.TH bindsnoop 8  "12 February 2020" "" ""
+.SH NAME
+bindsnoop \- Trace bind() system calls.
+.SH SYNOPSIS
+.B bindsnoop.py [\fB-h\fP] [\fB-w\fP] [\fB-t\fP] [\fB-p\fP PID] [\fB-P\fP PORT] [\fB-E\fP] [\fB-U\fP] [\fB-u\fP UID] [\fB--count\fP] [\fB--cgroupmap MAP\fP] [\fB--mntnsmap MNTNSMAP\fP]
+.SH DESCRIPTION
+bindsnoop reports socket options set before the bind call that would impact this system call behavior.
+.PP
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH
+OPTIONS:
+.RS
+.TP
+Show help message and exit:
+.TP
+.B
+\fB-h\fP, \fB--help\fP
+.TP
+Include timestamp on output:
+.TP
+.B
+\fB-t\fP, \fB--timestamp\fP
+.TP
+Wider columns (fit IPv6):
+.TP
+.B
+\fB-w\fP, \fB--wide\fP
+.TP
+Trace this PID only:
+.TP
+.B
+\fB-p\fP PID, \fB--pid\fP PID
+.TP
+Comma-separated list of ports to trace:
+.TP
+.B
+\fB-P\fP PORT, \fB--port\fP PORT
+.TP
+Trace cgroups in this BPF map:
+.TP
+.B
+\fB--cgroupmap\fP MAP
+.TP
+Trace mount namespaces in this BPF map:
+.TP
+.B
+\fB--mntnsmap\fP MNTNSMAP
+.TP
+Include errors in the output:
+.TP
+.B
+\fB-E\fP, \fB--errors\fP
+.TP
+Include UID on output:
+.TP
+.B
+\fB-U\fP, \fB--print-uid\fP
+.TP
+Trace this UID only:
+.TP
+.B
+\fB-u\fP UID, \fB--uid\fP UID
+.TP
+Count binds per src ip and port:
+.TP
+.B
+\fB--count\fP
+.RE
+.PP
+.SH
+EXAMPLES:
+.RS
+.TP
+Trace all IPv4 and IPv6 \fBbind\fP()s
+.TP
+.B
+bindsnoop
+.TP
+Include timestamps
+.TP
+.B
+bindsnoop \fB-t\fP
+.TP
+Trace PID 181
+.TP
+.B
+bindsnoop \fB-p\fP 181
+.TP
+Trace port 80
+.TP
+.B
+bindsnoop \fB-P\fP 80
+.TP
+Trace port 80 and 81
+.TP
+.B
+bindsnoop \fB-P\fP 80,81
+.TP
+Include UID
+.TP
+.B
+bindsnoop \fB-U\fP
+.TP
+Trace UID 1000
+.TP
+.B
+bindsnoop \fB-u\fP 1000
+.TP
+Report bind errors
+.TP
+.B
+bindsnoop \fB-E\fP
+.TP
+Count bind per src ip
+.TP
+.B
+bindsnoop \fB--count\fP
+.RE
+.PP
+Trace IPv4 and IPv6 bind system calls and report socket options that would impact bind call behavior:
+.RS
+.TP
+SOL_IP IP_FREEBIND              F\.\.\.\.
+.TP
+SOL_IP IP_TRANSPARENT           \.T\.\.\.
+.TP
+SOL_IP IP_BIND_ADDRESS_NO_PORT  \.\.N\.\.
+.TP
+SOL_SOCKET SO_REUSEADDR         \.\.\.R.
+.TP
+SOL_SOCKET SO_REUSEPORT         \.\.\.\.r
+.PP
+SO_BINDTODEVICE interface is reported as "IF" index
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Pavel Dubovitsky
+.SH SEE ALSO
+tcpaccept(8)

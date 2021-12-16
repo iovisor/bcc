@@ -11,7 +11,7 @@ class TestPercpu(unittest.TestCase):
 
     def setUp(self):
         try:
-            b = BPF(text='BPF_TABLE("percpu_array", u32, u32, stub, 1);')
+            b = BPF(text='BPF_PERCPU_ARRAY(stub, u32, 1);')
         except:
             raise unittest.SkipTest("PerCpu unsupported on this kernel")
 
@@ -25,12 +25,14 @@ class TestPercpu(unittest.TestCase):
 
     def test_u64(self):
         test_prog1 = """
-        BPF_TABLE("percpu_hash", u32, u64, stats, 1);
+        BPF_PERCPU_HASH(stats, u32, u64, 1);
         int hello_world(void *ctx) {
             u32 key=0;
             u64 value = 0, *val;
-            val = stats.lookup_or_init(&key, &value);
-            *val += 1;
+            val = stats.lookup_or_try_init(&key, &value);
+            if (val) {
+                *val += 1;
+            }
             return 0;
         }
         """
@@ -55,12 +57,14 @@ class TestPercpu(unittest.TestCase):
 
     def test_u32(self):
         test_prog1 = """
-        BPF_TABLE("percpu_array", u32, u32, stats, 1);
+        BPF_PERCPU_ARRAY(stats, u32, 1);
         int hello_world(void *ctx) {
             u32 key=0;
             u32 value = 0, *val;
-            val = stats.lookup_or_init(&key, &value);
-            *val += 1;
+            val = stats.lookup_or_try_init(&key, &value);
+            if (val) {
+                *val += 1;
+            }
             return 0;
         }
         """
@@ -89,13 +93,15 @@ class TestPercpu(unittest.TestCase):
         u32 c1;
         u32 c2;
         } counter;
-        BPF_TABLE("percpu_hash", u32, counter, stats, 1);
+        BPF_PERCPU_HASH(stats, u32, counter, 1);
         int hello_world(void *ctx) {
             u32 key=0;
             counter value = {0,0}, *val;
-            val = stats.lookup_or_init(&key, &value);
-            val->c1 += 1;
-            val->c2 += 1;
+            val = stats.lookup_or_try_init(&key, &value);
+            if (val) {
+                val->c1 += 1;
+                val->c2 += 1;
+            }
             return 0;
         }
         """

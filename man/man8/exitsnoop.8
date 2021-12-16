@@ -1,0 +1,110 @@
+.TH exitsnoop 8  "2019-05-28" "USER COMMANDS"
+.SH NAME
+exitsnoop \- Trace all process termination (exit, fatal signal). Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B exitsnoop [\-h] [\-t] [\-\-utc] [\-x] [\-p PID] [\-\-label LABEL] [\-\-per\-thread]
+.SH DESCRIPTION
+exitsnoop traces process termination, showing the command name and reason for
+termination, either an exit or a fatal signal.
+
+It catches processes of all users, processes in containers, as well
+as processes that become zombie.
+
+This works by tracing the kernel sched_process_exit() function using dynamic tracing,
+and will need updating to match any changes to this function.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-t
+Include a timestamp column.
+.TP
+\-\-utc
+Include a timestamp column, use UTC timezone.
+.TP
+\-x
+Exclude successful exits, exit( 0 )
+.TP
+\-p PID
+Trace this process ID only (filtered in-kernel).
+.TP
+\-\-label LABEL
+Label each line with LABEL (default 'exit') in first column (2nd if timestamp is present).
+.TP
+\-\-per\-thread
+Trace per thread termination
+.SH EXAMPLES
+.TP
+Trace all process termination
+#
+.B exitsnoop
+.TP
+Trace all process termination, and include timestamps:
+#
+.B exitsnoop \-t
+.TP
+Exclude successful exits, only include non-zero exit codes and fatal signals:
+#
+.B exitsnoop \-x
+.TP
+Trace PID 181 only:
+#
+.B exitsnoop \-p 181
+.TP
+Label each output line with 'EXIT':
+#
+.B exitsnoop \-\-label EXIT
+.TP
+Trace per thread termination
+#
+.B exitsnoop \-\-per\-thread
+.SH FIELDS
+.TP
+TIME-TZ
+Time of process termination HH:MM:SS.sss with milliseconds, where TZ is
+the local time zone, 'UTC' with \-\-utc option.
+.TP
+LABEL
+The optional label if \-\-label option is used.  This is useful with the
+\-t option for timestamps when the output of several tracing tools is
+sorted into one combined output.
+.TP
+PCOMM
+Process/command name.
+.TP
+PID
+Process ID
+.TP
+PPID
+The process ID of the process that will be notified of PID termination.
+.TP
+TID
+Thread ID.
+.TP
+EXIT_CODE
+The exit code for exit() or the signal number for a fatal signal.
+.SH OVERHEAD
+This traces the kernel sched_process_exit() function and prints output for each event.
+As the rate of this is generally expected to be low (< 1000/s), the overhead is also
+expected to be negligible. If you have an application that has a high rate of
+process termination, then test and understand overhead before use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Arturo Martin-de-Nicolas
+.SH SEE ALSO
+execsnoop(8)

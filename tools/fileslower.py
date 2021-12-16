@@ -31,7 +31,6 @@
 from __future__ import print_function
 from bcc import BPF
 import argparse
-import ctypes as ct
 import time
 
 # arguments
@@ -111,8 +110,9 @@ static int trace_rw_entry(struct pt_regs *ctx, struct file *file,
     val.sz = count;
     val.ts = bpf_ktime_get_ns();
 
-    val.name_len = de->d_name.len;
-    bpf_probe_read(&val.name, sizeof(val.name), (void *)de->d_name.name);
+    struct qstr d_name = de->d_name;
+    val.name_len = d_name.len;
+    bpf_probe_read_kernel(&val.name, sizeof(val.name), d_name.name);
     bpf_get_current_comm(&val.comm, sizeof(val.comm));
     entryinfo.update(&pid, &val);
 
@@ -159,8 +159,8 @@ static int trace_rw_return(struct pt_regs *ctx, int type)
     data.sz = valp->sz;
     data.delta_us = delta_us;
     data.name_len = valp->name_len;
-    bpf_probe_read(&data.name, sizeof(data.name), valp->name);
-    bpf_probe_read(&data.comm, sizeof(data.comm), valp->comm);
+    bpf_probe_read_kernel(&data.name, sizeof(data.name), valp->name);
+    bpf_probe_read_kernel(&data.comm, sizeof(data.comm), valp->comm);
     events.perf_submit(ctx, &data, sizeof(data));
 
     return 0;
@@ -199,29 +199,20 @@ b = BPF(text=bpf_text)
 # do_sync_read/do_sync_write), but those became static. So trace these from
 # the parent functions, at the cost of more overhead, instead.
 # Ultimately, we should be using [V]FS tracepoints.
-b.attach_kprobe(event="__vfs_read", fn_name="trace_read_entry")
-b.attach_kretprobe(event="__vfs_read", fn_name="trace_read_return")
+try:
+    b.attach_kprobe(event="__vfs_read", fn_name="trace_read_entry")
+    b.attach_kretprobe(event="__vfs_read", fn_name="trace_read_return")
+except Exception:
+    print('Current kernel does not have __vfs_read, try vfs_read instead')
+    b.attach_kprobe(event="vfs_read", fn_name="trace_read_entry")
+    b.attach_kretprobe(event="vfs_read", fn_name="trace_read_return")
 try:
     b.attach_kprobe(event="__vfs_write", fn_name="trace_write_entry")
     b.attach_kretprobe(event="__vfs_write", fn_name="trace_write_return")
-except:
-    # older kernels don't have __vfs_write so try vfs_write instead
+except Exception:
+    print('Current kernel does not have __vfs_write, try vfs_write instead')
     b.attach_kprobe(event="vfs_write", fn_name="trace_write_entry")
     b.attach_kretprobe(event="vfs_write", fn_name="trace_write_return")
-
-TASK_COMM_LEN = 16  # linux/sched.h
-DNAME_INLINE_LEN = 32  # linux/dcache.h
-
-class Data(ct.Structure):
-    _fields_ = [
-        ("mode", ct.c_int),
-        ("pid", ct.c_uint),
-        ("sz", ct.c_uint),
-        ("delta_us", ct.c_ulonglong),
-        ("name_len", ct.c_uint),
-        ("name", ct.c_char * DNAME_INLINE_LEN),
-        ("comm", ct.c_char * TASK_COMM_LEN),
-    ]
 
 mode_s = {
     0: 'R',
@@ -234,19 +225,22 @@ print("%-8s %-14s %-6s %1s %-7s %7s %s" % ("TIME(s)", "COMM", "TID", "D",
     "BYTES", "LAT(ms)", "FILENAME"))
 
 start_ts = time.time()
-
+DNAME_INLINE_LEN = 32 
 def print_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data)).contents
+    event = b["events"].event(data)
 
     ms = float(event.delta_us) / 1000
-    name = event.name.decode()
+    name = event.name.decode('utf-8', 'replace')
     if event.name_len > DNAME_INLINE_LEN:
         name = name[:-3] + "..."
 
     print("%-8.3f %-14.14s %-6s %1s %-7s %7.2f %s" % (
-        time.time() - start_ts, event.comm.decode(), event.pid,
-        mode_s[event.mode], event.sz, ms, name))
+        time.time() - start_ts, event.comm.decode('utf-8', 'replace'),
+        event.pid, mode_s[event.mode], event.sz, ms, name))
 
 b["events"].open_perf_buffer(print_event, page_cnt=64)
 while 1:
-    b.perf_buffer_poll()
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

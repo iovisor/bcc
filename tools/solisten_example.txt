@@ -21,7 +21,7 @@ PID    COMM         NETNS        PROTO  BACKLOG  ADDR                           
 6069   nginx        4026531957   TCPv6  128      ::                                      80
 
 This output show the listen event from 3 programs. Netcat was started twice as
-shown by the 2 different PIDs. The first time on the wilcard IPv4, the second
+shown by the 2 different PIDs. The first time on the wildcard IPv4, the second
 time on an IPv6. Netcat being a "one shot" program. It can accept a single
 connection, hence the backlog of "1".
 

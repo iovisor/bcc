@@ -1,0 +1,39 @@
+Demonstrations of undump.py, the Linux eBPF/bcc version.
+
+This example trace the kernel function performing receive AP_UNIX socket
+packet. Some example output:
+
+Terminal 1, UNIX Socket Server:
+
+```
+$ nc -lU /var/tmp/dsocket
+# receive from Client
+Hello, World
+abcdefg
+```
+
+Terminal 2, UNIX socket Client:
+
+```
+$ nc -U /var/tmp/dsocket
+# Input some lines
+Hello, World
+abcdefg
+```
+
+Terminal 3, receive tracing:
+
+```
+$ sudo python undump.py -p 49264
+Tracing PID=49264 UNIX socket packets ... Hit Ctrl-C to end
+
+# Here print bytes of receive
+PID 49264 Recv 13 bytes
+   48 65 6c 6c 6f 2c 20 57 6f 72 6c 64 0a 
+PID 49264 Recv 8 bytes
+   61 62 63 64 65 66 67 0a
+```
+
+This output shows two packet received by PID 49264(nc -lU /var/tmp/dsocket),
+`Hello, World` will be parsed as `48 65 6c 6c 6f 2c 20 57 6f 72 6c 64 0a`, the
+`0a` is `Enter`. `abcdefg` will be parsed as `61 62 63 64 65 66 67 0a`.

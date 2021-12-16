@@ -70,6 +70,7 @@ int pem(struct __sk_buff *skb) {
         meta.prog_id = meta.rx_port_id = 0;
     } else {
         meta.prog_id = skb->cb[0];
+        asm volatile("" ::: "memory");
         meta.rx_port_id = skb->cb[1];
     }
     if (!meta.prog_id) {

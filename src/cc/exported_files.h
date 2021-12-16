@@ -23,8 +23,10 @@ namespace ebpf {
 
 class ExportedFiles {
   static std::map<std::string, const char *> headers_;
+  static std::map<std::string, const char *> footers_;
  public:
   static const std::map<std::string, const char *> & headers() { return headers_; }
+  static const std::map<std::string, const char *> & footers() { return footers_; }
 };
 
 }

@@ -110,7 +110,7 @@ class EbpfTableKey(object):
                 ebpfHeader = program.getInstance(instance.name)
                 assert isinstance(ebpfHeader, ebpfInstance.SimpleInstance)
                 basetype = ebpfHeader.type
-                eInstance = program.getInstance(instance.base_name)
+                eInstance = program.getInstance(instance.name)
 
             ebpfField = basetype.getField(fieldname)
             assert isinstance(ebpfField, ebpfStructType.EbpfField)
@@ -136,7 +136,7 @@ class EbpfTableKey(object):
         # Sort fields in decreasing size; this will ensure that
         # there is no padding.
         # Padding may cause the ebpf verification to fail,
-        # since padding fields are not initalized
+        # since padding fields are not initialized
         fieldOrder = sorted(
             self.fields, key=EbpfTableKey.fieldRank, reverse=True)
         for f in fieldOrder:

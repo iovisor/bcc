@@ -28,7 +28,6 @@ from __future__ import print_function
 from bcc import BPF
 import argparse
 from time import strftime
-import ctypes as ct
 
 # arguments
 examples = """examples:
@@ -173,8 +172,15 @@ static int trace_return(struct pt_regs *ctx, int type)
 
     // calculate delta
     u64 ts = bpf_ktime_get_ns();
-    u64 delta_us = (ts - valp->ts) / 1000;
+    u64 delta_us = ts - valp->ts;
     entryinfo.delete(&id);
+
+    // Skip entries with backwards time: temp workaround for #728
+    if ((s64) delta_us < 0)
+        return 0;
+
+    delta_us /= 1000;
+
     if (FILTER_US)
         return 0;
 
@@ -187,13 +193,10 @@ static int trace_return(struct pt_regs *ctx, int type)
     bpf_get_current_comm(&data.task, sizeof(data.task));
 
     // workaround (rewriter should handle file to d_name in one step):
-    struct dentry *de = NULL;
-    struct qstr qs = {};
-    bpf_probe_read(&de, sizeof(de), &valp->fp->f_path.dentry);
-    bpf_probe_read(&qs, sizeof(qs), (void *)&de->d_name);
+    struct qstr qs = valp->fp->f_path.dentry->d_name;
     if (qs.len == 0)
         return 0;
-    bpf_probe_read(&data.file, sizeof(data.file), (void *)qs.name);
+    bpf_probe_read_kernel(&data.file, sizeof(data.file), (void *)qs.name);
 
     // output
     events.perf_submit(ctx, &data, sizeof(data));
@@ -236,24 +239,9 @@ if debug or args.ebpf:
     if args.ebpf:
         exit()
 
-# kernel->user event data: struct data_t
-DNAME_INLINE_LEN = 32   # linux/dcache.h
-TASK_COMM_LEN = 16      # linux/sched.h
-class Data(ct.Structure):
-    _fields_ = [
-        ("ts_us", ct.c_ulonglong),
-        ("type", ct.c_ulonglong),
-        ("size", ct.c_ulonglong),
-        ("offset", ct.c_ulonglong),
-        ("delta_us", ct.c_ulonglong),
-        ("pid", ct.c_ulonglong),
-        ("task", ct.c_char * TASK_COMM_LEN),
-        ("file", ct.c_char * DNAME_INLINE_LEN)
-    ]
-
 # process event
 def print_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data)).contents
+    event = b["events"].event(data)
 
     type = 'R'
     if event.type == 1:
@@ -299,4 +287,7 @@ else:
 # read events
 b["events"].open_perf_buffer(print_event, page_cnt=64)
 while 1:
-    b.perf_buffer_poll()
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

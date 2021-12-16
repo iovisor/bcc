@@ -10,6 +10,7 @@
 
 from __future__ import print_function
 from bcc import BPF
+from bcc.utils import printb
 
 # load BPF program
 b = BPF(text="""
@@ -22,7 +23,7 @@ int do_trace(struct pt_regs *ctx) {
 
     // attempt to read stored timestamp
     tsp = last.lookup(&key);
-    if (tsp != 0) {
+    if (tsp != NULL) {
         delta = bpf_ktime_get_ns() - *tsp;
         if (delta < 1000000000) {
             // output if time is less than 1 second
@@ -44,8 +45,11 @@ print("Tracing for quick sync's... Ctrl-C to end")
 # format output
 start = 0
 while 1:
-    (task, pid, cpu, flags, ts, ms) = b.trace_fields()
-    if start == 0:
-        start = ts
-    ts = ts - start
-    print("At time %.2f s: multiple syncs detected, last %s ms ago" % (ts, ms))
+    try:
+        (task, pid, cpu, flags, ts, ms) = b.trace_fields()
+        if start == 0:
+            start = ts
+        ts = ts - start
+        printb(b"At time %.2f s: multiple syncs detected, last %s ms ago" % (ts, ms))
+    except KeyboardInterrupt:
+        exit()

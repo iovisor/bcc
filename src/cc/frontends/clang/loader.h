@@ -20,6 +20,8 @@
 #include <memory>
 #include <string>
 
+#include <clang/Frontend/CompilerInvocation.h>
+
 #include "table_storage.h"
 
 namespace llvm {
@@ -54,7 +56,9 @@ class ClangLoader {
   int parse(std::unique_ptr<llvm::Module> *mod, TableStorage &ts,
             const std::string &file, bool in_memory, const char *cflags[],
             int ncflags, const std::string &id, FuncSource &func_src,
-            std::string &mod_src);
+            std::string &mod_src, const std::string &maps_ns,
+            fake_fd_map_def &fake_fd_map,
+            std::map<std::string, std::vector<std::string>> &perf_events);
 
  private:
   int do_compile(std::unique_ptr<llvm::Module> *mod, TableStorage &ts,
@@ -63,10 +67,18 @@ class ClangLoader {
                  const std::string &main_path,
                  const std::unique_ptr<llvm::MemoryBuffer> &main_buf,
                  const std::string &id, FuncSource &func_src,
-                 std::string &mod_src, bool use_internal_bpfh);
+                 std::string &mod_src, bool use_internal_bpfh,
+                 const std::string &maps_ns,
+                 fake_fd_map_def &fake_fd_map,
+                 std::map<std::string, std::vector<std::string>> &perf_events);
+  void add_remapped_includes(clang::CompilerInvocation& invocation);
+  void add_main_input(clang::CompilerInvocation& invocation,
+                      const std::string& main_path,
+                      llvm::MemoryBuffer *main_buf);
 
  private:
-  std::map<std::string, std::unique_ptr<llvm::MemoryBuffer>> remapped_files_;
+  std::map<std::string, std::unique_ptr<llvm::MemoryBuffer>> remapped_headers_;
+  std::map<std::string, std::unique_ptr<llvm::MemoryBuffer>> remapped_footers_;
   llvm::LLVMContext *ctx_;
   unsigned flags_;
 };

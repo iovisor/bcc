@@ -1,8 +1,9 @@
-.TH capable 8  "2016-09-13" "USER COMMANDS"
+.TH capable 8  "2020-03-08" "USER COMMANDS"
 .SH NAME
 capable \- Trace security capability checks (cap_capable()).
 .SH SYNOPSIS
-.B capable [\-h] [\-v] [\-p PID]
+.B capable [\-h] [\-v] [\-p PID] [\-K] [\-U] [\-x] [\-\-cgroupmap MAPPATH]
+           [\-\-mntnsmap MAPPATH] [--unique]
 .SH DESCRIPTION
 This traces security capability checks in the kernel, and prints details for
 each call. This can be useful for general debugging, and also security
@@ -19,6 +20,24 @@ USAGE message.
 Include non-audit capability checks. These are those deemed not interesting and
 not necessary to audit, such as CAP_SYS_ADMIN checks on memory allocation to
 affect the behavior of overcommit.
+.TP
+\-K
+Include kernel stack traces to the output.
+.TP
+\-U
+Include user-space stack traces to the output.
+.TP
+\-x
+Show extra fields in TID and INSETID columns.
+.TP
+\-\-cgroupmap MAPPATH
+Trace cgroups in this BPF map only (filtered in-kernel).
+.TP
+\-\-mntnsmap  MAPPATH
+Trace mount namespaces in this BPF map only (filtered in-kernel).
+.TP
+\-\-unique
+Don't repeat stacks for the same PID or cgroup.
 .SH EXAMPLES
 .TP
 Trace all capability checks system-wide:
@@ -28,6 +47,11 @@ Trace all capability checks system-wide:
 Trace capability checks for PID 181:
 #
 .B capable \-p 181
+.TP
+Trace capability checks in a set of cgroups only (see special_filtering.md
+from bcc sources for more details):
+#
+.B capable \-\-cgroupmap /sys/fs/bpf/test01
 .SH FIELDS
 .TP
 TIME(s)
@@ -48,6 +72,8 @@ Capability name. See capabilities(7) for descriptions.
 .TP
 AUDIT
 Whether this was an audit event. Use \-v to include non-audit events.
+INSETID
+Whether the INSETID bit was set (Linux >= 5.1).
 .SH OVERHEAD
 This adds low-overhead instrumentation to capability checks, which are expected
 to be low frequency, however, that depends on the application. Test in a lab

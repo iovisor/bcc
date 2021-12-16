@@ -25,7 +25,7 @@
 TEST_CASE("test read perf event", "[bpf_perf_event]") {
 // The basic bpf_perf_event_read is supported since Kernel 4.3. However in that
 // version it only supported HARDWARE and RAW events. On the other hand, our
-// tests running on Jenkins won't have availiable HARDWARE counters since they
+// tests running on Jenkins won't have available HARDWARE counters since they
 // are running on VMs. The support of other types of events such as SOFTWARE are
 // only added since Kernel 4.13, hence we can only run the test since that.
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
@@ -58,18 +58,18 @@ TEST_CASE("test read perf event", "[bpf_perf_event]") {
   res = bpf.init(
       BPF_PROGRAM,
       {"-DNUM_CPUS=" + std::to_string(sysconf(_SC_NPROCESSORS_ONLN))}, {});
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   res =
       bpf.open_perf_event("cnt", PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   std::string getuid_fnname = bpf.get_syscall_fnname("getuid");
   res = bpf.attach_kprobe(getuid_fnname, "on_sys_getuid");
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   REQUIRE(getuid() >= 0);
   res = bpf.detach_kprobe(getuid_fnname);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   res = bpf.close_perf_event("cnt");
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
 
   auto val = bpf.get_hash_table<int, uint64_t>("val");
   REQUIRE(val[0] >= 0);
@@ -113,13 +113,13 @@ TEST_CASE("test attach perf event", "[bpf_perf_event]") {
   ebpf::BPF bpf;
   ebpf::StatusTuple res(0);
   res = bpf.init(BPF_PROGRAM);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   res = bpf.attach_perf_event(PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK,
                               "on_event", 0, 1000);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   sleep(1);
   res = bpf.detach_perf_event(PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
 
   auto pid = bpf.get_hash_table<int, uint64_t>("pid");
   REQUIRE(pid[0] >= 0);
@@ -135,8 +135,9 @@ TEST_CASE("test attach perf event", "[bpf_perf_event]") {
   // the program slept one second between perf_event attachment and detachment
   // in the above, so the enabled counter should be 1000000000ns or
   // more. But in reality, most of counters (if not all) are 9xxxxxxxx,
-  // and I also saw one 8xxxxxxxx. So let us a little bit conservative here.
-  REQUIRE(counter.enabled >= 800000000);
+  // and I also saw 7xxxxxxxx. So let us a little bit conservative here and
+  // set 200000000 to avoie test flakiness.
+  REQUIRE(counter.enabled >= 200000000);
   REQUIRE(counter.running >= 0);
   REQUIRE(counter.running <= counter.enabled);
 #endif

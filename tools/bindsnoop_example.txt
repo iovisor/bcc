@@ -1,0 +1,116 @@
+Demonstrations of bindsnoop, the Linux eBPF/bcc version.
+
+This tool traces the kernel function performing socket binding and
+print socket options set before the system call invocation that might
+impact bind behavior and bound interface:
+SOL_IP     IP_FREEBIND              F....
+SOL_IP     IP_TRANSPARENT           .T...
+SOL_IP     IP_BIND_ADDRESS_NO_PORT  ..N..
+SOL_SOCKET SO_REUSEADDR             ...R.
+SOL_SOCKET SO_REUSEPORT             ....r
+
+
+# ./bindsnoop.py
+Tracing binds ... Hit Ctrl-C to end
+PID COMM         PROT ADDR            PORT   OPTS IF
+3941081 test_bind_op TCP  192.168.1.102       0 F.N..  0
+3940194 dig          TCP  ::              62087 .....  0
+3940219 dig          UDP  ::              48665 .....  0
+3940893 Acceptor Thr TCP  ::              35343 ...R.  0
+
+The output shows four bind system calls:
+two "test_bind_op" instances, one with IP_FREEBIND and IP_BIND_ADDRESS_NO_PORT
+options, dig process called bind for TCP and UDP sockets,
+and Acceptor called bind for TCP with SO_REUSEADDR option set.
+
+
+The -t option prints a timestamp column
+
+# ./bindsnoop.py -t
+TIME(s)        PID COMM         PROT ADDR            PORT   OPTS IF
+0.000000   3956801 dig          TCP  ::              49611 .....  0
+0.011045   3956822 dig          UDP  ::              56343 .....  0
+2.310629   3956498 test_bind_op TCP  192.168.1.102   39609 F...r  0
+
+
+The -U option prints a UID column:
+
+# ./bindsnoop.py -U
+Tracing binds ... Hit Ctrl-C to end
+   UID      PID COMM         PROT ADDR            PORT   OPTS IF
+127072  3956498 test_bind_op TCP  192.168.1.102   44491 F...r  0
+127072  3960261 Acceptor Thr TCP  ::              48869 ...R.  0
+     0  3960729 Acceptor Thr TCP  ::              44637 ...R.  0
+     0  3959075 chef-client  UDP  ::              61722 .....  0
+
+
+The -u option filtering UID:
+
+# ./bindsnoop.py -Uu 0
+Tracing binds ... Hit Ctrl-C to end
+   UID      PID COMM         PROT ADDR            PORT   OPTS IF
+     0  3966330 Acceptor Thr TCP  ::              39319 ...R.  0
+     0  3968044 python3.7    TCP  ::1             59371 .....  0
+     0    10224 fetch        TCP  0.0.0.0         42091 ...R.  0
+
+
+The --cgroupmap option filters based on a cgroup set.
+It is meant to be used with an externally created map.
+
+# ./bindsnoop.py --cgroupmap /sys/fs/bpf/test01
+
+For more details, see docs/special_filtering.md
+
+
+In order to track heavy bind usage one can use --count option
+# ./bindsnoop.py --count
+Tracing binds ... Hit Ctrl-C to end
+LADDR                                           LPORT     BINDS
+0.0.0.0                                          6771     4
+0.0.0.0                                          4433     4
+127.0.0.1                                       33665     1
+
+
+Usage message:
+# ./bindsnoop.py -h
+usage: bindsnoop.py [-h] [-t] [-w] [-p PID] [-P PORT] [-E] [-U] [-u UID]
+                  [--count] [--cgroupmap CGROUPMAP] [--mntnsmap MNTNSMAP]
+
+Trace TCP binds
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -t, --timestamp       include timestamp on output
+  -w, --wide            wide column output (fits IPv6 addresses)
+  -p PID, --pid PID     trace this PID only
+  -P PORT, --port PORT  comma-separated list of ports to trace.
+  -E, --errors          include errors in the output.
+  -U, --print-uid       include UID on output
+  -u UID, --uid UID     trace this UID only
+  --count               count binds per src ip and port
+  --cgroupmap CGROUPMAP
+                        trace cgroups in this BPF map only
+
+examples:
+    ./bindsnoop           # trace all TCP bind()s
+    ./bindsnoop -t        # include timestamps
+    ./bindsnoop -w        # wider columns (fit IPv6)
+    ./bindsnoop -p 181    # only trace PID 181
+    ./bindsnoop -P 80     # only trace port 80
+    ./bindsnoop -P 80,81  # only trace port 80 and 81
+    ./bindsnoop -U        # include UID
+    ./bindsnoop -u 1000   # only trace UID 1000
+    ./bindsnoop -E        # report bind errors
+    ./bindsnoop --count   # count bind per src ip
+    ./bindsnoop --cgroupmap mappath  # only trace cgroups in this BPF map
+    ./bindsnoop --mntnsmap  mappath  # only trace mount namespaces in the map
+
+    it is reporting socket options set before the bins call
+    impacting system call behavior:
+     SOL_IP     IP_FREEBIND              F....
+     SOL_IP     IP_TRANSPARENT           .T...
+     SOL_IP     IP_BIND_ADDRESS_NO_PORT  ..N..
+     SOL_SOCKET SO_REUSEADDR             ...R.
+     SOL_SOCKET SO_REUSEPORT             ....r
+
+     SO_BINDTODEVICE interface is reported as "IF" index

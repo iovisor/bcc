@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
 # tc_perf_event.py  Output skb and meta data through perf event
 #
@@ -77,9 +77,12 @@ try:
            parent="ffff:fff3", classid=1, direct_action=True)
 
     b["skb_events"].open_perf_buffer(print_skb_event)
-    print('Try: "ping -6 ff02::1%me"\n')
+    print('Try: "ping6 ff02::1%me"\n')
     print("%-3s %-32s %-12s %-10s" % ("CPU", "SRC IP", "DST IP", "Magic"))
-    while True:
-        b.perf_buffer_poll()
+    try:
+        while True:
+            b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        pass
 finally:
     if "me" in locals(): ipr.link("del", index=me)

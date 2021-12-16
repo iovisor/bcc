@@ -1,0 +1,359 @@
+#
+# Copyright (C) 2016,2020 Canonical
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+#
+name: bcc
+summary: BPF Compiler Collection (BCC)
+description: A toolkit for creating efficient kernel tracing and manipulation programs
+confinement: strict
+grade: stable
+plugs:
+    mount-observe: null
+    system-observe: null
+    system-trace: null
+assumes: [snapd2.37]
+base: core18
+adopt-info: bcc
+
+architectures:
+    - build-on: s390x
+    - build-on: ppc64el
+    - build-on: arm64
+    - build-on: armhf
+    - build-on: amd64
+    - build-on: i386
+
+parts:
+    bcc:
+        plugin: cmake
+        override-pull: |
+            snapcraftctl pull
+
+            find . -type f -exec sed -i 's|^#\!/usr/bin/python|#\!/usr/bin/env python3|' {} \;
+
+            version=$(git tag | sort -V | tail -1 | cut -c2-)
+            commits=$(git log --oneline | wc -l)
+            sha=$(git log -1 --oneline | cut -d' ' -f1)
+            date=$(date +'%Y%m%d')
+            snapcraftctl set-version "$version-$date-$commits-$sha"
+        configflags:
+            - '-DCMAKE_INSTALL_PREFIX=/usr'
+            - '-DPYTHON_CMD=$SNAPCRAFT_STAGE/usr/bin/python3'
+            - '-DCMAKE_VERBOSE_MAKEFILE=ON'
+        source: .
+        build-packages:
+            - bison
+            - build-essential
+            - flex
+            - git
+            - iperf
+            - libclang-4.0-dev
+            - libedit-dev
+            - libelf-dev
+            - libllvm4.0
+            - libfl-dev
+            - llvm-4.0-dev
+            - zlib1g-dev
+        prime:
+            - -usr/share/bcc/tools/doc
+            - usr/lib/*/lib*.so*
+            - usr/lib/python3
+            - usr/lib/python3.6*
+            - usr/share/bcc/tools
+        after:
+          - stage
+
+    stage:
+        plugin: nil
+        stage-packages:
+            - libbz2-1.0
+            - liblzma5
+            - libncursesw5
+            - libtinfo5
+            - libzzip-0-13
+            - python3
+            - python3-distutils
+            - python3-distutils-extra
+            - python3-pip
+            - python3-setuptools
+        prime:
+            - -usr/lib/*/perl
+            - -usr/lib/*/perl5
+            - usr/bin
+            - usr/lib
+
+    wrapper:
+        plugin: dump
+        after: [bcc]
+        source: snap/local
+
+apps:
+    argdist:
+        command: bcc-wrapper argdist
+    bashreadline:
+        command: bcc-wrapper bashreadline
+    biolatency:
+        command: bcc-wrapper biolatency
+    biolatpcts:
+        command: bcc-wrapper biolatpcts
+    biosnoop:
+        command: bcc-wrapper biosnoop
+    biotop:
+        command: bcc-wrapper biotop
+    bitesize:
+        command: bcc-wrapper bitesize
+    bpflist:
+        command: bcc-wrapper bpflist
+    btrfsdist:
+        command: bcc-wrapper btrfsdist
+    btrfsslower:
+        command: bcc-wrapper btrfsslower
+    cachestat:
+        command: bcc-wrapper cachestat
+    cachetop:
+        command: bcc-wrapper cachetop
+    capable:
+        command: bcc-wrapper capable
+    cobjnew:
+        command: bcc-wrapper cobjnew
+    compactsnoop:
+        command: bcc-wrapper compactsnoop
+    cpudist:
+        command: bcc-wrapper cpudist
+    cpuunclaimed:
+        command: bcc-wrapper cpuunclaimed
+    criticalstat:
+        command: bcc-wrapper criticalstat
+    dbslower:
+        command: bcc-wrapper dbslower
+    dbstat:
+        command: bcc-wrapper dbstat
+    dcsnoop:
+        command: bcc-wrapper dcsnoop
+    dcstat:
+        command: bcc-wrapper dcstat
+    deadlock:
+        command: bcc-wrapper deadlock
+    dirtop:
+        command: bcc-wrapper dirtop
+    drsnoop:
+        command: bcc-wrapper drsnoop
+    execsnoop:
+        command: bcc-wrapper execsnoop
+    exitsnoop:
+        command: bcc-wrapper exitsnoop
+    ext4dist:
+        command: bcc-wrapper ext4dist
+    ext4slower:
+        command: bcc-wrapper ext4slower
+    filelife:
+        command: bcc-wrapper filelife
+    fileslower:
+        command: bcc-wrapper fileslower
+    filetop:
+        command: bcc-wrapper filetop
+    funccount:
+        command: bcc-wrapper funccount
+    funcinterval:
+        command: bcc-wrapper funcinterval
+    funclatency:
+        command: bcc-wrapper funclatency
+    funcslower:
+        command: bcc-wrapper funcslower
+    gethostlatency:
+        command: bcc-wrapper gethostlatency
+    hardirqs:
+        command: bcc-wrapper hardirqs
+    inject:
+        command: bcc-wrapper inject
+    javacalls:
+        command: bcc-wrapper javacalls
+    javaflow:
+        command: bcc-wrapper javaflow
+    javagc:
+        command: bcc-wrapper javagc
+    javaobjnew:
+        command: bcc-wrapper javaobjnew
+    javastat:
+        command: bcc-wrapper javastat
+    javathreads:
+        command: bcc-wrapper javathreads
+    killsnoop:
+        command: bcc-wrapper killsnoop
+    klockstat:
+        command: bcc-wrapper klockstat
+    llcstat:
+        command: bcc-wrapper llcstat
+    mdflush:
+        command: bcc-wrapper mdflush
+    memleak:
+        command: bcc-wrapper memleak
+    mountsnoop:
+        command: bcc-wrapper mountsnoop
+    mysqld-qslower:
+        command: bcc-wrapper mysqld_qslower
+    netqtop:
+        command: bcc-wrapper netqtop
+    nfsdist:
+        command: bcc-wrapper nfsdist
+    nfsslower:
+        command: bcc-wrapper nfsslower
+    nodegc:
+        command: bcc-wrapper nodegc
+    nodestat:
+        command: bcc-wrapper nodestat
+    offcputime:
+        command: bcc-wrapper offcputime
+    offwaketime:
+        command: bcc-wrapper offwaketime
+    oomkill:
+        command: bcc-wrapper oomkill
+    opensnoop:
+        command: bcc-wrapper opensnoop
+    perlcalls:
+        command: bcc-wrapper perlcalls
+    perlflow:
+        command: bcc-wrapper perlflow
+    perlstat:
+        command: bcc-wrapper perlstat
+    pidpersec:
+        command: bcc-wrapper pidpersec
+    profile:
+        command: bcc-wrapper profile
+    phpcalls:
+        command: bcc-wrapper phpcalls
+    phpflow:
+        command: bcc-wrapper phpflow
+    phpstat:
+        command: bcc-wrapper phpstat
+    pythoncalls:
+        command: bcc-wrapper pythoncalls
+    pythonflow:
+        command: bcc-wrapper pythonflow
+    pythongc:
+        command: bcc-wrapper pythongc
+    pythonstat:
+        command: bcc-wrapper pythonstat
+    readahead:
+        command: bcc-wrapper readahead
+    reset-trace:
+        command: bcc-wrapper reset-trace
+    rubycalls:
+        command: bcc-wrapper rubycalls
+    rubyflow:
+        command: bcc-wrapper rubyflow
+    rubygc:
+        command: bcc-wrapper rubygc
+    rubyobjnew:
+        command: bcc-wrapper rubyobjnew
+    rubystat:
+        command: bcc-wrapper rubystat
+    runqlat:
+        command: bcc-wrapper runqlat
+    runqlen:
+        command: bcc-wrapper runqlen
+    runqslower:
+        command: bcc-wrapper runqslower
+    shmsnoop:
+        command: bcc-wrapper shmsnoop
+    slabratetop:
+        command: bcc-wrapper slabratetop
+    sofdsnoop:
+        command: bcc-wrapper sofdsnoop
+    softirqs:
+        command: bcc-wrapper softirqs
+    solisten:
+        command: bcc-wrapper solisten
+    sslsniff:
+        command: bcc-wrapper sslsniff
+    stackcount:
+        command: bcc-wrapper stackcount
+    statsnoop:
+        command: bcc-wrapper statsnoop
+    swapin:
+        command: bcc-wrapper swapin
+    syncsnoop:
+        command: bcc-wrapper syncsnoop
+    syscount:
+        command: bcc-wrapper syscount
+    tclcalls:
+        command: bcc-wrapper tclcalls
+    tclflow:
+        command: bcc-wrapper tclflow
+    tclobjnew:
+        command: bcc-wrapper tclobjnew
+    tclstat:
+        command: bcc-wrapper tclstat
+    tcpaccept:
+        command: bcc-wrapper tcpaccept
+    tcpconnect:
+        command: bcc-wrapper tcpconnect
+    tcpconnlat:
+        command: bcc-wrapper tcpconnlat
+    tcpdrop:
+        command: bcc-wrapper tcpdrop
+    tcplife:
+        command: bcc-wrapper tcplife
+    tcpretrans:
+        command: bcc-wrapper tcpretrans
+    tcprtt:
+        command: bcc-wrapper tcprtt
+    tcpstates:
+        command: bcc-wrapper tcpstates
+    tcpsubnet:
+        command: bcc-wrapper tcpsubnet
+    tcpsynbl:
+        command: bcc-wrapper tcpsynbl
+    tcptop:
+        command: bcc-wrapper tcptop
+    tcptracer:
+        command: bcc-wrapper tcptracer
+    threadsnoop:
+        command: bcc-wrapper threadsnoop
+    tplist:
+        command: bcc-wrapper tplist
+    trace:
+        command: bcc-wrapper trace
+    ttysnoop:
+        command: bcc-wrapper ttysnoop
+    ucalls:
+        command: bcc-wrapper lib/ucalls
+    uflow:
+        command: bcc-wrapper lib/uflow
+    ugc:
+        command: bcc-wrapper lib/ugc
+    uobjnew:
+        command: bcc-wrapper lib/uobjnew
+    ustat:
+        command: bcc-wrapper lib/ustat
+    uthreads:
+        command: bcc-wrapper lib/uthreads
+    vfscount:
+        command: bcc-wrapper vfscount
+    vfsstat:
+        command: bcc-wrapper vfsstat
+    wakeuptime:
+        command: bcc-wrapper wakeuptime
+    xfsdist:
+        command: bcc-wrapper xfsdist
+    xfsslower:
+        command: bcc-wrapper xfsslower
+    zfsdist:
+        command: bcc-wrapper zfsdist
+    zfsslower:
+        command: bcc-wrapper zfsslower
+
+# vim: set ai et sts=4 tabstop=4 sw=4:

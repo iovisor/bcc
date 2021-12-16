@@ -39,6 +39,7 @@ bool Argument::get_global_address(uint64_t *address, const std::string &binpath,
     static struct bcc_symbol_option default_option = {
       .use_debug_file = 1,
       .check_debug_file_crc = 1,
+      .lazy_symbolize = 1,
       .use_symbol_type = BCC_SYM_ALL_TYPES
     };
     return ProcSyms(*pid, &default_option)
@@ -63,7 +64,7 @@ bool Argument::assign_to_local(std::ostream &stream,
                                const std::string &binpath,
                                const optional<int> &pid) const {
   if (constant_) {
-    tfm::format(stream, "%s = %d;", local_name, *constant_);
+    tfm::format(stream, "%s = %lld;", local_name, *constant_);
     return true;
   }
 
@@ -91,7 +92,7 @@ bool Argument::assign_to_local(std::ostream &stream,
     tfm::format(stream, " %s ", COMPILER_BARRIER);
     tfm::format(stream,
                 "%s __res = 0x0; "
-                "bpf_probe_read(&__res, sizeof(__res), (void *)__addr); "
+                "bpf_probe_read_user(&__res, sizeof(__res), (void *)__addr); "
                 "%s = __res; }",
                 ctype(), local_name);
     return true;
@@ -104,7 +105,7 @@ bool Argument::assign_to_local(std::ostream &stream,
 
     tfm::format(stream,
                 "{ u64 __addr = 0x%xull + %d; %s __res = 0x0; "
-                "bpf_probe_read(&__res, sizeof(__res), (void *)__addr); "
+                "bpf_probe_read_user(&__res, sizeof(__res), (void *)__addr); "
                 "%s = __res; }",
                 global_address, *deref_offset_, ctype(), local_name);
     return true;
@@ -132,11 +133,27 @@ void ArgumentParser::skip_until_whitespace_from(size_t pos) {
 }
 
 bool ArgumentParser_aarch64::parse_register(ssize_t pos, ssize_t &new_pos,
-                                            optional<int> *reg_num) {
-  new_pos = parse_number(pos, reg_num);
-  if (new_pos == pos || *reg_num < 0 || *reg_num > 31)
+                                            std::string &reg_name) {
+  if (arg_[pos] == 'x') {
+    optional<int> reg_num;
+    new_pos = parse_number(pos + 1, &reg_num);
+    if (new_pos == pos + 1 || *reg_num < 0 || *reg_num > 31)
+      return error_return(pos + 1, pos + 1);
+
+    if (*reg_num == 31) {
+      reg_name = "sp";
+    } else {
+      reg_name = "regs[" + std::to_string(reg_num.value()) + "]";
+    }
+
+    return true;
+  } else if (arg_[pos] == 's' && arg_[pos + 1] == 'p') {
+    reg_name = "sp";
+    new_pos = pos + 2;
+    return true;
+  } else {
     return error_return(pos, pos);
-  return true;
+  }
 }
 
 bool ArgumentParser_aarch64::parse_size(ssize_t pos, ssize_t &new_pos,
@@ -155,11 +172,9 @@ bool ArgumentParser_aarch64::parse_size(ssize_t pos, ssize_t &new_pos,
 }
 
 bool ArgumentParser_aarch64::parse_mem(ssize_t pos, ssize_t &new_pos,
-                                       optional<int> *reg_num,
+                                       std::string &reg_name,
                                        optional<int> *offset) {
-  if (arg_[pos] != 'x')
-    return error_return(pos, pos);
-  if (parse_register(pos + 1, new_pos, reg_num) == false)
+  if (parse_register(pos, new_pos, reg_name) == false)
     return false;
 
   if (arg_[new_pos] == ',') {
@@ -194,24 +209,26 @@ bool ArgumentParser_aarch64::parse(Argument *dest) {
     return error_return(new_pos, new_pos);
   cur_pos = new_pos + 1;
 
-  if (arg_[cur_pos] == 'x') {
+  if (arg_[cur_pos] == 'x' || arg_[cur_pos] == 's') {
     // Parse ...@<reg>
-    optional<int> reg_num;
-    if (parse_register(cur_pos + 1, new_pos, &reg_num) == false)
+    std::string reg_name;
+    if (parse_register(cur_pos, new_pos, reg_name) == false)
       return false;
+
     cur_pos_ = new_pos;
-    dest->base_register_name_ = "regs[" + std::to_string(reg_num.value()) + "]";
+    dest->base_register_name_ = reg_name;
   } else if (arg_[cur_pos] == '[') {
     // Parse ...@[<reg>] and ...@[<reg,<offset>]
-    optional<int> reg_num, offset = 0;
-    if (parse_mem(cur_pos + 1, new_pos, &reg_num, &offset) == false)
+    optional<int> offset = 0;
+    std::string reg_name;
+    if (parse_mem(cur_pos + 1, new_pos, reg_name, &offset) == false)
       return false;
     cur_pos_ = new_pos;
-    dest->base_register_name_ = "regs[" + std::to_string(reg_num.value()) + "]";
+    dest->base_register_name_ = reg_name;
     dest->deref_offset_ = offset;
   } else {
     // Parse ...@<value>
-    optional<int> val;
+    optional<long long> val;
     new_pos = parse_number(cur_pos, &val);
     if (cur_pos == new_pos)
       return error_return(cur_pos, cur_pos);
@@ -251,7 +268,7 @@ bool ArgumentParser_powerpc64::parse(Argument *dest) {
     arg_str = &arg_[cur_pos_];
 
     if (std::regex_search(arg_str, matches, arg_op_regex_const)) {
-      dest->constant_ = stoi(matches.str(1));
+      dest->constant_ = (long long)stoull(matches.str(1));
     } else if (std::regex_search(arg_str, matches, arg_op_regex_reg)) {
       dest->base_register_name_ = "gpr[" + matches.str(1) + "]";
     } else if (std::regex_search(arg_str, matches, arg_op_regex_breg_off)) {
@@ -268,6 +285,59 @@ bool ArgumentParser_powerpc64::parse(Argument *dest) {
       dest->base_register_name_ = "gpr[" + matches.str(1) + "]";
       dest->index_register_name_ = "gpr[" + matches.str(2) + "]";
       dest->scale_ = abs(*dest->arg_size_);
+    } else {
+      matched = false;
+    }
+  }
+
+  if (!matched) {
+    print_error(cur_pos_);
+    skip_until_whitespace_from(cur_pos_);
+    skip_whitespace_from(cur_pos_);
+    return false;
+  }
+
+  cur_pos_ += matches.length(0);
+  skip_whitespace_from(cur_pos_);
+  return true;
+}
+
+bool ArgumentParser_s390x::parse(Argument *dest) {
+  if (done())
+    return false;
+
+  bool matched;
+  std::cmatch matches;
+#define S390X_IMM "(-?[0-9]+)"
+  std::regex arg_n_regex("^" S390X_IMM "@");
+  // <imm>
+  std::regex arg_op_regex_imm("^" S390X_IMM "(?: +|$)");
+  // %r<N>
+#define S390X_REG "%r([0-9]|1[0-5])"
+  std::regex arg_op_regex_reg("^" S390X_REG "(?: +|$)");
+  // <disp>(%r<N>,%r<N>)
+  std::regex arg_op_regex_mem("^" S390X_IMM "?\\(" S390X_REG
+                              "(?:," S390X_REG ")?\\)(?: +|$)");
+#undef S390X_IMM
+#undef S390X_REG
+
+  matched = std::regex_search(arg_ + cur_pos_, matches, arg_n_regex);
+  if (matched) {
+    dest->arg_size_ = stoi(matches.str(1));
+    cur_pos_ += matches.length(0);
+
+    if (std::regex_search(arg_ + cur_pos_, matches, arg_op_regex_imm)) {
+      dest->constant_ = (long long)stoull(matches.str(1));
+    } else if (std::regex_search(arg_ + cur_pos_, matches, arg_op_regex_reg)) {
+      dest->base_register_name_ = "gprs[" + matches.str(1) + "]";
+    } else if (std::regex_search(arg_ + cur_pos_, matches, arg_op_regex_mem)) {
+      if (matches.length(1) > 0) {
+        dest->deref_offset_ = stoi(matches.str(1));
+      }
+      dest->base_register_name_ = "gprs[" + matches.str(2) + "]";
+      if (matches.length(3) > 0) {
+        dest->index_register_name_ = "gprs[" + matches.str(3) + "]";
+      }
     } else {
       matched = false;
     }
@@ -413,111 +483,111 @@ bool ArgumentParser_x64::parse(Argument *dest) {
 
 const std::unordered_map<std::string, ArgumentParser_x64::RegInfo>
     ArgumentParser_x64::registers_ = {
-        {"rax", {REG_A, 8}},   {"eax", {REG_A, 4}},
-        {"ax", {REG_A, 2}},    {"al", {REG_A, 1}},
+        {"rax", {X64_REG_A, 8}},   {"eax", {X64_REG_A, 4}},
+        {"ax", {X64_REG_A, 2}},    {"al", {X64_REG_A, 1}},
 
-        {"rbx", {REG_B, 8}},   {"ebx", {REG_B, 4}},
-        {"bx", {REG_B, 2}},    {"bl", {REG_B, 1}},
+        {"rbx", {X64_REG_B, 8}},   {"ebx", {X64_REG_B, 4}},
+        {"bx", {X64_REG_B, 2}},    {"bl", {X64_REG_B, 1}},
 
-        {"rcx", {REG_C, 8}},   {"ecx", {REG_C, 4}},
-        {"cx", {REG_C, 2}},    {"cl", {REG_C, 1}},
+        {"rcx", {X64_REG_C, 8}},   {"ecx", {X64_REG_C, 4}},
+        {"cx", {X64_REG_C, 2}},    {"cl", {X64_REG_C, 1}},
 
-        {"rdx", {REG_D, 8}},   {"edx", {REG_D, 4}},
-        {"dx", {REG_D, 2}},    {"dl", {REG_D, 1}},
+        {"rdx", {X64_REG_D, 8}},   {"edx", {X64_REG_D, 4}},
+        {"dx", {X64_REG_D, 2}},    {"dl", {X64_REG_D, 1}},
 
-        {"rsi", {REG_SI, 8}},  {"esi", {REG_SI, 4}},
-        {"si", {REG_SI, 2}},   {"sil", {REG_SI, 1}},
+        {"rsi", {X64_REG_SI, 8}},  {"esi", {X64_REG_SI, 4}},
+        {"si", {X64_REG_SI, 2}},   {"sil", {X64_REG_SI, 1}},
 
-        {"rdi", {REG_DI, 8}},  {"edi", {REG_DI, 4}},
-        {"di", {REG_DI, 2}},   {"dil", {REG_DI, 1}},
+        {"rdi", {X64_REG_DI, 8}},  {"edi", {X64_REG_DI, 4}},
+        {"di", {X64_REG_DI, 2}},   {"dil", {X64_REG_DI, 1}},
 
-        {"rbp", {REG_BP, 8}},  {"ebp", {REG_BP, 4}},
-        {"bp", {REG_BP, 2}},   {"bpl", {REG_BP, 1}},
+        {"rbp", {X64_REG_BP, 8}},  {"ebp", {X64_REG_BP, 4}},
+        {"bp", {X64_REG_BP, 2}},   {"bpl", {X64_REG_BP, 1}},
 
-        {"rsp", {REG_SP, 8}},  {"esp", {REG_SP, 4}},
-        {"sp", {REG_SP, 2}},   {"spl", {REG_SP, 1}},
+        {"rsp", {X64_REG_SP, 8}},  {"esp", {X64_REG_SP, 4}},
+        {"sp", {X64_REG_SP, 2}},   {"spl", {X64_REG_SP, 1}},
 
-        {"r8", {REG_8, 8}},    {"r8d", {REG_8, 4}},
-        {"r8w", {REG_8, 2}},   {"r8b", {REG_8, 1}},
+        {"r8", {X64_REG_8, 8}},    {"r8d", {X64_REG_8, 4}},
+        {"r8w", {X64_REG_8, 2}},   {"r8b", {X64_REG_8, 1}},
 
-        {"r9", {REG_9, 8}},    {"r9d", {REG_9, 4}},
-        {"r9w", {REG_9, 2}},   {"r9b", {REG_9, 1}},
+        {"r9", {X64_REG_9, 8}},    {"r9d", {X64_REG_9, 4}},
+        {"r9w", {X64_REG_9, 2}},   {"r9b", {X64_REG_9, 1}},
 
-        {"r10", {REG_10, 8}},  {"r10d", {REG_10, 4}},
-        {"r10w", {REG_10, 2}}, {"r10b", {REG_10, 1}},
+        {"r10", {X64_REG_10, 8}},  {"r10d", {X64_REG_10, 4}},
+        {"r10w", {X64_REG_10, 2}}, {"r10b", {X64_REG_10, 1}},
 
-        {"r11", {REG_11, 8}},  {"r11d", {REG_11, 4}},
-        {"r11w", {REG_11, 2}}, {"r11b", {REG_11, 1}},
+        {"r11", {X64_REG_11, 8}},  {"r11d", {X64_REG_11, 4}},
+        {"r11w", {X64_REG_11, 2}}, {"r11b", {X64_REG_11, 1}},
 
-        {"r12", {REG_12, 8}},  {"r12d", {REG_12, 4}},
-        {"r12w", {REG_12, 2}}, {"r12b", {REG_12, 1}},
+        {"r12", {X64_REG_12, 8}},  {"r12d", {X64_REG_12, 4}},
+        {"r12w", {X64_REG_12, 2}}, {"r12b", {X64_REG_12, 1}},
 
-        {"r13", {REG_13, 8}},  {"r13d", {REG_13, 4}},
-        {"r13w", {REG_13, 2}}, {"r13b", {REG_13, 1}},
+        {"r13", {X64_REG_13, 8}},  {"r13d", {X64_REG_13, 4}},
+        {"r13w", {X64_REG_13, 2}}, {"r13b", {X64_REG_13, 1}},
 
-        {"r14", {REG_14, 8}},  {"r14d", {REG_14, 4}},
-        {"r14w", {REG_14, 2}}, {"r14b", {REG_14, 1}},
+        {"r14", {X64_REG_14, 8}},  {"r14d", {X64_REG_14, 4}},
+        {"r14w", {X64_REG_14, 2}}, {"r14b", {X64_REG_14, 1}},
 
-        {"r15", {REG_15, 8}},  {"r15d", {REG_15, 4}},
-        {"r15w", {REG_15, 2}}, {"r15b", {REG_15, 1}},
+        {"r15", {X64_REG_15, 8}},  {"r15d", {X64_REG_15, 4}},
+        {"r15w", {X64_REG_15, 2}}, {"r15b", {X64_REG_15, 1}},
 
-        {"rip", {REG_RIP, 8}},
+        {"rip", {X64_REG_RIP, 8}},
 };
 
 void ArgumentParser_x64::reg_to_name(std::string *norm, Register reg) {
   switch (reg) {
-  case REG_A:
+  case X64_REG_A:
     *norm = "ax";
     break;
-  case REG_B:
+  case X64_REG_B:
     *norm = "bx";
     break;
-  case REG_C:
+  case X64_REG_C:
     *norm = "cx";
     break;
-  case REG_D:
+  case X64_REG_D:
     *norm = "dx";
     break;
 
-  case REG_SI:
+  case X64_REG_SI:
     *norm = "si";
     break;
-  case REG_DI:
+  case X64_REG_DI:
     *norm = "di";
     break;
-  case REG_BP:
+  case X64_REG_BP:
     *norm = "bp";
     break;
-  case REG_SP:
+  case X64_REG_SP:
     *norm = "sp";
     break;
 
-  case REG_8:
+  case X64_REG_8:
     *norm = "r8";
     break;
-  case REG_9:
+  case X64_REG_9:
     *norm = "r9";
     break;
-  case REG_10:
+  case X64_REG_10:
     *norm = "r10";
     break;
-  case REG_11:
+  case X64_REG_11:
     *norm = "r11";
     break;
-  case REG_12:
+  case X64_REG_12:
     *norm = "r12";
     break;
-  case REG_13:
+  case X64_REG_13:
     *norm = "r13";
     break;
-  case REG_14:
+  case X64_REG_14:
     *norm = "r14";
     break;
-  case REG_15:
+  case X64_REG_15:
     *norm = "r15";
     break;
 
-  case REG_RIP:
+  case X64_REG_RIP:
     *norm = "ip";
     break;
   }

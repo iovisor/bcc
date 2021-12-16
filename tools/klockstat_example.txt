@@ -1,0 +1,167 @@
+Demonstrations of klockstat, the Linux eBPF/bcc version.
+
+klockstat traces kernel mutex lock events and display locks statistics
+
+# klockstat.py
+Tracing lock events... Hit Ctrl-C to end.
+^C
+                                  Caller   Avg Spin  Count   Max spin Total spin
+                      psi_avgs_work+0x2e       3675      5       5468      18379
+                     flush_to_ldisc+0x22       2833      2       4210       5667
+                       n_tty_write+0x30c       3914      1       3914       3914
+                               isig+0x5d       2390      1       2390       2390
+                   tty_buffer_flush+0x2a       1604      1       1604       1604
+                      commit_echoes+0x22       1400      1       1400       1400
+          n_tty_receive_buf_common+0x3b9       1399      1       1399       1399
+
+                                  Caller   Avg Hold  Count   Max hold Total hold
+                     flush_to_ldisc+0x22      42558      2      76135      85116
+                      psi_avgs_work+0x2e      14821      5      20446      74106
+          n_tty_receive_buf_common+0x3b9      12300      1      12300      12300
+                       n_tty_write+0x30c      10712      1      10712      10712
+                               isig+0x5d       3362      1       3362       3362
+                   tty_buffer_flush+0x2a       3078      1       3078       3078
+                      commit_echoes+0x22       3017      1       3017       3017
+
+
+Every caller to using kernel's mutex is displayed on every line.
+
+First portion of lines show the lock acquiring data, showing the
+amount of time it took to acquired given lock.
+
+  'Caller'       - symbol acquiring the mutex
+  'Average Spin' - average time to acquire the mutex
+  'Count'        - number of times mutex was acquired
+  'Max spin'     - maximum time to acquire the mutex
+  'Total spin'   - total time spent in acquiring the mutex
+
+Second portion of lines show the lock holding data, showing the
+amount of time it took to hold given lock.
+
+  'Caller'       - symbol holding the mutex
+  'Average Hold' - average time mutex was held
+  'Count'        - number of times mutex was held
+  'Max hold'     - maximum time mutex was held
+  'Total hold'   - total time spent in holding the mutex
+
+This works by tracing mutex_lock/unlock kprobes, updating the
+lock stats in maps and processing them in the python part.
+
+
+An -i option can be used to display stats in interval (5 seconds in example below):
+
+# klockstat.py -i 5
+Tracing lock events... Hit Ctrl-C to end.
+
+                                  Caller   Avg Spin  Count   Max spin Total spin
+                      psi_avgs_work+0x2e       3822     15       5650      57338
+                     flush_to_ldisc+0x22       4630      1       4630       4630
+                            work_fn+0x4f       4185      1       4185       4185
+
+                                  Caller   Avg Hold  Count   Max hold Total hold
+                      psi_avgs_work+0x2e      12155     15      15739     182329
+                     flush_to_ldisc+0x22      13809      1      13809      13809
+                            work_fn+0x4f       5274      1       5274       5274
+
+                                  Caller   Avg Spin  Count   Max spin Total spin
+                      psi_avgs_work+0x2e       3715     17       4374      63163
+
+                                  Caller   Avg Hold  Count   Max hold Total hold
+                      psi_avgs_work+0x2e      13141     17      19510     223399
+^C
+
+
+A -p option can be used to trace only selected process:
+
+# klockstat.py -p 883
+Tracing lock events... Hit Ctrl-C to end.
+^C
+                                  Caller   Avg Spin  Count   Max spin Total spin
+                          pipe_wait+0xa9        625 412686      16930  258277958
+                          pipe_read+0x3f        420 413425      16872  174017649
+                         pipe_write+0x35        471 413425      16765  194792253
+
+                                  Caller   Avg Hold  Count   Max hold Total hold
+                          pipe_read+0x3f        473 413425      20063  195773647
+                          pipe_wait+0xa9        604 412686      16972  249598153
+                         pipe_write+0x35        481 413425      16944  199008064
+
+
+A -c option can be used to display only callers with specific substring:
+
+# klockstat.py  -c pipe_
+Tracing lock events... Hit Ctrl-C to end.
+^C
+                                  Caller   Avg Spin  Count   Max spin Total spin
+                          pipe_read+0x3f        422 469554      18665  198354705
+                          pipe_wait+0xa9        679 469536      17196  319017069
+                         pipe_write+0x35        469 469554      17057  220338525
+
+                                  Caller   Avg Hold  Count   Max hold Total hold
+                         pipe_write+0x35        638 469554      17330  299857180
+                          pipe_wait+0xa9        779 469535      16912  366047392
+                          pipe_read+0x3f        575 469554      13251  270005394
+
+
+An -n option can be used to display only specific number of callers:
+
+# klockstat.py -n 3
+Tracing lock events... Hit Ctrl-C to end.
+^C
+                                  Caller   Avg Spin  Count   Max spin Total spin
+                          pipe_read+0x3f        420 334120      16964  140632284
+                          pipe_wait+0xa9        688 334116      16876  229957062
+                         pipe_write+0x35        463 334120      16791  154981747
+
+                                  Caller   Avg Hold  Count   Max hold Total hold
+                     flush_to_ldisc+0x22      27754      3      63270      83264
+                          pipe_read+0x3f        571 334120      17123  190976463
+                          pipe_wait+0xa9        759 334115      17068  253747213
+
+
+An -s option can be used to display number of callers backtrace entries:
+
+# klockstat.py -n 1 -s 3
+Tracing lock events... Hit Ctrl-C to end.
+^C
+                                  Caller   Avg Spin  Count   Max spin Total spin
+                          pipe_wait+0xa9        685 811947      17376  556542328
+                          pipe_wait+0xa9
+                         pipe_read+0x206
+
+                                  Caller   Avg Hold  Count   Max hold Total hold
+                     flush_to_ldisc+0x22      28145      3      63872      84437
+                     flush_to_ldisc+0x22
+                  process_one_work+0x1b0
+
+
+Output can be sorted by using -S <fields> option on various
+fields, the acq_total will force the acquired table to be
+sorted on 'Total spin' column:
+
+# klockstat.py -S acq_total
+Tracing lock events... Hit Ctrl-C to end.
+^C
+                                  Caller   Avg Spin  Count   Max spin Total spin
+                          pipe_wait+0xa9        691 269343      17190  186263983
+                         pipe_write+0x35        464 269351      11730  125205417
+                          pipe_read+0x3f        422 269351      17107  113724697
+                      psi_avgs_work+0x2e       2499     11       4454      27494
+                     flush_to_ldisc+0x22       3111      3       5096       9334
+                       n_tty_write+0x30c       2764      1       2764       2764
+                               isig+0x5d       1287      1       1287       1287
+                   tty_buffer_flush+0x2a        961      1        961        961
+                      commit_echoes+0x22        892      1        892        892
+          n_tty_receive_buf_common+0x3b9        868      1        868        868
+
+                                  Caller   Avg Hold  Count   Max hold Total hold
+                          pipe_wait+0xa9        788 269343      17128  212496240
+                         pipe_write+0x35        637 269351      17209  171596811
+                          pipe_read+0x3f        585 269351      11834  157606323
+                      psi_avgs_work+0x2e       8726     11      19177      95996
+                     flush_to_ldisc+0x22      22158      3      43731      66474
+                       n_tty_write+0x30c       9770      1       9770       9770
+          n_tty_receive_buf_common+0x3b9       6830      1       6830       6830
+                               isig+0x5d       3114      1       3114       3114
+                   tty_buffer_flush+0x2a       2032      1       2032       2032
+                      commit_echoes+0x22       1616      1       1616       1616

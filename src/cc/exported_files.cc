@@ -30,6 +30,10 @@ map<string, const char *> ExportedFiles::headers_ = {
     #include "compat/linux/virtual_bpf.h"
   },
   {
+    "/virtual/include/bcc/bpf_workaround.h",
+    #include "export/bpf_workaround.h"
+  },
+  {
     "/virtual/include/bcc/proto.h",
     #include "export/proto.h"
   },
@@ -40,6 +44,13 @@ map<string, const char *> ExportedFiles::headers_ = {
   {
     "/virtual/lib/clang/include/stdarg.h",
     #include "clang/include/stdarg.h"
+  },
+};
+
+map<string, const char *> ExportedFiles::footers_ = {
+  {
+    "/virtual/include/bcc/footer.h",
+    #include "export/footer.h"
   },
 };
 

@@ -1,0 +1,45 @@
+00400000-007c8000 r-xp 00000000 00:1b 11644523                           /opt/some/path/tobinary/bin/binary
+7f151476e000-7f1514779000 r-xp 00000000 00:1b 72809479                   /some/other/path/tolibs/lib/libnss_files-2.26.so
+7f1514779000-7f1514978000 ---p 0000b000 00:1b 72809479                   /some/other/path/tolibs/lib/libnss_files-2.26.so
+7f1514978000-7f1514979000 r--p 0000a000 00:1b 72809479                   /some/other/path/tolibs/lib/libnss_files-2.26.so
+7f1514979000-7f151497a000 rw-p 0000b000 00:1b 72809479                   /some/other/path/tolibs/lib/libnss_files-2.26.so
+7f1515b7e000-7f1515b7f000 rw-p 00009000 00:1b 72809418                   /some/other/path/tolibs/lib/libcrypt-2.26.so
+7f1515bad000-7f1515baf000 r-xp 00000000 00:1b 72809526                   /some/other/path/tolibs/lib/libutil-2.26.so
+7f1515baf000-7f1515dae000 ---p 00002000 00:1b 72809526                   /some/other/path/tolibs/lib/libutil-2.26.so
+7f1515dae000-7f1515daf000 r--p 00001000 00:1b 72809526                   /some/other/path/tolibs/lib/libutil-2.26.so
+7f1515daf000-7f1515db0000 rw-p 00002000 00:1b 72809526                   /some/other/path/tolibs/lib/libutil-2.26.so
+7f1515db0000-7f151601c000 r-xp 00000000 00:1b 72809420                   /some/other/path/tolibs/lib/libcrypto.so.1.1
+7f151601c000-7f151621c000 ---p 0026c000 00:1b 72809420                   /some/other/path/tolibs/lib/libcrypto.so.1.1
+7f151621c000-7f151623a000 r--p 0026c000 00:1b 72809420                   /some/other/path/tolibs/lib/libcrypto.so.1.1
+7f151623a000-7f1516244000 rw-p 0028a000 00:1b 72809420                   /some/other/path/tolibs/lib/libcrypto.so.1.1
+7f1516247000-7f15162ac000 r-xp 00000000 00:1b 72809514                   /some/other/path/tolibs/lib/libssl.so.1.1
+7f15162ac000-7f15164ab000 ---p 00065000 00:1b 72809514                   /some/other/path/tolibs/lib/libssl.so.1.1
+7f15164ab000-7f15164af000 r--p 00064000 00:1b 72809514                   /some/other/path/tolibs/lib/libssl.so.1.1
+7f15164af000-7f15164b5000 rw-p 00068000 00:1b 72809514                   /some/other/path/tolibs/lib/libssl.so.1.1
+7f15164b5000-7f15164cf000 r-xp 00000000 00:1b 72809538                   /some/other/path/tolibs/lib/libz.so.1.2.8
+7f15164cf000-7f15166ce000 ---p 0001a000 00:1b 72809538                   /some/other/path/tolibs/lib/libz.so.1.2.8
+7f15166ce000-7f15166cf000 r--p 00019000 00:1b 72809538                   /some/other/path/tolibs/lib/libz.so.1.2.8
+7f15166cf000-7f15166d0000 rw-p 0001a000 00:1b 72809538                   /some/other/path/tolibs/lib/libz.so.1.2.8
+7f15166d0000-7f15166d1000 r-xp 0001b064 00:1b 72809538                   /some/other/path/tolibs/lib/libz.so.1.2.8
+7f15168d4000-7f1516a23000 r-xp 00000000 00:1b 72809463                   /some/other/path/tolibs/lib/libm-2.26.so
+7f1516a23000-7f1516c22000 ---p 0014f000 00:1b 72809463                   /some/other/path/tolibs/lib/libm-2.26.so
+7f1516c22000-7f1516c23000 r--p 0014e000 00:1b 72809463                   /some/other/path/tolibs/lib/libm-2.26.so
+7f1516c23000-7f1516c24000 rw-p 0014f000 00:1b 72809463                   /some/other/path/tolibs/lib/libm-2.26.so
+7f1516c24000-7f1516c3e000 r-xp 00000000 00:1b 72809495                   /some/other/path/tolibs/lib/libpthread-2.26.so
+7f1516c3e000-7f1516e3d000 ---p 0001a000 00:1b 72809495                   /some/other/path/tolibs/lib/libpthread-2.26.so
+7f1516e3d000-7f1516e3e000 r--p 00019000 00:1b 72809495                   /some/other/path/tolibs/lib/libpthread-2.26.so
+7f1516e3e000-7f1516e3f000 rw-p 0001a000 00:1b 72809495                   /some/other/path/tolibs/lib/libpthread-2.26.so
+7f1516e43000-7f1516e6a000 r-xp 00000000 00:1b 72809393                   /some/other/path/tolibs/lib/ld-2.26.so
+7f1517010000-7f1517011000 rw-s 00000000 00:05 1117877022                 /dev/zero (deleted)
+7f1517011000-7f1517012000 rw-s 00000000 00:05 1117877021                 /dev/zero (deleted)
+7f1517012000-7f1517013000 rw-s 00000000 00:05 1117877020                 /dev/zero (deleted)
+7f1517013000-7f151701c000 rw-s 00000000 00:05 1117899207                 /dev/zero (deleted)
+7f151701c000-7f1517069000 rw-p 00000000 00:00 0
+7f1517069000-7f151706a000 r--p 00026000 00:1b 72809393                   /some/other/path/tolibs/lib/ld-2.26.so
+7f151706a000-7f151706b000 rw-p 00027000 00:1b 72809393                   /some/other/path/tolibs/lib/ld-2.26.so
+7f151706b000-7f151706c000 rw-p 00000000 00:00 0
+7ffd5070d000-7ffd5073d000 rwxp 00000000 00:00 0                          [stack]
+7ffd5073d000-7ffd5073e000 rw-p 00000000 00:00 0
+7ffd507d7000-7ffd507da000 r--p 00000000 00:00 0                          [vvar]
+7ffd507da000-7ffd507dc000 r-xp 00000000 00:00 0                          [vdso]
+ffffffffff600000-ffffffffff601000 r-xp 00000000 00:00 0                  [vsyscall]

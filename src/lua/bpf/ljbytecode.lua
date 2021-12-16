@@ -37,6 +37,8 @@ local function decode_ins(func, pc)
 	end
 	if mc == 13*128 then     -- BCMjump
 		c = pc+d-0x7fff
+	elseif mc == 14*128 then -- BCMcdata
+		c = jutil.funck(func, -d-1)
 	elseif mc == 9*128 then  -- BCMint
 		c = jutil.funck(func, d)
 	elseif mc == 10*128 then -- BCMstr

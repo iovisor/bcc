@@ -10,7 +10,7 @@ Some quick wins.
 
 ### 0. Before bcc
 
-Before using bcc, you should start with the Linux basics. One reference is the [Linux Performance Analysis in 60s](http://techblog.netflix.com/2015/11/linux-performance-analysis-in-60s.html) post, which covers these commands:
+Before using bcc, you should start with the Linux basics. One reference is the [Linux Performance Analysis in 60,000 Milliseconds](https://netflixtechblog.com/linux-performance-analysis-in-60-000-milliseconds-accc10403c55) post, which covers these commands:
 
 1. uptime
 1. dmesg | tail
@@ -63,7 +63,7 @@ More [examples](../tools/execsnoop_example.txt).
 
 ```
 # ./opensnoop
-PID    COMM      FD ERR PATH
+PID    COMM               FD ERR PATH
 1565   redis-server        5   0 /proc/1565/stat
 1565   redis-server        5   0 /proc/1565/stat
 1565   redis-server        5   0 /proc/1565/stat
@@ -97,7 +97,7 @@ TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
 
 ext4slower traces the ext4 file system and times common operations, and then only prints those that exceed a threshold.
 
-This is great for identifying or exonerating one type of performance issue: slow individually slow disk i/O via the file system. Disks process I/O asynchronously, and it can be difficult to associate latency at that layer with the latency applications experience. Tracing higher up in the kernel stack, at the VFS -> file system interface, will more closely match what an application suffers. Use this tool to identify if file system latency exceeds a given threshold.
+This is great for identifying or exonerating one type of performance issue: show individually slow disk i/O via the file system. Disks process I/O asynchronously, and it can be difficult to associate latency at that layer with the latency applications experience. Tracing higher up in the kernel stack, at the VFS -> file system interface, will more closely match what an application suffers. Use this tool to identify if file system latency exceeds a given threshold.
 
 Similar tools exist in bcc for other file systems: btrfsslower, xfsslower, and zfsslower. There is also fileslower, which works at the VFS layer and traces everything (although at some higher overhead).
 
@@ -151,7 +151,7 @@ TIME(s)        COMM           PID    DISK    T  SECTOR    BYTES   LAT(ms)
 
 biosnoop prints a line of output for each disk I/O, with details including latency (time from device issue to completion).
 
-This allows you to examine disk I/O in more detail, and look for time-ordered patterns (eg, reads queueing behind writes). Note that the output will be verbose if your system performance a high rate of disk I/O.
+This allows you to examine disk I/O in more detail, and look for time-ordered patterns (eg, reads queueing behind writes). Note that the output will be verbose if your system performs disk I/O at a high rate.
 
 More [examples](../tools/biosnoop_example.txt).
 
@@ -214,7 +214,7 @@ More [examples](../tools/tcpaccept_example.txt).
 #### 1.9. tcpretrans
 
 ```
-# ./tcpretrans 
+# ./tcpretrans
 TIME     PID    IP LADDR:LPORT          T> RADDR:RPORT          STATE
 01:55:05 0      4  10.153.223.157:22    R> 69.53.245.40:34619   ESTABLISHED
 01:55:05 0      4  10.153.223.157:22    R> 69.53.245.40:34619   ESTABLISHED
@@ -231,7 +231,7 @@ More [examples](../tools/tcpretrans_example.txt).
 #### 1.10. runqlat
 
 ```
-# ./runqlat 
+# ./runqlat
 Tracing run queue latency... Hit Ctrl-C to end.
 ^C
      usecs               : count     distribution
@@ -300,7 +300,7 @@ Sampling at 49 Hertz of all threads by user + kernel stack... Hit Ctrl-C to end.
         75
 ```
 
-profile is a CPU profiler, which takes samples of stack traces at timed intervals, and prints a summary of unique stack traces and a count of their occurrence. 
+profile is a CPU profiler, which takes samples of stack traces at timed intervals, and prints a summary of unique stack traces and a count of their occurrence.
 
 Use this tool to understand the code paths that are consuming CPU resources.
 

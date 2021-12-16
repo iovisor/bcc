@@ -10,7 +10,7 @@ static inline bool filter(char const* inputString)
 {
     char needle[] = "FILTER_STRING"; ///< The FILTER STRING is replaced by python code.
     char haystack[sizeof(needle)] = {};
-    bpf_probe_read(&haystack, sizeof(haystack), (void*)inputString);
+    bpf_probe_read_user(&haystack, sizeof(haystack), (void*)inputString);
     for (int i = 0; i < sizeof(needle) - 1; ++i) {
         if (needle[i] != haystack[i]) {
             return false;

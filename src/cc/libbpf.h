@@ -18,25 +18,33 @@
 #ifndef LIBBPF_H
 #define LIBBPF_H
 
-#include "compat/linux/bpf.h"
+#include "linux/bpf.h"
+#include <stdbool.h>
+#include <stdint.h>
+#include <sys/types.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+struct bpf_create_map_attr;
+struct bpf_load_program_attr;
 
 enum bpf_probe_attach_type {
 	BPF_PROBE_ENTRY,
 	BPF_PROBE_RETURN
 };
 
-int bpf_create_map(enum bpf_map_type map_type, const char *name,
+int bcc_create_map(enum bpf_map_type map_type, const char *name,
                    int key_size, int value_size, int max_entries,
                    int map_flags);
+int bcc_create_map_xattr(struct bpf_create_map_attr *attr, bool allow_rlimit);
 int bpf_update_elem(int fd, void *key, void *value, unsigned long long flags);
 int bpf_lookup_elem(int fd, void *key, void *value);
 int bpf_delete_elem(int fd, void *key);
 int bpf_get_first_key(int fd, void *key, size_t key_size);
 int bpf_get_next_key(int fd, void *key, void *next_key);
+int bpf_lookup_and_delete(int fd, void *key, void *value);
 
 /*
  * Load a BPF program, and return the FD of the loaded program.
@@ -52,12 +60,15 @@ int bpf_get_next_key(int fd, void *key, void *next_key);
  *     it will not to any additional memory allocation.
  *   - Otherwise, it will allocate an internal temporary buffer for log message
  *     printing, and continue to attempt increase that allocated buffer size if
- *     initial attemp was insufficient in size.
+ *     initial attempt was insufficient in size.
  */
-int bpf_prog_load(enum bpf_prog_type prog_type, const char *name,
-                  const struct bpf_insn *insns, int insn_len,
+int bcc_prog_load(enum bpf_prog_type prog_type, const char *name,
+                  const struct bpf_insn *insns, int prog_len,
                   const char *license, unsigned kern_version,
                   int log_level, char *log_buf, unsigned log_buf_size);
+int bcc_prog_load_xattr(struct bpf_load_program_attr *attr,
+                        int prog_len, char *log_buf,
+                        unsigned log_buf_size, bool allow_rlimit);
 
 int bpf_attach_socket(int sockfd, int progfd);
 
@@ -69,19 +80,28 @@ typedef void (*perf_reader_raw_cb)(void *cb_cookie, void *raw, int raw_size);
 typedef void (*perf_reader_lost_cb)(void *cb_cookie, uint64_t lost);
 
 int bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
-                      const char *ev_name, const char *fn_name);
+                      const char *ev_name, const char *fn_name, uint64_t fn_offset,
+                      int maxactive);
 int bpf_detach_kprobe(const char *ev_name);
 
 int bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type,
                       const char *ev_name, const char *binary_path,
-                      uint64_t offset, pid_t pid);
+                      uint64_t offset, pid_t pid, uint32_t ref_ctr_offset);
 int bpf_detach_uprobe(const char *ev_name);
 
 int bpf_attach_tracepoint(int progfd, const char *tp_category,
                           const char *tp_name);
 int bpf_detach_tracepoint(const char *tp_category, const char *tp_name);
 
-int bpf_attach_raw_tracepoint(int progfd, char *tp_name);
+int bpf_attach_raw_tracepoint(int progfd, const char *tp_name);
+
+int bpf_attach_kfunc(int prog_fd);
+
+int bpf_attach_lsm(int prog_fd);
+
+bool bpf_has_kernel_btf(void);
+
+int kernel_struct_has_field(const char *struct_name, const char *field_name);
 
 void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb,
                             perf_reader_lost_cb lost_cb, void *cb_cookie,
@@ -93,7 +113,7 @@ int bpf_attach_xdp(const char *dev_name, int progfd, uint32_t flags);
 // attach a prog expressed by progfd to run on a specific perf event. The perf
 // event will be created using the perf_event_attr pointer provided.
 int bpf_attach_perf_event_raw(int progfd, void *perf_event_attr, pid_t pid,
-                              int cpu, int group_fd);
+                              int cpu, int group_fd, unsigned long extra_flags);
 // attach a prog expressed by progfd to run on a specific perf event, with
 // certain sample period or sample frequency
 int bpf_attach_perf_event(int progfd, uint32_t ev_type, uint32_t ev_config,
@@ -104,6 +124,17 @@ int bpf_open_perf_event(uint32_t type, uint64_t config, int pid, int cpu);
 
 int bpf_close_perf_event_fd(int fd);
 
+typedef int (*ring_buffer_sample_fn)(void *ctx, void *data, size_t size);
+
+struct ring_buffer;
+
+void * bpf_new_ringbuf(int map_fd, ring_buffer_sample_fn sample_cb, void *ctx);
+void bpf_free_ringbuf(struct ring_buffer *rb);
+int bpf_add_ringbuf(struct ring_buffer *rb, int map_fd,
+                    ring_buffer_sample_fn sample_cb, void *ctx);
+int bpf_poll_ringbuf(struct ring_buffer *rb, int timeout_ms);
+int bpf_consume_ringbuf(struct ring_buffer *rb);
+
 int bpf_obj_pin(int fd, const char *pathname);
 int bpf_obj_get(const char *pathname);
 int bpf_obj_get_info(int prog_map_fd, void *info, uint32_t *info_len);
@@ -113,6 +144,19 @@ int bpf_prog_get_tag(int fd, unsigned long long *tag);
 int bpf_prog_get_next_id(uint32_t start_id, uint32_t *next_id);
 int bpf_prog_get_fd_by_id(uint32_t id);
 int bpf_map_get_fd_by_id(uint32_t id);
+int bpf_obj_get_info_by_fd(int prog_fd, void *info, uint32_t *info_len);
+
+int bcc_iter_attach(int prog_fd, union bpf_iter_link_info *link_info,
+                    uint32_t link_info_len);
+int bcc_iter_create(int link_fd);
+int bcc_make_parent_dir(const char *path);
+int bcc_check_bpffs_path(const char *path);
+int bpf_lookup_batch(int fd, __u32 *in_batch, __u32 *out_batch, void *keys,
+                     void *values, __u32 *count);
+int bpf_delete_batch(int fd,  void *keys, __u32 *count);
+int bpf_update_batch(int fd, void *keys, void *values, __u32 *count);
+int bpf_lookup_and_delete_batch(int fd, __u32 *in_batch, __u32 *out_batch,
+                                void *keys, void *values, __u32 *count);
 
 #define LOG_BUF_SIZE 65536
 

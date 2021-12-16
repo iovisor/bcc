@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # USAGE: test_usdt3.py
 #
@@ -20,6 +20,7 @@ class TestUDST(TestCase):
 static inline void record_val(int val)
 {
   FOLLY_SDT(test, probe, val);
+  FOLLY_SDT(test_dup_name, probe, val);
 }
 
 extern void record_a(int val);
@@ -81,20 +82,20 @@ int do_trace(struct pt_regs *ctx) {
         self.tmp_dir = tempfile.mkdtemp()
         print("temp directory: " + self.tmp_dir)
         _create_file(self.tmp_dir + "/common.h", common_h)
-        _create_file(self.tmp_dir + "/a.c", a_c)
-        _create_file(self.tmp_dir + "/b.c", b_c)
-        _create_file(self.tmp_dir + "/m.c", m_c)
+        _create_file(self.tmp_dir + "/a.cpp", a_c)
+        _create_file(self.tmp_dir + "/b.cpp", b_c)
+        _create_file(self.tmp_dir + "/m.cpp", m_c)
 
         # Compilation
         # the usdt test:probe exists in liba.so, libb.so and a.out
         include_path = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))) + "/include"
-        a_src = self.tmp_dir + "/a.c"
+        a_src = self.tmp_dir + "/a.cpp"
         a_obj = self.tmp_dir + "/a.o"
         a_lib = self.tmp_dir + "/liba.so"
-        b_src = self.tmp_dir + "/b.c"
+        b_src = self.tmp_dir + "/b.cpp"
         b_obj = self.tmp_dir + "/b.o"
         b_lib = self.tmp_dir + "/libb.so"
-        m_src = self.tmp_dir + "/m.c"
+        m_src = self.tmp_dir + "/m.cpp"
         m_bin = self.tmp_dir + "/a.out"
         m_linker_opt = " -L" + self.tmp_dir + " -la -lb"
         self.assertEqual(os.system("gcc -I" + include_path + " -fpic -c -o " + a_obj + " " + a_src), 0)
@@ -105,12 +106,12 @@ int do_trace(struct pt_regs *ctx) {
 
         # Run the application
         self.app = Popen([m_bin], env=dict(os.environ, LD_LIBRARY_PATH=self.tmp_dir))
-        # os.system("tplist.py -vvv -p " + str(self.app.pid))
+        os.system("../../tools/tplist.py -vvv -p " + str(self.app.pid))
 
     def test_attach1(self):
         # enable USDT probe from given PID and verifier generated BPF programs
         u = USDT(pid=int(self.app.pid))
-        u.enable_probe(probe="probe", fn_name="do_trace")
+        u.enable_probe(probe="test:probe", fn_name="do_trace")
         b = BPF(text=self.bpf_text, usdt_contexts=[u])
 
         # processing events
@@ -131,8 +132,14 @@ int do_trace(struct pt_regs *ctx) {
                 self.probe_value_other = 1
 
         b["event"].open_perf_buffer(print_event)
-        for i in range(10):
-            b.perf_buffer_poll()
+        for i in range(100):
+            if (self.probe_value_1 == 0 or
+                self.probe_value_2 == 0 or
+                self.probe_value_3 == 0 or
+                self.probe_value_other != 0):
+                b.perf_buffer_poll()
+            else:
+                break;
 
         self.assertTrue(self.probe_value_1 != 0)
         self.assertTrue(self.probe_value_2 != 0)

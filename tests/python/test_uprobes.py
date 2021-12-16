@@ -119,7 +119,7 @@ int count(struct pt_regs *ctx) {
             shutil.copy(libz_path, b"/tmp")
 
             libz = ctypes.CDLL("/tmp/libz.so.1")
-            time.sleep(1)
+            time.sleep(3)
             libz.zlibVersion()
             time.sleep(5)
             os._exit(0)
@@ -130,7 +130,7 @@ int count(struct pt_regs *ctx) {
         b = bcc.BPF(text=text)
         b.attach_uprobe(name=libname, sym=symname, fn_name="count", pid=child_pid)
         b.attach_uretprobe(name=libname, sym=symname, fn_name="count", pid=child_pid)
-        time.sleep(1)
+        time.sleep(5)
         self.assertEqual(b["stats"][ctypes.c_int(0)].value, 2)
         b.detach_uretprobe(name=libname, sym=symname, pid=child_pid)
         b.detach_uprobe(name=libname, sym=symname, pid=child_pid)

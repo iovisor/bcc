@@ -199,8 +199,10 @@ StmtNode * Parser::func_add(vector<int> *types, Scopes::StateScope *scope,
   auto cur_scope = scopes_->current_var();
   scopes_->set_current(scope);
   for (auto it = formals->begin(); it != formals->end(); ++it)
-    if (!variable_add(nullptr, it->get()))
+    if (!variable_add(nullptr, it->get())) {
+      delete decl;
       return nullptr;
+    }
   scopes_->set_current(cur_scope);
   decl->scope_ = scope;
   scopes_->top_func()->add(id->name_, decl);

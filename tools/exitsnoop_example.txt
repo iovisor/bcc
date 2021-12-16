@@ -1,0 +1,150 @@
+Demonstrations of exitsnoop.
+
+This Linux tool traces all process terminations and reason, it
+    - is implemented using BPF, which requires CAP_SYS_ADMIN and
+      should therefore be invoked with sudo
+    - traces sched_process_exit tracepoint in kernel/exit.c
+    - includes processes by root and all users
+    - includes processes in containers
+    - includes processes that become zombie
+
+The following example shows the termination of the 'sleep' and 'bash' commands
+when run in a loop that is interrupted with Ctrl-C from the terminal:
+
+# ./exitsnoop.py  > exitlog &
+[1] 18997
+# for((i=65;i<100;i+=5)); do bash -c "sleep 1.$i;exit $i"; done
+^C
+# fg
+./exitsnoop.py > exitlog
+^C
+# cat exitlog
+PCOMM            PID    PPID   TID    AGE(s)  EXIT_CODE
+sleep            19004  19003  19004  1.65    0
+bash             19003  17656  19003  1.65    code 65
+sleep            19007  19006  19007  1.70    0
+bash             19006  17656  19006  1.70    code 70
+sleep            19010  19009  19010  1.75    0
+bash             19009  17656  19009  1.75    code 75
+sleep            19014  19013  19014  0.23    signal 2 (INT)
+bash             19013  17656  19013  0.23    signal 2 (INT)
+
+#
+
+The output shows the process/command name (PCOMM), the PID,
+the process that will be notified (PPID), the thread (TID), the AGE
+of the process with hundredth of a second resolution, and the reason for
+the process exit (EXIT_CODE).
+
+A -t option can be used to include a timestamp column, it shows local time
+by default.  The --utc option shows the time in UTC.  The --label
+option adds a column indicating the tool that generated the output,
+'exit' by default.  If other tools follow this format their outputs
+can be merged into a single trace with a simple lexical sort
+increasing in time order with each line labeled to indicate the event,
+e.g. 'exec', 'open', 'exit', etc.  Time is displayed with millisecond
+resolution. The -x option will show only non-zero exits and fatal
+signals, which excludes processes that exit with 0 code:
+
+# ./exitsnoop.py -t --utc -x --label= > exitlog &
+[1] 18289
+# for((i=65;i<100;i+=5)); do bash -c "sleep 1.$i;exit $i"; done
+^C
+# fg
+./exitsnoop.py -t --utc -x --label= > exitlog
+^C
+# cat exitlog
+TIME-UTC     LABEL PCOMM            PID    PPID   TID    AGE(s)  EXIT_CODE
+13:20:22.997 exit  bash             18300  17656  18300  1.65    code 65
+13:20:24.701 exit  bash             18303  17656  18303  1.70    code 70
+13:20:26.456 exit  bash             18306  17656  18306  1.75    code 75
+13:20:28.260 exit  bash             18310  17656  18310  1.80    code 80
+13:20:30.113 exit  bash             18313  17656  18313  1.85    code 85
+13:20:31.495 exit  sleep            18318  18317  18318  1.38    signal 2 (INT)
+13:20:31.495 exit  bash             18317  17656  18317  1.38    signal 2 (INT)
+#
+
+USAGE message:
+
+# ./exitsnoop.py -h
+usage: exitsnoop.py [-h] [-t] [--utc] [-p PID] [--label LABEL] [-x] [--per-thread]
+
+Trace all process termination (exit, fatal signal)
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -t, --timestamp    include timestamp (local time default)
+  --utc              include timestamp in UTC (-t implied)
+  -p PID, --pid PID  trace this PID only
+  --label LABEL      label each line
+  -x, --failed       trace only fails, exclude exit(0)
+  --per-thread       trace per thread termination
+
+examples:
+    exitsnoop                # trace all process termination
+    exitsnoop -x             # trace only fails, exclude exit(0)
+    exitsnoop -t             # include timestamps (local time)
+    exitsnoop --utc          # include timestamps (UTC)
+    exitsnoop -p 181         # only trace PID 181
+    exitsnoop --label=exit   # label each output line with 'exit'
+    exitsnoop --per-thread   # trace per thread termination
+
+Exit status:
+
+    0 EX_OK        Success
+    2              argparse error
+   70 EX_SOFTWARE  syntax error detected by compiler, or
+                   verifier error from kernel
+   77 EX_NOPERM    Need sudo (CAP_SYS_ADMIN) for BPF() system call
+
+About process termination in Linux
+----------------------------------
+
+A program/process on Linux terminates normally
+    - by explicitly invoking the exit( int ) system call
+    - in C/C++ by returning an int from main(),
+      ...which is then used as the value for exit()
+    - by reaching the end of main() without a return
+      ...which is equivalent to return 0 (C99 and C++)
+  Notes:
+    - Linux keeps only the least significant eight bits of the exit value
+    - an exit value of 0 means success
+    - an exit value of 1-255 means an error
+
+A process terminates abnormally if it
+    - receives a signal which is not ignored or blocked and has no handler
+      ... the default action is to terminate with optional core dump
+    - is selected by the kernel's "Out of Memory Killer",
+      equivalent to being sent SIGKILL (9), which cannot be ignored or blocked
+  Notes:
+    - any signal can be sent asynchronously via the kill() system call
+    - synchronous signals are the result of the CPU detecting
+      a fault or trap during execution of the program, a kernel handler
+      is dispatched which determines the cause and the corresponding
+      signal, examples are
+        - attempting to fetch data or instructions at invalid or
+          privileged addresses,
+        - attempting to divide by zero, unmasked floating point exceptions
+        - hitting a breakpoint
+
+Linux keeps process termination information in 'exit_code', an int
+within struct 'task_struct' defined in <linux/sched.c>
+    - if the process terminated normally:
+        - the exit value is in bits 15:8
+        - the least significant 8 bits of exit_code are zero (bits 7:0)
+    - if the process terminates abnormally:
+        - the signal number (>= 1) is in bits 6:0
+        - bit 7 indicates a 'core dump' action, whether a core dump was
+          actually done depends on ulimit.
+
+Success is indicated with an exit value of zero.
+The meaning of a non zero exit value depends on the program.
+Some programs document their exit values and their meaning.
+This script uses exit values as defined in <include/sysexits.h>
+
+References:
+
+   https://github.com/torvalds/linux/blob/master/kernel/exit.c
+   https://github.com/torvalds/linux/blob/master/arch/x86/include/uapi/asm/signal.h
+   https://code.woboq.org/userspace/glibc/misc/sysexits.h.html
+

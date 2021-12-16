@@ -27,7 +27,7 @@ BPF_HASH(sessions, struct Key, struct Leaf, 1024);
   AND ALL the other packets having same (src_ip,dst_ip,src_port,dst_port)
   this means belonging to the same "session"
   this additional check avoids url truncation, if url is too long
-  userspace script, if necessary, reassembles urls splitted in 2 or more packets.
+  userspace script, if necessary, reassembles urls split in 2 or more packets.
   if the program is loaded as PROG_TYPE_SOCKET_FILTER
   and attached to a socket
   return  0 -> DROP the packet
@@ -56,6 +56,19 @@ int http_filter(struct __sk_buff *skb) {
 	struct Key 	key;
 	struct Leaf zero = {0};
 
+        //calculate ip header length
+        //value to multiply * 4
+        //e.g. ip->hlen = 5 ; IP Header Length = 5 x 4 byte = 20 byte
+        ip_header_length = ip->hlen << 2;    //SHL 2 -> *4 multiply
+
+        //check ip header length against minimum
+        if (ip_header_length < sizeof(*ip)) {
+                goto DROP;
+        }
+
+        //shift cursor forward for dynamic ip header size
+        void *_ = cursor_advance(cursor, (ip_header_length-sizeof(*ip)));
+
 	struct tcp_t *tcp = cursor_advance(cursor, sizeof(*tcp));
 
 	//retrieve ip src/dest and port src/dest of current packet
@@ -65,17 +78,12 @@ int http_filter(struct __sk_buff *skb) {
 	key.dst_port = tcp->dst_port;
 	key.src_port = tcp->src_port;
 
-	//calculate ip header length
-	//value to multiply * 4
-	//e.g. ip->hlen = 5 ; IP Header Length = 5 x 4 byte = 20 byte
-	ip_header_length = ip->hlen << 2;    //SHL 2 -> *4 multiply
-
 	//calculate tcp header length
 	//value to multiply *4
 	//e.g. tcp->offset = 5 ; TCP Header Length = 5 x 4 byte = 20 byte
 	tcp_header_length = tcp->offset << 2; //SHL 2 -> *4 multiply
 
-	//calculate patload offset and length
+	//calculate payload offset and length
 	payload_offset = ETH_HLEN + ip_header_length + tcp_header_length;
 	payload_length = ip->tlen - ip_header_length - tcp_header_length;
 
@@ -91,11 +99,8 @@ int http_filter(struct __sk_buff *skb) {
 	//direct access to skb not allowed
 	unsigned long p[7];
 	int i = 0;
-	int j = 0;
-	const int last_index = payload_offset + 7;
-	for (i = payload_offset ; i < last_index ; i++) {
-		p[j] = load_byte(skb , i);
-		j++;
+	for (i = 0; i < 7; i++) {
+		p[i] = load_byte(skb , payload_offset + i);
 	}
 
 	//find a match with an HTTP message
@@ -133,10 +138,10 @@ int http_filter(struct __sk_buff *skb) {
 	}
 	goto DROP;
 
-	//keep the packet and send it to userspace retruning -1
+	//keep the packet and send it to userspace returning -1
 	HTTP_MATCH:
 	//if not already present, insert into map <Key, Leaf>
-	sessions.lookup_or_init(&key,&zero);
+	sessions.lookup_or_try_init(&key,&zero);
 
 	//send packet to userspace returning -1
 	KEEP:

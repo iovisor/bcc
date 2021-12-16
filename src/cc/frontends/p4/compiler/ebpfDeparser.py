@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 
 from collections import defaultdict, OrderedDict
+from compilationException import CompilationException
 from p4_hlir.hlir import parse_call, p4_field, p4_parse_value_set, \
     P4_DEFAULT, p4_parse_state, p4_table, \
     p4_conditional_node, p4_parser_exception, \
@@ -96,7 +97,7 @@ class EbpfDeparser(object):
             assert isinstance(ebpfStack, ebpfInstance.EbpfHeaderStack)
 
             if isinstance(p4header.index, int):
-                index = "[" + str(headerInstance.index) + "]"
+                index = "[" + str(p4header.index) + "]"
             elif p4header.index is P4_NEXT:
                 index = "[" + ebpfStack.indexVar + "]"
             else:

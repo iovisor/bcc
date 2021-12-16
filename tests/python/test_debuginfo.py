@@ -6,6 +6,7 @@ import os
 import subprocess
 from bcc import SymbolCache, BPF
 from unittest import main, TestCase
+from utils import mayFail
 
 class TestKSyms(TestCase):
     def grab_sym(self):
@@ -100,6 +101,7 @@ class TestDebuglink(Harness):
     def test_resolve_addr(self):
         self.resolve_addr()
 
+    @mayFail("This fails on github actions environment, and needs to be fixed")
     def test_resolve_name(self):
         self.resolve_name()
 
@@ -130,6 +132,7 @@ class TestBuildid(Harness):
     def test_resolve_name(self):
         self.resolve_addr()
 
+    @mayFail("This fails on github actions environment, and needs to be fixed")
     def test_resolve_addr(self):
         self.resolve_name()
 

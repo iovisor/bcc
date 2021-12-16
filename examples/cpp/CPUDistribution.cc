@@ -61,14 +61,14 @@ int task_switch_event(struct pt_regs *ctx, struct task_struct *prev) {
 int main(int argc, char** argv) {
   ebpf::BPF bpf;
   auto init_res = bpf.init(BPF_PROGRAM);
-  if (init_res.code() != 0) {
+  if (!init_res.ok()) {
     std::cerr << init_res.msg() << std::endl;
     return 1;
   }
 
   auto attach_res =
       bpf.attach_kprobe("finish_task_switch", "task_switch_event");
-  if (attach_res.code() != 0) {
+  if (!attach_res.ok()) {
     std::cerr << attach_res.msg() << std::endl;
     return 1;
   }
@@ -88,7 +88,7 @@ int main(int argc, char** argv) {
   }
 
   auto detach_res = bpf.detach_kprobe("finish_task_switch");
-  if (detach_res.code() != 0) {
+  if (!detach_res.ok()) {
     std::cerr << detach_res.msg() << std::endl;
     return 1;
   }

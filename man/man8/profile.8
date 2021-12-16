@@ -1,9 +1,9 @@
-.TH profile 8  "2016-07-17" "USER COMMANDS"
+.TH profile 8  "2020-03-18" "USER COMMANDS"
 .SH NAME
 profile \- Profile CPU usage by sampling stack traces. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B profile [\-adfh] [\-p PID] [\-U | \-K] [\-F FREQUENCY | \-c COUNT]
-.B [\-\-stack\-storage\-size COUNT] [duration]
+.B profile [\-adfh] [\-p PID | \-L TID] [\-U | \-K] [\-F FREQUENCY | \-c COUNT]
+.B [\-\-stack\-storage\-size COUNT] [\-\-cgroupmap CGROUPMAP] [\-\-mntnsmap MAPPATH] [duration]
 .SH DESCRIPTION
 This is a CPU profiler. It works by taking samples of stack traces at timed
 intervals. It will help you understand and quantify CPU usage: which code is
@@ -28,8 +28,10 @@ for an older version that may work on Linux 4.6 - 4.8.
 Print usage message.
 .TP
 \-p PID
-Trace this process ID only (filtered in-kernel). Without this, all CPUs are
-profiled.
+Trace this process ID only (filtered in-kernel).
+.TP
+\-L TID
+Trace this thread ID only (filtered in-kernel).
 .TP
 \-F frequency
 Frequency to sample stacks.
@@ -50,9 +52,18 @@ Show stacks from user space only (no kernel space stacks).
 \-K
 Show stacks from kernel space only (no user space stacks).
 .TP
+\-I
+Include CPU idle stacks (by default these are excluded).
+.TP
 \-\-stack-storage-size COUNT
 The maximum number of unique stack traces that the kernel will count (default
 16384). If the sampled count exceeds this, a warning will be printed.
+.TP
+\-C cpu
+Collect stacks only from specified cpu.
+.TP
+\-\-cgroupmap MAPPATH
+Profile cgroups in this BPF map only (filtered in-kernel).
 .TP
 duration
 Duration to trace, in seconds.
@@ -74,9 +85,13 @@ Profile 1 in a million events for 5 seconds only:
 #
 .B profile -c 1000000 5
 .TP
-Profile PID 181 only:
+Profile process with PID 181 only:
 #
 .B profile -p 181
+.TP
+Profile thread with TID 181 only:
+#
+.B profile -L 181
 .TP
 Profile for 5 seconds and output in folded stack format (suitable as input for flame graphs), including a delimiter between kernel and user stacks:
 #
@@ -85,6 +100,10 @@ Profile for 5 seconds and output in folded stack format (suitable as input for f
 Profile kernel stacks only:
 #
 .B profile -K
+.TP
+Profile a set of cgroups only (see special_filtering.md from bcc sources for more details):
+#
+.B profile \-\-cgroupmap /sys/fs/bpf/test01
 .SH DEBUGGING
 See "[unknown]" frames with bogus addresses? This can happen for different
 reasons. Your best approach is to get Linux perf to work first, and then to

@@ -112,6 +112,36 @@ void CodegenLLVM::emit(const char *s) {
   //fflush(out_);
 }
 
+CallInst *CodegenLLVM::createCall(Value *callee, ArrayRef<Value *> args)
+{
+#if LLVM_MAJOR_VERSION >= 11
+  auto *calleePtrType = cast<PointerType>(callee->getType());
+  auto *calleeType = cast<FunctionType>(calleePtrType->getElementType());
+  return B.CreateCall(calleeType, callee, args);
+#else
+  return B.CreateCall(callee, args);
+#endif
+}
+
+LoadInst *CodegenLLVM::createLoad(Value *addr)
+{
+#if LLVM_MAJOR_VERSION >= 14
+  return B.CreateLoad(addr->getType()->getPointerElementType(), addr);
+#else
+  return B.CreateLoad(addr);
+#endif
+}
+
+Value *CodegenLLVM::createInBoundsGEP(Value *ptr, ArrayRef<Value *>idxlist)
+{
+#if LLVM_MAJOR_VERSION >= 14
+  return B.CreateInBoundsGEP(ptr->getType()->getScalarType()->getPointerElementType(),
+                             ptr, idxlist);
+#else
+  return B.CreateInBoundsGEP(ptr, idxlist);
+#endif
+}
+
 StatusTuple CodegenLLVM::visit_block_stmt_node(BlockStmtNode *n) {
 
   // enter scope
@@ -126,7 +156,7 @@ StatusTuple CodegenLLVM::visit_block_stmt_node(BlockStmtNode *n) {
   if (n->scope_)
     scopes_->pop_var();
 
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::visit_if_stmt_node(IfStmtNode *n) {
@@ -159,7 +189,7 @@ StatusTuple CodegenLLVM::visit_if_stmt_node(IfStmtNode *n) {
 
   B.SetInsertPoint(label_end);
 
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::visit_onvalid_stmt_node(OnValidStmtNode *n) {
@@ -192,7 +222,7 @@ StatusTuple CodegenLLVM::visit_onvalid_stmt_node(OnValidStmtNode *n) {
   }
 
   B.SetInsertPoint(label_end);
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::visit_switch_stmt_node(SwitchStmtNode *n) {
@@ -213,7 +243,7 @@ StatusTuple CodegenLLVM::visit_switch_stmt_node(SwitchStmtNode *n) {
     B.SetInsertPoint(resolve_label("DONE"));
     label_end->eraseFromParent();
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::visit_case_stmt_node(CaseStmtNode *n) {
@@ -236,7 +266,7 @@ StatusTuple CodegenLLVM::visit_case_stmt_node(CaseStmtNode *n) {
     if (!B.GetInsertBlock()->getTerminator())
       B.CreateBr(label_end);
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::visit_ident_expr_node(IdentExprNode *n) {
@@ -267,17 +297,17 @@ StatusTuple CodegenLLVM::visit_ident_expr_node(IdentExprNode *n) {
           emit("%s%s->%s", n->decl_->scope_id(), n->c_str(), n->sub_name_.c_str());
           auto it = vars_.find(n->decl_);
           if (it == vars_.end()) return mkstatus_(n, "Cannot locate variable %s in vars_ table", n->c_str());
-          LoadInst *load_1 = B.CreateLoad(it->second);
+          LoadInst *load_1 = createLoad(it->second);
           vector<Value *> indices({B.getInt32(0), B.getInt32(n->sub_decl_->slot_)});
-          expr_ = B.CreateInBoundsGEP(load_1, indices);
+          expr_ = createInBoundsGEP(load_1, indices);
           if (!n->is_lhs())
-            expr_ = B.CreateLoad(pop_expr());
+            expr_ = createLoad(pop_expr());
         }
       }
     } else {
       auto it = vars_.find(n->decl_);
       if (it == vars_.end()) return mkstatus_(n, "Cannot locate variable %s in vars_ table", n->c_str());
-      expr_ = n->is_lhs() ? it->second : (Value *)B.CreateLoad(it->second);
+      expr_ = n->is_lhs() ? it->second : (Value *)createLoad(it->second);
     }
   } else {
     if (n->sub_name_.size()) {
@@ -287,7 +317,7 @@ StatusTuple CodegenLLVM::visit_ident_expr_node(IdentExprNode *n) {
       vector<Value *> indices({const_int(0), const_int(n->sub_decl_->slot_, 32)});
       expr_ = B.CreateGEP(nullptr, it->second, indices);
       if (!n->is_lhs())
-        expr_ = B.CreateLoad(pop_expr());
+        expr_ = createLoad(pop_expr());
     } else {
       if (n->bitop_) {
         // ident is holding a host endian number, don't use dext
@@ -304,11 +334,11 @@ StatusTuple CodegenLLVM::visit_ident_expr_node(IdentExprNode *n) {
         if (n->is_lhs() || n->decl_->is_struct())
           expr_ = it->second;
         else
-          expr_ = B.CreateLoad(it->second);
+          expr_ = createLoad(it->second);
       }
     }
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::visit_assign_expr_node(AssignExprNode *n) {
@@ -343,7 +373,7 @@ StatusTuple CodegenLLVM::visit_assign_expr_node(AssignExprNode *n) {
       }
     }
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::lookup_var(Node *n, const string &name, Scopes::VarScope *scope,
@@ -353,7 +383,7 @@ StatusTuple CodegenLLVM::lookup_var(Node *n, const string &name, Scopes::VarScop
   auto it = vars_.find(*decl);
   if (it == vars_.end()) return mkstatus_(n, "unable to find %s memory location", name.c_str());
   *mem = it->second;
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::visit_packet_expr_node(PacketExprNode *n) {
@@ -374,32 +404,32 @@ StatusTuple CodegenLLVM::visit_packet_expr_node(PacketExprNode *n) {
       }
       if (n->is_ref()) {
         // e.g.: @ip.hchecksum, return offset of the header within packet
-        LoadInst *offset_ptr = B.CreateLoad(offset_mem);
+        LoadInst *offset_ptr = createLoad(offset_mem);
         Value *skb_hdr_offset = B.CreateAdd(offset_ptr, B.getInt64(bit_offset >> 3));
         expr_ = B.CreateIntCast(skb_hdr_offset, B.getInt64Ty(), false);
       } else if (n->is_lhs()) {
         emit("bpf_dins_pkt(pkt, %s + %zu, %zu, %zu, ", n->id_->c_str(), bit_offset >> 3, bit_offset & 0x7, bit_width);
         Function *store_fn = mod_->getFunction("bpf_dins_pkt");
         if (!store_fn) return mkstatus_(n, "unable to find function bpf_dins_pkt");
-        LoadInst *skb_ptr = B.CreateLoad(skb_mem);
+        LoadInst *skb_ptr = createLoad(skb_mem);
         Value *skb_ptr8 = B.CreateBitCast(skb_ptr, B.getInt8PtrTy());
-        LoadInst *offset_ptr = B.CreateLoad(offset_mem);
+        LoadInst *offset_ptr = createLoad(offset_mem);
         Value *skb_hdr_offset = B.CreateAdd(offset_ptr, B.getInt64(bit_offset >> 3));
         Value *rhs = B.CreateIntCast(pop_expr(), B.getInt64Ty(), false);
-        B.CreateCall(store_fn, vector<Value *>({skb_ptr8, skb_hdr_offset, B.getInt64(bit_offset & 0x7),
+        createCall(store_fn, vector<Value *>({skb_ptr8, skb_hdr_offset, B.getInt64(bit_offset & 0x7),
                                                B.getInt64(bit_width), rhs}));
       } else {
         emit("bpf_dext_pkt(pkt, %s + %zu, %zu, %zu)", n->id_->c_str(), bit_offset >> 3, bit_offset & 0x7, bit_width);
         Function *load_fn = mod_->getFunction("bpf_dext_pkt");
         if (!load_fn) return mkstatus_(n, "unable to find function bpf_dext_pkt");
-        LoadInst *skb_ptr = B.CreateLoad(skb_mem);
+        LoadInst *skb_ptr = createLoad(skb_mem);
         Value *skb_ptr8 = B.CreateBitCast(skb_ptr, B.getInt8PtrTy());
-        LoadInst *offset_ptr = B.CreateLoad(offset_mem);
+        LoadInst *offset_ptr = createLoad(offset_mem);
         Value *skb_hdr_offset = B.CreateAdd(offset_ptr, B.getInt64(bit_offset >> 3));
-        expr_ = B.CreateCall(load_fn, vector<Value *>({skb_ptr8, skb_hdr_offset,
+        expr_ = createCall(load_fn, vector<Value *>({skb_ptr8, skb_hdr_offset,
                                                       B.getInt64(bit_offset & 0x7), B.getInt64(bit_width)}));
         // this generates extra trunc insns whereas the bpf.load fns already
-        // trunc the values internally in the bpf interpeter
+        // trunc the values internally in the bpf interpreter
         //expr_ = B.CreateTrunc(pop_expr(), B.getIntNTy(bit_width));
       }
     } else {
@@ -407,7 +437,7 @@ StatusTuple CodegenLLVM::visit_packet_expr_node(PacketExprNode *n) {
       return mkstatus_(n, "unsupported");
     }
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::visit_integer_expr_node(IntegerExprNode *n) {
@@ -416,7 +446,7 @@ StatusTuple CodegenLLVM::visit_integer_expr_node(IntegerExprNode *n) {
   expr_ = ConstantInt::get(mod_->getContext(), val);
   if (n->bits_)
     expr_ = B.CreateIntCast(expr_, B.getIntNTy(n->bits_), false);
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::visit_string_expr_node(StringExprNode *n) {
@@ -425,14 +455,16 @@ StatusTuple CodegenLLVM::visit_string_expr_node(StringExprNode *n) {
   Value *global = B.CreateGlobalString(n->val_);
   Value *ptr = make_alloca(resolve_entry_stack(), B.getInt8Ty(), "",
                            B.getInt64(n->val_.size() + 1));
-#if LLVM_MAJOR_VERSION >= 7
+#if LLVM_MAJOR_VERSION >= 11
+  B.CreateMemCpy(ptr, Align(1), global, Align(1), n->val_.size() + 1);
+#elif LLVM_MAJOR_VERSION >= 7
   B.CreateMemCpy(ptr, 1, global, 1, n->val_.size() + 1);
 #else
   B.CreateMemCpy(ptr, global, n->val_.size() + 1, 1);
 #endif
   expr_ = ptr;
 
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::emit_short_circuit_and(BinopExprNode *n) {
@@ -459,7 +491,7 @@ StatusTuple CodegenLLVM::emit_short_circuit_and(BinopExprNode *n) {
   phi->addIncoming(pop_expr(), label_then);
   expr_ = phi;
 
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::emit_short_circuit_or(BinopExprNode *n) {
@@ -486,7 +518,7 @@ StatusTuple CodegenLLVM::emit_short_circuit_or(BinopExprNode *n) {
   phi->addIncoming(pop_expr(), label_then);
   expr_ = phi;
 
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::visit_binop_expr_node(BinopExprNode *n) {
@@ -514,7 +546,7 @@ StatusTuple CodegenLLVM::visit_binop_expr_node(BinopExprNode *n) {
     case Tok::TLOR: expr_ = B.CreateOr(lhs, rhs); break;
     default: return mkstatus_(n, "unsupported binary operator");
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::visit_unop_expr_node(UnopExprNode *n) {
@@ -524,11 +556,11 @@ StatusTuple CodegenLLVM::visit_unop_expr_node(UnopExprNode *n) {
     case Tok::TCMPL: expr_ = B.CreateNeg(pop_expr()); break;
     default: {}
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::visit_bitop_expr_node(BitopExprNode *n) {
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::visit_goto_expr_node(GotoExprNode *n) {
@@ -558,7 +590,7 @@ StatusTuple CodegenLLVM::visit_goto_expr_node(GotoExprNode *n) {
     }
   }
   B.CreateBr(resolve_label(jump_label));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::visit_return_expr_node(ReturnExprNode *n) {
@@ -567,7 +599,7 @@ StatusTuple CodegenLLVM::visit_return_expr_node(ReturnExprNode *n) {
   Value *cast_1 = B.CreateIntCast(pop_expr(), parent->getReturnType(), true);
   B.CreateStore(cast_1, retval_);
   B.CreateBr(resolve_label("DONE"));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::emit_table_lookup(MethodCallExprNode *n) {
@@ -585,14 +617,14 @@ StatusTuple CodegenLLVM::emit_table_lookup(MethodCallExprNode *n) {
   Function *lookup_fn = mod_->getFunction("bpf_map_lookup_elem_");
   if (!lookup_fn) return mkstatus_(n, "bpf_map_lookup_elem_ undefined");
 
-  CallInst *pseudo_call = B.CreateCall(pseudo_fn, vector<Value *>({B.getInt64(BPF_PSEUDO_MAP_FD),
+  CallInst *pseudo_call = createCall(pseudo_fn, vector<Value *>({B.getInt64(BPF_PSEUDO_MAP_FD),
                                                                   B.getInt64(table_fd_it->second)}));
   Value *pseudo_map_fd = pseudo_call;
 
   TRY2(arg0->accept(this));
   Value *key_ptr = B.CreateBitCast(pop_expr(), B.getInt8PtrTy());
 
-  expr_ = B.CreateCall(lookup_fn, vector<Value *>({pseudo_map_fd, key_ptr}));
+  expr_ = createCall(lookup_fn, vector<Value *>({pseudo_map_fd, key_ptr}));
 
   if (table->type_id()->name_ == "FIXED_MATCH" || table->type_id()->name_ == "INDEXED") {
     if (n->args_.size() == 2) {
@@ -610,7 +642,7 @@ StatusTuple CodegenLLVM::emit_table_lookup(MethodCallExprNode *n) {
   } else {
     return mkstatus_(n, "lookup in table type %s unsupported", table->type_id()->c_str());
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::emit_table_update(MethodCallExprNode *n) {
@@ -626,7 +658,7 @@ StatusTuple CodegenLLVM::emit_table_update(MethodCallExprNode *n) {
   Function *update_fn = mod_->getFunction("bpf_map_update_elem_");
   if (!update_fn) return mkstatus_(n, "bpf_map_update_elem_ undefined");
 
-  CallInst *pseudo_call = B.CreateCall(pseudo_fn, vector<Value *>({B.getInt64(BPF_PSEUDO_MAP_FD),
+  CallInst *pseudo_call = createCall(pseudo_fn, vector<Value *>({B.getInt64(BPF_PSEUDO_MAP_FD),
                                         B.getInt64(table_fd_it->second)}));
   Value *pseudo_map_fd = pseudo_call;
 
@@ -637,11 +669,11 @@ StatusTuple CodegenLLVM::emit_table_update(MethodCallExprNode *n) {
     TRY2(arg1->accept(this));
     Value *value_ptr = B.CreateBitCast(pop_expr(), B.getInt8PtrTy());
 
-    expr_ = B.CreateCall(update_fn, vector<Value *>({pseudo_map_fd, key_ptr, value_ptr, B.getInt64(BPF_ANY)}));
+    expr_ = createCall(update_fn, vector<Value *>({pseudo_map_fd, key_ptr, value_ptr, B.getInt64(BPF_ANY)}));
   } else {
     return mkstatus_(n, "unsupported");
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::emit_table_delete(MethodCallExprNode *n) {
@@ -656,7 +688,7 @@ StatusTuple CodegenLLVM::emit_table_delete(MethodCallExprNode *n) {
   Function *update_fn = mod_->getFunction("bpf_map_update_elem_");
   if (!update_fn) return mkstatus_(n, "bpf_map_update_elem_ undefined");
 
-  CallInst *pseudo_call = B.CreateCall(pseudo_fn, vector<Value *>({B.getInt64(BPF_PSEUDO_MAP_FD),
+  CallInst *pseudo_call = createCall(pseudo_fn, vector<Value *>({B.getInt64(BPF_PSEUDO_MAP_FD),
                                         B.getInt64(table_fd_it->second)}));
   Value *pseudo_map_fd = pseudo_call;
 
@@ -664,11 +696,11 @@ StatusTuple CodegenLLVM::emit_table_delete(MethodCallExprNode *n) {
   Value *key_ptr = B.CreateBitCast(pop_expr(), B.getInt8PtrTy());
 
   if (table->type_id()->name_ == "FIXED_MATCH" || table->type_id()->name_ == "INDEXED") {
-    expr_ = B.CreateCall(update_fn, vector<Value *>({pseudo_map_fd, key_ptr}));
+    expr_ = createCall(update_fn, vector<Value *>({pseudo_map_fd, key_ptr}));
   } else {
     return mkstatus_(n, "unsupported");
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::emit_log(MethodCallExprNode *n) {
@@ -688,14 +720,14 @@ StatusTuple CodegenLLVM::emit_log(MethodCallExprNode *n) {
   Value *printk_fn = B.CreateIntToPtr(B.getInt64(BPF_FUNC_trace_printk),
                                          PointerType::getUnqual(printk_fn_type));
 
-  expr_ = B.CreateCall(printk_fn, args);
-  return StatusTuple(0);
+  expr_ = createCall(printk_fn, args);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::emit_packet_rewrite_field(MethodCallExprNode *n) {
   TRY2(n->args_[1]->accept(this));
   TRY2(n->args_[0]->accept(this));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::emit_atomic_add(MethodCallExprNode *n) {
@@ -703,10 +735,16 @@ StatusTuple CodegenLLVM::emit_atomic_add(MethodCallExprNode *n) {
   Value *lhs = B.CreateBitCast(pop_expr(), Type::getInt64PtrTy(ctx()));
   TRY2(n->args_[1]->accept(this));
   Value *rhs = B.CreateSExt(pop_expr(), B.getInt64Ty());
+#if LLVM_MAJOR_VERSION >= 13
+  AtomicRMWInst *atomic_inst = B.CreateAtomicRMW(
+      AtomicRMWInst::Add, lhs, rhs, Align(8),
+      AtomicOrdering::SequentiallyConsistent);
+#else
   AtomicRMWInst *atomic_inst = B.CreateAtomicRMW(
       AtomicRMWInst::Add, lhs, rhs, AtomicOrdering::SequentiallyConsistent);
+#endif
   atomic_inst->setVolatile(false);
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::emit_incr_cksum(MethodCallExprNode *n, size_t sz) {
@@ -739,15 +777,15 @@ StatusTuple CodegenLLVM::emit_incr_cksum(MethodCallExprNode *n, size_t sz) {
   VariableDeclStmtNode *skb_decl;
   Value *skb_mem;
   TRY2(lookup_var(n, "skb", scopes_->current_var(), &skb_decl, &skb_mem));
-  LoadInst *skb_ptr = B.CreateLoad(skb_mem);
+  LoadInst *skb_ptr = createLoad(skb_mem);
   Value *skb_ptr8 = B.CreateBitCast(skb_ptr, B.getInt8PtrTy());
 
-  expr_ = B.CreateCall(csum_fn, vector<Value *>({skb_ptr8, offset, old_val, new_val, flags}));
-  return StatusTuple(0);
+  expr_ = createCall(csum_fn, vector<Value *>({skb_ptr8, offset, old_val, new_val, flags}));
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::emit_get_usec_time(MethodCallExprNode *n) {
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::visit_method_call_expr_node(MethodCallExprNode *n) {
@@ -773,7 +811,7 @@ StatusTuple CodegenLLVM::visit_method_call_expr_node(MethodCallExprNode *n) {
     return mkstatus_(n, "unsupported");
   }
   TRY2(n->block_->accept(this));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 /* result = lookup(key)
@@ -797,7 +835,7 @@ StatusTuple CodegenLLVM::visit_table_index_expr_node(TableIndexExprNode *n) {
   TRY2(lookup_struct_type(n->table_->leaf_type_, &leaf_type));
   PointerType *leaf_ptype = PointerType::getUnqual(leaf_type);
 
-  CallInst *pseudo_call = B.CreateCall(pseudo_fn, vector<Value *>({B.getInt64(BPF_PSEUDO_MAP_FD),
+  CallInst *pseudo_call = createCall(pseudo_fn, vector<Value *>({B.getInt64(BPF_PSEUDO_MAP_FD),
                                         B.getInt64(table_fd_it->second)}));
   Value *pseudo_map_fd = pseudo_call;
 
@@ -805,7 +843,7 @@ StatusTuple CodegenLLVM::visit_table_index_expr_node(TableIndexExprNode *n) {
   Value *key_ptr = B.CreateBitCast(pop_expr(), B.getInt8PtrTy());
 
   // result = lookup(key)
-  Value *lookup1 = B.CreateBitCast(B.CreateCall(lookup_fn, vector<Value *>({pseudo_map_fd, key_ptr})), leaf_ptype);
+  Value *lookup1 = B.CreateBitCast(createCall(lookup_fn, vector<Value *>({pseudo_map_fd, key_ptr})), leaf_ptype);
 
   Value *result = nullptr;
   if (n->table_->policy_id()->name_ == "AUTO") {
@@ -821,12 +859,16 @@ StatusTuple CodegenLLVM::visit_table_index_expr_node(TableIndexExprNode *n) {
     // var Leaf leaf {0}
     Value *leaf_ptr = B.CreateBitCast(
         make_alloca(resolve_entry_stack(), leaf_type), B.getInt8PtrTy());
+#if LLVM_MAJOR_VERSION >= 10
+    B.CreateMemSet(leaf_ptr, B.getInt8(0), B.getInt64(n->table_->leaf_id()->bit_width_ >> 3), MaybeAlign(1));
+#else
     B.CreateMemSet(leaf_ptr, B.getInt8(0), B.getInt64(n->table_->leaf_id()->bit_width_ >> 3), 1);
+#endif
     // update(key, leaf)
-    B.CreateCall(update_fn, vector<Value *>({pseudo_map_fd, key_ptr, leaf_ptr, B.getInt64(BPF_NOEXIST)}));
+    createCall(update_fn, vector<Value *>({pseudo_map_fd, key_ptr, leaf_ptr, B.getInt64(BPF_NOEXIST)}));
 
     // result = lookup(key)
-    Value *lookup2 = B.CreateBitCast(B.CreateCall(lookup_fn, vector<Value *>({pseudo_map_fd, key_ptr})), leaf_ptype);
+    Value *lookup2 = B.CreateBitCast(createCall(lookup_fn, vector<Value *>({pseudo_map_fd, key_ptr})), leaf_ptype);
     B.CreateBr(label_end);
 
     B.SetInsertPoint(label_end);
@@ -859,13 +901,13 @@ StatusTuple CodegenLLVM::visit_table_index_expr_node(TableIndexExprNode *n) {
 
         B.SetInsertPoint(label_end);
         vector<Value *> indices({B.getInt32(0), B.getInt32(n->sub_decl_->slot_)});
-        expr_ = B.CreateInBoundsGEP(result, indices);
+        expr_ = createInBoundsGEP(result, indices);
       } else {
         B.CreateCondBr(B.CreateIsNotNull(result), label_then, label_end);
 
         B.SetInsertPoint(label_then);
         vector<Value *> indices({B.getInt32(0), B.getInt32(n->sub_decl_->slot_)});
-        Value *field = B.CreateInBoundsGEP(result, indices);
+        Value *field = createInBoundsGEP(result, indices);
         B.CreateBr(label_end);
 
         B.SetInsertPoint(label_end);
@@ -880,7 +922,7 @@ StatusTuple CodegenLLVM::visit_table_index_expr_node(TableIndexExprNode *n) {
   } else {
     expr_ = result;
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 /// on_match
@@ -897,7 +939,7 @@ StatusTuple CodegenLLVM::visit_match_decl_stmt_node(MatchDeclStmtNode *n) {
   if (result == vars_.end()) return mkstatus_(n, "unable to find memory for _result built-in");
   vars_[leaf_n] = result->second;
 
-  Value *load_1 = B.CreateLoad(result->second);
+  Value *load_1 = createLoad(result->second);
   Value *is_null = B.CreateIsNotNull(load_1);
 
   Function *parent = B.GetInsertBlock()->getParent();
@@ -913,7 +955,7 @@ StatusTuple CodegenLLVM::visit_match_decl_stmt_node(MatchDeclStmtNode *n) {
   }
 
   B.SetInsertPoint(label_end);
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 /// on_miss
@@ -925,7 +967,7 @@ StatusTuple CodegenLLVM::visit_miss_decl_stmt_node(MissDeclStmtNode *n) {
   auto result = vars_.find(result_decl);
   if (result == vars_.end()) return mkstatus_(n, "unable to find memory for _result built-in");
 
-  Value *load_1 = B.CreateLoad(result->second);
+  Value *load_1 = createLoad(result->second);
   Value *is_null = B.CreateIsNull(load_1);
 
   Function *parent = B.GetInsertBlock()->getParent();
@@ -941,7 +983,7 @@ StatusTuple CodegenLLVM::visit_miss_decl_stmt_node(MissDeclStmtNode *n) {
   }
 
   B.SetInsertPoint(label_end);
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::visit_failure_decl_stmt_node(FailureDeclStmtNode *n) {
@@ -951,12 +993,12 @@ StatusTuple CodegenLLVM::visit_failure_decl_stmt_node(FailureDeclStmtNode *n) {
 StatusTuple CodegenLLVM::visit_expr_stmt_node(ExprStmtNode *n) {
   TRY2(n->expr_->accept(this));
   expr_ = nullptr;
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::visit_struct_variable_decl_stmt_node(StructVariableDeclStmtNode *n) {
   if (n->struct_id_->name_ == "" || n->struct_id_->name_[0] == '_') {
-    return StatusTuple(0);
+    return StatusTuple::OK();
   }
 
   StructType *stype;
@@ -1003,19 +1045,23 @@ StatusTuple CodegenLLVM::visit_struct_variable_decl_stmt_node(StructVariableDecl
         B.CreateStore(const_null, ptr_a);
       }
     } else {
+#if LLVM_MAJOR_VERSION >= 10
+      B.CreateMemSet(ptr_a, B.getInt8(0), B.getInt64(decl->bit_width_ >> 3), MaybeAlign(1));
+#else
       B.CreateMemSet(ptr_a, B.getInt8(0), B.getInt64(decl->bit_width_ >> 3), 1);
+#endif
       if (!n->init_.empty()) {
         for (auto it = n->init_.begin(); it != n->init_.end(); ++it)
           TRY2((*it)->accept(this));
       }
     }
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::visit_integer_variable_decl_stmt_node(IntegerVariableDeclStmtNode *n) {
   if (!B.GetInsertBlock())
-    return StatusTuple(0);
+    return StatusTuple::OK();
 
   // uintX var = init
   AllocaInst *ptr_a = make_alloca(resolve_entry_stack(),
@@ -1025,7 +1071,7 @@ StatusTuple CodegenLLVM::visit_integer_variable_decl_stmt_node(IntegerVariableDe
   // todo
   if (!n->init_.empty())
     TRY2(n->init_[0]->accept(this));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::visit_struct_decl_stmt_node(StructDeclStmtNode *n) {
@@ -1036,7 +1082,7 @@ StatusTuple CodegenLLVM::visit_struct_decl_stmt_node(StructDeclStmtNode *n) {
     fields.push_back(B.getIntNTy((*it)->bit_width_));
   struct_type->setBody(fields, n->is_packed());
   structs_[n] = struct_type;
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::visit_parser_state_stmt_node(ParserStateStmtNode *n) {
@@ -1045,12 +1091,12 @@ StatusTuple CodegenLLVM::visit_parser_state_stmt_node(ParserStateStmtNode *n) {
   B.SetInsertPoint(label_entry);
   if (n->next_state_)
     TRY2(n->next_state_->accept(this));
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::visit_state_decl_stmt_node(StateDeclStmtNode *n) {
   if (!n->id_)
-    return StatusTuple(0);
+    return StatusTuple::OK();
   string jump_label = n->scoped_name();
   BasicBlock *label_entry = resolve_label(jump_label);
   B.SetInsertPoint(label_entry);
@@ -1074,7 +1120,7 @@ StatusTuple CodegenLLVM::visit_state_decl_stmt_node(StateDeclStmtNode *n) {
   }
 
   scopes_->pop_state();
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::visit_table_decl_stmt_node(TableDeclStmtNode *n) {
@@ -1098,7 +1144,11 @@ StatusTuple CodegenLLVM::visit_table_decl_stmt_node(TableDeclStmtNode *n) {
     StructType *key_stype, *leaf_stype;
     TRY2(lookup_struct_type(n->key_type_, &key_stype));
     TRY2(lookup_struct_type(n->leaf_type_, &leaf_stype));
+#if LLVM_MAJOR_VERSION >= 12
+    StructType *decl_struct = StructType::getTypeByName(mod_->getContext(), "_struct." + n->id_->name_);
+#else
     StructType *decl_struct = mod_->getTypeByName("_struct." + n->id_->name_);
+#endif
     if (!decl_struct)
       decl_struct = StructType::create(ctx(), "_struct." + n->id_->name_);
     if (decl_struct->isOpaque())
@@ -1108,7 +1158,7 @@ StatusTuple CodegenLLVM::visit_table_decl_stmt_node(TableDeclStmtNode *n) {
     decl_gvar->setSection("maps");
     tables_[n] = decl_gvar;
 
-    int map_fd = bpf_create_map(map_type, n->id_->name_.c_str(),
+    int map_fd = bcc_create_map(map_type, n->id_->name_.c_str(),
                                 key->bit_width_ / 8, leaf->bit_width_ / 8,
                                 n->size_, 0);
     if (map_fd >= 0)
@@ -1116,7 +1166,7 @@ StatusTuple CodegenLLVM::visit_table_decl_stmt_node(TableDeclStmtNode *n) {
   } else {
     return mkstatus_(n, "Table %s not implemented", n->table_type_->name_.c_str());
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::lookup_struct_type(StructDeclStmtNode *decl, StructType **stype) const {
@@ -1125,7 +1175,7 @@ StatusTuple CodegenLLVM::lookup_struct_type(StructDeclStmtNode *decl, StructType
     return mkstatus_(decl, "could not find IR for type %s", decl->id_->c_str());
   *stype = struct_it->second;
 
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::lookup_struct_type(VariableDeclStmtNode *n, StructType **stype,
@@ -1147,7 +1197,7 @@ StatusTuple CodegenLLVM::lookup_struct_type(VariableDeclStmtNode *n, StructType 
   if (decl)
     *decl = type;
 
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::visit_func_decl_stmt_node(FuncDeclStmtNode *n) {
@@ -1161,7 +1211,11 @@ StatusTuple CodegenLLVM::visit_func_decl_stmt_node(FuncDeclStmtNode *n) {
       StructType *stype;
       //TRY2(lookup_struct_type(formal, &stype));
       auto var = (StructVariableDeclStmtNode *)formal;
+#if LLVM_MAJOR_VERSION >= 12
+      stype = StructType::getTypeByName(mod_->getContext(), "_struct." + var->struct_id_->name_);
+#else
       stype = mod_->getTypeByName("_struct." + var->struct_id_->name_);
+#endif
       if (!stype) return mkstatus_(n, "could not find type %s", var->struct_id_->c_str());
       formals.push_back(PointerType::getUnqual(stype));
     } else {
@@ -1224,13 +1278,14 @@ StatusTuple CodegenLLVM::visit_func_decl_stmt_node(FuncDeclStmtNode *n) {
 
     // always return something
     B.SetInsertPoint(label_return);
-    B.CreateRet(B.CreateLoad(retval_));
+    B.CreateRet(createLoad(retval_));
   }
 
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
-StatusTuple CodegenLLVM::visit(Node *root, TableStorage &ts, const string &id) {
+StatusTuple CodegenLLVM::visit(Node *root, TableStorage &ts, const string &id,
+                               const string &maps_ns) {
   scopes_->set_current(scopes_->top_state());
   scopes_->set_current(scopes_->top_var());
 
@@ -1256,7 +1311,7 @@ StatusTuple CodegenLLVM::visit(Node *root, TableStorage &ts, const string &id) {
                   table.first->size_, 0,
               });
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 StatusTuple CodegenLLVM::print_header() {
@@ -1284,7 +1339,7 @@ StatusTuple CodegenLLVM::print_header() {
       continue;
     TRY2((*it)->accept(this));
   }
-  return StatusTuple(0);
+  return StatusTuple::OK();
 }
 
 int CodegenLLVM::get_table_fd(const string &name) const {

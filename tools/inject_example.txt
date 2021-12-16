@@ -28,11 +28,16 @@ The "(true)" without an associated function is a predicate for the error
 injection mechanism of the current mode. In the case of kmalloc, the predicate
 would have access to the arguments of:
 
-	int should_failslab(struct kmem_cache *s, gfp_t gfpflags);
+	should_failslab(struct kmem_cache *s, gfp_t gfpflags)
 
-The bio mode works similarly, with access to the arguments of:
-	
-	static noinline int should_fail_bio(struct bio *bio)
+Other modes work similarly.
+"bio" has access to the arguments of:
+
+	should_fail_bio(struct bio *bio)
+
+"alloc_page" has access to the arguments of:
+
+	should_fail_alloc_page(gfp_t gfp_mask, unsigned int order)
 
 We also note that it's unnecessary to state the arguments of the function if you
 have no intention to reference them in the associated predicate.
@@ -62,7 +67,7 @@ In general, it's worth noting that the required specificity of the call chain is
 dependent on how much granularity you need. The example above might have
 performed as expected without the intermediate btrfs_alloc_device, but might
 have also done something unexpected(an earlier kmalloc could have failed before
-the one we were targetting).
+the one we were targeting).
 
 For hot paths, the approach outlined above isn't enough. If a path is traversed
 very often, we can distinguish distinct calls with function arguments. Let's say
@@ -115,12 +120,14 @@ fail our mounts half the time:
 # ./inject.py kmalloc -v -P 0.01 'SyS_mount()'
 
 USAGE message:
-usage: inject.py [-h] [-I header] [-P probability] [-v] {kmalloc,bio} spec
+usage: inject.py [-h] [-I header] [-P probability] [-v] [-c COUNT]
+                 {kmalloc,bio,alloc_page} spec
 
 Fail specified kernel functionality when call chain and predicates are met
 
 positional arguments:
-  {kmalloc,bio}         indicate which base kernel function to fail
+  {kmalloc,bio,alloc_page}
+                        indicate which base kernel function to fail
   spec                  specify call chain
 
 optional arguments:
@@ -130,6 +137,8 @@ optional arguments:
   -P probability, --probability probability
                         probability that this call chain will fail
   -v, --verbose         print BPF program
+  -c COUNT, --count COUNT
+                        Number of fails before bypassing the override
 
 EXAMPLES:
 # ./inject.py kmalloc -v 'SyS_mount()'

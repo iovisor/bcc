@@ -349,8 +349,13 @@ local function _decode_table_type(desc)
       table.insert(fields, f)
     end
 
-    assert(struct == "struct" or struct == "union", "unknown complex type: "..struct)
-    return string.format("%s { %s }", struct, table.concat(fields, " "))
+    assert(struct == "struct" or struct == "struct_packed" or struct == "union",
+           "unknown complex type: "..struct)
+    if struct == "union" then
+      return string.format("union { %s }", table.concat(fields, " "))
+    else
+      return string.format("struct { %s }", table.concat(fields, " "))
+    end
   end
   return _dec(json.parse(json_desc))
 end

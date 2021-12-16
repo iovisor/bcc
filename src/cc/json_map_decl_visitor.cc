@@ -20,6 +20,7 @@
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/RecordLayout.h>
 #include <clang/AST/RecursiveASTVisitor.h>
+#include <llvm/ADT/StringExtras.h>
 #include "common.h"
 #include "table_desc.h"
 
@@ -41,8 +42,8 @@ class BMapDeclVisitor : public clang::RecursiveASTVisitor<BMapDeclVisitor> {
   bool VisitTypedefType(const clang::TypedefType *T);
   bool VisitTagType(const clang::TagType *T);
   bool VisitPointerType(const clang::PointerType *T);
-  bool VisitEnumConstantDecl(clang::EnumConstantDecl *D);
   bool VisitEnumDecl(clang::EnumDecl *D);
+  bool VisitAttr(clang::Attr *A);
 
  private:
   bool shouldSkipPadding(const RecordDecl *D);
@@ -79,7 +80,11 @@ void BMapDeclVisitor::genJSONForField(FieldDecl *F) {
   result_ += "[";
   TraverseDecl(F);
   if (const ConstantArrayType *T = dyn_cast<ConstantArrayType>(F->getType()))
+#if LLVM_MAJOR_VERSION >= 13
+    result_ += ", [" + toString(T->getSize(), 10, false) + "]";
+#else
     result_ += ", [" + T->getSize().toString(10, false) + "]";
+#endif
   if (F->isBitField())
     result_ += ", " + to_string(F->getBitWidthValue(C));
   result_ += "], ";
@@ -92,22 +97,8 @@ bool BMapDeclVisitor::VisitFieldDecl(FieldDecl *D) {
   return true;
 }
 
-bool BMapDeclVisitor::VisitEnumConstantDecl(EnumConstantDecl *D) {
-  result_ += "\"";
-  result_ += D->getName();
-  result_ += "\",";
-  return false;
-}
-
 bool BMapDeclVisitor::VisitEnumDecl(EnumDecl *D) {
-  result_ += "[\"";
-  result_ += D->getName();
-  result_ += "\", [";
-  for (auto it = D->enumerator_begin(); it != D->enumerator_end(); ++it) {
-    TraverseDecl(*it);
-  }
-  result_.erase(result_.end() - 1);
-  result_ += "], \"enum\"]";
+  TraverseType(D->getIntegerType());
   return false;
 }
 
@@ -159,8 +150,12 @@ bool BMapDeclVisitor::VisitRecordDecl(RecordDecl *D) {
   result_ += "]";
   if (D->isUnion())
     result_ += ", \"union\"";
-  else if (D->isStruct())
-    result_ += ", \"struct\"";
+  else if (D->isStruct()) {
+    if (SkipPadding)
+      result_ += ", \"struct\"";
+    else
+      result_ += ", \"struct_packed\"";
+  }
   result_ += "]";
   return true;
 }
@@ -179,6 +174,7 @@ bool BMapDeclVisitor::VisitBuiltinType(const BuiltinType *T) {
   result_ += "\"";
   return true;
 }
+bool BMapDeclVisitor::VisitAttr(clang::Attr *A) { return false; }
 
 class JsonMapTypesVisitor : public virtual MapTypesVisitor {
  public:

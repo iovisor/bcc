@@ -10,6 +10,78 @@ block device I/O:
 Tracing 1 functions for "submit_bio"... Hit Ctrl-C to end.
 ^C
   submit_bio
+  submit_bh
+  journal_submit_commit_record.isra.13
+  jbd2_journal_commit_transaction
+  kjournald2
+  kthread
+  ret_from_fork
+  mb_cache_list
+    1
+
+  submit_bio
+  __block_write_full_page.constprop.39
+  block_write_full_page
+  blkdev_writepage
+  __writepage
+  write_cache_pages
+  generic_writepages
+  do_writepages
+  __writeback_single_inode
+  writeback_sb_inodes
+  __writeback_inodes_wb
+    2
+
+  submit_bio
+  __block_write_full_page.constprop.39
+  block_write_full_page
+  blkdev_writepage
+  __writepage
+  write_cache_pages
+  generic_writepages
+  do_writepages
+  __filemap_fdatawrite_range
+  filemap_fdatawrite
+  fdatawrite_one_bdev
+    36
+
+  submit_bio
+  submit_bh
+  jbd2_journal_commit_transaction
+  kjournald2
+  kthread
+  ret_from_fork
+  mb_cache_list
+    38
+
+  submit_bio
+  ext4_writepages
+  do_writepages
+  __filemap_fdatawrite_range
+  filemap_flush
+  ext4_alloc_da_blocks
+  ext4_rename
+  ext4_rename2
+  vfs_rename
+  sys_rename
+  entry_SYSCALL_64_fastpath
+    79
+
+Detaching...
+
+The output shows unique stack traces, in order from leaf (on-CPU) to root,
+followed by their occurrence count. The last stack trace in the above output
+shows syscall handling, ext4_rename(), and filemap_flush(): looks like an
+application issued file rename has caused back end disk I/O due to ext4
+block allocation and a filemap_flush().
+
+
+Now adding the -P option to display stacks separately for each process:
+
+# ./stackcount -P submit_bio
+Tracing 1 functions for "submit_bio"... Hit Ctrl-C to end.
+^C
+  submit_bio
   ext4_writepages
   do_writepages
   __filemap_fdatawrite_range
@@ -64,15 +136,14 @@ Tracing 1 functions for "submit_bio"... Hit Ctrl-C to end.
 
 Detaching...
 
-The output shows unique stack traces, in order from leaf (on-CPU) to root,
-followed by their occurrence count. The last stack trace in the above output
-shows syscall handling, sys_read(), vfs_read(), and then "readahead" functions:
-looks like an application issued file read has triggered read ahead. The
-application can be seen after the stack trace, in this case, "tar [15069]"
-for the "tar" command, PID 15069.
+The last stack trace in the above output shows syscall handling, sys_read(),
+vfs_read(), and then "readahead" functions: looks like an application issued
+file read has triggered read ahead. With "-P", the application can be seen
+after the stack trace, in this case, "tar [15069]" for the "tar" command,
+PID 15069.
 
 The order of printed stack traces is from least to most frequent. The most
-frequent in this case, the ext4_rename() stack, was taken 113 times during
+frequent in this case, the ext4_readpages() stack, was taken 113 times during
 tracing.
 
 The "[unknown]" frames are from user-level, since this simple workload is
@@ -82,7 +153,7 @@ walkers. Similar broken stacks will be seen by other profilers and debuggers
 that use frame pointers. Hopefully your application preserves them so that
 the user-level stack trace is visible. So how does one get frame pointers, if
 your application doesn't have them to start with? For the current bcc (until
-it supports other stack walkers), you need to be running a application binaries
+it supports other stack walkers), you need to be running an application binaries
 that preserves frame pointers, eg, using gcc's -fno-omit-frame-pointer. That's
 about all I'll say here: this is a big topic that is not bcc/BPF specific.
 
@@ -92,7 +163,7 @@ disk IOPS. These could have in-kernel origins (eg, background scrub).
 
 Now adding the -d option to delimit kernel and user stacks:
 
-# ./stackcount -d submit_bio
+# ./stackcount -P -d submit_bio
 Tracing 1 functions for "submit_bio"... Hit Ctrl-C to end.
 ^C
   submit_bio
@@ -181,7 +252,7 @@ A "--" is printed between the kernel and user stacks.
 
 As a different example, here is the kernel function hrtimer_init_sleeper():
 
-# ./stackcount.py -d hrtimer_init_sleeper
+# ./stackcount.py -P -d hrtimer_init_sleeper
 Tracing 1 functions for "hrtimer_init_sleeper"... Hit Ctrl-C to end.
 ^C
   hrtimer_init_sleeper
@@ -294,7 +365,7 @@ JIT symbol translation). dockerd and containerd don't have frame pointers
 
 Here's another kernel function, ip_output():
 
-# ./stackcount.py -d ip_output
+# ./stackcount.py -P -d ip_output
 Tracing 1 functions for "ip_output"... Hit Ctrl-C to end.
 ^C
   ip_output
@@ -391,7 +462,7 @@ was the same.
 
 Here is just the user stacks, fetched during the kernel function ip_output():
 
-# ./stackcount.py -U ip_output
+# ./stackcount.py -P -U ip_output
 Tracing 1 functions for "ip_output"... Hit Ctrl-C to end.
 ^C
   [unknown]
@@ -444,12 +515,12 @@ without debuginfo.
 
 
 In addition to kernel and user-space functions, kernel tracepoints and USDT
-tracepoints are also supported. 
+tracepoints are also supported.
 
-For example, to determine where threads are being created in a particular 
+For example, to determine where threads are being created in a particular
 process, use the pthread_create USDT tracepoint:
 
-# ./stackcount -p $(pidof parprimes) u:pthread:pthread_create
+# ./stackcount -P -p $(pidof parprimes) u:pthread:pthread_create
 Tracing 1 functions for "u:pthread:pthread_create"... Hit Ctrl-C to end.
 ^C
 
@@ -463,10 +534,10 @@ Tracing 1 functions for "u:pthread:pthread_create"... Hit Ctrl-C to end.
 You can use "readelf -n file" to see if it has USDT tracepoints.
 
 
-Similarly, to determine where context switching is happening in the kernel, 
+Similarly, to determine where context switching is happening in the kernel,
 use the sched:sched_switch kernel tracepoint:
 
-# ./stackcount t:sched:sched_switch
+# ./stackcount -P t:sched:sched_switch
   __schedule
   schedule
   worker_thread
@@ -518,7 +589,7 @@ use the sched:sched_switch kernel tracepoint:
 A -i option can be used to set an output interval, and -T to include a
 timestamp. For example:
 
-# ./stackcount.py -Tdi 1 submit_bio
+# ./stackcount.py -P -Tdi 1 submit_bio
 Tracing 1 functions for "submit_bio"... Hit Ctrl-C to end.
 
 06:05:13
@@ -705,7 +776,7 @@ did not span block device I/O.
 The -s output prints the return instruction offset for each function (aka
 symbol offset). Eg:
 
-# ./stackcount.py -s tcp_sendmsg
+# ./stackcount.py -P -s tcp_sendmsg
 Tracing 1 functions for "tcp_sendmsg"... Hit Ctrl-C to end.
 ^C
   tcp_sendmsg+0x1
@@ -738,7 +809,7 @@ offset can help you locate the lines of code from a disassembly dump.
 
 The -v output is verbose, and shows raw addresses:
 
-./stackcount.py -v tcp_sendmsg
+./stackcount.py -P -v tcp_sendmsg
 Tracing 1 functions for "tcp_sendmsg"... Hit Ctrl-C to end.
 ^C
   ffffffff817b05c1 tcp_sendmsg
@@ -825,7 +896,7 @@ Use -r to allow regular expressions.
 The -f option will emit folded output, which can be used as input to other
 tools including flame graphs. For example, with delimiters as well:
 
-# ./stackcount.py -df t:sched:sched_switch
+# ./stackcount.py -P -df t:sched:sched_switch
 ^Csnmp-pass;[unknown];[unknown];[unknown];[unknown];[unknown];-;entry_SYSCALL_64_fastpath;SyS_select;core_sys_select;do_select;poll_schedule_timeout;schedule_hrtimeout_range;schedule_hrtimeout_range_clock;schedule;__schedule 1
 kworker/7:0;-;ret_from_fork;kthread;worker_thread;schedule;__schedule 1
 watchdog/0;-;ret_from_fork;kthread;smpboot_thread_fn;schedule;__schedule 1
@@ -843,8 +914,8 @@ This folded output can be piped directly into flamegraph.pl (the Perl version).
 USAGE message:
 
 # ./stackcount -h
-usage: stackcount [-h] [-p PID] [-i INTERVAL] [-D DURATION] [-T] [-r] [-s]
-                  [-P] [-K] [-U] [-v] [-d] [-f] [--debug]
+usage: stackcount [-h] [-p PID] [-c CPU] [-i INTERVAL] [-D DURATION] [-T] [-r]
+                  [-s] [-P] [-K] [-U] [-v] [-d] [-f] [--debug]
                   pattern
 
 Count events and their stack traces
@@ -855,6 +926,7 @@ positional arguments:
 optional arguments:
   -h, --help            show this help message and exit
   -p PID, --pid PID     trace this PID only
+  -c CPU, --cpu CPU     trace this CPU only
   -i INTERVAL, --interval INTERVAL
                         summary interval, seconds
   -D DURATION, --duration DURATION
@@ -886,5 +958,6 @@ examples:
     ./stackcount -p 185 c:malloc    # count stacks for malloc in PID 185
     ./stackcount t:sched:sched_fork # count stacks for sched_fork tracepoint
     ./stackcount -p 185 u:node:*    # count stacks for all USDT probes in node
+    ./stackcount -c 1 put_prev_entity   # count put_prev_entity stacks for CPU 1 only
     ./stackcount -K t:sched:sched_switch   # kernel stacks only
     ./stackcount -U t:sched:sched_switch   # user stacks only

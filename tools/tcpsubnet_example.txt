@@ -42,7 +42,7 @@ By default, tcpsubnet will categorize traffic in the following subnets:
 
 The last subnet is a catch-all. In other words, anything that doesn't
 match the first 4 defaults will be categorized under 0.0.0.0/0
-You can change this default behavoir by passing a comma separated list
+You can change this default behavior by passing a comma separated list
 of subnets. Let's say we would like to know how much traffic we
 are sending to github.com. We first find out what IPs github.com resolves
 to, Eg:
@@ -96,7 +96,7 @@ the first element of the list and 192.130.253.112/32 as the second, all the
 traffic going to 192.130.253.112/32 will have been categorized in
 0.0.0.0/0 as 192.130.253.112/32 is contained in 0.0.0.0/0.
 
-The default ouput unit is bytes. You can change it by using the
+The default output unit is bytes. You can change it by using the
 -f [--format] flag. tcpsubnet uses the same flags as iperf for the unit
 format and adds mM. When using kmKM, the output will be rounded to floor.
 Eg:

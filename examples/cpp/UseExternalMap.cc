@@ -2,7 +2,7 @@
  * UseExternalMap shows how to access an external map through
  * C++ interface. The external map could be a pinned map.
  * This example simulates the pinned map through a locally
- * created map by calling libbpf bpf_create_map.
+ * created map by calling libbpf bcc_create_map.
  *
  * Copyright (c) Facebook, Inc.
  * Licensed under the Apache License, Version 2.0 (the "License")
@@ -55,8 +55,10 @@ int on_sched_switch(struct tracepoint__sched__sched_switch *args) {
   key.next_pid = args->next_pid;
   __builtin_memcpy(&key.prev_comm, args->prev_comm, 16);
   __builtin_memcpy(&key.next_comm, args->next_comm, 16);
-  val = counts.lookup_or_init(&key, &zero);
-  (*val)++;
+  val = counts.lookup_or_try_init(&key, &zero);
+  if (val) {
+    (*val)++;
+  }
 
   return 0;
 }
@@ -79,10 +81,10 @@ int main() {
   int ctrl_map_fd;
   uint32_t val;
 
-  // create a map through bpf_create_map, bcc knows nothing about this map.
-  ctrl_map_fd = bpf_create_map(BPF_MAP_TYPE_ARRAY, "control", sizeof(uint32_t),
+  // create a map through bcc_create_map, bcc knows nothing about this map.
+  ctrl_map_fd = bcc_create_map(BPF_MAP_TYPE_ARRAY, "control", sizeof(uint32_t),
                                sizeof(uint32_t), 1, 0);
-  CHECK(ctrl_map_fd < 0, "bpf_create_map failure");
+  CHECK(ctrl_map_fd < 0, "bcc_create_map failure");
 
   // populate control map into TableStorage
   std::unique_ptr<ebpf::TableStorage> local_ts =

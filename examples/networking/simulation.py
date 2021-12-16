@@ -40,7 +40,10 @@ class Simulation(object):
                        "net.ipv6.conf.default.disable_ipv6=1"]
                 nsp = NSPopen(ns_ipdb.nl.netns, cmd1)
                 nsp.wait(); nsp.release()
-            ns_ipdb.interfaces.lo.up().commit()
+            try:
+                ns_ipdb.interfaces.lo.up().commit()
+            except pyroute2.ipdb.exceptions.CommitException:
+                print("Warning, commit for lo failed, operstate may be unknown")
         if in_ifc:
             in_ifname = in_ifc.ifname
             with in_ifc as v:
@@ -49,7 +52,7 @@ class Simulation(object):
         else:
             # delete the potentially leaf-over veth interfaces
             ipr = IPRoute()
-            for i in ipr.link_lookup(ifname='%sa' % ifc_base_name): ipr.link_remove(i)
+            for i in ipr.link_lookup(ifname='%sa' % ifc_base_name): ipr.link("del", index=i)
             ipr.close()
             try:
                 out_ifc = self.ipdb.create(ifname="%sa" % ifc_base_name, kind="veth",
@@ -65,7 +68,19 @@ class Simulation(object):
                 raise
 
         if out_ifc: out_ifc.up().commit()
-        ns_ipdb.interfaces.lo.up().commit()
+        try:
+            # this is a workaround for fc31 and possible other disto's.
+            # when interface 'lo' is already up, do another 'up().commit()'
+            # has issues in fc31.
+            # the workaround may become permanent if we upgrade pyroute2
+            # in all machines.
+            if 'state' in ns_ipdb.interfaces.lo.keys():
+                if ns_ipdb.interfaces.lo['state'] != 'up':
+                    ns_ipdb.interfaces.lo.up().commit()
+            else:
+                ns_ipdb.interfaces.lo.up().commit()
+        except pyroute2.ipdb.exceptions.CommitException:
+            print("Warning, commit for lo failed, operstate may be unknown")
         ns_ipdb.initdb()
         in_ifc = ns_ipdb.interfaces[in_ifname]
         with in_ifc as v:

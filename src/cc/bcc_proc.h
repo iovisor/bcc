@@ -23,15 +23,26 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#include <stdio.h>
 #include <stdbool.h>
 
-// Module name, start address, end address, file_offset,
-// whether to check mount namespace, payload
+
+typedef struct mod_info {
+  char *name;
+  uint64_t start_addr;
+  uint64_t end_addr;
+  long long unsigned int file_offset;
+  uint64_t dev_major;
+  uint64_t dev_minor;
+  uint64_t inode;
+} mod_info;
+
+// Module info, whether to check mount namespace, payload
 // Callback returning a negative value indicates to stop the iteration
-typedef int (*bcc_procutils_modulecb)(const char *, uint64_t, uint64_t,
-                                      uint64_t, bool, void *);
+typedef int (*bcc_procutils_modulecb)(mod_info *, int, void *);
+
 // Symbol name, address, payload
-typedef void (*bcc_procutils_ksymcb)(const char *, uint64_t, void *);
+typedef void (*bcc_procutils_ksymcb)(const char *, const char *, uint64_t, void *);
 
 char *bcc_procutils_which_so(const char *libname, int pid);
 char *bcc_procutils_which(const char *binpath);
@@ -42,6 +53,9 @@ int bcc_mapping_is_file_backed(const char *mapname);
 // Returns -1 on error, and 0 on success
 int bcc_procutils_each_module(int pid, bcc_procutils_modulecb callback,
                               void *payload);
+
+int _procfs_maps_each_module(FILE *procmaps, int pid,
+                             bcc_procutils_modulecb callback, void *payload);
 // Iterate over all non-data Kernel symbols.
 // Returns -1 on error, and 0 on success
 int bcc_procutils_each_ksym(bcc_procutils_ksymcb callback, void *payload);

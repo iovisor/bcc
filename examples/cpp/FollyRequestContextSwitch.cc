@@ -12,6 +12,7 @@
  */
 
 #include <signal.h>
+#include <functional>
 #include <iostream>
 #include <vector>
 
@@ -59,44 +60,66 @@ void handle_output(void* cb_cookie, void* data, int data_size) {
             << event->new_addr << std::endl;
 }
 
-ebpf::BPF* bpf;
+std::function<void(int)> shutdown_handler;
 
-void signal_handler(int s) {
-  std::cerr << "Terminating..." << std::endl;
-  delete bpf;
-  exit(0);
-}
+void signal_handler(int s) { shutdown_handler(s); }
 
 int main(int argc, char** argv) {
-  if (argc != 2) {
-    std::cout << "USAGE: FollyRequestContextSwitch PATH_TO_BINARY" << std::endl;
+  std::string binary;
+  pid_t pid = -1;
+  for (int i = 0; i < argc; i++) {
+    if (strncmp(argv[i], "--pid", 5) == 0) {
+      pid = std::stoi(argv[i + 1]);
+      i++;
+      continue;
+    }
+    if (strncmp(argv[i], "--binary", 8) == 0) {
+      binary = argv[i + 1];
+      i++;
+      continue;
+    }
+  }
+
+  if (pid <= 0 && binary.empty()) {
+    std::cout << "Must specify at least one of binary or PID:" << std::endl
+              << "FollyRequestContextSwitch [--pid PID] [--binary BINARY]"
+              << std::endl;
     exit(1);
   }
-  std::string binary_path(argv[1]);
 
-  bpf = new ebpf::BPF();
-  std::vector<ebpf::USDT> u;
-  u.emplace_back(binary_path, "folly", "request_context_switch_before",
-                 "on_context_switch");
-  auto init_res = bpf->init(BPF_PROGRAM, {}, u);
-  if (init_res.code() != 0) {
+  ebpf::USDT u(binary, pid, "folly", "request_context_switch_before",
+               "on_context_switch");
+
+  ebpf::BPF* bpf = new ebpf::BPF();
+
+  auto init_res = bpf->init(BPF_PROGRAM, {}, {u});
+  if (!init_res.ok()) {
     std::cerr << init_res.msg() << std::endl;
     return 1;
   }
 
-  auto attach_res = bpf->attach_usdt(u[0]);
-  if (attach_res.code() != 0) {
+  auto attach_res = bpf->attach_usdt_all();
+  if (!attach_res.ok()) {
     std::cerr << attach_res.msg() << std::endl;
     return 1;
+  } else {
+    std::cout << "Attached to USDT " << u;
   }
 
   auto open_res = bpf->open_perf_buffer("events", &handle_output);
-  if (open_res.code() != 0) {
+  if (!open_res.ok()) {
     std::cerr << open_res.msg() << std::endl;
     return 1;
   }
 
+  shutdown_handler = [&](int s) {
+    std::cerr << "Terminating..." << std::endl;
+    bpf->detach_usdt_all();
+    delete bpf;
+    exit(0);
+  };
   signal(SIGINT, signal_handler);
+
   std::cout << "Started tracing, hit Ctrl-C to terminate." << std::endl;
   auto perf_buffer = bpf->get_perf_buffer("events");
   if (perf_buffer)

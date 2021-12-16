@@ -33,6 +33,21 @@ struct sk_buff {
 	uint32_t cb[5];
 	uint32_t hash;
 	uint32_t tc_classid;
+	uint32_t data;
+	uint32_t data_end;
+	uint32_t napi_id;
+
+	/* Accessed by BPF_PROG_TYPE_sk_skb types from here to ... */
+	uint32_t family;
+	uint32_t remote_ip4;	/* Stored in network byte order */
+	uint32_t local_ip4;	/* Stored in network byte order */
+	uint32_t remote_ip6[4];	/* Stored in network byte order */
+	uint32_t local_ip6[4];	/* Stored in network byte order */
+	uint32_t remote_port;	/* Stored in network byte order */
+	uint32_t local_port;	/* stored in host byte order */
+	/* ... here. */
+
+	uint32_t data_meta;
 };
 
 struct net_off_t {
@@ -185,7 +200,7 @@ else
 end
 -- Map symbolic registers to architecture ABI
 ffi.metatype('struct pt_regs', {
-		__index = function (t,k)
+		__index = function (_ --[[t]],k)
 			return assert(parm_to_reg[k], 'no such register: '..k)
 		end,
 })
@@ -223,7 +238,7 @@ local function next_offset(e, var, type, off, mask, shift)
 	if mask then
 		e.emit(BPF.ALU + BPF.AND + BPF.K, tmp_reg, 0, 0, mask)
 	end
-	if shift then
+	if shift and shift ~= 0 then
 		local op = BPF.LSH
 		if shift < 0 then
 			op = BPF.RSH
@@ -264,9 +279,9 @@ M.type = function(typestr, t)
 	t.__dissector=ffi.typeof(typestr)
 	return t
 end
-M.skb     = M.type('struct sk_buff', {__base=true})
-M.pt_regs = M.type('struct pt_regs', {__base=true, source='probe'})
-M.pkt     = {off=0, __dissector=ffi.typeof('struct eth_t')} -- skb needs special accessors
+M.skb     = M.type('struct sk_buff', {source='ptr_to_ctx'})
+M.pt_regs = M.type('struct pt_regs', {source='ptr_to_probe'})
+M.pkt     = M.type('struct eth_t',   {off=0, source='ptr_to_pkt'}) -- skb needs special accessors
 -- M.eth     = function (...) return dissector(ffi.typeof('struct eth_t'), ...) end
 M.dot1q   = function (...) return dissector(ffi.typeof('struct dot1q_t'), ...) end
 M.arp     = function (...) return dissector(ffi.typeof('struct arp_t'), ...) end
@@ -307,6 +322,28 @@ ffi.metatype(ffi.typeof('struct ip_t'), {
 		icmp = function(e, dst) next_offset(e, dst, ffi.typeof('uint8_t'), 0, 0x0f, 2) end,
 		udp  = function(e, dst) next_offset(e, dst, ffi.typeof('uint8_t'), 0, 0x0f, 2) end,
 		tcp  = function(e, dst) next_offset(e, dst, ffi.typeof('uint8_t'), 0, 0x0f, 2) end,
+	}
+})
+
+ffi.metatype(ffi.typeof('struct ip6_t'), {
+	__index = {
+		-- Skip fixed IPv6 header length (40 bytes)
+		-- The caller must check the value of `next_header` to skip any extension headers
+		icmp6 = function(e, dst) next_skip(e, dst, ffi.sizeof('struct ip6_t'), 0) end,
+		udp  = function(e, dst) next_skip(e, dst, ffi.sizeof('struct ip6_t'), 0) end,
+		tcp  = function(e, dst) next_skip(e, dst, ffi.sizeof('struct ip6_t'), 0) end,
+		ip6_opt = function(e, dst) next_skip(e, dst, ffi.sizeof('struct ip6_t'), 0) end,
+	}
+})
+
+local ip6_opt_ext_len_off = ffi.offsetof('struct ip6_opt_t', 'ext_len')
+ffi.metatype(ffi.typeof('struct ip6_opt_t'), {
+	__index = {
+		-- Skip IPv6 extension header length (field `ext_len`)
+		icmp6 = function(e, dst) next_offset(e, dst, ffi.typeof('uint8_t'), ip6_opt_ext_len_off) end,
+		udp  = function(e, dst) next_offset(e, dst, ffi.typeof('uint8_t'), ip6_opt_ext_len_off) end,
+		tcp  = function(e, dst) next_offset(e, dst, ffi.typeof('uint8_t'), ip6_opt_ext_len_off) end,
+		ip6_opt = function(e, dst) next_offset(e, dst, ffi.typeof('uint8_t'), ip6_opt_ext_len_off) end,
 	}
 })
 

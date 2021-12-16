@@ -92,12 +92,12 @@ def compileP4(inputFile, gen_file, isRouter, preprocessor_args):
         f = open(gen_file, 'w')
         f.write(serializer.toString())
         return CompileResult("OK", "")
-    except CompilationException, e:
+    except CompilationException as e:
         prefix = ""
         if e.isBug:
             prefix = "### Compiler bug: "
         return CompileResult("bug", prefix + e.show())
-    except NotSupportedException, e:
+    except NotSupportedException as e:
         return CompileResult("not supported", e.show())
     except:
         return CompileResult("exception", traceback.format_exc())

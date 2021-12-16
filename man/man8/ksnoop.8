@@ -1,0 +1,298 @@
+.\" Man page generated from reStructuredText.
+.
+.TH KSNOOP 8 "" "" ""
+.SH NAME
+KSNOOP \- tool for tracing kernel function entry/return showing arguments/return values
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.SH SYNOPSIS
+.INDENT 0.0
+.INDENT 3.5
+\fBksnoop\fP [\fIOPTIONS\fP] { \fICOMMAND\fP  \fIFUNC\fP | \fBhelp\fP }
+.sp
+\fIOPTIONS\fP := { { \fB\-V\fP | \fB\-\-version\fP } | { \fB\-h\fP | \fB\-\-help\fP }
+| { [\fB\-P\fP | \fB\-\-pages\fP] nr_pages} | { [\fB\-p\fP | \fB\-\-pid\fP] pid} |
+[{ \fB\-s\fP | \fB\-\-stack\fP }] | [{ \fB\-d\fP | \fB\-\-debug\fP }] }
+.sp
+\fICOMMAND\fP := { \fBtrace\fP | \fBinfo\fP }
+.sp
+\fIFUNC\fP := { \fBname\fP | \fBname\fP(\fBarg\fP[,**arg]) }
+.UNINDENT
+.UNINDENT
+.SH DESCRIPTION
+.INDENT 0.0
+.INDENT 3.5
+\fIksnoop\fP allows for inspection of arguments and return values
+associated with function entry/return.
+.INDENT 0.0
+.TP
+.B \fBksnoop info\fP \fIFUNC\fP
+Show function description, arguments and return value types.
+.TP
+.B \fBksnoop trace\fP \fIFUNC\fP [\fIFUNC\fP]
+Trace function entry and return, showing arguments and
+return values.  A function name can simply be specified,
+or a function name along with named arguments, return values.
+\fBreturn\fP is used to specify the return value.
+.UNINDENT
+.sp
+\fIksnoop\fP requires the kernel to provide BTF for itself, and if
+tracing of module data is required, module BTF must be present also.
+Check /sys/kernel/btf to see if BTF is present.
+.sp
+\fBksnoop\fP requires \fICAP_BPF\fP and \fICAP_TRACING\fP capabilities.
+.UNINDENT
+.UNINDENT
+.SH OPTIONS
+.INDENT 0.0
+.INDENT 3.5
+.INDENT 0.0
+.TP
+.B \-h\fP,\fB  \-\-help
+Show help information
+.TP
+.B \-V\fP,\fB  \-\-version
+Show version.
+.TP
+.B \-d\fP,\fB  \-\-debug
+Show debug output.
+.TP
+.B \-p\fP,\fB  \-\-pid
+Filter events by pid.
+.TP
+.B \-P\fP,\fB  \-\-pages
+Specify number of pages used per\-CPU for perf event
+collection.  Default is 8.
+.TP
+.B \-s\fP,\fB  \-\-stack
+Specified set of functions are traced if and only
+if they are encountered in the order specified.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.SH EXAMPLES
+.sp
+\fB# ksnoop info ip_send_skb\fP
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+int  ip_send_skb(struct net  * net, struct sk_buff  * skb);
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Show function description.
+.sp
+\fB# ksnoop trace ip_send_skb\fP
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+          TIME  CPU      PID FUNCTION/ARGS
+78101668506811    1     2813 ip_send_skb(
+                                 net = *(0xffffffffb5959840)
+                                  (struct net){
+                                   .passive = (refcount_t){
+                                    .refs = (atomic_t){
+                                     .counter = (int)0x2,
+                                    },
+                                   },
+                                   .dev_base_seq = (unsigned int)0x18,
+                                   .ifindex = (int)0xf,
+                                   .list = (struct list_head){
+                                    .next = (struct list_head *)0xffff9895440dc120,
+                                    .prev = (struct list_head *)0xffffffffb595a8d0,
+                                   },
+                                 ...
+
+79561322965250    1     2813 ip_send_skb(
+                                 return =
+                                  (int)0x0
+                             );
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Show entry/return for ip_send_skb() with arguments, return values.
+.sp
+\fB# ksnoop trace "ip_send_skb(skb)"\fP
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+         TIME  CPU      PID FUNCTION/ARGS
+78142420834537    1     2813 ip_send_skb(
+                                 skb = *(0xffff989750797c00)
+                                  (struct sk_buff){
+                                   (union){
+                                    .sk = (struct sock *)0xffff98966ce19200,
+                                    .ip_defrag_offset = (int)0x6ce19200,
+                                   },
+                                   (union){
+                                    (struct){
+                                     ._skb_refdst = (long unsigned int)0xffff98981dde2d80,
+                                     .destructor = (void (*)(struct sk_buff *))0xffffffffb3e1beb0,
+                                    },
+                                ...
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Show entry argument \fBskb\fP\&.
+.sp
+\fB# ksnoop trace "ip_send_skb(return)"\fP
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+         TIME  CPU      PID FUNCTION/ARGS
+78178228354796    1     2813 ip_send_skb(
+                                 return =
+                                  (int)0x0
+                             );
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Show return value from ip_send_skb().
+.sp
+\fB# ksnoop trace "ip_send_skb(skb\->sk)"\fP
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+          TIME  CPU      PID FUNCTION/ARGS
+78207649138829    2     2813 ip_send_skb(
+                                 skb\->sk = *(0xffff98966ce19200)
+                                  (struct sock){
+                                   .__sk_common = (struct sock_common){
+                                    (union){
+                                     .skc_addrpair = (__addrpair)0x1701a8c017d38f8d,
+                                     (struct){
+                                      .skc_daddr = (__be32)0x17d38f8d,
+                                      .skc_rcv_saddr = (__be32)0x1701a8c0,
+                                     },
+                                    },
+                                  ...
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Trace member information associated with argument.  Only one level of
+membership is supported.
+.sp
+\fB# ksnoop \-p 2813 "ip_rcv(dev)"\fP
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+          TIME  CPU      PID FUNCTION/ARGS
+78254803164920    1     2813 ip_rcv(
+                                 dev = *(0xffff9895414cb000)
+                                  (struct net_device){
+                                   .name = (char[16])[
+                                    \(aql\(aq,
+                                    \(aqo\(aq,
+                                   ],
+                                   .name_node = (struct netdev_name_node *)0xffff989541515ec0,
+                                   .state = (long unsigned int)0x3,
+                                 ...
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Trace \fBdev\fP argument of \fBip_rcv()\fP\&.  Specify process id 2813 for events
+for that process only.
+.sp
+\fB# ksnoop \-s tcp_sendmsg __tcp_transmit_skb  ip_output\fP
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+         TIME  CPU      PID FUNCTION/ARGS
+71827770952903    1     4777 __tcp_transmit_skb(
+                                 sk = *(0xffff9852460a2300)
+                                  (struct sock){
+                                   .__sk_common = (struct sock_common){
+                                    (union){
+                                     .skc_addrpair = (__addrpair)0x61b2af0a35cbfe0a,
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Trace entry/return of tcp_sendmsg, __tcp_transmit_skb and ip_output when
+tcp_sendmsg leads to a call to __tcp_transmit_skb and that in turn
+leads to a call to ip_output; i.e. with a call graph matching the order
+specified.  The order does not have to be direct calls, i.e. function A
+can call another function that calls function B.
+.sp
+\fB# ksnoop "ip_send_skb(skb\->len > 100, skb)"\fP
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+          TIME  CPU      PID FUNCTION/ARGS
+39267395709745    1     2955 ip_send_skb(
+                                 skb\->len =
+                                  (unsigned int)0x89,
+                                 skb = *(0xffff89c8be81e500)
+                                  (struct sk_buff){
+                                   (union){
+                                    .sk = (struct sock *)0xffff89c6c59e5580,
+                                    .ip_defrag_offset = (int)0xc59e5580,
+                                   },
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Trace ip_send_skb() skbs which have len > 100.
+.SH SEE ALSO
+.INDENT 0.0
+.INDENT 3.5
+\fBbpf\fP(2),
+.UNINDENT
+.UNINDENT
+.\" Generated by docutils manpage writer.
+.

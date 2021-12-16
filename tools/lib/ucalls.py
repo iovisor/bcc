@@ -4,7 +4,7 @@
 # ucalls  Summarize method calls in high-level languages and/or system calls.
 #         For Linux, uses BCC, eBPF.
 #
-# USAGE: ucalls [-l {java,python,ruby,php}] [-h] [-T TOP] [-L] [-S] [-v] [-m]
+# USAGE: ucalls [-l {java,perl,php,python,ruby,tcl}] [-h] [-T TOP] [-L] [-S] [-v] [-m]
 #        pid [interval]
 #
 # Copyright 2016 Sasha Goldshtein
@@ -14,11 +14,11 @@
 
 from __future__ import print_function
 import argparse
-from bcc import BPF, USDT, utils
 from time import sleep
-import os
+from bcc import BPF, USDT, utils
+from bcc.syscall import syscall_name
 
-languages = ["java", "python", "ruby", "php"]
+languages = ["java", "perl", "php", "python", "ruby", "tcl"]
 
 examples = """examples:
     ./ucalls -l java 185        # trace Java calls and print statistics on ^C
@@ -49,6 +49,8 @@ parser.add_argument("-v", "--verbose", action="store_true",
     help="verbose mode: print the BPF program (for debugging purposes)")
 parser.add_argument("-m", "--milliseconds", action="store_true",
     help="report times in milliseconds (default is microseconds)")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 language = args.language
@@ -69,6 +71,18 @@ if language == "java":
     read_method = "bpf_usdt_readarg(4, ctx, &method);"
     extra_message = ("If you do not see any results, make sure you ran java"
                      " with option -XX:+ExtendedDTraceProbes")
+elif language == "perl":
+    entry_probe = "sub__entry"
+    return_probe = "sub__return"
+    read_class = "bpf_usdt_readarg(2, ctx, &clazz);"    # filename really
+    read_method = "bpf_usdt_readarg(1, ctx, &method);"
+elif language == "php":
+    entry_probe = "function__entry"
+    return_probe = "function__return"
+    read_class = "bpf_usdt_readarg(4, ctx, &clazz);"
+    read_method = "bpf_usdt_readarg(1, ctx, &method);"
+    extra_message = ("If you do not see any results, make sure the environment"
+                     " variable USE_ZEND_DTRACE is set to 1")
 elif language == "python":
     entry_probe = "function__entry"
     return_probe = "function__return"
@@ -80,13 +94,12 @@ elif language == "ruby":
     return_probe = "method__return"
     read_class = "bpf_usdt_readarg(1, ctx, &clazz);"
     read_method = "bpf_usdt_readarg(2, ctx, &method);"
-elif language == "php":
-    entry_probe = "function__entry"
-    return_probe = "function__return"
-    read_class = "bpf_usdt_readarg(4, ctx, &clazz);"
+elif language == "tcl":
+    # TODO Also consider probe cmd__entry and cmd__return with same arguments
+    entry_probe = "proc__entry"
+    return_probe = "proc__return"
+    read_class = ""  # no class/file info available
     read_method = "bpf_usdt_readarg(1, ctx, &method);"
-    extra_message = ("If you do not see any results, make sure the environment"
-                     " variable USE_ZEND_DTRACE is set to 1")
 elif not language or language == "none":
     if not args.syscalls:
         print("Nothing to do; use -S to trace syscalls.")
@@ -117,7 +130,7 @@ struct info_t {
 };
 struct syscall_entry_t {
     u64 timestamp;
-    u64 ip;
+    u64 id;
 };
 
 #ifndef LATENCY
@@ -145,13 +158,15 @@ int trace_entry(struct pt_regs *ctx) {
 #endif
     READ_CLASS
     READ_METHOD
-    bpf_probe_read(&data.method.clazz, sizeof(data.method.clazz),
+    bpf_probe_read_user(&data.method.clazz, sizeof(data.method.clazz),
                    (void *)clazz);
-    bpf_probe_read(&data.method.method, sizeof(data.method.method),
+    bpf_probe_read_user(&data.method.method, sizeof(data.method.method),
                    (void *)method);
 #ifndef LATENCY
-    valp = counts.lookup_or_init(&data.method, &val);
-    ++(*valp);
+    valp = counts.lookup_or_try_init(&data.method, &val);
+    if (valp) {
+        ++(*valp);
+    }
 #endif
 #ifdef LATENCY
     entry.update(&data, &timestamp);
@@ -167,17 +182,19 @@ int trace_return(struct pt_regs *ctx) {
     data.pid = bpf_get_current_pid_tgid();
     READ_CLASS
     READ_METHOD
-    bpf_probe_read(&data.method.clazz, sizeof(data.method.clazz),
+    bpf_probe_read_user(&data.method.clazz, sizeof(data.method.clazz),
                    (void *)clazz);
-    bpf_probe_read(&data.method.method, sizeof(data.method.method),
+    bpf_probe_read_user(&data.method.method, sizeof(data.method.method),
                    (void *)method);
     entry_timestamp = entry.lookup(&data);
     if (!entry_timestamp) {
         return 0;   // missed the entry event
     }
-    info = times.lookup_or_init(&data.method, &zero);
-    info->num_calls += 1;
-    info->total_ns += bpf_ktime_get_ns() - *entry_timestamp;
+    info = times.lookup_or_try_init(&data.method, &zero);
+    if (info) {
+        info->num_calls += 1;
+        info->total_ns += bpf_ktime_get_ns() - *entry_timestamp;
+    }
     entry.delete(&data);
     return 0;
 }
@@ -185,39 +202,41 @@ int trace_return(struct pt_regs *ctx) {
 #endif  // NOLANG
 
 #ifdef SYSCALLS
-int syscall_entry(struct pt_regs *ctx) {
+TRACEPOINT_PROBE(raw_syscalls, sys_enter) {
     u64 pid = bpf_get_current_pid_tgid();
-    u64 *valp, ip = PT_REGS_IP(ctx), val = 0;
+    u64 *valp, id = args->id, val = 0;
     PID_FILTER
 #ifdef LATENCY
     struct syscall_entry_t data = {};
     data.timestamp = bpf_ktime_get_ns();
-    data.ip = ip;
+    data.id = id;
+    sysentry.update(&pid, &data);
 #endif
 #ifndef LATENCY
-    valp = syscounts.lookup_or_init(&ip, &val);
-    ++(*valp);
-#endif
-#ifdef LATENCY
-    sysentry.update(&pid, &data);
+    valp = syscounts.lookup_or_try_init(&id, &val);
+    if (valp) {
+        ++(*valp);
+    }
 #endif
     return 0;
 }
 
 #ifdef LATENCY
-int syscall_return(struct pt_regs *ctx) {
+TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
     struct syscall_entry_t *e;
     struct info_t *info, zero = {};
-    u64 pid = bpf_get_current_pid_tgid(), ip;
+    u64 pid = bpf_get_current_pid_tgid(), id;
     PID_FILTER
     e = sysentry.lookup(&pid);
     if (!e) {
         return 0;   // missed the entry event
     }
-    ip = e->ip;
-    info = systimes.lookup_or_init(&ip, &zero);
-    info->num_calls += 1;
-    info->total_ns += bpf_ktime_get_ns() - e->timestamp;
+    id = e->id;
+    info = systimes.lookup_or_try_init(&id, &zero);
+    if (info) {
+        info->num_calls += 1;
+        info->total_ns += bpf_ktime_get_ns() - e->timestamp;
+    }
     sysentry.delete(&pid);
     return 0;
 }
@@ -238,41 +257,40 @@ if language:
 else:
     usdt = None
 
-if args.verbose:
-    if usdt:
+if args.ebpf or args.verbose:
+    if args.verbose and usdt:
         print(usdt.get_text())
     print(program)
+    if args.ebpf:
+        exit()
 
 bpf = BPF(text=program, usdt_contexts=[usdt] if usdt else [])
 if args.syscalls:
-    syscall_regex = "^[Ss]y[Ss]_.*"
-    bpf.attach_kprobe(event_re=syscall_regex, fn_name="syscall_entry")
-    if args.latency:
-        bpf.attach_kretprobe(event_re=syscall_regex, fn_name="syscall_return")
-    print("Attached %d kernel probes for syscall tracing." %
-          bpf.num_open_kprobes())
+    print("Attached kernel tracepoints for syscall tracing.")
 
 def get_data():
     # Will be empty when no language was specified for tracing
     if args.latency:
-        data = list(map(lambda kv: (kv[0].clazz.decode() + "." + \
-                                    kv[0].method.decode(),
+        data = list(map(lambda kv: (kv[0].clazz.decode('utf-8', 'replace') \
+                                    + "." + \
+                                    kv[0].method.decode('utf-8', 'replace'),
                                    (kv[1].num_calls, kv[1].total_ns)),
                    bpf["times"].items()))
     else:
-        data = list(map(lambda kv: (kv[0].clazz.decode() + "." + \
-                                    kv[0].method.decode(),
+        data = list(map(lambda kv: (kv[0].clazz.decode('utf-8', 'replace') \
+                                    + "." + \
+                                    kv[0].method.decode('utf-8', 'replace'),
                                    (kv[1].value, 0)),
                    bpf["counts"].items()))
 
     if args.syscalls:
         if args.latency:
-            syscalls = map(lambda kv: (bpf.ksym(kv[0].value),
-                                           (kv[1].num_calls, kv[1].total_ns)),
+            syscalls = map(lambda kv: (syscall_name(kv[0].value).decode('utf-8', 'replace'),
+                                       (kv[1].num_calls, kv[1].total_ns)),
                            bpf["systimes"].items())
             data.extend(syscalls)
         else:
-            syscalls = map(lambda kv: (bpf.ksym(kv[0].value),
+            syscalls = map(lambda kv: (syscall_name(kv[0].value).decode('utf-8', 'replace'),
                                        (kv[1].value, 0)),
                            bpf["syscounts"].items())
             data.extend(syscalls)

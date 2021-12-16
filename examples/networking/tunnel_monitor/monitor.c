@@ -125,13 +125,15 @@ finish:
   if (key.outer_dip < key.outer_sip)
     swap_ipkey(&key);
   struct counters zleaf = {0};
-  struct counters *leaf = stats.lookup_or_init(&key, &zleaf);
-  if (is_ingress) {
-    lock_xadd(&leaf->rx_pkts, 1);
-    lock_xadd(&leaf->rx_bytes, skb->len);
-  } else {
-    lock_xadd(&leaf->tx_pkts, 1);
-    lock_xadd(&leaf->tx_bytes, skb->len);
+  struct counters *leaf = stats.lookup_or_try_init(&key, &zleaf);
+  if (leaf) {
+    if (is_ingress) {
+      lock_xadd(&leaf->rx_pkts, 1);
+      lock_xadd(&leaf->rx_bytes, skb->len);
+    } else {
+      lock_xadd(&leaf->tx_pkts, 1);
+      lock_xadd(&leaf->tx_bytes, skb->len);
+    }
   }
   return 1;
 }

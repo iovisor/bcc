@@ -36,7 +36,7 @@ M.VERBOSITY_VERBOSE = 20
 -- set EXPORT_ASSERT_TO_GLOBALS to have all asserts visible as global values
 -- EXPORT_ASSERT_TO_GLOBALS = true
 
--- we need to keep a copy of the script args before it is overriden
+-- we need to keep a copy of the script args before it is overridden
 local cmdline_argv = rawget(_G, "arg")
 
 M.FAILURE_PREFIX = 'LuaUnit test FAILURE: ' -- prefix string for failed tests
@@ -2136,7 +2136,7 @@ end
     end
 -- class LuaUnit
 
--- For compatbility with LuaUnit v2
+-- For compatibility with LuaUnit v2
 M.run = M.LuaUnit.run
 M.Run = M.LuaUnit.run
 

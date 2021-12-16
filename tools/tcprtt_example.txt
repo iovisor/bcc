@@ -1,0 +1,188 @@
+Demonstrations of tcprtt, the Linux eBPF/bcc version.
+
+
+This program traces TCP RTT(round-trip time) to analyze the quality of
+network, then help us to distinguish the network latency trouble is from
+user process or physical network.
+
+For example, wrk show the http request latency distribution:
+# wrk -d 30 -c 10 --latency http://192.168.122.100/index.html
+Running 30s test @ http://192.168.122.100/index.html
+  2 threads and 10 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    86.75ms  153.76ms   1.54s    90.85%
+    Req/Sec   160.91     76.07   424.00     67.06%
+  Latency Distribution
+     50%   14.55ms
+     75%  119.21ms
+     90%  230.22ms
+     99%  726.90ms
+  9523 requests in 30.02s, 69.62MB read
+  Socket errors: connect 0, read 0, write 0, timeout 1
+
+During wrk testing, run tcprtt:
+# ./tcprtt -i 1 -d 10 -m
+Tracing TCP RTT... Hit Ctrl-C to end.
+     msecs               : count     distribution
+         0 -> 1          : 4        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 1055     |****************************************|
+         8 -> 15         : 26       |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 18       |                                        |
+       128 -> 255        : 14       |                                        |
+       256 -> 511        : 14       |                                        |
+       512 -> 1023       : 12       |                                        |
+
+The wrk output shows that the latency of web service is not stable, and tcprtt
+also shows unstable TCP RTT. So in this situation, we need to make sure the
+quality of network is good or not firstly.
+
+
+Use filter for address and(or) port. Ex, only collect local address 192.168.122.200
+and remote address 192.168.122.100 and remote port 80.
+# ./tcprtt -i 1 -d 10 -m -a 192.168.122.200 -A 192.168.122.100 -P 80
+
+
+Tracing at server side, show each clients with its own histogram.
+For example, run tcprtt on a storage node to show initiators' rtt histogram:
+# ./tcprtt -i 1 --lport 3260 --byraddr -e
+Tracing TCP RTT... Hit Ctrl-C to end.
+
+
+Remote Addres = 10.194.87.206 [AVG 170]
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 31       |                                        |
+        64 -> 127        : 5150     |*******************                     |
+       128 -> 255        : 10327    |****************************************|
+       256 -> 511        : 1014     |***                                     |
+       512 -> 1023       : 10       |                                        |
+      1024 -> 2047       : 7        |                                        |
+      2048 -> 4095       : 14       |                                        |
+      4096 -> 8191       : 10       |                                        |
+
+Remote Addres = 10.194.87.197 [AVG 4293]
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 3        |********                                |
+      2048 -> 4095       : 12       |**********************************      |
+      4096 -> 8191       : 14       |****************************************|
+
+Remote Addres = 10.194.88.148 [AVG 6215]
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 0        |                                        |
+      4096 -> 8191       : 2        |****************************************|
+
+Remote Addres = 10.194.87.90 [AVG 2188]
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 15       |*********                               |
+       512 -> 1023       : 30       |******************                      |
+      1024 -> 2047       : 50       |******************************          |
+      2048 -> 4095       : 65       |****************************************|
+      4096 -> 8191       : 22       |*************                           |
+
+....
+
+
+Use -e(--extension) to show extension RTT:
+# ./tcprtt -i 1 -e
+
+All Addresses = ******* [AVG 324]
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 5360     |********                                |
+       128 -> 255        : 23834    |****************************************|
+       256 -> 511        : 11276    |******************                      |
+       512 -> 1023       : 700      |*                                       |
+      1024 -> 2047       : 434      |                                        |
+      2048 -> 4095       : 356      |                                        |
+      4096 -> 8191       : 328      |                                        |
+      8192 -> 16383      : 91       |                                        |
+
+
+Full USAGE:
+
+# ./tcprtt -h
+usage: tcprtt [-h] [-i INTERVAL] [-d DURATION] [-T] [-m] [-p LPORT]
+              [-P RPORT] [-a LADDR] [-A RADDR] [-b] [-B] [-e] [-D]
+              [-4 | -6]
+
+Summarize TCP RTT as a histogram
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i INTERVAL, --interval INTERVAL
+                        summary interval, seconds
+  -d DURATION, --duration DURATION
+                        total duration of trace, seconds
+  -T, --timestamp       include timestamp on output
+  -m, --milliseconds    millisecond histogram
+  -p LPORT, --lport LPORT
+                        filter for local port
+  -P RPORT, --rport RPORT
+                        filter for remote port
+  -a LADDR, --laddr LADDR
+                        filter for local address
+  -A RADDR, --raddr RADDR
+                        filter for remote address
+  -b, --byladdr         show sockets histogram by local address
+  -B, --byraddr         show sockets histogram by remote address
+  -e, --extension       show extension summary(average)
+  -D, --debug           print BPF program before starting (for debugging
+                        purposes)
+  -4, --ipv4            trace IPv4 family only
+  -6, --ipv6            trace IPv6 family only
+
+examples:
+    ./tcprtt            # summarize TCP RTT
+    ./tcprtt -i 1 -d 10 # print 1 second summaries, 10 times
+    ./tcprtt -m -T      # summarize in millisecond, and timestamps
+    ./tcprtt -p         # filter for local port
+    ./tcprtt -P         # filter for remote port
+    ./tcprtt -a         # filter for local address
+    ./tcprtt -A         # filter for remote address
+    ./tcprtt -b         # show sockets histogram by local address
+    ./tcprtt -B         # show sockets histogram by remote address
+    ./tcprtt -D         # show debug bpf text
+    ./tcprtt -e         # show extension summary(average)
+    ./tcprtt -4         # trace IPv4 family only
+    ./tcprtt -6         # trace IPv6 family only

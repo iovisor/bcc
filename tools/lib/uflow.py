@@ -4,7 +4,7 @@
 # uflow  Trace method execution flow in high-level languages.
 #        For Linux, uses BCC, eBPF.
 #
-# USAGE: uflow [-C CLASS] [-M METHOD] [-v] {java,python,ruby,php} pid
+# USAGE: uflow [-C CLASS] [-M METHOD] [-v] {java,perl,php,python,ruby,tcl} pid
 #
 # Copyright 2016 Sasha Goldshtein
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -18,7 +18,7 @@ import ctypes as ct
 import time
 import os
 
-languages = ["java", "python", "ruby", "php"]
+languages = ["java", "perl", "php", "python", "ruby", "tcl"]
 
 examples = """examples:
     ./uflow -l java 185                # trace Java method calls in process 185
@@ -39,6 +39,8 @@ parser.add_argument("-C", "--class", dest="clazz",
     help="trace only calls to classes starting with this prefix")
 parser.add_argument("-v", "--verbose", action="store_true",
     help="verbose mode: print the BPF program (for debugging purposes)")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 usdt = USDT(pid=args.pid)
@@ -47,7 +49,6 @@ program = """
 struct call_t {
     u64 depth;                  // first bit is direction (0 entry, 1 return)
     u64 pid;                    // (tgid << 32) + pid from bpf_get_current...
-    u64 timestamp;              // ns
     char clazz[80];
     char method[80];
 };
@@ -80,15 +81,17 @@ int NAME(struct pt_regs *ctx) {
 
     READ_CLASS
     READ_METHOD
-    bpf_probe_read(&data.clazz, sizeof(data.clazz), (void *)clazz);
-    bpf_probe_read(&data.method, sizeof(data.method), (void *)method);
+    bpf_probe_read_user(&data.clazz, sizeof(data.clazz), (void *)clazz);
+    bpf_probe_read_user(&data.method, sizeof(data.method), (void *)method);
 
     FILTER_CLASS
     FILTER_METHOD
 
     data.pid = bpf_get_current_pid_tgid();
-    data.timestamp = bpf_ktime_get_ns();
-    depth = entry.lookup_or_init(&data.pid, &zero);
+    depth = entry.lookup_or_try_init(&data.pid, &zero);
+    if (!depth) {
+        depth = &zero;
+    }
     data.depth = DEPTH;
     UPDATE
 
@@ -127,6 +130,20 @@ if language == "java":
     enable_probe("method__return", "java_return",
                  "bpf_usdt_readarg(2, ctx, &clazz);",
                  "bpf_usdt_readarg(4, ctx, &method);", is_return=True)
+elif language == "perl":
+    enable_probe("sub__entry", "perl_entry",
+                 "bpf_usdt_readarg(2, ctx, &clazz);",
+                 "bpf_usdt_readarg(1, ctx, &method);", is_return=False)
+    enable_probe("sub__return", "perl_return",
+                 "bpf_usdt_readarg(2, ctx, &clazz);",
+                 "bpf_usdt_readarg(1, ctx, &method);", is_return=True)
+elif language == "php":
+    enable_probe("function__entry", "php_entry",
+                 "bpf_usdt_readarg(4, ctx, &clazz);",
+                 "bpf_usdt_readarg(1, ctx, &method);", is_return=False)
+    enable_probe("function__return", "php_return",
+                 "bpf_usdt_readarg(4, ctx, &clazz);",
+                 "bpf_usdt_readarg(1, ctx, &method);", is_return=True)
 elif language == "python":
     enable_probe("function__entry", "python_entry",
                  "bpf_usdt_readarg(1, ctx, &clazz);",   # filename really
@@ -147,20 +164,23 @@ elif language == "ruby":
     enable_probe("cmethod__return", "ruby_creturn",
                  "bpf_usdt_readarg(1, ctx, &clazz);",
                  "bpf_usdt_readarg(2, ctx, &method);", is_return=True)
-elif language == "php":
-    enable_probe("function__entry", "php_entry",
-                 "bpf_usdt_readarg(4, ctx, &clazz);",
+elif language == "tcl":
+    enable_probe("proc__args", "tcl_entry",
+                 "",  # no class/file info available
                  "bpf_usdt_readarg(1, ctx, &method);", is_return=False)
-    enable_probe("function__return", "php_return",
-                 "bpf_usdt_readarg(4, ctx, &clazz);",
+    enable_probe("proc__return", "tcl_return",
+                 "",  # no class/file info available
                  "bpf_usdt_readarg(1, ctx, &method);", is_return=True)
 else:
     print("No language detected; use -l to trace a language.")
     exit(1)
 
-if args.verbose:
-    print(usdt.get_text())
+if args.ebpf or args.verbose:
+    if args.verbose:
+        print(usdt.get_text())
     print(program)
+    if args.ebpf:
+        exit()
 
 bpf = BPF(text=program, usdt_contexts=[usdt])
 print("Tracing method calls in %s process %d... Ctrl-C to quit." %
@@ -171,7 +191,6 @@ class CallEvent(ct.Structure):
     _fields_ = [
         ("depth", ct.c_ulonglong),
         ("pid", ct.c_ulonglong),
-        ("timestamp", ct.c_ulonglong),
         ("clazz", ct.c_char * 80),
         ("method", ct.c_char * 80)
         ]
@@ -184,8 +203,13 @@ def print_event(cpu, data, size):
     direction = "<- " if event.depth & (1 << 63) else "-> "
     print("%-3d %-6d %-6d %-8.3f %-40s" % (cpu, event.pid >> 32,
         event.pid & 0xFFFFFFFF, time.time() - start_ts,
-        ("  " * (depth - 1)) + direction + event.clazz + "." + event.method))
+        ("  " * (depth - 1)) + direction + \
+            event.clazz.decode('utf-8', 'replace') + "." + \
+            event.method.decode('utf-8', 'replace')))
 
 bpf["calls"].open_perf_buffer(print_event)
 while 1:
-    bpf.perf_buffer_poll()
+    try:
+        bpf.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

@@ -325,11 +325,45 @@ tcp_v4_send_check                30
 __tcp_v4_send_check              30
 Detaching...
 
+A cpu is specified by "-c CPU", this will only trace the specified CPU. Eg,
+trace how many timers setting per sencond of CPU 1 on a x86(Intel) server:
+
+# funccount.py -i 1 -c 1 lapic_next_deadline
+Tracing 1 functions for "lapic_next_deadline"... Hit Ctrl-C to end.
+
+FUNC                                    COUNT
+lapic_next_deadline                      3840
+
+FUNC                                    COUNT
+lapic_next_deadline                      3930
+
+FUNC                                    COUNT
+lapic_next_deadline                      4701
+
+FUNC                                    COUNT
+lapic_next_deadline                      5895
+
+FUNC                                    COUNT
+lapic_next_deadline                      5591
+
+FUNC                                    COUNT
+lapic_next_deadline                      4727
+
+FUNC                                    COUNT
+lapic_next_deadline                      5560
+
+FUNC                                    COUNT
+lapic_next_deadline                      5416
+^C
+FUNC                                    COUNT
+lapic_next_deadline                       372
+Detaching...
 
 Full USAGE:
 
 # ./funccount -h
-usage: funccount [-h] [-p PID] [-i INTERVAL] [-d DURATION] [-T] [-r] [-D]
+usage: funccount.py [-h] [-p PID] [-i INTERVAL] [-d DURATION] [-T] [-r] [-D]
+                    [-c CPU]
                     pattern
 
 Count functions, tracepoints, and USDT probes
@@ -349,6 +383,7 @@ optional arguments:
                         only.
   -D, --debug           print BPF program before starting (for debugging
                         purposes)
+  -c CPU, --cpu CPU     trace this CPU only
 
 examples:
     ./funccount 'vfs_*'             # count kernel fns starting with "vfs"
@@ -362,3 +397,4 @@ examples:
     ./funccount go:os.*             # count all "os.*" calls in libgo
     ./funccount -p 185 go:os.*      # count all "os.*" calls in libgo, PID 185
     ./funccount ./test:read*        # count "read*" calls in the ./test binary
+    ./funccount -c 1 'vfs_*'        # count vfs calls on CPU 1 only

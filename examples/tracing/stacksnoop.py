@@ -59,7 +59,7 @@ void trace_stack(struct pt_regs *ctx) {
     u32 pid = bpf_get_current_pid_tgid();
     FILTER
     struct data_t data = {};
-    data.stack_id = stack_traces.get_stackid(ctx, BPF_F_REUSE_STACKID),
+    data.stack_id = stack_traces.get_stackid(ctx, 0),
     data.pid = pid;
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
     events.perf_submit(ctx, &data, sizeof(data));
@@ -120,4 +120,7 @@ def print_event(cpu, data, size):
 
 b["events"].open_perf_buffer(print_event)
 while 1:
-    b.perf_buffer_poll()
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

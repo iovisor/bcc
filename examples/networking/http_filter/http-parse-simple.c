@@ -34,19 +34,27 @@ int http_filter(struct __sk_buff *skb) {
 	u32  payload_offset = 0;
 	u32  payload_length = 0;
 
-	struct tcp_t *tcp = cursor_advance(cursor, sizeof(*tcp));
-
 	//calculate ip header length
 	//value to multiply * 4
 	//e.g. ip->hlen = 5 ; IP Header Length = 5 x 4 byte = 20 byte
 	ip_header_length = ip->hlen << 2;    //SHL 2 -> *4 multiply
+
+        //check ip header length against minimum
+	if (ip_header_length < sizeof(*ip)) {
+		goto DROP;
+	}
+
+        //shift cursor forward for dynamic ip header size
+        void *_ = cursor_advance(cursor, (ip_header_length-sizeof(*ip)));
+
+	struct tcp_t *tcp = cursor_advance(cursor, sizeof(*tcp));
 
 	//calculate tcp header length
 	//value to multiply *4
 	//e.g. tcp->offset = 5 ; TCP Header Length = 5 x 4 byte = 20 byte
 	tcp_header_length = tcp->offset << 2; //SHL 2 -> *4 multiply
 
-	//calculate patload offset and length
+	//calculate payload offset and length
 	payload_offset = ETH_HLEN + ip_header_length + tcp_header_length;
 	payload_length = ip->tlen - ip_header_length - tcp_header_length;
 
@@ -62,11 +70,8 @@ int http_filter(struct __sk_buff *skb) {
 	//direct access to skb not allowed
 	unsigned long p[7];
 	int i = 0;
-	int j = 0;
-	const int last_index = payload_offset + 7;
-	for (i = payload_offset ; i < last_index ; i++) {
-		p[j] = load_byte(skb , i);
-		j++;
+	for (i = 0; i < 7; i++) {
+		p[i] = load_byte(skb , payload_offset + i);
 	}
 
 	//find a match with an HTTP message
@@ -98,7 +103,7 @@ int http_filter(struct __sk_buff *skb) {
 	//no HTTP match
 	goto DROP;
 
-	//keep the packet and send it to userspace retruning -1
+	//keep the packet and send it to userspace returning -1
 	KEEP:
 	return -1;
 

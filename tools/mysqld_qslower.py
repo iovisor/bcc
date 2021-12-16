@@ -18,11 +18,10 @@
 from __future__ import print_function
 from bcc import BPF, USDT
 import sys
-import ctypes as ct
 
 # arguments
 def usage():
-    print("USAGE: mysqld_latency PID [min_ms]")
+    print("USAGE: mysqld_qslower PID [min_ms]")
     exit()
 if len(sys.argv) < 2:
     usage()
@@ -59,19 +58,21 @@ BPF_HASH(start_tmp, u32, struct start_t);
 BPF_PERF_OUTPUT(events);
 
 int do_start(struct pt_regs *ctx) {
-    u32 pid = bpf_get_current_pid_tgid();
+    u32 tid = bpf_get_current_pid_tgid();
     struct start_t start = {};
     start.ts = bpf_ktime_get_ns();
     bpf_usdt_readarg(1, ctx, &start.query);
-    start_tmp.update(&pid, &start);
+    start_tmp.update(&tid, &start);
     return 0;
 };
 
 int do_done(struct pt_regs *ctx) {
-    u32 pid = bpf_get_current_pid_tgid();
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 pid = pid_tgid >> 32;
+    u32 tid = (u32)pid_tgid;
     struct start_t *sp;
 
-    sp = start_tmp.lookup(&pid);
+    sp = start_tmp.lookup(&tid);
     if (sp == 0) {
         // missed tracing start
         return 0;
@@ -82,11 +83,11 @@ int do_done(struct pt_regs *ctx) {
     if (delta >= """ + str(min_ns) + """) {
         // populate and emit data struct
         struct data_t data = {.pid = pid, .ts = sp->ts, .delta = delta};
-        bpf_probe_read(&data.query, sizeof(data.query), (void *)sp->query);
+        bpf_probe_read_user(&data.query, sizeof(data.query), (void *)sp->query);
         events.perf_submit(ctx, &data, sizeof(data));
     }
 
-    start_tmp.delete(&pid);
+    start_tmp.delete(&tid);
 
     return 0;
 };
@@ -109,19 +110,11 @@ print("Tracing MySQL server queries for PID %d slower than %s ms..." % (pid,
     min_ms_text))
 print("%-14s %-6s %8s %s" % ("TIME(s)", "PID", "MS", "QUERY"))
 
-class Data(ct.Structure):
-    _fields_ = [
-        ("pid", ct.c_ulonglong),
-        ("ts", ct.c_ulonglong),
-        ("delta", ct.c_ulonglong),
-        ("query", ct.c_char * QUERY_MAX)
-    ]
-
 # process event
 start = 0
 def print_event(cpu, data, size):
     global start
-    event = ct.cast(data, ct.POINTER(Data)).contents
+    event = b["events"].event(data)
     if start == 0:
         start = event.ts
     print("%-14.6f %-6d %8.3f %s" % (float(event.ts - start) / 1000000000,
@@ -130,4 +123,7 @@ def print_event(cpu, data, size):
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event, page_cnt=64)
 while 1:
-    b.perf_buffer_poll()
+    try:
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()

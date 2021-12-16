@@ -17,7 +17,7 @@ groff            15902    0 /usr/bin/troff -mtty-char -mandoc -rLL=169n -rLT=169
 groff            15903    0 /usr/bin/grotty
 
 The output shows the parent process/command name (PCOMM), the PID, the return
-value of the exec() (RET), and the filename with arguments (ARGS). 
+value of the exec() (RET), and the filename with arguments (ARGS).
 
 This works by traces the execve() system call (commonly used exec() variant),
 and shows details of the arguments and return value. This catches new processes
@@ -51,13 +51,14 @@ failures (trying to execute a /usr/local/bin/setuidgid, which I just noticed
 doesn't exist).
 
 
-A -t option can be used to include a timestamp column, and a -n option to match
-on a name. Regular expressions are allowed. 
+A -T option can be used to include a time column, a -t option to include a
+timestamp column, and a -n option to match on a name. Regular expressions
+are allowed.
 For example, matching commands containing "mount":
 
-# ./execsnoop -tn mount
-TIME(s) PCOMM            PID    RET ARGS
-2.849   mount            18049    0 /bin/mount -p
+# ./execsnoop -Ttn mount
+TIME     TIME(s) PCOMM            PID    PPID  RET ARGS
+14:08:23 2.849   mount            18049  1045    0 /bin/mount -p
 
 The -l option can be used to only show command where one of the arguments
 matches specified line. The limitation is that we are looking only into first 20
@@ -76,27 +77,71 @@ python           3345086 4146419   0 /usr/local/bin/python /usr/local/bin/yum in
 yum              3345086 4146419   0 /usr/bin/yum install testpkg
 rpm              3345452 4146419   0 /bin/rpm -qa testpkg
 
+
+The --cgroupmap option filters based on a cgroup set. It is meant to be used
+with an externally created map.
+
+# ./execsnoop --cgroupmap /sys/fs/bpf/test01
+
+For more details, see docs/special_filtering.md
+
+The -U option include UID on output:
+
+# ./execsnoop -U
+
+UID   PCOMM            PID    PPID   RET ARGS
+1000  ls               171318 133702   0 /bin/ls --color=auto
+1000  w                171322 133702   0 /usr/bin/w
+
+The -u options filters output based process UID. You also can use username as
+argument, in that cause UID will be looked up using getpwnam (see man 3 getpwnam).
+
+# ./execsnoop -Uu 1000
+UID   PCOMM            PID    PPID   RET ARGS
+1000  ls               171335 133702   0 /bin/ls --color=auto
+1000  man              171340 133702   0 /usr/bin/man getpwnam
+1000  bzip2            171341 171340   0 /bin/bzip2 -dc
+1000  bzip2            171342 171340   0 /bin/bzip2 -dc
+1000  bzip2            171345 171340   0 /bin/bzip2 -dc
+1000  manpager         171355 171340   0 /usr/bin/manpager
+1000  less             171355 171340   0 /usr/bin/less
+
 USAGE message:
 
 # ./execsnoop -h
-usage: execsnoop [-h] [-t] [-x] [-n NAME] [-l LINE] [--max-args MAX_ARGS]
+usage: execsnoop.py [-h] [-T] [-t] [-x] [--cgroupmap CGROUPMAP] [-u USER] [-q]
+                    [-n NAME] [-l LINE] [-U] [--max-args MAX_ARGS]
 
 Trace exec() syscalls
 
 optional arguments:
   -h, --help            show this help message and exit
+  -T, --time            include time column on output (HH:MM:SS)
   -t, --timestamp       include timestamp on output
   -x, --fails           include failed exec()s
+  --cgroupmap CGROUPMAP
+                        trace cgroups in this BPF map only
+  --mntnsmap MNTNSMAP   trace mount namespaces in this BPF map only
+  -u USER, --uid USER   trace this UID only
+  -q, --quote           Add quotemarks (") around arguments.
   -n NAME, --name NAME  only print commands matching this name (regex), any
                         arg
   -l LINE, --line LINE  only print commands where arg contains this line
                         (regex)
+  -U, --print-uid       print UID column
   --max-args MAX_ARGS   maximum number of arguments parsed and displayed,
                         defaults to 20
 
 examples:
     ./execsnoop           # trace all exec() syscalls
     ./execsnoop -x        # include failed exec()s
+    ./execsnoop -T        # include time (HH:MM:SS)
+    ./execsnoop -U        # include UID
+    ./execsnoop -u 1000   # only trace UID 1000
+    ./execsnoop -u root   # get root UID and trace only this
     ./execsnoop -t        # include timestamps
+    ./execsnoop -q        # add "quotemarks" around arguments
     ./execsnoop -n main   # only print command lines containing "main"
     ./execsnoop -l tpkg   # only print command where arguments contains "tpkg"
+    ./execsnoop --cgroupmap mappath  # only trace cgroups in this BPF map
+    ./execsnoop --mntnsmap mappath   # only trace mount namespaces in the map

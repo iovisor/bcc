@@ -12,6 +12,7 @@
 
 from __future__ import print_function
 from bcc import BPF, USDT
+from bcc.utils import printb
 import sys
 
 if len(sys.argv) < 2:
@@ -33,7 +34,8 @@ int do_trace(struct pt_regs *ctx) {
      * see: https://dev.mysql.com/doc/refman/5.7/en/dba-dtrace-ref-query.html
      */
     bpf_usdt_readarg(1, ctx, &addr);
-    bpf_trace_printk("%s\\n", addr);
+    bpf_probe_read_user(&query, sizeof(query), (void *)addr);
+    bpf_trace_printk("%s\\n", query);
     return 0;
 };
 """
@@ -58,4 +60,6 @@ while 1:
     except ValueError:
         print("value error")
         continue
-    print("%-18.9f %-16s %-6d %s" % (ts, task, pid, msg))
+    except KeyboardInterrupt:
+        exit()
+    printb(b"%-18.9f %-16s %-6d %s" % (ts, task, pid, msg))

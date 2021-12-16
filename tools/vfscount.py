@@ -14,7 +14,19 @@
 from __future__ import print_function
 from bcc import BPF
 from time import sleep
+from sys import argv
+def usage():
+    print("USAGE: %s [time]" % argv[0])
+    exit()
 
+interval = 99999999
+if len(argv) > 1:
+    try:
+        interval = int(argv[1])
+        if interval == 0:
+            raise
+    except:  # also catches -h, --help
+        usage()
 # load BPF program
 b = BPF(text="""
 #include <uapi/linux/ptrace.h>
@@ -27,10 +39,8 @@ BPF_HASH(counts, struct key_t, u64, 256);
 
 int do_count(struct pt_regs *ctx) {
     struct key_t key = {};
-    u64 zero = 0, *val;
     key.ip = PT_REGS_IP(ctx);
-    val = counts.lookup_or_init(&key, &zero);
-    (*val)++;
+    counts.atomic_increment(key);
     return 0;
 }
 """)
@@ -41,7 +51,7 @@ print("Tracing... Ctrl-C to end.")
 
 # output
 try:
-    sleep(99999999)
+    sleep(interval)
 except KeyboardInterrupt:
     pass
 

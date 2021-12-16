@@ -38,8 +38,10 @@ int on_tcp_send(struct pt_regs *ctx) {
   key.user_stack = stack_traces.get_stackid(ctx, BPF_F_USER_STACK);
 
   u64 zero = 0, *val;
-  val = counts.lookup_or_init(&key, &zero);
-  (*val)++;
+  val = counts.lookup_or_try_init(&key, &zero);
+  if (val) {
+    (*val)++;
+  }
 
   return 0;
 }
@@ -56,13 +58,13 @@ struct stack_key_t {
 int main(int argc, char** argv) {
   ebpf::BPF bpf;
   auto init_res = bpf.init(BPF_PROGRAM);
-  if (init_res.code() != 0) {
+  if (!init_res.ok()) {
     std::cerr << init_res.msg() << std::endl;
     return 1;
   }
 
   auto attach_res = bpf.attach_kprobe("tcp_sendmsg", "on_tcp_send");
-  if (attach_res.code() != 0) {
+  if (!attach_res.ok()) {
     std::cerr << attach_res.msg() << std::endl;
     return 1;
   }
@@ -75,7 +77,7 @@ int main(int argc, char** argv) {
   sleep(probe_time);
 
   auto detach_res = bpf.detach_kprobe("tcp_sendmsg");
-  if (detach_res.code() != 0) {
+  if (!detach_res.ok()) {
     std::cerr << detach_res.msg() << std::endl;
     return 1;
   }
@@ -99,7 +101,7 @@ int main(int argc, char** argv) {
       for (auto sym : syms)
         std::cout << "    " << sym << std::endl;
     } else {
-      // -EFAULT normally means the stack is not availiable and not an error
+      // -EFAULT normally means the stack is not available and not an error
       if (it.first.kernel_stack != -EFAULT) {
         lost_stacks++;
         std::cout << "    [Lost Kernel Stack" << it.first.kernel_stack << "]"
@@ -112,7 +114,7 @@ int main(int argc, char** argv) {
       for (auto sym : syms)
         std::cout << "    " << sym << std::endl;
     } else {
-      // -EFAULT normally means the stack is not availiable and not an error
+      // -EFAULT normally means the stack is not available and not an error
       if (it.first.user_stack != -EFAULT) {
         lost_stacks++;
         std::cout << "    [Lost User Stack " << it.first.user_stack << "]"

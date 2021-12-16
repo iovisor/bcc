@@ -1,10 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
 # stackcount    Count events and their stack traces.
 #               For Linux, uses BCC, eBPF.
 #
-# USAGE: stackcount.py [-h] [-p PID] [-i INTERVAL] [-D DURATION] [-T] [-r] [-s]
-#                      [-P] [-K] [-U] [-v] [-d] [-f] [--debug]
+# USAGE: stackcount.py [-h] [-p PID] [-c CPU] [-i INTERVAL] [-D DURATION] [-T]
+#                      [-r] [-s] [-P] [-K] [-U] [-v] [-d] [-f] [--debug]
 #
 # The pattern is a string with optional '*' wildcards, similar to file
 # globbing. If you'd prefer to use regular expressions, use the -r option.
@@ -28,7 +28,7 @@ debug = False
 
 class Probe(object):
     def __init__(self, pattern, kernel_stack, user_stack, use_regex=False,
-                 pid=None, per_pid=False):
+                 pid=None, per_pid=False, cpu=None):
         """Init a new probe.
 
         Init the probe from the pattern provided by the user. The supported
@@ -75,6 +75,7 @@ class Probe(object):
 
         self.pid = pid
         self.per_pid = per_pid
+        self.cpu = cpu
         self.matched = 0
 
     def is_kernel_probe(self):
@@ -109,14 +110,14 @@ class Probe(object):
         if self.user_stack:
                 stack_trace += """
                     key.user_stack_id = stack_traces.get_stackid(
-                      %s, BPF_F_REUSE_STACKID | BPF_F_USER_STACK
+                      %s, BPF_F_USER_STACK
                     );""" % (ctx_name)
         else:
                 stack_trace += "key.user_stack_id = -1;"
         if self.kernel_stack:
                 stack_trace += """
                     key.kernel_stack_id = stack_traces.get_stackid(
-                      %s, BPF_F_REUSE_STACKID
+                      %s, 0
                     );""" % (ctx_name)
         else:
                 stack_trace += "key.kernel_stack_id = -1;"
@@ -128,9 +129,7 @@ int trace_count(void *ctx) {
     key.tgid = GET_TGID;
     STORE_COMM
     %s
-    u64 zero = 0;
-    u64 *val = counts.lookup_or_init(&key, &zero);
-    (*val)++;
+    counts.atomic_increment(key);
     return 0;
 }
         """
@@ -151,25 +150,27 @@ BPF_HASH(counts, struct key_t);
 BPF_STACK_TRACE(stack_traces, 1024);
         """
 
+        filter_text = []
         # We really mean the tgid from the kernel's perspective, which is in
         # the top 32 bits of bpf_get_current_pid_tgid().
         if self.is_kernel_probe() and self.pid:
-            trace_count_text = trace_count_text.replace('FILTER',
-                ('u32 pid; pid = bpf_get_current_pid_tgid() >> 32; ' +
-                'if (pid != %d) { return 0; }') % (self.pid))
-        else:
-            trace_count_text = trace_count_text.replace('FILTER', '')
+            filter_text.append('u32 pid; pid = bpf_get_current_pid_tgid() >> 32; ' +
+                               'if (pid != %d) { return 0; }' % self.pid)
 
-        # We need per-pid statistics when tracing a user-space process, because
-        # the meaning of the symbols depends on the pid. We also need them if
-        # per-pid statistics were requested with -P, or for user stacks.
-        if self.per_pid or not self.is_kernel_probe() or self.user_stack:
+        if self.is_kernel_probe() and self.cpu:
+            filter_text.append('struct task_struct *task; task = (struct task_struct*)bpf_get_current_task(); ' +
+                               'if (task->cpu != %d) { return 0; }' % self.cpu)
+
+        trace_count_text = trace_count_text.replace('FILTER', '\n    '.join(filter_text))
+
+        # Do per-pid statistics iff -P is provided
+        if self.per_pid:
             trace_count_text = trace_count_text.replace('GET_TGID',
                                         'bpf_get_current_pid_tgid() >> 32')
             trace_count_text = trace_count_text.replace('STORE_COMM',
                         'bpf_get_current_comm(&key.name, sizeof(key.name));')
         else:
-            # kernel stacks only. skip splitting on PID so these aggregate
+            # skip splitting on PID so these aggregate
             # together, and don't store the process name.
             trace_count_text = trace_count_text.replace(
                                     'GET_TGID', '0xffffffff')
@@ -213,6 +214,7 @@ class Tool(object):
     ./stackcount -r '^tcp_send.*'   # same as above, using regular expressions
     ./stackcount -Ti 5 ip_output    # output every 5 seconds, with timestamps
     ./stackcount -p 185 ip_output   # count ip_output stacks for PID 185 only
+    ./stackcount -c 1 put_prev_entity   # count put_prev_entity stacks for CPU 1 only
     ./stackcount -p 185 c:malloc    # count stacks for malloc in PID 185
     ./stackcount t:sched:sched_fork # count stacks for sched_fork tracepoint
     ./stackcount -p 185 u:node:*    # count stacks for all USDT probes in node
@@ -225,6 +227,8 @@ class Tool(object):
             epilog=examples)
         parser.add_argument("-p", "--pid", type=int,
             help="trace this PID only")
+        parser.add_argument("-c", "--cpu", type=int,
+            help="trace this CPU only")
         parser.add_argument("-i", "--interval",
             help="summary interval, seconds")
         parser.add_argument("-D", "--duration",
@@ -271,9 +275,15 @@ class Tool(object):
             self.kernel_stack = self.args.kernel_stacks_only
             self.user_stack = self.args.user_stacks_only
 
+        # For tracing single processes in isolation, explicitly set perpid
+        # to True, if not already set. This is required to generate the correct
+        # BPF program that can store pid in the tgid field of the key_t object.
+        if self.args.pid is not None and self.args.pid > 0:
+            self.args.perpid = True
+
         self.probe = Probe(self.args.pattern,
                            self.kernel_stack, self.user_stack,
-                           self.args.regexp, self.args.pid, self.args.perpid)
+                           self.args.regexp, self.args.pid, self.args.perpid, self.args.cpu)
         self.need_delimiter = self.args.delimited and not (
                     self.args.kernel_stacks_only or self.args.user_stacks_only)
 
@@ -341,11 +351,11 @@ class Tool(object):
                     # print folded stack output
                     user_stack = list(user_stack)
                     kernel_stack = list(kernel_stack)
-                    line = [k.name.decode()] + \
-                        [b.sym(addr, k.tgid) for addr in
+                    line = [k.name.decode('utf-8', 'replace')] + \
+                        [b.sym(addr, k.tgid).decode('utf-8', 'replace') for addr in
                         reversed(user_stack)] + \
                         (self.need_delimiter and ["-"] or []) + \
-                        [b.ksym(addr) for addr in reversed(kernel_stack)]
+                        [b.ksym(addr).decode('utf-8', 'replace') for addr in reversed(kernel_stack)]
                     print("%s %d" % (";".join(line), v.value))
                 else:
                     # print multi-line stack output

@@ -141,7 +141,9 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
 
 out:
     val = counts.lookup_or_init(&key, &zero);
-    (*val) += delta;
+    if (val) {
+        (*val) += delta;
+    }
     return 0;
 }
 """
@@ -185,7 +187,7 @@ while (1):
     for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         if folded:
             # print folded stack output
-            line = k.name.decode() + ";"
+            line = k.name.decode('utf-8', 'replace') + ";"
             for i in reversed(range(0, maxdepth)):
                 if k.ret[i] == 0:
                     continue

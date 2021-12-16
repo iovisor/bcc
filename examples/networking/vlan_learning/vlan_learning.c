@@ -32,11 +32,13 @@ int handle_phys2virt(struct __sk_buff *skb) {
       // auto-program reverse direction table
       int out_ifindex = leaf->out_ifindex;
       struct ifindex_leaf_t zleaf = {0};
-      struct ifindex_leaf_t *out_leaf = egress.lookup_or_init(&out_ifindex, &zleaf);
-      // to capture potential configuration changes
-      out_leaf->out_ifindex = skb->ifindex;
-      out_leaf->vlan_tci = skb->vlan_tci;
-      out_leaf->vlan_proto = skb->vlan_proto;
+      struct ifindex_leaf_t *out_leaf = egress.lookup_or_try_init(&out_ifindex, &zleaf);
+      if (out_leaf) {
+	// to capture potential configuration changes
+	out_leaf->out_ifindex = skb->ifindex;
+	out_leaf->vlan_tci = skb->vlan_tci;
+	out_leaf->vlan_proto = skb->vlan_proto;
+      }
       // pop the vlan header and send to the destination
       bpf_skb_vlan_pop(skb);
       bpf_clone_redirect(skb, leaf->out_ifindex, 0);

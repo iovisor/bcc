@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import argparse
 from time import sleep, strftime
 from sys import argv

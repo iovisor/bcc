@@ -1,1 +1,2 @@
-install(PROGRAMS xdp_drop_count.py DESTINATION share/bcc/examples/networking/xdp)
+file(GLOB PY_FILES *.py)
+install(PROGRAMS ${PY_FILES} DESTINATION share/bcc/examples/networking/xdp)

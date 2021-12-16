@@ -1,0 +1,66 @@
+Demonstrations of shmsnoop, the Linux eBPF/bcc version.
+
+shmsnoop traces shm*() syscalls, for example:
+
+# ./shmsnoop.py
+PID    COMM                SYS              RET ARGs
+19813  server           SHMGET            10000 key: 0x78020001, size: 20, shmflg: 0x3b6 (IPC_CREAT|0666)
+19813  server            SHMAT     7f1cf8b1f000 shmid: 0x10000, shmaddr: 0x0, shmflg: 0x0
+19816  client           SHMGET            10000 key: 0x78020001, size: 20, shmflg: 0x1b6 (0666)
+19816  client            SHMAT     7f4fd8ee7000 shmid: 0x10000, shmaddr: 0x0, shmflg: 0x0
+19816  client            SHMDT                0 shmaddr: 0x7f4fd8ee7000
+19813  server            SHMDT                0 shmaddr: 0x7f1cf8b1f000
+19813  server           SHMCTL                0 shmid: 0x10000, cmd: 0, buf: 0x0
+
+
+Every call the shm* syscall (SHM column) is displayed
+on separate line together with process info (PID/COMM
+columns) and argument details: return value (RET column)
+and syscall arguments (ARGs column).
+
+The ARGs column contains 'arg: value' couples that represent
+given syscall arguments as described in their manpage.
+
+This works by tracing shm* system calls and sending
+argument details to the python script.
+
+A -T option can be used to include a timestamp column,
+and a -n option to match on a command name. Regular
+expressions are allowed.  For example, matching commands
+containing "server" with timestamps:
+
+# ./shmsnoop.py -T -n server
+TIME(s)       PID    COMM                SYS              RET ARGs
+0.563194000   19825  server            SHMDT                0 shmaddr: 0x7f74362e4000
+0.563237000   19825  server           SHMCTL                0 shmid: 0x18000, cmd: 0, buf: 0x0
+
+
+A -p option can be used to trace only selected process:
+
+# ./shmsnoop.py -p 19855
+PID    COMM                SYS              RET ARGs
+19855  server            SHMDT                0 shmaddr: 0x7f4329ff8000
+19855  server           SHMCTL                0 shmid: 0x20000, cmd: 0, buf: 0x0
+
+USAGE message:
+# ./shmsnoop.py -h
+usage: shmsnoop.py [-h] [-T] [-p PID] [-t TID] [-d DURATION] [-n NAME]
+
+Trace shm*() syscalls
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -T, --timestamp       include timestamp on output
+  -p PID, --pid PID     trace this PID only
+  -t TID, --tid TID     trace this TID only
+  -d DURATION, --duration DURATION
+                        total duration of trace in seconds
+  -n NAME, --name NAME  only print process names containing this name
+
+examples:
+    ./shmsnoop           # trace all shm*() syscalls
+    ./shmsnoop -T        # include timestamps
+    ./shmsnoop -p 181    # only trace PID 181
+    ./shmsnoop -t 123    # only trace TID 123
+    ./shmsnoop -d 10     # trace for 10 seconds only
+    ./shmsnoop -n main   # only print process names containing "main"

@@ -22,44 +22,49 @@ typedef enum {
   BCC_ARCH_PPC_LE,
   BCC_ARCH_S390X,
   BCC_ARCH_ARM64,
+  BCC_ARCH_MIPS,
   BCC_ARCH_X86
 } bcc_arch_t;
 
-typedef void *(*arch_callback_t)(bcc_arch_t arch);
+typedef void *(*arch_callback_t)(bcc_arch_t arch, bool for_syscall);
 
-static void *run_arch_callback(arch_callback_t fn)
+static void *run_arch_callback(arch_callback_t fn, bool for_syscall = false)
 {
   const char *archenv = getenv("ARCH");
 
   /* If ARCH is not set, detect from local arch clang is running on */
   if (!archenv) {
 #if defined(__powerpc64__)
-#if defined(_CALL_ELF) && _CALL_ELF == 2
-    return fn(BCC_ARCH_PPC_LE);
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+    return fn(BCC_ARCH_PPC_LE, for_syscall);
 #else
-    return fn(BCC_ARCH_PPC);
+    return fn(BCC_ARCH_PPC, for_syscall);
 #endif
 #elif defined(__s390x__)
-    return fn(BCC_ARCH_S390X);
+    return fn(BCC_ARCH_S390X, for_syscall);
 #elif defined(__aarch64__)
-    return fn(BCC_ARCH_ARM64);
+    return fn(BCC_ARCH_ARM64, for_syscall);
+#elif defined(__mips__)
+    return fn(BCC_ARCH_MIPS, for_syscall);
 #else
-    return fn(BCC_ARCH_X86);
+    return fn(BCC_ARCH_X86, for_syscall);
 #endif
   }
 
   /* Otherwise read it from ARCH */
   if (!strcmp(archenv, "powerpc")) {
-#if defined(_CALL_ELF) && _CALL_ELF == 2
-    return fn(BCC_ARCH_PPC_LE);
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+    return fn(BCC_ARCH_PPC_LE, for_syscall);
 #else
-    return fn(BCC_ARCH_PPC);
+    return fn(BCC_ARCH_PPC, for_syscall);
 #endif
   } else if (!strcmp(archenv, "s390x")) {
-    return fn(BCC_ARCH_S390X);
+    return fn(BCC_ARCH_S390X, for_syscall);
   } else if (!strcmp(archenv, "arm64")) {
-    return fn(BCC_ARCH_ARM64);
+    return fn(BCC_ARCH_ARM64, for_syscall);
+  } else if (!strcmp(archenv, "mips")) {
+    return fn(BCC_ARCH_MIPS, for_syscall);
   } else {
-    return fn(BCC_ARCH_X86);
+    return fn(BCC_ARCH_X86, for_syscall);
   }
 }

@@ -19,7 +19,7 @@ A  28978  nc               4  10.202.210.1     10.202.109.12    8080   59160
 X  28978  nc               4  10.202.210.1     10.202.109.12    8080   59160
 ```
 
-This output shows three conections, one outgoing from a "telnet" process, one
+This output shows three connections, one outgoing from a "telnet" process, one
 outgoing from "curl" to a local netcat, and one incoming received by the "nc"
 process. The output details show the kind of event (C for connection, X for
 close and A for accept), PID, IP version, source address, destination address,
@@ -35,3 +35,11 @@ TIME(s)  T  PID    COMM             IP SADDR            DADDR            SPORT  
 3.546    C    748  curl             6  [::1]            [::1]            42592  80
 4.294    X  31002  telnet           4  192.168.1.2      192.168.1.1      42590  23
 ```
+
+
+The --cgroupmap option filters based on a cgroup set. It is meant to be used
+with an externally created map.
+
+# ./tcptracer --cgroupmap /sys/fs/bpf/test01
+
+For more details, see docs/special_filtering.md

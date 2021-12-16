@@ -2,7 +2,7 @@
 .SH NAME
 btrfsslower \- Trace slow btrfs file operations, with per-event details.
 .SH SYNOPSIS
-.B btrfsslower [\-h] [\-j] [\-p PID] [min_ms]
+.B btrfsslower [\-h] [\-j] [\-p PID] [min_ms] [\-d DURATION]
 .SH DESCRIPTION
 This tool traces common btrfs file operations: reads, writes, opens, and
 syncs. It measures the time spent in these operations, and prints details
@@ -25,6 +25,9 @@ Trace this PID only.
 .TP
 min_ms
 Minimum I/O latency (duration) to trace, in milliseconds. Default is 10 ms.
+.TP
+\-d DURATION
+Total duration of trace in seconds.
 .SH EXAMPLES
 .TP
 Trace synchronous file reads and writes slower than 10 ms:
@@ -46,6 +49,10 @@ Trace all file reads and writes (warning: the output will be verbose):
 Trace slower than 1 ms, for PID 181 only:
 #
 .B btrfsslower \-p 181 1
+.TP
+Trace for 10 seconds only:
+#
+.B btrfsslower \-d 10
 .SH FIELDS
 .TP
 TIME(s)
@@ -74,7 +81,7 @@ accurate measure of the latency suffered by applications performing file
 system I/O, than to measure this down at the block device interface.
 .TP
 FILENAME
-A cached kernel file name (comes from dentry->d_iname).
+A cached kernel file name (comes from dentry->d_name.name).
 .TP
 ENDTIME_us
 Completion timestamp, microseconds (\-j only).

@@ -26,7 +26,7 @@ int printarg(struct pt_regs *ctx) {
   if (pid != PID)
     return 0;
   char str[128] = {};
-  bpf_probe_read(&str, sizeof(str), (void *)PT_REGS_PARM1(ctx));
+  bpf_probe_read_user(&str, sizeof(str), (void *)PT_REGS_PARM1(ctx));
   bpf_trace_printk("strlen(\"%s\")\n", &str);
   return 0;
 };

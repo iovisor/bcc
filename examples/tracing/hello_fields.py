@@ -1,8 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
 # This is a Hello World example that formats output as fields.
 
 from bcc import BPF
+from bcc.utils import printb
 
 # define BPF program
 prog = """
@@ -25,4 +26,6 @@ while 1:
         (task, pid, cpu, flags, ts, msg) = b.trace_fields()
     except ValueError:
         continue
-    print("%-18.9f %-16s %-6d %s" % (ts, task, pid, msg))
+    except KeyboardInterrupt:
+        exit()
+    printb(b"%-18.9f %-16s %-6d %s" % (ts, task, pid, msg))

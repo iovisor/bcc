@@ -54,7 +54,7 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
     // create map key
     u64 zero = 0, *val;
     struct key_t key = {};
-    int stack_flags = BPF_F_REUSE_STACKID;
+    int stack_flags = 0;
 
     /*
     if (!(prev->flags & PF_KTHREAD))
@@ -64,8 +64,10 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
     bpf_get_current_comm(&key.name, sizeof(key.name));
     key.stack_id = stack_traces.get_stackid(ctx, stack_flags);
 
-    val = counts.lookup_or_init(&key, &zero);
-    (*val) += delta;
+    val = counts.lookup_or_try_init(&key, &zero);
+    if (val) {
+        (*val) += delta;
+    }
     return 0;
 }
 ]]

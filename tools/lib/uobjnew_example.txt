@@ -48,7 +48,7 @@ block size 80                       569        45520
 USAGE message:
 
 # ./uobjnew -h
-usage: uobjnew.py [-h] [-l {java,ruby,c}] [-C TOP_COUNT] [-S TOP_SIZE] [-v]
+usage: uobjnew.py [-h] [-l {c,java,ruby,tcl}] [-C TOP_COUNT] [-S TOP_SIZE] [-v]
                   pid [interval]
 
 Summarize object allocations in high-level languages.
@@ -59,7 +59,7 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -l {java,ruby,c}, --language {java,ruby,c}
+  -l {c,java,ruby,tcl}, --language {c,java,ruby,tcl}
                         language to trace
   -C TOP_COUNT, --top-count TOP_COUNT
                         number of most frequently allocated types to print

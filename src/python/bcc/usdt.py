@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import print_function
 import ctypes as ct
-import os, sys
+import sys
 from .libbcc import lib, _USDT_CB, _USDT_PROBE_CB, \
                     bcc_usdt_location, bcc_usdt_argument, \
                     BCC_USDT_ARGUMENT_FLAGS
@@ -49,24 +50,24 @@ class USDTProbeArgument(object):
         if self.valid & BCC_USDT_ARGUMENT_FLAGS.CONSTANT != 0:
             return "%d" % self.constant
         if self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_OFFSET == 0:
-            return "%s" % self.base_register_name
+            return "%s" % self.base_register_name.decode()
         if self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_OFFSET != 0 and \
            self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_IDENT == 0:
             if self.valid & BCC_USDT_ARGUMENT_FLAGS.INDEX_REGISTER_NAME != 0:
-                index_offset = " + %s" % self.index_register_name
+                index_offset = " + %s" % self.index_register_name.decode()
                 if self.valid & BCC_USDT_ARGUMENT_FLAGS.SCALE != 0:
                     index_offset += " * %d" % self.scale
             else:
                 index_offset = ""
             sign = '+' if self.deref_offset >= 0 else '-'
-            return "*(%s %s %d%s)" % (self.base_register_name,
-                                    sign, abs(self.deref_offset), index_offset)
+            return "*(%s %s %d%s)" % (self.base_register_name.decode(),
+                                      sign, abs(self.deref_offset), index_offset)
         if self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_OFFSET != 0 and \
            self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_IDENT != 0 and \
            self.valid & BCC_USDT_ARGUMENT_FLAGS.BASE_REGISTER_NAME != 0 and \
            self.base_register_name == "ip":
             sign = '+' if self.deref_offset >= 0 else '-'
-            return "*(&%s %s %d)" % (self.deref_ident,
+            return "*(&%s %s %d)" % (self.deref_ident.decode(),
                                      sign, abs(self.deref_offset))
         # If we got here, this is an unrecognized case. Doesn't mean it's
         # necessarily bad, so just provide the raw data. It just means that
@@ -85,7 +86,7 @@ class USDTProbeLocation(object):
         self.bin_path = location.bin_path
 
     def __str__(self):
-        return "%s 0x%x" % (self.bin_path, self.address)
+        return "%s 0x%x" % (self.bin_path.decode(), self.address)
 
     def get_argument(self, index):
         arg = bcc_usdt_argument()
@@ -110,10 +111,10 @@ class USDTProbe(object):
 
     def __str__(self):
         return "%s:%s [sema 0x%x]" % \
-               (self.provider, self.name, self.semaphore)
+               (self.provider.decode(), self.name.decode(), self.semaphore)
 
     def short_name(self):
-        return "%s:%s" % (self.provider, self.name)
+        return "%s:%s" % (self.provider.decode(), self.name.decode())
 
     def get_location(self, index):
         loc = bcc_usdt_location()
@@ -146,23 +147,30 @@ class USDT(object):
         lib.bcc_usdt_close(self.context)
 
     def enable_probe(self, probe, fn_name):
-        if lib.bcc_usdt_enable_probe(self.context, probe.encode('ascii'),
-                fn_name.encode('ascii')) != 0:
+        probe_parts = probe.split(":", 1)
+        if len(probe_parts) == 1:
+            ret = lib.bcc_usdt_enable_probe(
+                self.context, probe.encode('ascii'), fn_name.encode('ascii'))
+        else:
+            (provider_name, probe_name) = probe_parts
+            ret = lib.bcc_usdt_enable_fully_specified_probe(
+                self.context, provider_name.encode('ascii'), probe_name.encode('ascii'),
+                fn_name.encode('ascii'))
+
+        if ret != 0:
             raise USDTException(
-                    ("failed to enable probe '%s'; a possible cause " +
-                     "can be that the probe requires a pid to enable") %
-                     probe
-                  )
+"""Failed to enable USDT probe '%s':
+the specified pid might not contain the given language's runtime,
+or the runtime was not built with the required USDT probes. Look
+for a configure flag similar to --with-dtrace or --enable-dtrace.
+To check which probes are present in the process, use the tplist tool.
+""" % probe)
 
     def enable_probe_or_bail(self, probe, fn_name):
-        if lib.bcc_usdt_enable_probe(self.context, probe.encode('ascii'),
-                fn_name.encode('ascii')) != 0:
-            print(
-"""Error attaching USDT probes: the specified pid might not contain the
-given language's runtime, or the runtime was not built with the required
-USDT probes. Look for a configure flag similar to --with-dtrace or
---enable-dtrace. To check which probes are present in the process, use the
-tplist tool.""")
+        try:
+            self.enable_probe(probe, fn_name)
+        except USDTException as e:
+            print(e, file=sys.stderr)
             sys.exit(1)
 
     def get_context(self):
@@ -174,8 +182,14 @@ tplist tool.""")
         return lib.bcc_usdt_genargs(ctx_array, 1).decode()
 
     def get_probe_arg_ctype(self, probe_name, arg_index):
-        return lib.bcc_usdt_get_probe_argctype(
-            self.context, probe_name.encode('ascii'), arg_index).decode()
+        probe_parts = probe_name.split(":", 1)
+        if len(probe_parts) == 1:
+            return lib.bcc_usdt_get_probe_argctype(
+                self.context, probe_name.encode('ascii'), arg_index).decode()
+        else:
+            (provider_name, probe) = probe_parts
+            return lib.bcc_usdt_get_fully_specified_probe_argctype(
+                self.context, provider_name.encode('ascii'), probe.encode('ascii'), arg_index).decode()
 
     def enumerate_probes(self):
         probes = []
@@ -187,9 +201,11 @@ tplist tool.""")
 
     # This is called by the BPF module's __init__ when it realizes that there
     # is a USDT context and probes need to be attached.
-    def attach_uprobes(self, bpf):
+    def attach_uprobes(self, bpf, attach_usdt_ignore_pid):
         probes = self.enumerate_active_probes()
         for (binpath, fn_name, addr, pid) in probes:
+            if attach_usdt_ignore_pid:
+                pid = -1
             bpf.attach_uprobe(name=binpath.decode(), fn_name=fn_name.decode(),
                               addr=addr, pid=pid)
 

@@ -1,6 +1,8 @@
 # Copyright (c) 2017 Facebook, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
+if (ENABLE_NO_PIE)
+
 if (CMAKE_C_COMPILER_ID MATCHES "Clang")
 	set(COMPILER_NOPIE_FLAG "-nopie")
 else()
@@ -15,3 +17,18 @@ else()
 	endif()
 	set(CMAKE_REQUIRED_FLAGS "${_backup_c_flags}")
 endif()
+
+endif(ENABLE_NO_PIE)
+
+# check whether reallocarray availability
+# this is used to satisfy reallocarray usage under src/cc/libbpf/
+CHECK_CXX_SOURCE_COMPILES(
+"
+#define _GNU_SOURCE
+#include <stdlib.h>
+
+int main(void)
+{
+        return !!reallocarray(NULL, 1, 1);
+}
+" HAVE_REALLOCARRAY_SUPPORT)

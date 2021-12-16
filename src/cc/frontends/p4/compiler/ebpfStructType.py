@@ -22,7 +22,7 @@ class EbpfField(object):
         try:
             self.type = EbpfScalarType(
                 self.hlirType, widthInBits, signed, config)
-        except CompilationException, e:
+        except CompilationException as e:
             raise CompilationException(
                 e.isBug, "{0}.{1}: {2}", hlirParentType, self.name, e.show())
 

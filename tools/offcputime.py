@@ -13,7 +13,7 @@
 from __future__ import print_function
 from bcc import BPF
 from sys import stderr
-from time import sleep, strftime
+from time import strftime
 import argparse
 import errno
 import signal
@@ -36,7 +36,7 @@ def positive_nonzero_int(val):
     return ival
 
 def stack_id_err(stack_id):
-    # -EFAULT in get_stackid normally means the stack-trace is not availible,
+    # -EFAULT in get_stackid normally means the stack-trace is not available,
     # Such as getting kernel stack trace in userspace code
     return (stack_id < 0) and (stack_id != -errno.EFAULT)
 
@@ -99,8 +99,6 @@ parser.add_argument("--state", type=positive_int,
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
-if args.pid and args.tgid:
-    parser.error("specify only one of -p and -t")
 folded = args.folded
 duration = int(args.duration)
 debug = 0
@@ -118,8 +116,8 @@ bpf_text = """
 #define MAXBLOCK_US    MAXBLOCK_US_VALUEULL
 
 struct key_t {
-    u32 pid;
-    u32 tgid;
+    u64 pid;
+    u64 tgid;
     int user_stack_id;
     int kernel_stack_id;
     char name[TASK_COMM_LEN];
@@ -127,6 +125,14 @@ struct key_t {
 BPF_HASH(counts, struct key_t);
 BPF_HASH(start, u32);
 BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE);
+
+struct warn_event_t {
+    u32 pid;
+    u32 tgid;
+    u32 t_start;
+    u32 t_end;
+};
+BPF_PERF_OUTPUT(warn_events);
 
 int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
     u32 pid = prev->pid;
@@ -148,15 +154,26 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
     }
 
     // calculate current thread's delta time
-    u64 delta = bpf_ktime_get_ns() - *tsp;
+    u64 t_start = *tsp;
+    u64 t_end = bpf_ktime_get_ns();
     start.delete(&pid);
+    if (t_start > t_end) {
+        struct warn_event_t event = {
+            .pid = pid,
+            .tgid = tgid,
+            .t_start = t_start,
+            .t_end = t_end,
+        };
+        warn_events.perf_submit(ctx, &event, sizeof(event));
+        return 0;
+    }
+    u64 delta = t_end - t_start;
     delta = delta / 1000;
     if ((delta < MINBLOCK_US) || (delta > MAXBLOCK_US)) {
         return 0;
     }
 
     // create map key
-    u64 zero = 0, *val;
     struct key_t key = {};
 
     key.pid = pid;
@@ -165,8 +182,7 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
     key.kernel_stack_id = KERNEL_STACK_GET;
     bpf_get_current_comm(&key.name, sizeof(key.name));
 
-    val = counts.lookup_or_init(&key, &zero);
-    (*val) += delta;
+    counts.increment(key, delta);
     return 0;
 }
 """
@@ -189,14 +205,18 @@ else:
     thread_context = "all threads"
     thread_filter = '1'
 if args.state == 0:
-    state_filter = 'prev->state == 0'
+    state_filter = 'prev->STATE_FIELD == 0'
 elif args.state:
     # these states are sometimes bitmask checked
-    state_filter = 'prev->state & %d' % args.state
+    state_filter = 'prev->STATE_FIELD & %d' % args.state
 else:
     state_filter = '1'
 bpf_text = bpf_text.replace('THREAD_FILTER', thread_filter)
 bpf_text = bpf_text.replace('STATE_FILTER', state_filter)
+if BPF.kernel_struct_has_field(b'task_struct', b'__state') == 1:
+    bpf_text = bpf_text.replace('STATE_FIELD', '__state')
+else:
+    bpf_text = bpf_text.replace('STATE_FIELD', 'state')
 
 # set stack storage size
 bpf_text = bpf_text.replace('STACK_STORAGE_SIZE', str(args.stack_storage_size))
@@ -235,7 +255,8 @@ if debug or args.ebpf:
 
 # initialize BPF
 b = BPF(text=bpf_text)
-b.attach_kprobe(event="finish_task_switch", fn_name="oncpu")
+b.attach_kprobe(event_re="^finish_task_switch$|^finish_task_switch\.isra\.\d$",
+                fn_name="oncpu")
 matched = b.num_open_kprobes()
 if matched == 0:
     print("error: 0 functions traced. Exiting.", file=stderr)
@@ -250,8 +271,23 @@ if not folded:
     else:
         print("... Hit Ctrl-C to end.")
 
+
+def print_warn_event(cpu, data, size):
+    event = b["warn_events"].event(data)
+    # See https://github.com/iovisor/bcc/pull/3227 for those wondering how can this happen.
+    print("WARN: Skipped an event with negative duration: pid:%d, tgid:%d, off-cpu:%d, on-cpu:%d"
+          % (event.pid, event.tgid, event.t_start, event.t_end),
+          file=stderr)
+
+b["warn_events"].open_perf_buffer(print_warn_event)
 try:
-    sleep(duration)
+    duration_ms = duration * 1000
+    start_time_ms = int(BPF.monotonic_time() / 1000000)
+    while True:
+        elapsed_ms = int(BPF.monotonic_time() / 1000000) - start_time_ms
+        if elapsed_ms >= duration_ms:
+            break
+        b.perf_buffer_poll(timeout=duration_ms - elapsed_ms)
 except KeyboardInterrupt:
     # as cleanup can take many seconds, trap Ctrl-C:
     signal.signal(signal.SIGINT, signal_ignore)
@@ -283,20 +319,22 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         # print folded stack output
         user_stack = list(user_stack)
         kernel_stack = list(kernel_stack)
-        line = [k.name.decode()]
+        line = [k.name.decode('utf-8', 'replace')]
         # if we failed to get the stack is, such as due to no space (-ENOMEM) or
         # hash collision (-EEXIST), we still print a placeholder for consistency
         if not args.kernel_stacks_only:
             if stack_id_err(k.user_stack_id):
                 line.append("[Missed User Stack]")
             else:
-                line.extend([b.sym(addr, k.tgid) for addr in reversed(user_stack)])
+                line.extend([b.sym(addr, k.tgid).decode('utf-8', 'replace')
+                    for addr in reversed(user_stack)])
         if not args.user_stacks_only:
             line.extend(["-"] if (need_delimiter and k.kernel_stack_id >= 0 and k.user_stack_id >= 0) else [])
             if stack_id_err(k.kernel_stack_id):
                 line.append("[Missed Kernel Stack]")
             else:
-                line.extend([b.ksym(addr) for addr in reversed(kernel_stack)])
+                line.extend([b.ksym(addr).decode('utf-8', 'replace')
+                    for addr in reversed(kernel_stack)])
         print("%s %d" % (";".join(line), v.value))
     else:
         # print default multi-line stack output
@@ -305,7 +343,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
                 print("    [Missed Kernel Stack]")
             else:
                 for addr in kernel_stack:
-                    print("    %s" % b.ksym(addr))
+                    print("    %s" % b.ksym(addr).decode('utf-8', 'replace'))
         if not args.kernel_stacks_only:
             if need_delimiter and k.user_stack_id >= 0 and k.kernel_stack_id >= 0:
                 print("    --")
@@ -313,8 +351,8 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
                 print("    [Missed User Stack]")
             else:
                 for addr in user_stack:
-                    print("    %s" % b.sym(addr, k.tgid))
-        print("    %-16s %s (%d)" % ("-", k.name.decode(), k.pid))
+                    print("    %s" % b.sym(addr, k.tgid).decode('utf-8', 'replace'))
+        print("    %-16s %s (%d)" % ("-", k.name.decode('utf-8', 'replace'), k.pid))
         print("        %d\n" % v.value)
 
 if missing_stacks > 0:

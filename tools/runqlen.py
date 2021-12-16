@@ -170,7 +170,7 @@ if args.cpus:
 else:
     bpf_text = bpf_text.replace('STORAGE',
         'BPF_HISTOGRAM(dist, unsigned int);')
-    bpf_text = bpf_text.replace('STORE', 'dist.increment(len);')
+    bpf_text = bpf_text.replace('STORE', 'dist.atomic_increment(len);')
 
 if check_runnable_weight_field():
     bpf_text = bpf_text.replace('RUNNABLE_WEIGHT_FIELD', 'unsigned long runnable_weight;')

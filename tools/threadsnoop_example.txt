@@ -1,0 +1,27 @@
+Demonstrations of threadsnoop, the Linux BCC/eBPF version.
+
+
+Tracing new threads via phtread_create():
+
+# ./threadsnoop
+Attaching 2 probes...
+TIME(ms)   PID    COMM             FUNC
+1938       28549  dockerd          threadentry
+1939       28549  dockerd          threadentry
+1939       28549  dockerd          threadentry
+1940       28549  dockerd          threadentry
+1949       28549  dockerd          threadentry
+1958       28549  dockerd          threadentry
+1939       28549  dockerd          threadentry
+1950       28549  dockerd          threadentry
+2013       28579  docker-containe  0x562f30f2e710L
+2036       28549  dockerd          threadentry
+2083       28579  docker-containe  0x562f30f2e710L
+2116       629    systemd-journal  0x7fb7114955c0L
+2116       629    systemd-journal  0x7fb7114955c0L
+[...]
+
+The output shows a dockerd process creating several threads with the start
+routine threadentry(), and docker-containe (truncated) and systemd-journal
+also starting threads: in their cases, the function had no symbol information
+available, so their addresses are printed in hex.

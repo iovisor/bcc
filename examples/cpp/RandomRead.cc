@@ -11,6 +11,7 @@
  */
 
 #include <signal.h>
+#include <sys/resource.h>
 #include <iostream>
 
 #include "BPF.h"
@@ -23,14 +24,6 @@ const std::string BPF_PROGRAM = R"(
 #define CGROUP_FILTER 0
 #endif
 
-struct urandom_read_args {
-  // See /sys/kernel/debug/tracing/events/random/urandom_read/format
-  uint64_t common__unused;
-  int got_bits;
-  int pool_left;
-  int input_left;
-};
-
 struct event_t {
   int pid;
   char comm[16];
@@ -41,7 +34,7 @@ struct event_t {
 BPF_PERF_OUTPUT(events);
 BPF_CGROUP_ARRAY(cgroup, 1);
 
-int on_urandom_read(struct urandom_read_args* attr) {
+int on_urandom_read(struct bpf_raw_tracepoint_args *ctx) {
   if (CGROUP_FILTER && (cgroup.check_current_task(0) != 1))
     return 0;
 
@@ -49,9 +42,11 @@ int on_urandom_read(struct urandom_read_args* attr) {
   event.pid = bpf_get_current_pid_tgid();
   bpf_get_current_comm(&event.comm, sizeof(event.comm));
   event.cpu = bpf_get_smp_processor_id();
-  event.got_bits = attr->got_bits;
+  // from include/trace/events/random.h:
+  //    TP_PROTO(int got_bits, int pool_left, int input_left)
+  event.got_bits = ctx->args[0];
 
-  events.perf_submit(attr, &event, sizeof(event));
+  events.perf_submit(ctx, &event, sizeof(event));
   return 0;
 }
 )";
@@ -79,41 +74,67 @@ void signal_handler(int s) {
   exit(0);
 }
 
+void usage(void) {
+  std::cerr << "USAGE: RandomRead [{-r|-u} [cgroup2_path]]" << std::endl;
+}
+
 int main(int argc, char** argv) {
-  if (argc != 1 && argc != 2) {
-    std::cerr << "USAGE: RandomRead [cgroup2_path]" << std::endl;
+  if (argc > 3) {
+    usage();
     return 1;
+  }
+
+  bool allow_rlimit = true;
+  if (argc >= 2) {
+    // Set a small rlimit for MEMLOCK
+    struct rlimit rlim_new = {4096, 4096};
+    setrlimit(RLIMIT_MEMLOCK, &rlim_new);
+
+    if (strcmp(argv[1], "-r") == 0) {
+      allow_rlimit = false;
+    } else if (strcmp(argv[1], "-u") == 0) {
+      allow_rlimit = true;
+    } else {
+      usage();
+      return 1;
+    }
   }
 
   std::vector<std::string> cflags = {};
-  if (argc == 2)
+  if (argc == 3)
     cflags.emplace_back("-DCGROUP_FILTER=1");
 
-  bpf = new ebpf::BPF();
+  bpf = new ebpf::BPF(0, nullptr, true, "", allow_rlimit);
   auto init_res = bpf->init(BPF_PROGRAM, cflags, {});
-  if (init_res.code() != 0) {
+  if (!init_res.ok()) {
     std::cerr << init_res.msg() << std::endl;
     return 1;
   }
-  if (argc == 2) {
+  if (argc == 3) {
     auto cgroup_array = bpf->get_cgroup_array("cgroup");
-    auto update_res = cgroup_array.update_value(0, argv[1]);
-    if (update_res.code() != 0) {
+    auto update_res = cgroup_array.update_value(0, argv[2]);
+    if (!update_res.ok()) {
       std::cerr << update_res.msg() << std::endl;
       return 1;
     }
   }
 
   auto attach_res =
-      bpf->attach_tracepoint("random:urandom_read", "on_urandom_read");
-  if (attach_res.code() != 0) {
+      bpf->attach_raw_tracepoint("urandom_read", "on_urandom_read");
+  if (!attach_res.ok()) {
     std::cerr << attach_res.msg() << std::endl;
     return 1;
   }
 
   auto open_res = bpf->open_perf_buffer("events", &handle_output);
-  if (open_res.code() != 0) {
+  if (!open_res.ok()) {
     std::cerr << open_res.msg() << std::endl;
+    return 1;
+  }
+
+  // done with all initial work, free bcc memory
+  if (bpf->free_bcc_memory()) {
+    std::cerr << "Failed to free llvm/clang memory" << std::endl;
     return 1;
   }
 

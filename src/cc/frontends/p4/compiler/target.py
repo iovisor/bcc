@@ -91,7 +91,7 @@ class TargetConfig(object):
 # source tree samples folder and which attaches to a socket
 class KernelSamplesConfig(TargetConfig):
     def __init__(self):
-        super(SocketConfig, self).__init__("Socket")
+        super(TargetConfig, self).__init__("Socket")
         self.entrySection = "socket1"
         self.section = "SEC"
         self.uprefix = "u"

@@ -1,0 +1,56 @@
+.TH netqtop 8 "2020-07-30" "USER COMMANDS"
+.SH NAME
+netqtop \- Summarize PPS, BPS, average size of packets and packet counts ordered by packet sizes 
+on each queue of a network interface.
+.SH SYNOPSIS
+.B netqtop [\-n nic] [\-i interval] [\-t throughput]
+.SH DESCRIPTION
+netqtop accounts statistics of both transmitted and received packets on each queue of 
+a specified network interface to help developers check if its traffic load is balanced. 
+The result is displayed as a table with columns of PPS, BPS, average size and 
+packet counts in range [0,64), [64, 5120), [512, 2048), [2048, 16K), [16K, 64K). 
+This is printed every given interval (default 1) in seconds.
+
+The tool uses the net:net_dev_start_xmit and net:netif_receive_skb kernel tracepoints. 
+Since it uses tracepoint, the tool only works on Linux 4.7+.
+
+netqtop introduces significant overhead while network traffic is large. See OVERHEAD 
+section below.
+
+.SH REQUIREMENTS
+CONFIG_bpf and bcc
+.SH OPTIONS
+.TP
+\-n NIC
+Specify the network interface card
+.TP
+\-i INTERVAL
+Print results every INTERVAL seconds.
+The default value is 1.
+.TP
+\-t THROUGHPUT
+Print BPS and PPS of each queue.
+.SH EXAMPLES
+.TP
+Account statistics of eth0 and output every 2 seconds:
+#
+.B netqtop -n eth0 -i 1
+.SH OVERHEAD
+In performance test, netqtop introduces a overhead up to 30% PPS drop 
+while printing interval is set to 1 second. So be mindful of potential packet drop 
+when using this tool.
+
+It also increases ping-pong latency by about 1 usec. 
+.SH SOURCE
+This is from bcc
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a netqtop_example.txt file containing
+example usage, output and commentary for this tool.
+.SH OS 
+Linux
+.SH STABILITY
+Unstable - in development
+.SH AUTHOR
+Yolandajn

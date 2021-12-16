@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
 # xdp_drop_count.py Drop incoming packets on XDP layer and count for which
 #                   protocol type
@@ -16,24 +16,33 @@ flags = 0
 def usage():
     print("Usage: {0} [-S] <ifdev>".format(sys.argv[0]))
     print("       -S: use skb mode\n")
+    print("       -D: use driver mode\n")
+    print("       -H: use hardware offload mode\n")
     print("e.g.: {0} eth0\n".format(sys.argv[0]))
     exit(1)
 
 if len(sys.argv) < 2 or len(sys.argv) > 3:
     usage()
 
+offload_device = None
 if len(sys.argv) == 2:
     device = sys.argv[1]
+elif len(sys.argv) == 3:
+    device = sys.argv[2]
 
+maptype = "percpu_array"
 if len(sys.argv) == 3:
     if "-S" in sys.argv:
         # XDP_FLAGS_SKB_MODE
-        flags |= 2 << 0
-
-    if "-S" == sys.argv[1]:
-        device = sys.argv[2]
-    else:
-        device = sys.argv[1]
+        flags |= BPF.XDP_FLAGS_SKB_MODE
+    if "-D" in sys.argv:
+        # XDP_FLAGS_DRV_MODE
+        flags |= BPF.XDP_FLAGS_DRV_MODE
+    if "-H" in sys.argv:
+        # XDP_FLAGS_HW_MODE
+        maptype = "array"
+        offload_device = device
+        flags |= BPF.XDP_FLAGS_HW_MODE
 
 mode = BPF.XDP
 #mode = BPF.SCHED_CLS
@@ -47,7 +56,6 @@ else:
 
 # load BPF program
 b = BPF(text = """
-#define KBUILD_MODNAME "foo"
 #include <uapi/linux/bpf.h>
 #include <linux/in.h>
 #include <linux/if_ether.h>
@@ -56,8 +64,7 @@ b = BPF(text = """
 #include <linux/ip.h>
 #include <linux/ipv6.h>
 
-
-BPF_TABLE("percpu_array", uint32_t, long, dropcnt, 256);
+BPF_TABLE(MAPTYPE, uint32_t, long, dropcnt, 256);
 
 static inline int parse_ipv4(void *data, u64 nh_off, void *data_end) {
     struct iphdr *iph = data + nh_off;
@@ -96,23 +103,18 @@ int xdp_prog1(struct CTXTYPE *ctx) {
 
     h_proto = eth->h_proto;
 
-    if (h_proto == htons(ETH_P_8021Q) || h_proto == htons(ETH_P_8021AD)) {
-        struct vlan_hdr *vhdr;
+    // parse double vlans
+    #pragma unroll
+    for (int i=0; i<2; i++) {
+        if (h_proto == htons(ETH_P_8021Q) || h_proto == htons(ETH_P_8021AD)) {
+            struct vlan_hdr *vhdr;
 
-        vhdr = data + nh_off;
-        nh_off += sizeof(struct vlan_hdr);
-        if (data + nh_off > data_end)
-            return rc;
-            h_proto = vhdr->h_vlan_encapsulated_proto;
-    }
-    if (h_proto == htons(ETH_P_8021Q) || h_proto == htons(ETH_P_8021AD)) {
-        struct vlan_hdr *vhdr;
-
-        vhdr = data + nh_off;
-        nh_off += sizeof(struct vlan_hdr);
-        if (data + nh_off > data_end)
-            return rc;
-            h_proto = vhdr->h_vlan_encapsulated_proto;
+            vhdr = data + nh_off;
+            nh_off += sizeof(struct vlan_hdr);
+            if (data + nh_off > data_end)
+                return rc;
+                h_proto = vhdr->h_vlan_encapsulated_proto;
+        }
     }
 
     if (h_proto == htons(ETH_P_IP))
@@ -124,13 +126,15 @@ int xdp_prog1(struct CTXTYPE *ctx) {
 
     value = dropcnt.lookup(&index);
     if (value)
-        *value += 1;
+        __sync_fetch_and_add(value, 1);
 
     return rc;
 }
-""", cflags=["-w", "-DRETURNCODE=%s" % ret, "-DCTXTYPE=%s" % ctxtype])
+""", cflags=["-w", "-DRETURNCODE=%s" % ret, "-DCTXTYPE=%s" % ctxtype,
+			 "-DMAPTYPE=\"%s\"" % maptype],
+     device=offload_device)
 
-fn = b.load_func("xdp_prog1", mode)
+fn = b.load_func("xdp_prog1", mode, offload_device)
 
 if mode == BPF.XDP:
     b.attach_xdp(device, fn, flags)
@@ -148,7 +152,7 @@ print("Printing drops per IP protocol-number, hit CTRL+C to stop")
 while 1:
     try:
         for k in dropcnt.keys():
-            val = dropcnt.sum(k).value
+            val = dropcnt[k].value if maptype == "array" else dropcnt.sum(k).value
             i = k.value
             if val:
                 delta = val - prev[i]
@@ -157,7 +161,7 @@ while 1:
         time.sleep(1)
     except KeyboardInterrupt:
         print("Removing filter from device")
-        break;
+        break
 
 if mode == BPF.XDP:
     b.remove_xdp(device, flags)
