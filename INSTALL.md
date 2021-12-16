@@ -367,6 +367,56 @@ sudo make install
 popd
 ```
 
+## CentOS-8.5 - Source
+suppose you're running with root or add sudo first
+
+### Install build dependencies
+```
+dnf install -y bison cmake ethtool flex git iperf3 libstdc++-devel python3-netaddr python3-pip gcc gcc-c++ make zlib-devel elfutils-libelf-devel
+# dnf install -y luajit luajit-devel ## if use luajit, will report some lua function(which in lua5.3) undefined problem 
+dnf install -y clang clang-devel llvm llvm-devel llvm-static ncurses-devel
+dnf -y install netperf
+pip3 install pyroute2
+ln -s /usr/bin/python3 /usr/bin/python
+```
+### Install and Compile bcc
+```
+git clone https://github.com/iovisor/bcc.git
+
+mkdir bcc-build
+cd bcc-build/
+
+## here llvm should always link shared library
+cmake ../bcc -DCMAKE_INSTALL_PREFIX=/usr -DENABLE_LLVM_SHARED=1  
+make -j10
+make install 
+
+```
+after install , you may add bcc directory to your $PATH, which you can add to ~/.bashrc
+```
+bcctools=/usr/share/bcc/tools
+bccexamples=/usr/share/bcc/examples
+export PATH=$bcctools:$bccexamples:$PATH
+```
+### let path take effect
+```
+source ~/.bashrc 
+```
+then run 
+```
+hello_world.py
+```
+Or 
+```
+cd /usr/share/bcc/examples
+./hello_world.py
+./tracing/bitehist.py
+
+cd /usr/share/bcc/tools
+./bitesize 
+
+```
+
 ## Fedora - Source
 
 ### Install build dependencies
