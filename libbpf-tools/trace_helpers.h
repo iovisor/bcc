@@ -58,7 +58,6 @@ void print_linear_hist(unsigned int *vals, int vals_size, unsigned int base,
 		unsigned int step, const char *val_type);
 
 unsigned long long get_ktime_ns(void);
-int bump_memlock_rlimit(void);
 
 bool is_kernel_module(const char *name);
 

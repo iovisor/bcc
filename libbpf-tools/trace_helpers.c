@@ -967,16 +967,6 @@ unsigned long long get_ktime_ns(void)
 	return ts.tv_sec * NSEC_PER_SEC + ts.tv_nsec;
 }
 
-int bump_memlock_rlimit(void)
-{
-	struct rlimit rlim_new = {
-		.rlim_cur	= RLIM_INFINITY,
-		.rlim_max	= RLIM_INFINITY,
-	};
-
-	return setrlimit(RLIMIT_MEMLOCK, &rlim_new);
-}
-
 bool is_kernel_module(const char *name)
 {
 	bool found = false;
@@ -1007,20 +997,22 @@ bool fentry_exists(const char *name, const char *mod)
 	const struct btf_type *type;
 	const struct btf_enum *e;
 	char sysfs_mod[80];
-	int id = -1, i;
+	int id = -1, i, err;
 
 	base = btf__parse(sysfs_vmlinux, NULL);
-	if (libbpf_get_error(base)) {
+	if (!base) {
+		err = -errno;
 		fprintf(stderr, "failed to parse vmlinux BTF at '%s': %s\n",
-			sysfs_vmlinux, strerror(-libbpf_get_error(base)));
+			sysfs_vmlinux, strerror(-err));
 		goto err_out;
 	}
 	if (mod && module_btf_exists(mod)) {
 		snprintf(sysfs_mod, sizeof(sysfs_mod), "/sys/kernel/btf/%s", mod);
 		btf = btf__parse_split(sysfs_mod, base);
-		if (libbpf_get_error(btf)) {
+		if (!btf) {
+			err = -errno;
 			fprintf(stderr, "failed to load BTF from %s: %s\n",
-				sysfs_mod, strerror(-libbpf_get_error(btf)));
+				sysfs_mod, strerror(-err));
 			btf = base;
 			base = NULL;
 		}
