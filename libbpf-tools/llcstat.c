@@ -106,10 +106,8 @@ static int open_and_attach_perf_event(__u64 config, int period,
 			return -1;
 		}
 		links[i] = bpf_program__attach_perf_event(prog, fd);
-		if (libbpf_get_error(links[i])) {
-			fprintf(stderr, "failed to attach perf event on cpu: "
-				"%d\n", i);
-			links[i] = NULL;
+		if (!links[i]) {
+			fprintf(stderr, "failed to attach perf event on cpu: %d\n", i);
 			close(fd);
 			return -1;
 		}
@@ -185,13 +183,8 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
+	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
-
-	err = bump_memlock_rlimit();
-	if (err) {
-		fprintf(stderr, "failed to increase rlimit: %d\n", err);
-		return 1;
-	}
 
 	nr_cpus = libbpf_num_possible_cpus();
 	if (nr_cpus < 0) {
