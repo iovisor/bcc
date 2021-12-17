@@ -325,17 +325,13 @@ static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 
 static void print_events(int perf_map_fd)
 {
-	struct perf_buffer_opts pb_opts = {
-		.sample_cb = handle_event,
-		.lost_cb = handle_lost_events,
-	};
-	struct perf_buffer *pb = NULL;
+	struct perf_buffer *pb;
 	int err;
 
-	pb = perf_buffer__new(perf_map_fd, 128, &pb_opts);
-	err = libbpf_get_error(pb);
-	if (err) {
-		pb = NULL;
+	pb = perf_buffer__new(perf_map_fd, 128,
+			      handle_event, handle_lost_events, NULL, NULL);
+	if (!pb) {
+		err = -errno;
 		warn("failed to open perf buffer: %d\n", err);
 		goto cleanup;
 	}
@@ -343,8 +339,8 @@ static void print_events(int perf_map_fd)
 	print_events_header();
 	while (!exiting) {
 		err = perf_buffer__poll(pb, 100);
-		if (err < 0 && errno != EINTR) {
-			warn("error polling perf buffer: %s\n", strerror(errno));
+		if (err < 0 && err != -EINTR) {
+			warn("error polling perf buffer: %s\n", strerror(-err));
 			goto cleanup;
 		}
 		/* reset err to return 0 if exiting */
@@ -370,13 +366,8 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
+	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
-
-	err = bump_memlock_rlimit();
-	if (err) {
-		warn("failed to increase rlimit: %s\n", strerror(errno));
-		return 1;
-	}
 
 	obj = tcpconnect_bpf__open();
 	if (!obj) {
