@@ -256,11 +256,7 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
-	err = bump_memlock_rlimit();
-	if (err) {
-		warn("failed to increase rlimit: %d\n", err);
-		return 1;
-	}
+	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 
 	obj = filetop_bpf__open();
 	if (!obj) {
