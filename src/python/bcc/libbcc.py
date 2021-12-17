@@ -20,9 +20,6 @@ lib = ct.CDLL("libbcc.so.0", use_errno=True)
 from .perf import Perf
 
 # keep in sync with bcc_common.h
-lib.bpf_module_create_b.restype = ct.c_void_p
-lib.bpf_module_create_b.argtypes = [ct.c_char_p, ct.c_char_p, ct.c_uint,
-        ct.c_char_p]
 lib.bpf_module_create_c.restype = ct.c_void_p
 lib.bpf_module_create_c.argtypes = [ct.c_char_p, ct.c_uint,
         ct.POINTER(ct.c_char_p), ct.c_int, ct.c_bool, ct.c_char_p]

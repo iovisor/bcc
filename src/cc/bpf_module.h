@@ -99,7 +99,6 @@ class BPFModule {
             const char *dev_name = nullptr);
   ~BPFModule();
   int free_bcc_memory();
-  int load_b(const std::string &filename, const std::string &proto_filename);
   int load_c(const std::string &filename, const char *cflags[], int ncflags);
   int load_string(const std::string &text, const char *cflags[], int ncflags);
   std::string id() const { return id_; }

@@ -25,8 +25,6 @@
 extern "C" {
 #endif
 
-void * bpf_module_create_b(const char *filename, const char *proto_filename, unsigned flags,
-                           const char *dev_name);
 void * bpf_module_create_c(const char *filename, unsigned flags, const char *cflags[], int ncflags,
                            bool allow_rlimit, const char *dev_name);
 void * bpf_module_create_c_from_string(const char *text, unsigned flags, const char *cflags[],

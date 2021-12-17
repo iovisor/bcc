@@ -125,12 +125,7 @@ function Bpf:initialize(args)
   elseif args.src_file then
     local src = _find_file(Bpf.SCRIPT_ROOT, args.src_file)
 
-    if src:ends(".b") then
-      local hdr = _find_file(Bpf.SCRIPT_ROOT, args.hdr_file)
-      self.module = libbcc.bpf_module_create_b(src, hdr, llvm_debug)
-    else
-      self.module = libbcc.bpf_module_create_c(src, llvm_debug, cflags_ary, #cflags, true)
-    end
+    self.module = libbcc.bpf_module_create_c(src, llvm_debug, cflags_ary, #cflags, true)
   end
 
   assert(self.module ~= nil, "failed to compile BPF module")
