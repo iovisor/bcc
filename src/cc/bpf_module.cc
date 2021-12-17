@@ -38,7 +38,6 @@
 #include "common.h"
 #include "bcc_debug.h"
 #include "bcc_elf.h"
-#include "frontends/b/loader.h"
 #include "frontends/clang/loader.h"
 #include "frontends/clang/b_frontend_action.h"
 #include "bpf_module.h"
@@ -831,43 +830,6 @@ int BPFModule::table_leaf_scanf(size_t id, const char *leaf_str, void *leaf) {
     fprintf(stderr, "%s\n", rc.msg().c_str());
     return -1;
   }
-  return 0;
-}
-
-// load a B file, which comes in two parts
-int BPFModule::load_b(const string &filename, const string &proto_filename) {
-  if (!sections_.empty()) {
-    fprintf(stderr, "Program already initialized\n");
-    return -1;
-  }
-  if (filename.empty() || proto_filename.empty()) {
-    fprintf(stderr, "Invalid filenames\n");
-    return -1;
-  }
-
-  // Helpers are inlined in the following file (C). Load the definitions and
-  // pass the partially compiled module to the B frontend to continue with.
-  auto helpers_h = ExportedFiles::headers().find("/virtual/include/bcc/helpers.h");
-  if (helpers_h == ExportedFiles::headers().end()) {
-    fprintf(stderr, "Internal error: missing bcc/helpers.h");
-    return -1;
-  }
-  if (int rc = load_includes(helpers_h->second))
-    return rc;
-
-  BLoader b_loader(flags_);
-  used_b_loader_ = true;
-  if (int rc = b_loader.parse(&*mod_, filename, proto_filename, *ts_, id_,
-                              maps_ns_))
-    return rc;
-  if (rw_engine_enabled_) {
-    if (int rc = annotate())
-      return rc;
-  } else {
-    annotate_light();
-  }
-  if (int rc = finalize())
-    return rc;
   return 0;
 }
 

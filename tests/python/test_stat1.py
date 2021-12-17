@@ -19,13 +19,6 @@ if len(sys.argv) > 1:
 
 Key = None
 Leaf = None
-if arg1.endswith(".b"):
-    class Key(Structure):
-        _fields_ = [("dip", c_uint),
-                    ("sip", c_uint)]
-    class Leaf(Structure):
-        _fields_ = [("rx_pkts", c_ulong),
-                    ("tx_pkts", c_ulong)]
 
 class TestBPFSocket(TestCase):
     def setUp(self):

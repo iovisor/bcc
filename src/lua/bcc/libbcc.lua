@@ -58,7 +58,6 @@ int bpf_close_perf_event_fd(int fd);
 ]]
 
 ffi.cdef[[
-void * bpf_module_create_b(const char *filename, const char *proto_filename, unsigned flags);
 void * bpf_module_create_c(const char *filename, unsigned flags, const char *cflags[], int ncflags, bool allow_rlimit);
 void * bpf_module_create_c_from_string(const char *text, unsigned flags, const char *cflags[], int ncflags, bool allow_rlimit);
 void bpf_module_destroy(void *program);
