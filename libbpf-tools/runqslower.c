@@ -146,7 +146,6 @@ int main(int argc, char **argv)
 		.parser = parse_arg,
 		.doc = argp_program_doc,
 	};
-	struct perf_buffer_opts pb_opts;
 	struct perf_buffer *pb = NULL;
 	struct runqslower_bpf *obj;
 	int err;
@@ -155,13 +154,8 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
+	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
-
-	err = bump_memlock_rlimit();
-	if (err) {
-		fprintf(stderr, "failed to increase rlimit: %d\n", err);
-		return 1;
-	}
 
 	obj = runqslower_bpf__open();
 	if (!obj) {
@@ -192,12 +186,10 @@ int main(int argc, char **argv)
 	else
 		printf("%-8s %-16s %-6s %14s\n", "TIME", "COMM", "TID", "LAT(us)");
 
-	pb_opts.sample_cb = handle_event;
-	pb_opts.lost_cb = handle_lost_events;
-	pb = perf_buffer__new(bpf_map__fd(obj->maps.events), 64, &pb_opts);
-	err = libbpf_get_error(pb);
-	if (err) {
-		pb = NULL;
+	pb = perf_buffer__new(bpf_map__fd(obj->maps.events), 64,
+			      handle_event, handle_lost_events, NULL, NULL);
+	if (!pb) {
+		err = -errno;
 		fprintf(stderr, "failed to open perf buffer: %d\n", err);
 		goto cleanup;
 	}
@@ -210,8 +202,8 @@ int main(int argc, char **argv)
 
 	while (!exiting) {
 		err = perf_buffer__poll(pb, 100);
-		if (err < 0 && errno != EINTR) {
-			fprintf(stderr, "error polling perf buffer: %s\n", strerror(errno));
+		if (err < 0 && err != -EINTR) {
+			fprintf(stderr, "error polling perf buffer: %s\n", strerror(-err));
 			goto cleanup;
 		}
 		/* reset err to return 0 if exiting */
