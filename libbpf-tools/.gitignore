@@ -52,6 +52,7 @@
 /tcplife
 /tcptracer
 /tcprtt
+/tcpstates
 /tcpsynbl
 /vfsstat
 /xfsdist

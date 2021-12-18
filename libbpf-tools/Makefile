@@ -67,6 +67,7 @@ APPS = \
 	tcpconnlat \
 	tcplife \
 	tcprtt \
+	tcpstates \
 	tcpsynbl \
 	vfsstat \
 	#
