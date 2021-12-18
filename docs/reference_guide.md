@@ -869,7 +869,7 @@ Maps are BPF data stores, and are the basis for higher level object types includ
 
 Syntax: ```BPF_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries)```
 
-Creates a map named ```_name```. Most of the time this will be used via higher-level macros, like BPF_HASH, BPF_ARRAY, BPF_HISTGRAM, etc.
+Creates a map named ```_name```. Most of the time this will be used via higher-level macros, like BPF_HASH, BPF_ARRAY, BPF_HISTOGRAM, etc.
 
 `BPF_F_TABLE` is a variant that takes a flag in the last parameter. `BPF_TABLE(...)` is actually a wrapper to `BPF_F_TABLE(..., 0 /* flag */)`.
 
