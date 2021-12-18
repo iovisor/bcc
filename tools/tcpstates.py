@@ -102,12 +102,8 @@ struct ipv6_data_t {
     char task[TASK_COMM_LEN];
 };
 BPF_PERF_OUTPUT(ipv6_events);
-
-struct id_t {
-    u32 pid;
-    char task[TASK_COMM_LEN];
-};
 """
+
 bpf_text_tracepoint = """
 TRACEPOINT_PROBE(sock, inet_sock_set_state)
 {
@@ -135,7 +131,7 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
         delta_us = (bpf_ktime_get_ns() - *tsp) / 1000;
     u16 family = args->family;
     FILTER_FAMILY
-    
+
     if (args->family == AF_INET) {
         struct ipv4_data_t data4 = {
             .span_us = delta_us,
@@ -204,7 +200,7 @@ int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
 
     u16 family = sk->__sk_common.skc_family;
     FILTER_FAMILY
-    
+
     if (family == AF_INET) {
         struct ipv4_data_t data4 = {
             .span_us = delta_us,
@@ -252,7 +248,7 @@ int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
 """
 
 bpf_text = bpf_header
-if (BPF.tracepoint_exists("sock", "inet_sock_set_state")):
+if BPF.tracepoint_exists("sock", "inet_sock_set_state"):
     bpf_text += bpf_text_tracepoint
 else:
     bpf_text += bpf_text_kprobe
