@@ -48,7 +48,7 @@ class BPFQueueStackTableBase {
   StatusTuple leaf_to_string(const ValueType* value, std::string& value_str) {
     char buf[8 * desc.leaf_size];
     StatusTuple rc = desc.leaf_snprintf(buf, sizeof(buf), value);
-    if (!rc.code())
+    if (rc.ok())
       value_str.assign(buf);
     return rc;
   }
@@ -90,7 +90,7 @@ class BPFTableBase {
   StatusTuple key_to_string(const KeyType* key, std::string& key_str) {
     char buf[8 * desc.key_size];
     StatusTuple rc = desc.key_snprintf(buf, sizeof(buf), key);
-    if (!rc.code())
+    if (rc.ok())
       key_str.assign(buf);
     return rc;
   }
@@ -98,7 +98,7 @@ class BPFTableBase {
   StatusTuple leaf_to_string(const ValueType* value, std::string& value_str) {
     char buf[8 * desc.leaf_size];
     StatusTuple rc = desc.leaf_snprintf(buf, sizeof(buf), value);
-    if (!rc.code())
+    if (rc.ok())
       value_str.assign(buf);
     return rc;
   }
