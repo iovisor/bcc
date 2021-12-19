@@ -54,6 +54,7 @@ APPS = \
 	tcpconnect \
 	tcpconnlat \
 	tcprtt \
+	tcpsynbl \
 	vfsstat \
 	#
 

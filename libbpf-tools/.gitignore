@@ -43,6 +43,7 @@
 /tcpconnect
 /tcpconnlat
 /tcprtt
+/tcpsynbl
 /vfsstat
 /xfsdist
 /xfsslower
