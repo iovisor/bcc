@@ -305,6 +305,10 @@ static int ksnoop(struct pt_regs *ctx, bool entry)
 	__u32 currpid;
 	int ret;
 	__u8 i;
+	struct task_struct *task;
+	struct pid *pid;
+	unsigned int level;
+	struct upid upid;
 
 	trace = get_trace(ctx, entry);
 	if (!trace)
@@ -315,6 +319,17 @@ static int ksnoop(struct pt_regs *ctx, bool entry)
 	if (trace->filter_pid && trace->filter_pid != currpid)
 		return 0;
 	trace->pid = currpid;
+
+	/*  get the pid namespace by following task_active_pid_ns(),
+	 *  pid->numbers[pid->level].ns
+	 */
+	task = (struct task_struct *)bpf_get_current_task();
+	pid = BPF_CORE_READ(task, thread_pid);
+	level = BPF_CORE_READ(pid, level);
+	bpf_core_read(&upid, sizeof(upid), &pid->numbers[level]);
+	trace->pid_ns_id = BPF_CORE_READ(upid.ns, ns.inum);
+
+	bpf_get_current_comm(trace->comm, sizeof(trace->comm));
 
 	trace->cpu = bpf_get_smp_processor_id();
 	trace->time = bpf_ktime_get_ns();
