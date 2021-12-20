@@ -1,16 +1,22 @@
-FROM ubuntu:18.04
+ARG UBUNTU_VERSION="18.04"
+FROM ubuntu:${UBUNTU_VERSION}
 
 ARG LLVM_VERSION="8"
 ENV LLVM_VERSION=$LLVM_VERSION
 
+ARG UBUNTU_SHORTNAME="bionic"
+
 RUN apt-get update && apt-get install -y curl gnupg &&\
     llvmRepository="\n\
-deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic main\n\
-deb-src http://apt.llvm.org/bionic/ llvm-toolchain-bionic main\n\
-deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-${LLVM_VERSION} main\n\
-deb-src http://apt.llvm.org/bionic/ llvm-toolchain-bionic-${LLVM_VERSION} main\n" &&\
+deb http://apt.llvm.org/${UBUNTU_SHORTNAME}/ llvm-toolchain-${UBUNTU_SHORTNAME} main\n\
+deb-src http://apt.llvm.org/${UBUNTU_SHORTNAME}/ llvm-toolchain-${UBUNTU_SHORTNAME} main\n\
+deb http://apt.llvm.org/${UBUNTU_SHORTNAME}/ llvm-toolchain-${UBUNTU_SHORTNAME}-${LLVM_VERSION} main\n\
+deb-src http://apt.llvm.org/${UBUNTU_SHORTNAME}/ llvm-toolchain-${UBUNTU_SHORTNAME}-${LLVM_VERSION} main\n" &&\
     echo $llvmRepository >> /etc/apt/sources.list && \
     curl -L https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
+
+ARG DEBIAN_FRONTEND="noninteractive"
+ENV TZ="Etc/UTC"
 
 RUN apt-get update && apt-get install -y \
       util-linux \
@@ -40,7 +46,6 @@ RUN apt-get update && apt-get install -y \
       iproute2 \
       python3 \
       python3-pip \
-      python-pip \
       ethtool \
       arping \
       netperf \
@@ -50,8 +55,7 @@ RUN apt-get update && apt-get install -y \
       libtinfo5 \
       libtinfo-dev
 
-RUN pip3 install pyroute2 netaddr dnslib cachetools
-RUN pip install pyroute2==0.5.18 netaddr==0.8.0 dnslib==0.9.14 cachetools==3.1.1
+RUN pip3 install pyroute2==0.5.18 netaddr==0.8.0 dnslib==0.9.14 cachetools==3.1.1
 
 # FIXME this is faster than building from source, but it seems there is a bug
 # in probing libruby.so rather than ruby binary

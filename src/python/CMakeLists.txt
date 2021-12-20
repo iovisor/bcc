@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 
 if(NOT PYTHON_CMD)
-  set(PYTHON_CMD "python")
+  set(PYTHON_CMD "python3")
 endif()
 
 if(EXISTS "/etc/debian_version")
