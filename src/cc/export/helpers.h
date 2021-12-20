@@ -920,6 +920,14 @@ static long (*bpf_kallsyms_lookup_name)(const char *name, int name_sz, int flags
 static long (*bpf_find_vma)(struct task_struct *task, __u64 addr, void *callback_fn,
 			    void *callback_ctx, __u64 flags) =
   (void *)BPF_FUNC_find_vma;
+static long (*bpf_loop)(__u32 nr_loops, void *callback_fn, void *callback_ctx, __u64 flags) =
+  (void *)BPF_FUNC_loop;
+static long (*bpf_strncmp)(const char *s1, __u32 s1_sz, const char *s2) =
+  (void *)BPF_FUNC_strncmp;
+static long (*bpf_get_func_arg)(void *ctx, __u32 n, __u64 *value) =
+  (void *)BPF_FUNC_get_func_arg;
+static long (*bpf_get_func_ret)(void *ctx, __u64 *value) = (void *)BPF_FUNC_get_func_ret;
+static long (*bpf_get_func_arg_cnt)(void *ctx) = (void *)BPF_FUNC_get_func_arg_cnt;
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
