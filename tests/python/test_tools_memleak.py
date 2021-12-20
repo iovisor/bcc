@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from unittest import main, skipUnless, TestCase
 from utils import kernel_version_ge
