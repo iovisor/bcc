@@ -162,7 +162,6 @@ int main(int argc, char **argv)
 		.parser = parse_arg,
 		.doc = argp_program_doc,
 	};
-	struct perf_buffer_opts pb_opts;
 	struct perf_buffer *pb = NULL;
 	struct tcpconnlat_bpf *obj;
 	int err;
@@ -171,13 +170,8 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
+	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
-
-	err = bump_memlock_rlimit();
-	if (err) {
-		fprintf(stderr, "failed to increase rlimit: %d\n", err);
-		return 1;
-	}
 
 	obj = tcpconnlat_bpf__open();
 	if (!obj) {
@@ -200,15 +194,10 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	pb_opts.sample_cb = handle_event;
-
-	pb_opts.lost_cb = handle_lost_events;
 	pb = perf_buffer__new(bpf_map__fd(obj->maps.events), PERF_BUFFER_PAGES,
-			      &pb_opts);
-	err = libbpf_get_error(pb);
-	if (err) {
-		pb = NULL;
-		fprintf(stderr, "failed to open perf buffer: %d\n", err);
+			      handle_event, handle_lost_events, NULL, NULL);
+	if (!pb) {
+		fprintf(stderr, "failed to open perf buffer: %d\n", errno);
 		goto cleanup;
 	}
 
@@ -223,7 +212,6 @@ int main(int argc, char **argv)
 			"PID", "COMM", "IP", "SADDR", "DADDR", "DPORT", "LAT(ms)");
 	}
 
-
 	if (signal(SIGINT, sig_int) == SIG_ERR) {
 		fprintf(stderr, "can't set signal handler: %s\n", strerror(errno));
 		err = 1;
@@ -233,8 +221,8 @@ int main(int argc, char **argv)
 	/* main: poll */
 	while (!exiting) {
 		err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS);
-		if (err < 0 && errno != EINTR) {
-			fprintf(stderr, "error polling perf buffer: %s\n", strerror(errno));
+		if (err < 0 && err != -EINTR) {
+			fprintf(stderr, "error polling perf buffer: %s\n", strerror(-err));
 			goto cleanup;
 		}
 		/* reset err to return 0 if exiting */

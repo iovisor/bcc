@@ -173,20 +173,18 @@ static int attach_kprobes(struct funclatency_bpf *obj)
 {
 	long err;
 
-	obj->links.dummy_kprobe =
-		bpf_program__attach_kprobe(obj->progs.dummy_kprobe, false,
-					   env.funcname);
-	err = libbpf_get_error(obj->links.dummy_kprobe);
-	if (err) {
+	obj->links.dummy_kprobe = bpf_program__attach_kprobe(obj->progs.dummy_kprobe, false,
+							     env.funcname);
+	if (!obj->links.dummy_kprobe) {
+		err = -errno;
 		warn("failed to attach kprobe: %ld\n", err);
 		return -1;
 	}
 
-	obj->links.dummy_kretprobe =
-		bpf_program__attach_kprobe(obj->progs.dummy_kretprobe, true,
-					   env.funcname);
-	err = libbpf_get_error(obj->links.dummy_kretprobe);
-	if (err) {
+	obj->links.dummy_kretprobe = bpf_program__attach_kprobe(obj->progs.dummy_kretprobe, true,
+								env.funcname);
+	if (!obj->links.dummy_kretprobe) {
+		err = -errno;
 		warn("failed to attach kretprobe: %ld\n", err);
 		return -1;
 	}
@@ -227,8 +225,8 @@ static int attach_uprobes(struct funclatency_bpf *obj)
 	obj->links.dummy_kprobe =
 		bpf_program__attach_uprobe(obj->progs.dummy_kprobe, false,
 					   env.pid ?: -1, bin_path, func_off);
-	err = libbpf_get_error(obj->links.dummy_kprobe);
-	if (err) {
+	if (!obj->links.dummy_kprobe) {
+		err = -errno;
 		warn("Failed to attach uprobe: %ld\n", err);
 		goto out_binary;
 	}
@@ -236,8 +234,8 @@ static int attach_uprobes(struct funclatency_bpf *obj)
 	obj->links.dummy_kretprobe =
 		bpf_program__attach_uprobe(obj->progs.dummy_kretprobe, true,
 					   env.pid ?: -1, bin_path, func_off);
-	err = libbpf_get_error(obj->links.dummy_kretprobe);
-	if (err) {
+	if (!obj->links.dummy_kretprobe) {
+		err = -errno;
 		warn("Failed to attach uretprobe: %ld\n", err);
 		goto out_binary;
 	}
@@ -286,11 +284,7 @@ int main(int argc, char **argv)
 
 	sigaction(SIGINT, &sigact, 0);
 
-	err = bump_memlock_rlimit();
-	if (err) {
-		warn("failed to increase rlimit: %d\n", err);
-		return 1;
-	}
+	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 
 	obj = funclatency_bpf__open();
 	if (!obj) {

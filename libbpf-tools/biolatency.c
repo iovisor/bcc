@@ -256,13 +256,8 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
+	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
-
-	err = bump_memlock_rlimit();
-	if (err) {
-		fprintf(stderr, "failed to increase rlimit: %d\n", err);
-		return 1;
-	}
 
 	obj = biolatency_bpf__open();
 	if (!obj) {
@@ -313,25 +308,22 @@ int main(int argc, char **argv)
 	}
 
 	if (env.queued) {
-		obj->links.block_rq_insert =
-			bpf_program__attach(obj->progs.block_rq_insert);
-		err = libbpf_get_error(obj->links.block_rq_insert);
-		if (err) {
+		obj->links.block_rq_insert = bpf_program__attach(obj->progs.block_rq_insert);
+		if (!obj->links.block_rq_insert) {
+			err = -errno;
 			fprintf(stderr, "failed to attach: %s\n", strerror(-err));
 			goto cleanup;
 		}
 	}
-	obj->links.block_rq_issue =
-		bpf_program__attach(obj->progs.block_rq_issue);
-	err = libbpf_get_error(obj->links.block_rq_issue);
-	if (err) {
+	obj->links.block_rq_issue = bpf_program__attach(obj->progs.block_rq_issue);
+	if (!obj->links.block_rq_issue) {
+		err = -errno;
 		fprintf(stderr, "failed to attach: %s\n", strerror(-err));
 		goto cleanup;
 	}
-	obj->links.block_rq_complete =
-		bpf_program__attach(obj->progs.block_rq_complete);
-	err = libbpf_get_error(obj->links.block_rq_complete);
-	if (err) {
+	obj->links.block_rq_complete = bpf_program__attach(obj->progs.block_rq_complete);
+	if (!obj->links.block_rq_complete) {
+		err = -errno;
 		fprintf(stderr, "failed to attach: %s\n", strerror(-err));
 		goto cleanup;
 	}

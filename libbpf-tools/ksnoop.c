@@ -37,7 +37,6 @@ static enum log_level log_level = WARN;
 static __u32 filter_pid;
 static bool stack_mode;
 
-#define libbpf_errstr(val)	strerror(-libbpf_get_error(val))
 
 static void __p(enum log_level level, char *level_str, char *fmt, ...)
 {
@@ -222,14 +221,12 @@ static int get_func_btf(struct btf *btf, struct func *func)
 		return -ENOENT;
 	}
 	type = btf__type_by_id(btf, func->id);
-	if (libbpf_get_error(type) ||
-	    BTF_INFO_KIND(type->info) != BTF_KIND_FUNC) {
+	if (!type || BTF_INFO_KIND(type->info) != BTF_KIND_FUNC) {
 		p_err("Error looking up function type via id '%d'", func->id);
 		return -EINVAL;
 	}
 	type = btf__type_by_id(btf, type->type);
-	if (libbpf_get_error(type) ||
-	    BTF_INFO_KIND(type->info) != BTF_KIND_FUNC_PROTO) {
+	if (!type || BTF_INFO_KIND(type->info) != BTF_KIND_FUNC_PROTO) {
 		p_err("Error looking up function proto type via id '%d'",
 		      func->id);
 		return -EINVAL;
@@ -343,15 +340,16 @@ static int trace_to_value(struct btf *btf, struct func *func, char *argname,
 static struct btf *get_btf(const char *name)
 {
 	struct btf *mod_btf;
+	int err;
 
 	p_debug("getting BTF for %s",
 		name && strlen(name) > 0 ? name : "vmlinux");
 
 	if (!vmlinux_btf) {
 		vmlinux_btf = btf__load_vmlinux_btf();
-		if (libbpf_get_error(vmlinux_btf)) {
-			p_err("No BTF, cannot determine type info: %s",
-			      libbpf_errstr(vmlinux_btf));
+		if (!vmlinux_btf) {
+			err = -errno;
+			p_err("No BTF, cannot determine type info: %s", strerror(-err));
 			return NULL;
 		}
 	}
@@ -359,9 +357,9 @@ static struct btf *get_btf(const char *name)
 		return vmlinux_btf;
 
 	mod_btf = btf__load_module_btf(name, vmlinux_btf);
-	if (libbpf_get_error(mod_btf)) {
-		p_err("No BTF for module '%s': %s",
-		      name, libbpf_errstr(mod_btf));
+	if (!mod_btf) {
+		err = -errno;
+		p_err("No BTF for module '%s': %s", name, strerror(-err));
 		return NULL;
 	}
 	return mod_btf;
@@ -395,11 +393,11 @@ static char *type_id_to_str(struct btf *btf, __s32 type_id, char *str)
 	default:
 		do {
 			type = btf__type_by_id(btf, type_id);
-
-			if (libbpf_get_error(type)) {
+			if (!type) {
 				name = "?";
 				break;
 			}
+
 			switch (BTF_INFO_KIND(type->info)) {
 			case BTF_KIND_CONST:
 			case BTF_KIND_VOLATILE:
@@ -554,16 +552,17 @@ static int parse_trace(char *str, struct trace *trace)
 		return ret;
 	}
 	trace->btf = get_btf(func->mod);
-	if (libbpf_get_error(trace->btf)) {
+	if (!trace->btf) {
+		ret = -errno;
 		p_err("could not get BTF for '%s': %s",
 		      strlen(func->mod) ? func->mod : "vmlinux",
-		      libbpf_errstr(trace->btf));
+		      strerror(-ret));
 		return -ENOENT;
 	}
 	trace->dump = btf_dump__new(trace->btf, NULL, &opts, trace_printf);
-	if (libbpf_get_error(trace->dump)) {
-		p_err("could not create BTF dump : %n",
-		      libbpf_errstr(trace->btf));
+	if (!trace->dump) {
+		ret = -errno;
+		p_err("could not create BTF dump : %n", strerror(-ret));
 		return -EINVAL;
 	}
 
@@ -823,20 +822,20 @@ static int attach_traces(struct ksnoop_bpf *skel, struct trace *traces,
 			bpf_program__attach_kprobe(skel->progs.kprobe_entry,
 						   false,
 						   traces[i].func.name);
-		ret = libbpf_get_error(traces[i].links[0]);
-		if (ret) {
+		if (!traces[i].links[0]) {
+			ret = -errno;
 			p_err("Could not attach kprobe to '%s': %s",
 			      traces[i].func.name, strerror(-ret));
 				return ret;
-			}
+		}
 		p_debug("Attached kprobe for '%s'", traces[i].func.name);
 
 		traces[i].links[1] =
 			bpf_program__attach_kprobe(skel->progs.kprobe_return,
 						   true,
 						   traces[i].func.name);
-		ret = libbpf_get_error(traces[i].links[1]);
-		if (ret) {
+		if (!traces[i].links[1]) {
+			ret = -errno;
 			p_err("Could not attach kretprobe to '%s': %s",
 			      traces[i].func.name, strerror(-ret));
 			return ret;
@@ -848,7 +847,6 @@ static int attach_traces(struct ksnoop_bpf *skel, struct trace *traces,
 
 static int cmd_trace(int argc, char **argv)
 {
-	struct perf_buffer_opts pb_opts = {};
 	struct bpf_map *perf_map, *func_map;
 	struct perf_buffer *pb = NULL;
 	struct ksnoop_bpf *skel;
@@ -861,7 +859,8 @@ static int cmd_trace(int argc, char **argv)
 
 	skel = ksnoop_bpf__open_and_load();
 	if (!skel) {
-		p_err("Could not load ksnoop BPF: %s", libbpf_errstr(skel));
+		ret = -errno;
+		p_err("Could not load ksnoop BPF: %s", strerror(-ret));
 		return 1;
 	}
 
@@ -886,12 +885,11 @@ static int cmd_trace(int argc, char **argv)
 		goto cleanup;
 	}
 
-	pb_opts.sample_cb = trace_handler;
-	pb_opts.lost_cb = lost_handler;
-	pb = perf_buffer__new(bpf_map__fd(perf_map), pages, &pb_opts);
-	if (libbpf_get_error(pb)) {
-		p_err("Could not create perf buffer: %s",
-		      libbpf_errstr(pb));
+	pb = perf_buffer__new(bpf_map__fd(perf_map), pages,
+			      trace_handler, lost_handler, NULL, NULL);
+	if (!pb) {
+		ret = -errno;
+		p_err("Could not create perf buffer: %s", strerror(-ret));
 		goto cleanup;
 	}
 
@@ -905,8 +903,8 @@ static int cmd_trace(int argc, char **argv)
 
 	while (!exiting) {
 		ret = perf_buffer__poll(pb, 1);
-		if (ret < 0 && errno != EINTR) {
-			fprintf(stderr, "error polling perf buffer: %s\n", strerror(errno));
+		if (ret < 0 && ret != -EINTR) {
+			fprintf(stderr, "error polling perf buffer: %s\n", strerror(-ret));
 			goto cleanup;
 		}
 		/* reset ret to return 0 if exiting */
@@ -999,6 +997,8 @@ int main(int argc, char *argv[])
 	argv += optind;
 	if (argc < 0)
 		usage();
+
+	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 
 	return cmd_select(argc, argv);
 }

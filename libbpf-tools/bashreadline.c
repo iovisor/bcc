@@ -137,7 +137,6 @@ int main(int argc, char **argv)
 		.doc = argp_program_doc,
 	};
 	struct bashreadline_bpf *obj = NULL;
-	struct perf_buffer_opts pb_opts;
 	struct perf_buffer *pb = NULL;
 	char *readline_so_path;
 	off_t func_off;
@@ -154,11 +153,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	err = bump_memlock_rlimit();
-	if (err) {
-		warn("failed to increase rlimit: %d\n", err);
-		goto cleanup;
-	}
+	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 
 	obj = bashreadline_bpf__open_and_load();
 	if (!obj) {
@@ -174,17 +169,16 @@ int main(int argc, char **argv)
 
 	obj->links.printret = bpf_program__attach_uprobe(obj->progs.printret, true, -1,
 							 readline_so_path, func_off);
-	err = libbpf_get_error(obj->links.printret);
-	if (err) {
+	if (!obj->links.printret) {
+		err = -errno;
 		warn("failed to attach readline: %d\n", err);
 		goto cleanup;
 	}
 
-	pb_opts.sample_cb = handle_event;
-	pb_opts.lost_cb = handle_lost_events;
-	pb = perf_buffer__new(bpf_map__fd(obj->maps.events), PERF_BUFFER_PAGES, &pb_opts);
-	err = libbpf_get_error(pb);
-	if (err) {
+	pb = perf_buffer__new(bpf_map__fd(obj->maps.events), PERF_BUFFER_PAGES,
+			      handle_event, handle_lost_events, NULL, NULL);
+	if (!pb) {
+		err = -errno;
 		warn("failed to open perf buffer: %d\n", err);
 		goto cleanup;
 	}
@@ -198,8 +192,8 @@ int main(int argc, char **argv)
 	printf("%-9s %-7s %s\n", "TIME", "PID", "COMMAND");
 	while (!exiting) {
 		err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS);
-		if (err < 0 && errno != EINTR) {
-			warn("error polling perf buffer: %s\n", strerror(errno));
+		if (err < 0 && err != -EINTR) {
+			warn("error polling perf buffer: %s\n", strerror(-err));
 			goto cleanup;
 		}
 		err = 0;

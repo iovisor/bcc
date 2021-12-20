@@ -81,13 +81,8 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
+	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
-
-	err = bump_memlock_rlimit();
-	if (err) {
-		fprintf(stderr, "failed to increase rlimit: %d\n", err);
-		return 1;
-	}
 
 	obj = numamove_bpf__open_and_load();
 	if (!obj) {
@@ -108,18 +103,15 @@ int main(int argc, char **argv)
 
 	signal(SIGINT, sig_handler);
 
-	printf("%-10s %18s %18s\n", "TIME", "NUMA_migrations",
-		"NUMA_migrations_ms");
+	printf("%-10s %18s %18s\n", "TIME", "NUMA_migrations", "NUMA_migrations_ms");
 	while (!exiting) {
 		sleep(1);
 		time(&t);
 		tm = localtime(&t);
 		strftime(ts, sizeof(ts), "%H:%M:%S", tm);
 		printf("%-10s %18lld %18lld\n", ts,
-			__atomic_exchange_n(&obj->bss->num, 0,
-					__ATOMIC_RELAXED),
-			__atomic_exchange_n(&obj->bss->latency, 0,
-					__ATOMIC_RELAXED));
+			__atomic_exchange_n(&obj->bss->num, 0, __ATOMIC_RELAXED),
+			__atomic_exchange_n(&obj->bss->latency, 0, __ATOMIC_RELAXED));
 	}
 
 cleanup:

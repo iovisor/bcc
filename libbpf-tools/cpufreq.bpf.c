@@ -17,11 +17,21 @@ struct {
 	__type(value, struct hist);
 } hists SEC(".maps");
 
+#define clamp_umax(VAR, UMAX)						\
+	asm volatile (							\
+		"if %0 <= %[max] goto +1\n"				\
+		"%0 = %[max]\n"						\
+		: "+r"(VAR)						\
+		: [max]"i"(UMAX)					\
+	)
+
 SEC("tp_btf/cpu_frequency")
 int BPF_PROG(cpu_frequency, unsigned int state, unsigned int cpu_id)
 {
 	if (cpu_id >= MAX_CPU_NR)
 		return 0;
+
+	clamp_umax(cpu_id, MAX_CPU_NR - 1);
 	freqs_mhz[cpu_id] = state / 1000;
 	return 0;
 }
@@ -36,6 +46,7 @@ int do_sample(struct bpf_perf_event_data *ctx)
 
 	if (cpu >= MAX_CPU_NR)
 		return 0;
+	clamp_umax(cpu, MAX_CPU_NR - 1);
 	freq_mhz = freqs_mhz[cpu];
 	if (!freq_mhz)
 		return 0;

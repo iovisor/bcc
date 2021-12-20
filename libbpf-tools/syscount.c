@@ -391,13 +391,8 @@ int main(int argc, char **argv)
 		goto free_names;
 	}
 
+	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
-
-	err = bump_memlock_rlimit();
-	if (err) {
-		warn("failed to increase rlimit: %s\n", strerror(errno));
-		goto free_names;
-	}
 
 	obj = syscount_bpf__open();
 	if (!obj) {
@@ -424,16 +419,15 @@ int main(int argc, char **argv)
 	}
 
 	obj->links.sys_exit = bpf_program__attach(obj->progs.sys_exit);
-	err = libbpf_get_error(obj->links.sys_exit);
-	if (err) {
-		warn("failed to attach sys_exit program: %s\n",
-		     strerror(-err));
+	if (!obj->links.sys_exit) {
+		err = -errno;
+		warn("failed to attach sys_exit program: %s\n", strerror(-err));
 		goto cleanup_obj;
 	}
 	if (env.latency) {
 		obj->links.sys_enter = bpf_program__attach(obj->progs.sys_enter);
-		err = libbpf_get_error(obj->links.sys_enter);
-		if (err) {
+		if (!obj->links.sys_enter) {
+			err = -errno;
 			warn("failed to attach sys_enter programs: %s\n",
 			     strerror(-err));
 			goto cleanup_obj;

@@ -186,13 +186,8 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
-
-	err = bump_memlock_rlimit();
-	if (err) {
-		fprintf(stderr, "failed to increase rlimit: %d\n", err);
-		return 1;
-	}
 
 	obj = hardirqs_bpf__open();
 	if (!obj) {
@@ -213,30 +208,27 @@ int main(int argc, char **argv)
 	}
 
 	if (env.count) {
-		obj->links.handle__irq_handler =
-			bpf_program__attach(obj->progs.handle__irq_handler);
-		err = libbpf_get_error(obj->links.handle__irq_handler);
-		if (err) {
+		obj->links.handle__irq_handler = bpf_program__attach(obj->progs.handle__irq_handler);
+		if (!obj->links.handle__irq_handler) {
+			err = -errno;
 			fprintf(stderr,
 				"failed to attach irq/irq_handler_entry: %s\n",
-				strerror(err));
+				strerror(-err));
 		}
 	} else {
-		obj->links.irq_handler_entry =
-			bpf_program__attach(obj->progs.irq_handler_entry);
-		err = libbpf_get_error(obj->links.irq_handler_entry);
-		if (err) {
+		obj->links.irq_handler_entry = bpf_program__attach(obj->progs.irq_handler_entry);
+		if (!obj->links.irq_handler_entry) {
+			err = -errno;
 			fprintf(stderr,
 				"failed to attach irq_handler_entry: %s\n",
-				strerror(err));
+				strerror(-err));
 		}
-		obj->links.irq_handler_exit_exit =
-			bpf_program__attach(obj->progs.irq_handler_exit_exit);
-		err = libbpf_get_error(obj->links.irq_handler_exit_exit);
-		if (err) {
+		obj->links.irq_handler_exit_exit = bpf_program__attach(obj->progs.irq_handler_exit_exit);
+		if (!obj->links.irq_handler_exit_exit) {
+			err = -errno;
 			fprintf(stderr,
 				"failed to attach irq_handler_exit: %s\n",
-				strerror(err));
+				strerror(-err));
 		}
 	}
 

@@ -146,13 +146,8 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
+	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
-
-	err = bump_memlock_rlimit();
-	if (err) {
-		fprintf(stderr, "failed to increase rlimit: %d\n", err);
-		return 1;
-	}
 
 	obj = biostacks_bpf__open();
 	if (!obj) {
@@ -184,12 +179,10 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	obj->links.blk_account_io_start =
-		bpf_program__attach(obj->progs.blk_account_io_start);
-	err = libbpf_get_error(obj->links.blk_account_io_start);
-	if (err) {
-		fprintf(stderr, "failed to attach blk_account_io_start: %s\n",
-			strerror(err));
+	obj->links.blk_account_io_start = bpf_program__attach(obj->progs.blk_account_io_start);
+	if (!obj->links.blk_account_io_start) {
+		err = -errno;
+		fprintf(stderr, "failed to attach blk_account_io_start: %s\n", strerror(-err));
 		goto cleanup;
 	}
 	ksyms = ksyms__load();
@@ -199,23 +192,19 @@ int main(int argc, char **argv)
 	}
 	if (ksyms__get_symbol(ksyms, "blk_account_io_merge_bio")) {
 		obj->links.blk_account_io_merge_bio =
-			bpf_program__attach(obj->
-					progs.blk_account_io_merge_bio);
-		err = libbpf_get_error(obj->
-				links.blk_account_io_merge_bio);
-		if (err) {
-			fprintf(stderr, "failed to attach "
-				"blk_account_io_merge_bio: %s\n",
-				strerror(err));
+			bpf_program__attach(obj->progs.blk_account_io_merge_bio);
+		if (!obj->links.blk_account_io_merge_bio) {
+			err = -errno;
+			fprintf(stderr, "failed to attach blk_account_io_merge_bio: %s\n",
+				strerror(-err));
 			goto cleanup;
 		}
 	}
-	obj->links.blk_account_io_done =
-		bpf_program__attach(obj->progs.blk_account_io_done);
-	err = libbpf_get_error(obj->links.blk_account_io_done);
-	if (err) {
+	obj->links.blk_account_io_done = bpf_program__attach(obj->progs.blk_account_io_done);
+	if (!obj->links.blk_account_io_done) {
+		err = -errno;
 		fprintf(stderr, "failed to attach blk_account_io_done: %s\n",
-			strerror(err));
+			strerror(-err));
 		goto cleanup;
 	}
 
