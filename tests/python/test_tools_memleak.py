@@ -7,7 +7,7 @@ import subprocess
 import sys
 import tempfile
 
-TOOLS_DIR = "../../tools/"
+TOOLS_DIR = "/bcc/tools/"
 
 
 class cfg:
