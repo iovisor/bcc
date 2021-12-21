@@ -8,10 +8,10 @@ on:
 
 jobs:
   test_bcc:
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-20.04
     strategy:
       matrix:
-        os: [ubuntu-20.04]
+        os: [{version: "18.04", nick: bionic}, {version: "20.04", nick: focal}]
         env:
         - TYPE: Debug
           PYTHON_TEST_LOGFILE: critical.log
@@ -25,7 +25,10 @@ jobs:
         ip addr
     - name: Build docker container with all deps
       run: |
-        docker build -t bcc-docker -f Dockerfile.tests .
+        docker build \
+        --build-arg UBUNTU_VERSION=${{ matrix.os.version }} \
+        --build-arg UBUNTU_SHORTNAME=${{ matrix.os.nick }} \
+        -t bcc-docker -f Dockerfile.tests .
     - name: Run bcc build
       env: ${{ matrix.env }}
       run: |
@@ -88,7 +91,7 @@ jobs:
 
     - uses: actions/upload-artifact@v1
       with:
-        name: critical-tests-${{ matrix.env['TYPE'] }}-${{ matrix.os }}
+        name: critical-tests-${{ matrix.env['TYPE'] }}-${{ matrix.os.version }}
         path: tests/python/critical.log
 
 # To debug weird issues, you can add this step to be able to SSH to the test environment
