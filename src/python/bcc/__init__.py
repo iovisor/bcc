@@ -737,6 +737,10 @@ class BPF(object):
                 # non-attachable.
                 elif fn.startswith(b'__perf') or fn.startswith(b'perf_'):
                     continue
+                # Exclude all static functions with prefix __SCT__, they are
+                # all non-attachable
+                elif fn.startswith(b'__SCT__'):
+                    continue
                 # Exclude all gcc 8's extra .cold functions
                 elif re.match(b'^.*\.cold(\.\d+)?$', fn):
                     continue
