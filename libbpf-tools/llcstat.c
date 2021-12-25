@@ -115,8 +115,7 @@ static int open_and_attach_perf_event(__u64 config, int period,
 	return 0;
 }
 
-int libbpf_print_fn(enum libbpf_print_level level,
-		    const char *format, va_list args)
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
 	if (level == LIBBPF_DEBUG && !env.verbose)
 		return 0;

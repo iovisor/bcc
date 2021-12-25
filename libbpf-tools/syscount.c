@@ -94,8 +94,7 @@ static int get_int(const char *arg, int *ret, int min, int max)
 	return 0;
 }
 
-static int libbpf_print_fn(enum libbpf_print_level level,
-			   const char *format, va_list args)
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
 	if (level == LIBBPF_DEBUG && !env.verbose)
 		return 0;

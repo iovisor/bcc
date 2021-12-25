@@ -194,8 +194,7 @@ static void alias_parse(char *prog)
 	}
 }
 
-static int libbpf_print_fn(enum libbpf_print_level level,
-			   const char *format, va_list args)
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
 	if (level == LIBBPF_DEBUG && !verbose)
 		return 0;
