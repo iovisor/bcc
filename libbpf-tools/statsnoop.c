@@ -23,6 +23,7 @@ static volatile sig_atomic_t exiting = 0;
 static pid_t target_pid = 0;
 static bool trace_failed_only = false;
 static bool emit_timestamp = false;
+static bool verbose = false;
 
 const char *argp_program_version = "statsnoop 0.1";
 const char *argp_program_bug_address =
@@ -39,10 +40,11 @@ const char argp_program_doc[] =
 "    statsnoop -p 1216     # only trace PID 1216\n";
 
 static const struct argp_option opts[] = {
-	{"pid", 'p', "PID", 0, "Process ID to trace"},
-	{"failed", 'x', NULL, 0, "Only show failed stats"},
-	{"timestamp", 't', NULL, 0, "Include timestamp on output"},
-	{NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help"},
+	{ "pid", 'p', "PID", 0, "Process ID to trace" },
+	{ "failed", 'x', NULL, 0, "Only show failed stats" },
+	{ "timestamp", 't', NULL, 0, "Include timestamp on output" },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
 
@@ -66,6 +68,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	case 't':
 		emit_timestamp = true;
 		break;
+	case 'v':
+		verbose = true;
+		break;
 	case 'h':
 		argp_state_help(state, stderr, ARGP_HELP_STD_HELP);
 		break;
@@ -73,6 +78,13 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		return ARGP_ERR_UNKNOWN;
 	}
 	return 0;
+}
+
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
+{
+	if (level == LIBBPF_DEBUG && !verbose)
+		return 0;
+	return vfprintf(stderr, format, args);
 }
 
 static void sig_int(int signo)
@@ -124,6 +136,7 @@ int main(int argc, char **argv)
 		return err;
 
 	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
+	libbpf_set_print(libbpf_print_fn);
 
 	obj = statsnoop_bpf__open();
 	if (!obj) {
