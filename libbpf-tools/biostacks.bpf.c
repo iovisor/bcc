@@ -11,7 +11,8 @@
 #define MAX_ENTRIES	10240
 
 const volatile bool targ_ms = false;
-const volatile dev_t targ_dev = -1;
+const volatile bool filter_dev = false;
+const volatile __u32 targ_dev = -1;
 
 struct internal_rqinfo {
 	u64 start_ts;
@@ -41,11 +42,11 @@ int trace_start(void *ctx, struct request *rq, bool merge_bio)
 {
 	struct internal_rqinfo *i_rqinfop = NULL, i_rqinfo = {};
 	struct gendisk *disk = BPF_CORE_READ(rq, rq_disk);
-	dev_t dev;
+	u32 dev;
 
 	dev = disk ? MKDEV(BPF_CORE_READ(disk, major),
 			BPF_CORE_READ(disk, first_minor)) : 0;
-	if (targ_dev != -1 && targ_dev != dev)
+	if (filter_dev && targ_dev != dev)
 		return 0;
 
 	if (merge_bio)

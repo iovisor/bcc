@@ -16,7 +16,8 @@ const volatile bool targ_per_disk = false;
 const volatile bool targ_per_flag = false;
 const volatile bool targ_queued = false;
 const volatile bool targ_ms = false;
-const volatile dev_t targ_dev = -1;
+const volatile bool filter_dev = false;
+const volatile __u32 targ_dev = 0;
 
 struct {
 	__uint(type, BPF_MAP_TYPE_CGROUP_ARRAY);
@@ -51,9 +52,9 @@ int trace_rq_start(struct request *rq, int issue)
 
 	u64 ts = bpf_ktime_get_ns();
 
-	if (targ_dev != -1) {
+	if (filter_dev) {
 		struct gendisk *disk = BPF_CORE_READ(rq, rq_disk);
-		dev_t dev;
+		u32 dev;
 
 		dev = disk ? MKDEV(BPF_CORE_READ(disk, major),
 				BPF_CORE_READ(disk, first_minor)) : 0;
