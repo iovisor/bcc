@@ -8,7 +8,8 @@
 #include "bits.bpf.h"
 
 const volatile char targ_comm[TASK_COMM_LEN] = {};
-const volatile dev_t targ_dev = -1;
+const volatile bool filter_dev = false;
+const volatile __u32 targ_dev = 0;
 
 extern __u32 LINUX_KERNEL_VERSION __kconfig;
 
@@ -39,9 +40,9 @@ static int trace_rq_issue(struct request *rq)
 	struct hist *histp;
 	u64 slot;
 
-	if (targ_dev != -1) {
+	if (filter_dev) {
 		struct gendisk *disk = BPF_CORE_READ(rq, rq_disk);
-		dev_t dev;
+		u32 dev;
 
 		dev = disk ? MKDEV(BPF_CORE_READ(disk, major),
 				BPF_CORE_READ(disk, first_minor)) : 0;

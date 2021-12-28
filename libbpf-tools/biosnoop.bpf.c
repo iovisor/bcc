@@ -10,7 +10,8 @@
 
 const volatile bool filter_cg = false;
 const volatile bool targ_queued = false;
-const volatile dev_t targ_dev = -1;
+const volatile bool filter_dev = false;
+const volatile __u32 targ_dev = 0;
 
 extern __u32 LINUX_KERNEL_VERSION __kconfig;
 
@@ -37,7 +38,7 @@ struct {
 struct stage {
 	u64 insert;
 	u64 issue;
-	dev_t dev;
+	__u32 dev;
 };
 
 struct {
@@ -95,7 +96,7 @@ int trace_rq_start(struct request *rq, bool insert)
 
 		stage.dev = disk ? MKDEV(BPF_CORE_READ(disk, major),
 				BPF_CORE_READ(disk, first_minor)) : 0;
-		if (targ_dev != -1 && targ_dev != stage.dev)
+		if (filter_dev && targ_dev != stage.dev)
 			return 0;
 		stagep = &stage;
 	}

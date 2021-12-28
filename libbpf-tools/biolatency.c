@@ -277,6 +277,7 @@ int main(int argc, char **argv)
 			fprintf(stderr, "invaild partition name: not exist\n");
 			goto cleanup;
 		}
+		obj->rodata->filter_dev = true;
 		obj->rodata->targ_dev = partition->dev;
 	}
 	obj->rodata->targ_per_disk = env.per_disk;
