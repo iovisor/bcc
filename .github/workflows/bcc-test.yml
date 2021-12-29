@@ -28,7 +28,7 @@ jobs:
         docker build \
         --build-arg UBUNTU_VERSION=${{ matrix.os.version }} \
         --build-arg UBUNTU_SHORTNAME=${{ matrix.os.nick }} \
-        -t bcc-docker -f Dockerfile.tests .
+        -t bcc-docker -f docker/Dockerfile.tests .
     - name: Run bcc build
       env: ${{ matrix.env }}
       run: |
@@ -93,6 +93,86 @@ jobs:
       with:
         name: critical-tests-${{ matrix.env['TYPE'] }}-${{ matrix.os.version }}
         path: tests/python/critical.log
+
+  test_bcc_fedora:
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        env:
+        - TYPE: Debug
+          PYTHON_TEST_LOGFILE: critical.log
+        - TYPE: Release
+          PYTHON_TEST_LOGFILE: critical.log
+    steps:
+    - uses: actions/checkout@v2
+    - name: System info
+      run: |
+        uname -a
+        ip addr
+    - name: Build docker container with all deps
+      run: |
+        docker build \
+        -t bcc-docker -f docker/Dockerfile.fedora .
+    - name: Run bcc build
+      env: ${{ matrix.env }}
+      run: |
+        /bin/bash -c \
+                   "docker run --privileged \
+                   --pid=host \
+                   -v $(pwd):/bcc \
+                   -v /sys/kernel/debug:/sys/kernel/debug:rw \
+                   -v /lib/modules:/lib/modules:ro \
+                   -v /usr/src:/usr/src:ro \
+                   -v /usr/include/linux:/usr/include/linux:ro \
+                   bcc-docker \
+                   /bin/bash -c \
+                   'mkdir -p /bcc/build && cd /bcc/build && \
+                    cmake -DCMAKE_BUILD_TYPE=${TYPE} -DENABLE_LLVM_SHARED=ON -DRUN_LUA_TESTS=OFF .. && make -j9'"
+    - name: Run bcc's cc tests
+      env: ${{ matrix.env }}
+      # tests are wrapped with `script` as a hack to get a TTY as github actions doesn't provide this
+      # see https://github.com/actions/runner/issues/241
+      run: |
+        script -e -c /bin/bash -c \
+        "docker run -ti \
+                    --privileged \
+                    --network=host \
+                    --pid=host \
+                    -v $(pwd):/bcc \
+                    -v /sys/kernel/debug:/sys/kernel/debug:rw \
+                    -v /lib/modules:/lib/modules:ro \
+                    -v /usr/src:/usr/src:ro \
+                    -e CTEST_OUTPUT_ON_FAILURE=1 \
+                    bcc-docker \
+                    /bin/bash -c \
+                    '/bcc/build/tests/wrapper.sh \
+                        c_test_all sudo /bcc/build/tests/cc/test_libbcc'"
+
+    - name: Run all tests
+      env: ${{ matrix.env }}
+      run: |
+        script -e -c /bin/bash -c \
+        "docker run -ti \
+                    --privileged \
+                    --network=host \
+                    --pid=host \
+                    -v $(pwd):/bcc \
+                    -v /sys/kernel/debug:/sys/kernel/debug:rw \
+                    -v /lib/modules:/lib/modules:ro \
+                    -v /usr/src:/usr/src:ro \
+                    -e CTEST_OUTPUT_ON_FAILURE=1 \
+                    bcc-docker \
+                    /bin/bash -c \
+                    'cd /bcc/build && \
+                     make test PYTHON_TEST_LOGFILE=$PYTHON_TEST_LOGFILE ARGS=-V'"
+
+    - name: Check critical tests
+      env: ${{ matrix.env }}
+      run: |
+        critical_count=$(grep @mayFail tests/python/critical.log | wc -l)
+        echo "There were $critical_count critical tests skipped with @mayFail:"
+        grep -A2 @mayFail tests/python/critical.log
+
 
 # To debug weird issues, you can add this step to be able to SSH to the test environment
 #     https://github.com/marketplace/actions/debugging-with-tmate
