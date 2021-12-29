@@ -67,6 +67,7 @@ option(ENABLE_USDT "Enable User-level Statically Defined Tracing" ON)
 option(ENABLE_EXAMPLES "Build examples" ON)
 option(ENABLE_MAN "Build man pages" ON)
 option(ENABLE_TESTS "Build tests" ON)
+option(RUN_LUA_TESTS "Run lua tests" ON)
 CMAKE_DEPENDENT_OPTION(ENABLE_CPP_API "Enable C++ API" ON "ENABLE_USDT" OFF)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
