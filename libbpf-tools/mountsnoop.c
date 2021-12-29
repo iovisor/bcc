@@ -38,6 +38,7 @@ static volatile sig_atomic_t exiting = 0;
 static pid_t target_pid = 0;
 static bool emit_timestamp = false;
 static bool output_vertically = false;
+static bool verbose = false;
 static const char *flag_names[] = {
 	[0] = "MS_RDONLY",
 	[1] = "MS_NOSUID",
@@ -91,6 +92,7 @@ static const struct argp_option opts[] = {
 	{ "pid", 'p', "PID", 0, "Process ID to trace" },
 	{ "timestamp", 't', NULL, 0, "Include timestamp on output" },
 	{ "detailed", 'd', NULL, 0, "Output result in detail mode" },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
@@ -115,6 +117,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	case 'd':
 		output_vertically = true;
 		break;
+	case 'v':
+		verbose = true;
+		break;
 	case 'h':
 		argp_state_help(state, stderr, ARGP_HELP_STD_HELP);
 		break;
@@ -122,6 +127,13 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		return ARGP_ERR_UNKNOWN;
 	}
 	return 0;
+}
+
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
+{
+	if (level == LIBBPF_DEBUG && !verbose)
+		return 0;
+	return vfprintf(stderr, format, args);
 }
 
 static void sig_int(int signo)
@@ -246,6 +258,7 @@ int main(int argc, char **argv)
 		return err;
 
 	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
+	libbpf_set_print(libbpf_print_fn);
 
 	obj = mountsnoop_bpf__open();
 	if (!obj) {

@@ -51,8 +51,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	return 0;
 }
 
-int libbpf_print_fn(enum libbpf_print_level level,
-		    const char *format, va_list args)
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
 	if (level == LIBBPF_DEBUG && !env.verbose)
 		return 0;
@@ -89,7 +88,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "failed to open and/or load BPF object\n");
 		return 1;
 	}
-	
+
 	if (!obj->bss) {
 		fprintf(stderr, "Memory-mapping BPF maps is supported starting from Linux 5.7, please upgrade.\n");
 		goto cleanup;

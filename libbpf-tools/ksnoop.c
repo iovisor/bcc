@@ -33,6 +33,7 @@ enum log_level {
 };
 
 static enum log_level log_level = WARN;
+static bool verbose = false;
 
 static __u32 filter_pid;
 static bool stack_mode;
@@ -70,7 +71,7 @@ static int cmd_help(int argc, char **argv)
 		"	FUNC	:= { name | name(ARG[,ARG]*) }\n"
 		"	ARG	:= { arg | arg [PRED] | arg->member [PRED] }\n"
 		"	PRED	:= { == | != | > | >= | < | <=  value }\n"
-		"	OPTIONS	:= { {-d|--debug} | {-V|--version} |\n"
+		"	OPTIONS	:= { {-d|--debug} | {-v|--verbose} | {-V|--version} |\n"
 		"                    {-p|--pid filter_pid}|\n"
 		"                    {-P|--pages nr_pages} }\n"
 		"                    {-s|--stack}\n",
@@ -251,7 +252,7 @@ static int get_func_btf(struct btf *btf, struct func *func)
 	return 0;
 }
 
-int predicate_to_value(char *predicate, struct value *val)
+static int predicate_to_value(char *predicate, struct value *val)
 {
 	char pred[MAX_STR];
 	long v;
@@ -946,9 +947,10 @@ static int cmd_select(int argc, char **argv)
 	return cmd_trace(argc, argv);
 }
 
-static int print_all_levels(enum libbpf_print_level level,
-		 const char *format, va_list args)
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
+	if (level == LIBBPF_DEBUG && !verbose)
+		return 0;
 	return vfprintf(stderr, format, args);
 }
 
@@ -956,6 +958,7 @@ int main(int argc, char *argv[])
 {
 	static const struct option options[] = {
 		{ "debug",	no_argument,		NULL,	'd' },
+		{ "verbose",	no_argument,		NULL,	'v' },
 		{ "help",	no_argument,		NULL,	'h' },
 		{ "version",	no_argument,		NULL,	'V' },
 		{ "pages",	required_argument,	NULL,	'P' },
@@ -966,11 +969,15 @@ int main(int argc, char *argv[])
 
 	bin_name = argv[0];
 
-	while ((opt = getopt_long(argc, argv, "dhp:P:sV", options,
+	while ((opt = getopt_long(argc, argv, "dvhp:P:sV", options,
 				  NULL)) >= 0) {
 		switch (opt) {
 		case 'd':
-			libbpf_set_print(print_all_levels);
+			verbose = true;
+			log_level = DEBUG;
+			break;
+		case 'v':
+			verbose = true;
 			log_level = DEBUG;
 			break;
 		case 'h':
@@ -999,6 +1006,7 @@ int main(int argc, char *argv[])
 		usage();
 
 	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
+	libbpf_set_print(libbpf_print_fn);
 
 	return cmd_select(argc, argv);
 }

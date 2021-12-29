@@ -42,6 +42,7 @@ static int output_rows = 20;
 static int sort_by = ALL;
 static int interval = 1;
 static int count = 99999999;
+static bool verbose = false;
 
 const char *argp_program_version = "filetop 0.1";
 const char *argp_program_bug_address =
@@ -62,6 +63,7 @@ static const struct argp_option opts[] = {
 	{ "all", 'a', NULL, 0, "Include special files" },
 	{ "sort", 's', "SORT", 0, "Sort columns, default all [all, reads, writes, rbytes, wbytes]" },
 	{ "rows", 'r', "ROWS", 0, "Maximum rows to print, default 20" },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
@@ -114,6 +116,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		if (output_rows > OUTPUT_ROWS_LIMIT)
 			output_rows = OUTPUT_ROWS_LIMIT;
 		break;
+	case 'v':
+		verbose = true;
+		break;
 	case 'h':
 		argp_state_help(state, stderr, ARGP_HELP_STD_HELP);
 		break;
@@ -141,6 +146,13 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		return ARGP_ERR_UNKNOWN;
 	}
 	return 0;
+}
+
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
+{
+	if (level == LIBBPF_DEBUG && !verbose)
+		return 0;
+	return vfprintf(stderr, format, args);
 }
 
 static void sig_int(int signo)
@@ -257,6 +269,7 @@ int main(int argc, char **argv)
 		return err;
 
 	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
+	libbpf_set_print(libbpf_print_fn);
 
 	obj = filetop_bpf__open();
 	if (!obj) {
