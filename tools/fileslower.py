@@ -98,6 +98,7 @@ static int trace_rw_entry(struct pt_regs *ctx, struct file *file,
         return 0;
 
     u32 pid = bpf_get_current_pid_tgid();
+    u32 tid = bpf_get_current_pid_tgid();
 
     // skip I/O lacking a filename
     struct dentry *de = file->f_path.dentry;
@@ -114,7 +115,7 @@ static int trace_rw_entry(struct pt_regs *ctx, struct file *file,
     val.name_len = d_name.len;
     bpf_probe_read_kernel(&val.name, sizeof(val.name), d_name.name);
     bpf_get_current_comm(&val.comm, sizeof(val.comm));
-    entryinfo.update(&pid, &val);
+    entryinfo.update(&tid, &val);
 
     return 0;
 }
@@ -142,14 +143,15 @@ static int trace_rw_return(struct pt_regs *ctx, int type)
 {
     struct val_t *valp;
     u32 pid = bpf_get_current_pid_tgid();
+    u32 tid = bpf_get_current_pid_tgid();
 
-    valp = entryinfo.lookup(&pid);
+    valp = entryinfo.lookup(&tid);
     if (valp == 0) {
         // missed tracing issue or filtered
         return 0;
     }
     u64 delta_us = (bpf_ktime_get_ns() - valp->ts) / 1000;
-    entryinfo.delete(&pid);
+    entryinfo.delete(&tid);
     if (delta_us < MIN_US)
         return 0;
 
