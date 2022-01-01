@@ -128,6 +128,21 @@ jobs:
                    /bin/bash -c \
                    'mkdir -p /bcc/build && cd /bcc/build && \
                     cmake -DCMAKE_BUILD_TYPE=${TYPE} -DENABLE_LLVM_SHARED=ON -DRUN_LUA_TESTS=OFF .. && make -j9'"
+    - name: Run libbpf-tools build
+      env: ${{ matrix.env }}
+      run: |
+        /bin/bash -c \
+                   "docker run --privileged \
+                   --pid=host \
+                   -v $(pwd):/bcc \
+                   -v /sys/kernel/debug:/sys/kernel/debug:rw \
+                   -v /lib/modules:/lib/modules:ro \
+                   -v /usr/src:/usr/src:ro \
+                   -v /usr/include/linux:/usr/include/linux:ro \
+                   bcc-docker \
+                   /bin/bash -c \
+                   'cd /bcc/libbpf-tools && make -j9'"
+
     - name: Run bcc's cc tests
       env: ${{ matrix.env }}
       # tests are wrapped with `script` as a hack to get a TTY as github actions doesn't provide this
