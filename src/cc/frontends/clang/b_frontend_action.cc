@@ -946,6 +946,9 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
             std::vector<std::string> perf_event;
 
             for (auto it = r->field_begin(); it != r->field_end(); ++it) {
+              // After LLVM commit aee49255074f
+              // (https://github.com/llvm/llvm-project/commit/aee49255074fd4ef38d97e6e70cbfbf2f9fd0fa7)
+              // array type change from `comm#char [16]` to `comm#char[16]`
               perf_event.push_back(it->getNameAsString() + "#" + it->getType().getAsString()); //"pid#u32"
             }
             fe_.perf_events_[name] = perf_event;
