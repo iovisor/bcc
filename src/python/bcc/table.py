@@ -227,8 +227,8 @@ def _get_event_class(event_map):
                    'unsigned __int128' : (ct.c_ulonglong * 2),
                    'void *'            : ct.c_void_p }
 
-    # handle array types e.g. "int [16] foo"
-    array_type = re.compile(r"(.+) \[([0-9]+)\]$")
+    # handle array types e.g. "int [16]" or "char[16]"
+    array_type = re.compile(r"([^ ]+) ?\[([0-9]+)\]$")
 
     fields = []
     num_fields = lib.bpf_perf_event_fields(event_map.bpf.module, event_map._name)
