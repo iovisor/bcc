@@ -1081,6 +1081,18 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           } else if (memb_name == "sk_storage_delete") {
             prefix = "bpf_sk_storage_delete";
             suffix = ")";
+          } else if (memb_name == "inode_storage_get") {
+            prefix = "bpf_inode_storage_get";
+            suffix = ")";
+          } else if (memb_name == "inode_storage_delete") {
+            prefix = "bpf_inode_storage_delete";
+            suffix = ")";
+          } else if (memb_name == "task_storage_get") {
+            prefix = "bpf_task_storage_get";
+            suffix = ")";
+          } else if (memb_name == "task_storage_delete") {
+            prefix = "bpf_task_storage_delete";
+            suffix = ")";
           } else if (memb_name == "get_local_storage") {
             prefix = "bpf_get_local_storage";
             suffix = ")";
@@ -1510,6 +1522,10 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       map_type = BPF_MAP_TYPE_ARRAY_OF_MAPS;
     } else if (section_attr == "maps/sk_storage") {
       map_type = BPF_MAP_TYPE_SK_STORAGE;
+    } else if (section_attr == "maps/inode_storage") {
+      map_type = BPF_MAP_TYPE_INODE_STORAGE;
+    } else if (section_attr == "maps/task_storage") {
+      map_type = BPF_MAP_TYPE_TASK_STORAGE;
     } else if (section_attr == "maps/sockmap") {
       map_type = BPF_MAP_TYPE_SOCKMAP;
     } else if (section_attr == "maps/sockhash") {

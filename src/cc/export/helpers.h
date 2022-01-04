@@ -414,6 +414,30 @@ __attribute__((section("maps/sk_storage"))) \
 struct _name##_table_t _name = { .flags = BPF_F_NO_PREALLOC }; \
 BPF_ANNOTATE_KV_PAIR(_name, int, _leaf_type)
 
+#define BPF_INODE_STORAGE(_name, _leaf_type) \
+struct _name##_table_t { \
+  int key; \
+  _leaf_type leaf; \
+  void * (*inode_storage_get) (void *, void *, int); \
+  int (*inode_storage_delete) (void *); \
+  u32 flags; \
+}; \
+__attribute__((section("maps/inode_storage"))) \
+struct _name##_table_t _name = { .flags = BPF_F_NO_PREALLOC }; \
+BPF_ANNOTATE_KV_PAIR(_name, int, _leaf_type)
+
+#define BPF_TASK_STORAGE(_name, _leaf_type) \
+struct _name##_table_t { \
+  int key; \
+  _leaf_type leaf; \
+  void * (*task_storage_get) (void *, void *, int); \
+  int (*task_storage_delete) (void *); \
+  u32 flags; \
+}; \
+__attribute__((section("maps/task_storage"))) \
+struct _name##_table_t _name = { .flags = BPF_F_NO_PREALLOC }; \
+BPF_ANNOTATE_KV_PAIR(_name, int, _leaf_type)
+
 #define BPF_SOCKMAP_COMMON(_name, _max_entries, _kind, _helper_name) \
 struct _name##_table_t { \
   u32 key; \
