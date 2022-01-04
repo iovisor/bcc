@@ -2,6 +2,7 @@
 // Copyright (c) 2021 Wenbo Zhang
 #include <vmlinux.h>
 #include <bpf/bpf_helpers.h>
+#include <bpf/bpf_core_read.h>
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_endian.h>
 #include "tcprtt.h"
@@ -56,7 +57,7 @@ int BPF_PROG(tcp_rcv, struct sock *sk)
 	if (!histp)
 		return 0;
 	ts = (struct tcp_sock *)(sk);
-	srtt = ts->srtt_us >> 3;
+	srtt = BPF_CORE_READ(ts, srtt_us) >> 3;
 	if (targ_ms)
 		srtt /= 1000U;
 	slot = log2l(srtt);
