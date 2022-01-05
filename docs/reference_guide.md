@@ -44,7 +44,7 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [6. ringbuf_output()](#6-ringbuf_output)
         - [7. ringbuf_reserve()](#7-ringbuf_reserve)
         - [8. ringbuf_submit()](#8-ringbuf_submit)
-        - [9. ringbuf_discard()](#9-ringbuf_submit)
+        - [9. ringbuf_discard()](#9-ringbuf_discard)
     - [Maps](#maps)
         - [1. BPF_TABLE](#1-bpf_table)
         - [2. BPF_HASH](#2-bpf_hash)
@@ -104,11 +104,11 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
     - [Debug Output](#debug-output)
         - [1. trace_print()](#1-trace_print)
         - [2. trace_fields()](#2-trace_fields)
-    - [Output](#output)
+    - [Output APIs](#output-apis)
         - [1. perf_buffer_poll()](#1-perf_buffer_poll)
         - [2. ring_buffer_poll()](#2-ring_buffer_poll)
         - [3. ring_buffer_consume()](#3-ring_buffer_consume)
-    - [Maps](#maps)
+    - [Map APIs](#map-apis)
         - [1. get_table()](#1-get_table)
         - [2. open_perf_buffer()](#2-open_perf_buffer)
         - [3. items()](#3-items)
@@ -135,7 +135,7 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
     - [1. Invalid mem access](#1-invalid-mem-access)
     - [2. Cannot call GPL only function from proprietary program](#2-cannot-call-gpl-only-function-from-proprietary-program)
 
-- [Environment Variables](#envvars)
+- [Environment Variables](#Environment-Variables)
     - [1. kernel source directory](#1-kernel-source-directory)
     - [2. kernel version overriding](#2-kernel-version-overriding)
 
@@ -411,7 +411,7 @@ used to audit security events and implement MAC security policies in BPF.
 It is defined by specifying the hook name followed by its arguments.
 
 Hook names can be found in
-[include/linux/security.h](https://github.com/torvalds/linux/tree/master/include/linux/security.h#L254)
+[include/linux/security.h](https://github.com/torvalds/linux/blob/v5.15/include/linux/security.h#L260)
 by taking functions like `security_hookname` and taking just the `hookname` part.
 For example, `security_bpf` would simply become `bpf`.
 
@@ -745,10 +745,10 @@ Creates a BPF table for pushing out custom event data to user space via a ringbu
 
 - Buffer is shared across all CPUs, meaning no per-CPU allocation
 - Supports two APIs for BPF programs
-    - ```map.ringbuf_output()``` works like ```map.perf_submit()``` (covered in [ringbuf_output](#5-ringbuf_output))
+    - ```map.ringbuf_output()``` works like ```map.perf_submit()``` (covered in [ringbuf_output](#6-ringbuf_output))
     - ```map.ringbuf_reserve()```/```map.ringbuf_submit()```/```map.ringbuf_discard()```
       split the process of reserving buffer space and submitting events into two steps
-      (covered in [ringbuf_reserve](#6-ringbuf_reserve), [ringbuf_submit](#7-ringbuf_submit), [ringbuf_discard](#8-ringbuf_submit))
+      (covered in [ringbuf_reserve](#7-ringbuf_reserve), [ringbuf_submit](#8-ringbuf_submit), [ringbuf_discard](#9-ringbuf_discard))
 - BPF APIs do not require access to a CPU ctx argument
 - Superior performance and latency in userspace thanks to a shared ring buffer manager
 - Supports two ways of consuming data in userspace
@@ -1338,7 +1338,7 @@ Examples in situ:
 
 Syntax: ```void map.call(void *ctx, int index)```
 
-This invokes ```bpf_tail_call()``` to tail-call the bpf program which the ```index``` entry in [9. BPF_PROG_ARRAY](#9-bpf_prog_array) points to. A tail-call is different from the normal call. It reuses the current stack frame after jumping to another bpf program and never goes back. If the ```index``` entry is empty, it won't jump anywhere and the program execution continues as normal.
+This invokes ```bpf_tail_call()``` to tail-call the bpf program which the ```index``` entry in [BPF_PROG_ARRAY](#10-bpf_prog_array) points to. A tail-call is different from the normal call. It reuses the current stack frame after jumping to another bpf program and never goes back. If the ```index``` entry is empty, it won't jump anywhere and the program execution continues as normal.
 
 For example:
 
@@ -1377,7 +1377,7 @@ Examples in situ:
 
 Syntax: ```int map.redirect_map(int index, int flags)```
 
-This redirects the incoming packets based on the ```index``` entry. If the map is [10. BPF_DEVMAP](#10-bpf_devmap), the packet will be sent to the transmit queue of the network interface that the entry points to. If the map is [11. BPF_CPUMAP](#11-bpf_cpumap), the packet will be sent to the ring buffer of the ```index``` CPU and be processed by the CPU later. If the map is [12. BPF_XSKMAP](#12-bpf_xskmap), the packet will be sent to the AF_XDP socket attached to the queue.
+This redirects the incoming packets based on the ```index``` entry. If the map is [BPF_DEVMAP](#11-bpf_devmap), the packet will be sent to the transmit queue of the network interface that the entry points to. If the map is [BPF_CPUMAP](#12-bpf_cpumap), the packet will be sent to the ring buffer of the ```index``` CPU and be processed by the CPU later. If the map is [BPF_XSKMAP](#13-bpf_xskmap), the packet will be sent to the AF_XDP socket attached to the queue.
 
 If the packet is redirected successfully, the function will return XDP_REDIRECT. Otherwise, it will return XDP_ABORTED to discard the packet.
 
@@ -1968,7 +1968,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=trace_fields+path%3Aexamples+language%3Apython&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=trace_fields+path%3Atools+language%3Apython&type=Code)
 
-## Output
+## Output APIs
 
 Normal output from a BPF program is either:
 
@@ -2049,7 +2049,7 @@ while 1:
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=ring_buffer_consume+path%3Aexamples+language%3Apython&type=Code),
 
-## Maps
+## Map APIs
 
 Maps are BPF data stores, and are used in bcc to implement a table, and then higher level objects on top of tables, including hashes and histograms.
 
