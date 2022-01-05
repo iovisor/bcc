@@ -297,6 +297,25 @@ static uint64_t ptr_to_u64(void *ptr)
   return (uint64_t) (unsigned long) ptr;
 }
 
+static int libbpf_bpf_map_create(struct bpf_create_map_attr *create_attr)
+{
+  LIBBPF_OPTS(bpf_map_create_opts, p);
+
+  p.map_flags = create_attr->map_flags;
+  p.numa_node = create_attr->numa_node;
+  p.btf_fd = create_attr->btf_fd;
+  p.btf_key_type_id = create_attr->btf_key_type_id;
+  p.btf_value_type_id = create_attr->btf_value_type_id;
+  p.map_ifindex = create_attr->map_ifindex;
+  if (create_attr->map_type == BPF_MAP_TYPE_STRUCT_OPS)
+    p.btf_vmlinux_value_type_id = create_attr->btf_vmlinux_value_type_id;
+  else
+    p.inner_map_fd = create_attr->inner_map_fd;
+
+  return bpf_map_create(create_attr->map_type, create_attr->name, create_attr->key_size,
+                        create_attr->value_size, create_attr->max_entries, &p);
+}
+
 int bcc_create_map_xattr(struct bpf_create_map_attr *attr, bool allow_rlimit)
 {
   unsigned name_len = attr->name ? strlen(attr->name) : 0;
@@ -304,7 +323,7 @@ int bcc_create_map_xattr(struct bpf_create_map_attr *attr, bool allow_rlimit)
 
   memcpy(map_name, attr->name, min(name_len, BPF_OBJ_NAME_LEN - 1));
   attr->name = map_name;
-  int ret = bpf_create_map_xattr(attr);
+  int ret = libbpf_bpf_map_create(attr);
 
   if (ret < 0 && errno == EPERM) {
     if (!allow_rlimit)
@@ -316,7 +335,7 @@ int bcc_create_map_xattr(struct bpf_create_map_attr *attr, bool allow_rlimit)
       rl.rlim_max = RLIM_INFINITY;
       rl.rlim_cur = rl.rlim_max;
       if (setrlimit(RLIMIT_MEMLOCK, &rl) == 0)
-        ret = bpf_create_map_xattr(attr);
+        ret = libbpf_bpf_map_create(attr);
     }
   }
 
@@ -326,12 +345,12 @@ int bcc_create_map_xattr(struct bpf_create_map_attr *attr, bool allow_rlimit)
     attr->btf_fd = 0;
     attr->btf_key_type_id = 0;
     attr->btf_value_type_id = 0;
-    ret = bpf_create_map_xattr(attr);
+    ret = libbpf_bpf_map_create(attr);
   }
 
   if (ret < 0 && name_len && (errno == E2BIG || errno == EINVAL)) {
     map_name[0] = '\0';
-    ret = bpf_create_map_xattr(attr);
+    ret = libbpf_bpf_map_create(attr);
   }
 
   if (ret < 0 && errno == EPERM) {
@@ -344,7 +363,7 @@ int bcc_create_map_xattr(struct bpf_create_map_attr *attr, bool allow_rlimit)
       rl.rlim_max = RLIM_INFINITY;
       rl.rlim_cur = rl.rlim_max;
       if (setrlimit(RLIMIT_MEMLOCK, &rl) == 0)
-        ret = bpf_create_map_xattr(attr);
+        ret = libbpf_bpf_map_create(attr);
     }
   }
   return ret;
@@ -608,6 +627,47 @@ int bpf_prog_get_tag(int fd, unsigned long long *ptag)
   return 0;
 }
 
+static int libbpf_bpf_prog_load(const struct bpf_load_program_attr *load_attr,
+                                char *log_buf, size_t log_buf_sz)
+{
+  LIBBPF_OPTS(bpf_prog_load_opts, p);
+
+  if (!load_attr || !log_buf != !log_buf_sz) {
+    errno = EINVAL;
+    return -EINVAL;
+  }
+
+  p.expected_attach_type = load_attr->expected_attach_type;
+  switch (load_attr->prog_type) {
+  case BPF_PROG_TYPE_STRUCT_OPS:
+  case BPF_PROG_TYPE_LSM:
+    p.attach_btf_id = load_attr->attach_btf_id;
+    break;
+  case BPF_PROG_TYPE_TRACING:
+  case BPF_PROG_TYPE_EXT:
+    p.attach_btf_id = load_attr->attach_btf_id;
+    p.attach_prog_fd = load_attr->attach_prog_fd;
+    break;
+  default:
+    p.prog_ifindex = load_attr->prog_ifindex;
+    p.kern_version = load_attr->kern_version;
+  }
+  p.log_level = load_attr->log_level;
+  p.log_buf = log_buf;
+  p.log_size = log_buf_sz;
+  p.prog_btf_fd = load_attr->prog_btf_fd;
+  p.func_info_rec_size = load_attr->func_info_rec_size;
+  p.func_info_cnt = load_attr->func_info_cnt;
+  p.func_info = load_attr->func_info;
+  p.line_info_rec_size = load_attr->line_info_rec_size;
+  p.line_info_cnt = load_attr->line_info_cnt;
+  p.line_info = load_attr->line_info;
+  p.prog_flags = load_attr->prog_flags;
+
+  return bpf_prog_load(load_attr->prog_type, load_attr->name, load_attr->license,
+                       load_attr->insns, load_attr->insns_cnt, &p);
+}
+
 int bcc_prog_load_xattr(struct bpf_load_program_attr *attr, int prog_len,
                         char *log_buf, unsigned log_buf_size, bool allow_rlimit)
 {
@@ -690,7 +750,7 @@ int bcc_prog_load_xattr(struct bpf_load_program_attr *attr, int prog_len,
     attr->name = prog_name;
   }
 
-  ret = bpf_load_program_xattr(attr, attr_log_buf, attr_log_buf_size);
+  ret = libbpf_bpf_prog_load(attr, attr_log_buf, attr_log_buf_size);
 
   // func_info/line_info may not be supported in old kernels.
   if (ret < 0 && attr->func_info && errno == EINVAL) {
@@ -701,14 +761,14 @@ int bcc_prog_load_xattr(struct bpf_load_program_attr *attr, int prog_len,
     attr->line_info = NULL;
     attr->line_info_cnt = 0;
     attr->line_info_rec_size = 0;
-    ret = bpf_load_program_xattr(attr, attr_log_buf, attr_log_buf_size);
+    ret = libbpf_bpf_prog_load(attr, attr_log_buf, attr_log_buf_size);
   }
 
   // BPF object name is not supported on older Kernels.
   // If we failed due to this, clear the name and try again.
   if (ret < 0 && name_len && (errno == E2BIG || errno == EINVAL)) {
     prog_name[0] = '\0';
-    ret = bpf_load_program_xattr(attr, attr_log_buf, attr_log_buf_size);
+    ret = libbpf_bpf_prog_load(attr, attr_log_buf, attr_log_buf_size);
   }
 
   if (ret < 0 && errno == EPERM) {
@@ -727,7 +787,7 @@ int bcc_prog_load_xattr(struct bpf_load_program_attr *attr, int prog_len,
       rl.rlim_max = RLIM_INFINITY;
       rl.rlim_cur = rl.rlim_max;
       if (setrlimit(RLIMIT_MEMLOCK, &rl) == 0)
-        ret = bpf_load_program_xattr(attr, attr_log_buf, attr_log_buf_size);
+        ret = libbpf_bpf_prog_load(attr, attr_log_buf, attr_log_buf_size);
     }
   }
 
@@ -745,7 +805,7 @@ int bcc_prog_load_xattr(struct bpf_load_program_attr *attr, int prog_len,
       // If logging is not already enabled, enable it and do the syscall again.
       if (attr->log_level == 0) {
         attr->log_level = 1;
-        ret = bpf_load_program_xattr(attr, log_buf, log_buf_size);
+        ret = libbpf_bpf_prog_load(attr, log_buf, log_buf_size);
       }
       // Print the log message and return.
       bpf_print_hints(ret, log_buf);
@@ -769,7 +829,7 @@ int bcc_prog_load_xattr(struct bpf_load_program_attr *attr, int prog_len,
         goto return_result;
       }
       tmp_log_buf[0] = 0;
-      ret = bpf_load_program_xattr(attr, tmp_log_buf, tmp_log_buf_size);
+      ret = libbpf_bpf_prog_load(attr, tmp_log_buf, tmp_log_buf_size);
       if (ret < 0 && errno == ENOSPC) {
         // Temporary buffer size is not enough. Double it and try again.
         free(tmp_log_buf);

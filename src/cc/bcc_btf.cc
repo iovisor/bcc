@@ -597,7 +597,7 @@ int BTF::load(uint8_t *btf_sec, uintptr_t btf_sec_size,
     return -1;
   }
 
-  if (btf__load(btf)) {
+  if (btf__load_into_kernel(btf)) {
     btf__free(btf);
     warning("Loading .BTF section failed\n");
     return -1;
