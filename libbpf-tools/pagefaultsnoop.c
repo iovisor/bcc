@@ -21,43 +21,6 @@
 #define PERF_POLL_TIMEOUT_MS	100
 #define warn(...) fprintf(stderr, __VA_ARGS__)
 
-static volatile sig_atomic_t exiting = 0;
-
-static bool emit_timestamp = false;
-static pid_t target_pid = 0;
-static bool ignore_errors = false;
-static bool verbose = false;
-
-const char *argp_program_version = "pagefaultsnoop 0.1";
-const char *argp_program_bug_address =
-	"https://github.com/iovisor/bcc/tree/master/libbpf-tools";
-const char argp_program_doc[] =
-"Trace page fault.\n"
-"\n"
-"USAGE: pagefaultsnoop [-h] [-t] [-x] [-p PID]\n"
-"\n"
-"EXAMPLES:\n"
-"    pagefaultsnoop             # trace page fault\n"
-"    pagefaultsnoop -t          # include timestamps\n"
-"    pagefaultsnoop -x          # ignore errors on output\n"
-"    pagefaultsnoop -p 1216     # only trace PID 1216\n"
-"\n"
-"VM_FAULT options are reported as:\n"
-"  VM_FAULT_OOM                    O.............\n"
-"  VM_FAULT_SIGBUS                 .S............\n"
-"  VM_FAULT_MAJOR                  ..M...........\n"
-"  VM_FAULT_WRITE                  ...W..........\n"
-"  VM_FAULT_HWPOISON               ....h.........\n"
-"  VM_FAULT_HWPOISON_LARGE         .....H........\n"
-"  VM_FAULT_SIGSEGV                ......V.......\n"
-"  VM_FAULT_NOPAGE                 .......N......\n"
-"  VM_FAULT_LOCKED                 ........L.....\n"
-"  VM_FAULT_RETRY                  .........R....\n"
-"  VM_FAULT_FALLBACK               ..........F...\n"
-"  VM_FAULT_DONE_COW               ...........C..\n"
-"  VM_FAULT_NEEDDSYNC              ............s.\n"
-"  VM_FAULT_HINDEX_MASK            .............m\n";
-
 enum vm_fault_reason {
 	VM_FAULT_OOM            = 0x000001,
 	VM_FAULT_SIGBUS         = 0x000002,
@@ -75,18 +38,86 @@ enum vm_fault_reason {
 	VM_FAULT_HINDEX_MASK    = 0x0f0000,
 };
 
+static volatile sig_atomic_t exiting = 0;
+
+static bool emit_timestamp = false;
+static pid_t target_pid = 0;
+static bool ignore_errors = false;
+static bool verbose = false;
+static bool with_flag = false;
+static enum vm_fault_reason opt_flag = 0;
+
+const char *argp_program_version = "pagefaultsnoop 0.1";
+const char *argp_program_bug_address =
+	"https://github.com/iovisor/bcc/tree/master/libbpf-tools";
+const char argp_program_doc[] =
+"Trace page fault.\n"
+"\n"
+"USAGE: pagefaultsnoop [-h] [-t] [-x] [-p PID] [-F flag]\n"
+"\n"
+"EXAMPLES:\n"
+"    pagefaultsnoop             # trace page fault\n"
+"    pagefaultsnoop -t          # include timestamps\n"
+"    pagefaultsnoop -x          # ignore errors on output\n"
+"    pagefaultsnoop -p 1216     # only trace PID 1216\n"
+"    pagefaultsnoop -F RETRY    # only trace VM_FAULT_RETRY page fault\n"
+"\n"
+"VM_FAULT options are reported as:\n"
+"  VM_FAULT_OOM                    O.............\n"
+"  VM_FAULT_SIGBUS                 .S............\n"
+"  VM_FAULT_MAJOR                  ..M...........\n"
+"  VM_FAULT_WRITE                  ...W..........\n"
+"  VM_FAULT_HWPOISON               ....h.........\n"
+"  VM_FAULT_HWPOISON_LARGE         .....H........\n"
+"  VM_FAULT_SIGSEGV                ......V.......\n"
+"  VM_FAULT_NOPAGE                 .......N......\n"
+"  VM_FAULT_LOCKED                 ........L.....\n"
+"  VM_FAULT_RETRY                  .........R....\n"
+"  VM_FAULT_FALLBACK               ..........F...\n"
+"  VM_FAULT_DONE_COW               ...........C..\n"
+"  VM_FAULT_NEEDDSYNC              ............s.\n"
+"  VM_FAULT_HINDEX_MASK            .............m\n"
+"\n"
+"Flag option [-F flag]:\n"
+"  flag is one of the VM_FAULT without VM_FAULT_ prefix";
+
 static const struct argp_option opts[] = {
 	{ "timestamp", 't', NULL, 0, "Include timestamp on output" },
 	{ "failed", 'x', NULL, 0, "Include errors on output." },
 	{ "pid", 'p', "PID", 0, "Process ID to trace" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
+	{ "flag", 'F', "FLAG", 0, "Only trace FLAG page fault" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
+};
+
+static const struct {
+	enum vm_fault_reason fault;
+	char *name;
+} opt_flags[] = {
+#define DEF_FLAG(f) {VM_FAULT_##f, #f}
+	DEF_FLAG(OOM),
+	DEF_FLAG(SIGBUS),
+	DEF_FLAG(MAJOR),
+	DEF_FLAG(WRITE),
+	DEF_FLAG(HWPOISON),
+	DEF_FLAG(HWPOISON_LARGE),
+	DEF_FLAG(NOPAGE),
+	DEF_FLAG(LOCKED),
+	DEF_FLAG(RETRY),
+	DEF_FLAG(FALLBACK),
+	DEF_FLAG(DONE_COW),
+	DEF_FLAG(NEEDDSYNC),
+	DEF_FLAG(HINDEX_MASK),
+	DEF_FLAG(SIGBUS),
+#undef DEF_FLAG
+	{0,0}
 };
 
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
 	long pid;
+	int i = 0;
 
 	switch (key) {
 	case 'p':
@@ -97,6 +128,20 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			argp_usage(state);
 		}
 		target_pid = pid;
+		break;
+	case 'F':
+		with_flag = true;
+		while (opt_flags[i].fault) {
+			if (strcmp(opt_flags[i].name, arg) == 0) {
+				opt_flag = opt_flags[i].fault;
+				break;
+			}
+			i++;
+		}
+		if (opt_flag == 0) {
+			warn("Invalid -F flag: %s\n", arg);
+			argp_usage(state);
+		}
 		break;
 	case 'x':
 		ignore_errors = true;
@@ -112,6 +157,11 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	default:
 		return ARGP_ERR_UNKNOWN;
+	}
+
+	if (ignore_errors && with_flag) {
+		warn("Can't set the -x and -F options at the same time.\n");
+		argp_usage(state);
 	}
 	return 0;
 }
@@ -178,6 +228,10 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		}
 		i++;
 	}
+	if (with_flag && opt_flag) {
+		if (! (e->vm_fault & opt_flag))
+			return;
+	}
 	printf("%-7d %-16s %-5s %-15s %#016lx\n",
 	       e->pid, e->task, type, vm_faults, e->address);
 }
@@ -240,6 +294,7 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
+	printf("Tracing Pagefault, Ctrl-C to end.\n");
 	if (emit_timestamp)
 		printf("%-8s ", "TIME(s)");
 	printf("%-7s %-16s %-5s %-15s %-18s\n",
