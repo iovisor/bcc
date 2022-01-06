@@ -7,6 +7,7 @@
 #include <bpf/bpf_endian.h>
 #include "pagefaultsnoop.h"
 #include "maps.bpf.h"
+#include "bits.bpf.h"
 
 #define MAX_ENTRIES	10240
 
@@ -21,21 +22,33 @@ struct {
 } vmfs SEC(".maps");
 
 struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, MAX_ENTRIES);
+    __type(key, __u32);
+    __type(value, __u64);
+} starts SEC(".maps");
+
+struct {
 	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
 	__uint(key_size, sizeof(__u32));
 	__uint(value_size, sizeof(__u32));
 } events SEC(".maps");
+
+struct hist hists[PF_TYPE_MAX] = {};
 
 static int pagefault_entry(struct pt_regs *ctx, struct vm_fault *vmf)
 {
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 pid = pid_tgid >> 32;
 	__u32 tid = (__u32)pid_tgid;
+	__u64 ts;
 
 	if (target_pid && target_pid != pid)
 		return 0;
 
+	ts = bpf_ktime_get_ns();
 	bpf_map_update_elem(&vmfs, &tid, &vmf, BPF_ANY);
+	bpf_map_update_elem(&starts, &tid, &ts, BPF_ANY);
 	return 0;
 };
 
@@ -48,6 +61,18 @@ static int pagefault_exit(struct pt_regs *ctx, pf_type_enum pf_type)
 	struct vm_area_struct *vma;
 	struct pagefault_event event = {};
 	int ret;
+	__u64 ts = bpf_ktime_get_ns();
+	__u64 *tsp, slot;
+    __s64 delta;
+
+	tsp = bpf_map_lookup_elem(&starts, &tid);
+	if (!tsp)
+        return 0;
+
+	delta = (__s64)(ts - *tsp);
+    if (delta < 0) {
+        goto cleanup;
+	}
 
 	vmfp = bpf_map_lookup_elem(&vmfs, &tid);
 	if (!vmfp)
@@ -65,12 +90,19 @@ static int pagefault_exit(struct pt_regs *ctx, pf_type_enum pf_type)
 	event.ret = ret;
 	event.address = BPF_CORE_READ_BITFIELD_PROBED(vmf, address);
 	bpf_get_current_comm(&event.task, sizeof(event.task));
+	event.delta = delta;
 	event.pf_type = pf_type;
 
 	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &event, sizeof(event));
 
+	slot = log2l(delta);
+    if (slot >= MAX_SLOTS)
+        slot = MAX_SLOTS - 1;
+    __sync_fetch_and_add(&hists[pf_type].slots[slot], 1);
+
 cleanup:
 	bpf_map_delete_elem(&vmfs, &tid);
+	bpf_map_delete_elem(&starts, &tid);
 	return 0;
 }
 
