@@ -42,6 +42,7 @@ APPS = \
 	numamove \
 	offcputime \
 	opensnoop \
+	pagefaultsnoop \
 	readahead \
 	runqlat \
 	runqlen \
