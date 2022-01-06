@@ -204,6 +204,10 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	const char *type;
 	int i = 0;
 
+	if (with_flag && opt_flag) {
+		if (! (e->vm_fault & opt_flag))
+			return;
+	}
 	if (emit_timestamp) {
 		time(&t);
 		tm = localtime(&t);
@@ -227,10 +231,6 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 			vm_faults[i] = '.';
 		}
 		i++;
-	}
-	if (with_flag && opt_flag) {
-		if (! (e->vm_fault & opt_flag))
-			return;
 	}
 	printf("%-7d %-16s %-5s %-15s %#016lx\n",
 	       e->pid, e->task, type, vm_faults, e->address);
