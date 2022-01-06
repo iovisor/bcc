@@ -17,7 +17,7 @@ struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, MAX_ENTRIES);
 	__type(key, __u32);
-	__type(value, struct socket *);
+	__type(value, struct vm_fault *);
 } vmfs SEC(".maps");
 
 struct {
