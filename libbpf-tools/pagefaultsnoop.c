@@ -46,6 +46,7 @@ static bool ignore_errors = false;
 static bool verbose = false;
 static bool with_flag = false;
 static enum vm_fault_reason opt_flag = 0;
+static struct hist zero;
 
 const char *argp_program_version = "pagefaultsnoop 0.1";
 const char *argp_program_bug_address =
@@ -112,6 +113,10 @@ static const struct {
 	DEF_FLAG(SIGBUS),
 #undef DEF_FLAG
 	{0,0}
+};
+
+static char *pf_type_names[] = {
+	"FILE", "ANON", "SWAP", "NUMA", "WRITE"
 };
 
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
@@ -232,13 +237,31 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		}
 		i++;
 	}
-	printf("%-7d %-16s %-5s %-15s %#016lx\n",
-	       e->pid, e->task, type, vm_faults, e->address);
+	printf("%-7d %-16s %-5s %-15s %#016lx %-5lld\n",
+	       e->pid, e->task, type, vm_faults, e->address, e->delta);
 }
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 {
 	warn("lost %llu events on CPU #%d\n", lost_cnt, cpu);
+}
+
+static int print_hists(struct pagefaultsnoop_bpf__bss *bss)
+{
+    const char *units = "nsecs";
+    pf_type_enum pf_type; 
+
+    for (pf_type = PF_TYPE_FILE; pf_type < PF_TYPE_MAX; pf_type++) {
+        struct hist hist = bss->hists[pf_type];
+
+        bss->hists[pf_type] = zero;
+        if (!memcmp(&zero, &hist, sizeof(hist)))
+            continue;
+        printf("operation = '%s'\n", pf_type_names[pf_type]);
+        print_log2_hist(hist.slots, MAX_SLOTS, units);
+        printf("\n");
+    }   
+    return 0;
 }
 
 int main(int argc, char **argv)
@@ -297,8 +320,8 @@ int main(int argc, char **argv)
 	printf("Tracing Pagefault, Ctrl-C to end.\n");
 	if (emit_timestamp)
 		printf("%-8s ", "TIME(s)");
-	printf("%-7s %-16s %-5s %-15s %-18s\n",
-	       "PID", "COMM", "TYPE", "VM_FAULT", "ADDR");
+	printf("%-7s %-16s %-5s %-15s %-18s %-5s\n",
+	       "PID", "COMM", "TYPE", "VM_FAULT", "ADDR", "NSEC");
 
 	while (!exiting) {
 		err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS);
@@ -311,6 +334,8 @@ int main(int argc, char **argv)
 	}
 
 cleanup:
+	printf("Cleanup, output latency hists.\n");
+	print_hists(obj->bss);
 	perf_buffer__free(pb);
 	pagefaultsnoop_bpf__destroy(obj);
 
