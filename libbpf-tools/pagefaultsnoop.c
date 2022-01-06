@@ -32,12 +32,12 @@ const char *argp_program_version = "pagefaultsnoop 0.1";
 const char *argp_program_bug_address =
 	"https://github.com/iovisor/bcc/tree/master/libbpf-tools";
 const char argp_program_doc[] =
-"Trace bind syscalls.\n"
+"Trace page fault.\n"
 "\n"
 "USAGE: pagefaultsnoop [-h] [-t] [-x] [-p PID]\n"
 "\n"
 "EXAMPLES:\n"
-"    pagefaultsnoop             # trace all bind syscall\n"
+"    pagefaultsnoop             # trace page fault\n"
 "    pagefaultsnoop -t          # include timestamps\n"
 "    pagefaultsnoop -x          # ignore errors on output\n"
 "    pagefaultsnoop -p 1216     # only trace PID 1216\n"
