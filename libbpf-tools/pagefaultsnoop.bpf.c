@@ -63,14 +63,14 @@ static int pagefault_exit(struct pt_regs *ctx, pf_type_enum pf_type)
 	int ret;
 	__u64 ts = bpf_ktime_get_ns();
 	__u64 *tsp, slot;
-    __s64 delta;
+	__s64 delta;
 
 	tsp = bpf_map_lookup_elem(&starts, &tid);
 	if (!tsp)
         return 0;
 
 	delta = (__s64)(ts - *tsp);
-    if (delta < 0) {
+	if (delta < 0) {
         goto cleanup;
 	}
 
@@ -96,9 +96,9 @@ static int pagefault_exit(struct pt_regs *ctx, pf_type_enum pf_type)
 	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &event, sizeof(event));
 
 	slot = log2l(delta);
-    if (slot >= MAX_SLOTS)
-        slot = MAX_SLOTS - 1;
-    __sync_fetch_and_add(&hists[pf_type].slots[slot], 1);
+	if (slot >= MAX_SLOTS)
+		slot = MAX_SLOTS - 1;
+	__sync_fetch_and_add(&hists[pf_type].slots[slot], 1);
 
 cleanup:
 	bpf_map_delete_elem(&vmfs, &tid);
