@@ -16,6 +16,7 @@
 
 from __future__ import print_function
 from bcc import BPF
+from bcc.containers import ContainersMap, generate_container_info_code, print_container_info_header
 from time import sleep, strftime
 import argparse
 from subprocess import call
@@ -39,6 +40,8 @@ parser.add_argument("interval", nargs="?", default=1,
     help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
     help="number of outputs")
+parser.add_argument("--containersmap",
+    help="print additional information about the containers where the IO occurred")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
@@ -75,6 +78,9 @@ struct info_t {
     int major;
     int minor;
     char name[TASK_COMM_LEN];
+#ifdef PRINT_CONTAINER_INFO
+    u64 mntnsid;
+#endif
 };
 
 // the value of the output summary
@@ -145,6 +151,9 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
 #else
     info.rwflag = !!((req->cmd_flags & REQ_OP_MASK) == REQ_OP_WRITE);
 #endif
+#ifdef PRINT_CONTAINER_INFO
+    info.mntnsid = get_mntns_id();
+#endif
 
     whop = whobyreq.lookup(&req);
     if (whop == 0) {
@@ -173,6 +182,11 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
 if args.ebpf:
     print(bpf_text)
     exit()
+
+containers_map = None
+if args.containersmap:
+    bpf_text = generate_container_info_code() + bpf_text
+    containers_map = ContainersMap(args.containersmap)
 
 b = BPF(text=bpf_text)
 b.attach_kprobe(event="blk_account_io_start", fn_name="trace_pid_start")
@@ -206,6 +220,9 @@ while 1:
         print()
     with open(loadavg) as stats:
         print("%-8s loadavg: %s" % (strftime("%H:%M:%S"), stats.read()))
+
+    if containers_map:
+        print_container_info_header()
     print("%-6s %-16s %1s %-3s %-3s %-8s %5s %7s %6s" % ("PID", "COMM",
         "D", "MAJ", "MIN", "DISK", "I/O", "Kbytes", "AVGms"))
 
@@ -221,6 +238,9 @@ while 1:
             diskname = disklookup[disk]
         else:
             diskname = "?"
+
+        if containers_map:
+            containers_map.print_container_info(k.mntnsid)
 
         # print line
         avg_ms = (float(v.us) / 1000) / v.io
