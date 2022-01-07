@@ -4,6 +4,12 @@
  * Based on klockstat from BCC by Jiri Olsa and others
  * 2021-10-26   Barret Rhoden   Created this.
  */
+/* Differences from BCC python tool:
+ * - can specify a lock by ksym name, using '-L'
+ * - tracks whichever task had the max time for acquire and hold, outputted
+ *     when '-s' > 1 (otherwise it's cluttered).
+ * - does not reset stats each interval by default. Can request with -R.
+ */
 #include <argp.h>
 #include <errno.h>
 #include <signal.h>
@@ -484,12 +490,7 @@ int main(int argc, char **argv)
 
 	sigaction(SIGINT, &sigact, 0);
 
-	err = bump_memlock_rlimit();
-	if (err) {
-		warn("failed to increase rlimit: %d\n", err);
-		err = 1;
-		goto cleanup;
-	}
+	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 
 	ksyms = ksyms__load();
 	if (!ksyms) {
