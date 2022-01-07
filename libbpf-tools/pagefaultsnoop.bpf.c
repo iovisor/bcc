@@ -118,13 +118,13 @@ int BPF_KRETPROBE(do_anonymous_exit)
 	return pagefault_exit(ctx, PF_TYPE_ANON);
 }
 
-SEC("kprobe/do_fault")
+SEC("kprobe/__do_fault")
 int BPF_KPROBE(do_fault_entry, struct vm_fault *vmf)
 {
 	return pagefault_entry(ctx, vmf);
 }
 
-SEC("kretprobe/do_fault")
+SEC("kretprobe/__do_fault")
 int BPF_KRETPROBE(do_fault_exit)
 {
 	return pagefault_exit(ctx, PF_TYPE_FILE);
