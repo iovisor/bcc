@@ -15,11 +15,13 @@ only exception is resulting tool binaries, which are put in a current
 directory. `make clean` will clean up all the build artifacts, including
 generated binaries.
 
-Given libbpf package might not be available across wide variety of
-distributions, all libbpf-based tools are linked statically against version of
-libbpf that BCC links against (from submodule under src/cc/libbpf). This
+Given that the libbpf package might not be available across wide variety of
+distributions, all libbpf-based tools are linked statically against a version 
+of libbpf that BCC links against (from submodule under src/cc/libbpf). This
 results in binaries with minimal amount of dependencies (libc, libelf, and
-libz are linked dynamically, though, given their widespread availability).
+libz are linked dynamically, though, given their widespread availability). 
+If your build fails because the libbpf submodule is outdated, try running `git 
+submodule update --init --recursive`. 
 
 Tools are expected to follow a simple naming convention:
   - <tool>.c contains userspace C code of a tool.
