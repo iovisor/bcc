@@ -238,7 +238,7 @@ ProcSyms::Module::Module(const char *name, const char *path,
   // Other symbol files
   if (bcc_is_valid_perf_map(path_.c_str()) == 1)
     type_ = ModuleType::PERF_MAP;
-  else if (bcc_elf_is_vdso(path_.c_str()) == 1)
+  else if (bcc_elf_is_vdso(name_.c_str()) == 1)
     type_ = ModuleType::VDSO;
 
   // Will be stored later
