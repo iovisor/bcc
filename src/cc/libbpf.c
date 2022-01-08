@@ -1408,8 +1408,22 @@ int bpf_attach_lsm(int prog_fd)
 
 void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb,
                             perf_reader_lost_cb lost_cb, void *cb_cookie,
-                            int pid, int cpu, int page_cnt) {
-  int pfd;
+                            int pid, int cpu, int page_cnt)
+{
+  struct bcc_perf_buffer_opts opts = {
+    .pid = pid,
+    .cpu = cpu,
+    .wakeup_events = 1,
+  };
+
+  return bpf_open_perf_buffer_opts(raw_cb, lost_cb, cb_cookie, page_cnt, &opts);
+}
+
+void * bpf_open_perf_buffer_opts(perf_reader_raw_cb raw_cb,
+                            perf_reader_lost_cb lost_cb, void *cb_cookie,
+                            int page_cnt, struct bcc_perf_buffer_opts *opts)
+{
+  int pfd, pid = opts->pid, cpu = opts->cpu;
   struct perf_event_attr attr = {};
   struct perf_reader *reader = NULL;
 
@@ -1421,7 +1435,7 @@ void * bpf_open_perf_buffer(perf_reader_raw_cb raw_cb,
   attr.type = PERF_TYPE_SOFTWARE;
   attr.sample_type = PERF_SAMPLE_RAW;
   attr.sample_period = 1;
-  attr.wakeup_events = 1;
+  attr.wakeup_events = opts->wakeup_events;
   pfd = syscall(__NR_perf_event_open, &attr, pid, cpu, -1, PERF_FLAG_FD_CLOEXEC);
   if (pfd < 0) {
     fprintf(stderr, "perf_event_open: %s\n", strerror(errno));

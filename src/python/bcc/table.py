@@ -25,7 +25,7 @@ import errno
 import re
 import sys
 
-from .libbcc import lib, _RAW_CB_TYPE, _LOST_CB_TYPE, _RINGBUF_CB_TYPE
+from .libbcc import lib, _RAW_CB_TYPE, _LOST_CB_TYPE, _RINGBUF_CB_TYPE, bcc_perf_buffer_opts
 from .utils import get_online_cpus
 from .utils import get_possible_cpus
 
@@ -960,7 +960,7 @@ class PerfEventArray(ArrayBase):
             self._event_class = _get_event_class(self)
         return ct.cast(data, ct.POINTER(self._event_class)).contents
 
-    def open_perf_buffer(self, callback, page_cnt=8, lost_cb=None):
+    def open_perf_buffer(self, callback, page_cnt=8, lost_cb=None, wakeup_events=1):
         """open_perf_buffers(callback)
 
         Opens a set of per-cpu ring buffer to receive custom perf event
@@ -974,9 +974,9 @@ class PerfEventArray(ArrayBase):
             raise Exception("Perf buffer page_cnt must be a power of two")
 
         for i in get_online_cpus():
-            self._open_perf_buffer(i, callback, page_cnt, lost_cb)
+            self._open_perf_buffer(i, callback, page_cnt, lost_cb, wakeup_events)
 
-    def _open_perf_buffer(self, cpu, callback, page_cnt, lost_cb):
+    def _open_perf_buffer(self, cpu, callback, page_cnt, lost_cb, wakeup_events):
         def raw_cb_(_, data, size):
             try:
                 callback(cpu, data, size)
@@ -995,7 +995,11 @@ class PerfEventArray(ArrayBase):
                     raise e
         fn = _RAW_CB_TYPE(raw_cb_)
         lost_fn = _LOST_CB_TYPE(lost_cb_) if lost_cb else ct.cast(None, _LOST_CB_TYPE)
-        reader = lib.bpf_open_perf_buffer(fn, lost_fn, None, -1, cpu, page_cnt)
+        opts = bcc_perf_buffer_opts()
+        opts.pid = -1
+        opts.cpu = cpu
+        opts.wakeup_events = wakeup_events
+        reader = lib.bpf_open_perf_buffer_opts(fn, lost_fn, None, page_cnt, ct.byref(opts))
         if not reader:
             raise Exception("Could not open perf buffer")
         fd = lib.perf_reader_fd(reader)

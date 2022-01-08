@@ -133,6 +133,16 @@ lib.kernel_struct_has_field.restype = ct.c_int
 lib.kernel_struct_has_field.argtypes = [ct.c_char_p, ct.c_char_p]
 lib.bpf_open_perf_buffer.restype = ct.c_void_p
 lib.bpf_open_perf_buffer.argtypes = [_RAW_CB_TYPE, _LOST_CB_TYPE, ct.py_object, ct.c_int, ct.c_int, ct.c_int]
+
+class bcc_perf_buffer_opts(ct.Structure):
+    _fields_ = [
+        ('pid', ct.c_int),
+        ('cpu', ct.c_int),
+        ('wakeup_events', ct.c_int),
+    ]
+
+lib.bpf_open_perf_buffer_opts.restype = ct.c_void_p
+lib.bpf_open_perf_buffer_opts.argtypes = [_RAW_CB_TYPE, _LOST_CB_TYPE, ct.py_object, ct.c_int, ct.POINTER(bcc_perf_buffer_opts)]
 lib.bpf_open_perf_event.restype = ct.c_int
 lib.bpf_open_perf_event.argtypes = [ct.c_uint, ct.c_ulonglong, ct.c_int, ct.c_int]
 lib.perf_reader_poll.restype = ct.c_int
