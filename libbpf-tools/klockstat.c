@@ -3,7 +3,6 @@
  *
  * Based on klockstat from BCC by Jiri Olsa and others
  * 2021-10-26   Barret Rhoden   Created this.
- * 07-Jan-2022  Rong Tao        Eliminate compilation warnings of reallocarray.
  */
 /* Differences from BCC python tool:
  * - can specify a lock by ksym name, using '-L'
@@ -15,8 +14,8 @@
 #include <errno.h>
 #include <signal.h>
 #include <stdio.h>
-#ifndef __USE_GNU                                                                                                            
-#define __USE_GNU
+#ifndef _GNU_SOURCE                                                                                                            
+#define _GNU_SOURCE
 #endif
 #include <stdlib.h>
 #include <string.h>
