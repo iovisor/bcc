@@ -1825,7 +1825,7 @@ XDP_FLAGS_REPLACE = (1 << 4)
 
 You can use flags like this ```BPF.attach_xdp(dev="device", fn=b.load_func("fn_name",BPF.XDP), flags=BPF.XDP_FLAGS_UPDATE_IF_NOEXIST)```
 
-The default value of flgas is 0. This means if there is no xdp program with `device`, the fn will run with that device. If there is an xdp program running with device, the old program will be replaced with new fn program.
+The default value of flags is 0. This means if there is no xdp program with `device`, the fn will run with that device. If there is an xdp program running with device, the old program will be replaced with new fn program.
 
 Currently, bcc does not support XDP_FLAGS_REPLACE flag. The following are the descriptions of other flags.
 
