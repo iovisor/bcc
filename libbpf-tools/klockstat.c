@@ -14,7 +14,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <stdio.h>
-#ifndef _GNU_SOURCE                                                                                                            
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
 #include <stdlib.h>
