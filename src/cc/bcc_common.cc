@@ -37,6 +37,10 @@ void * bpf_module_create_c_from_string(const char *text, unsigned flags, const c
   return mod;
 }
 
+bool bpf_module_rw_engine_enabled() {
+  return ebpf::bpf_module_rw_engine_enabled();
+}
+
 void bpf_module_destroy(void *program) {
   auto mod = static_cast<ebpf::BPFModule *>(program);
   if (!mod) return;

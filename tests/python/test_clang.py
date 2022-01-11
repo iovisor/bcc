@@ -3,6 +3,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 
 from bcc import BPF
+from bcc.libbcc import lib
 import ctypes as ct
 from unittest import main, skipUnless, TestCase
 from utils import kernel_version_ge
@@ -143,6 +144,7 @@ int do_completion(struct pt_regs *ctx, struct request *req) {
         b = BPF(text=text, debug=0)
         fns = b.load_funcs(BPF.KPROBE)
 
+    @skipUnless(lib.bpf_module_rw_engine_enabled(), "requires enabled rwengine")
     def test_sscanf(self):
         text = """
 BPF_HASH(stats, int, struct { u64 a; u64 b; u64 c:36; u64 d:28; struct { u32 a; u32 b; } s; }, 10);
@@ -164,6 +166,7 @@ int foo(void *ctx) {
         self.assertEqual(l.s.a, 5)
         self.assertEqual(l.s.b, 6)
 
+    @skipUnless(lib.bpf_module_rw_engine_enabled(), "requires enabled rwengine")
     def test_sscanf_array(self):
         text = """
 BPF_HASH(stats, int, struct { u32 a[3]; u32 b; }, 10);
@@ -180,6 +183,7 @@ BPF_HASH(stats, int, struct { u32 a[3]; u32 b; }, 10);
         self.assertEqual(l.a[2], 3)
         self.assertEqual(l.b, 4)
 
+    @skipUnless(lib.bpf_module_rw_engine_enabled(), "requires enabled rwengine")
     def test_sscanf_string(self):
         text = """
 struct Symbol {
