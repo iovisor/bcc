@@ -1667,6 +1667,18 @@ class BPF(object):
             readers[i] = v
         lib.perf_reader_poll(len(readers), readers, timeout)
 
+    def perf_buffer_consume(self):
+        """perf_buffer_consume(self)
+
+        Consume all open perf buffers, regardless of whether or not
+        they currently contain events data. Necessary to catch 'remainder'
+        events when wakeup_events > 1 is set in open_perf_buffer
+        """
+        readers = (ct.c_void_p * len(self.perf_buffers))()
+        for i, v in enumerate(self.perf_buffers.values()):
+            readers[i] = v
+        lib.perf_reader_consume(len(readers), readers)
+
     def kprobe_poll(self, timeout = -1):
         """kprobe_poll(self)
 
