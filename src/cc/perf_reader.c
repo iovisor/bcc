@@ -237,6 +237,14 @@ int perf_reader_poll(int num_readers, struct perf_reader **readers, int timeout)
   return 0;
 }
 
+int perf_reader_consume(int num_readers, struct perf_reader **readers) {
+  int i;
+  for (i = 0; i < num_readers; ++i) {
+    perf_reader_event_read(readers[i]);
+  }
+  return 0;
+}
+
 void perf_reader_set_fd(struct perf_reader *reader, int fd) {
   reader->fd = fd;
 }
