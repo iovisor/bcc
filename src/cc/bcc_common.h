@@ -30,6 +30,7 @@ void * bpf_module_create_c(const char *filename, unsigned flags, const char *cfl
 void * bpf_module_create_c_from_string(const char *text, unsigned flags, const char *cflags[],
                                        int ncflags, bool allow_rlimit,
                                        const char *dev_name);
+bool bpf_module_rw_engine_enabled();
 void bpf_module_destroy(void *program);
 char * bpf_module_license(void *program);
 unsigned bpf_module_kern_version(void *program);
