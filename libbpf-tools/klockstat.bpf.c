@@ -107,6 +107,21 @@ static void lock_contended(void *ctx, struct mutex *lock)
 	bpf_map_update_elem(&lockholder_map, &tl, li, BPF_ANY);
 }
 
+static void lock_aborted(struct mutex *lock)
+{
+	u64 task_id;
+	struct task_lock tl = {};
+
+	if (targ_lock && targ_lock != lock)
+		return;
+	task_id = bpf_get_current_pid_tgid();
+	if (!tracing_task(task_id))
+		return;
+	tl.task_id = task_id;
+	tl.lock_ptr = (u64)lock;
+	bpf_map_delete_elem(&lockholder_map, &tl);
+}
+
 static void lock_acquired(struct mutex *lock)
 {
 	u64 task_id;
@@ -217,6 +232,40 @@ int BPF_PROG(mutex_trylock_exit, struct mutex *lock, long ret)
 		lock_contended(ctx, lock);
 		lock_acquired(lock);
 	}
+	return 0;
+}
+
+SEC("fentry/mutex_lock_interruptible")
+int BPF_PROG(mutex_lock_interruptible, struct mutex *lock)
+{
+	lock_contended(ctx, lock);
+	return 0;
+}
+
+SEC("fexit/mutex_lock_interruptible")
+int BPF_PROG(mutex_lock_interruptible_exit, struct mutex *lock, long ret)
+{
+	if (ret)
+		lock_aborted(lock);
+	else
+		lock_acquired(lock);
+	return 0;
+}
+
+SEC("fentry/mutex_lock_killable")
+int BPF_PROG(mutex_lock_killable, struct mutex *lock)
+{
+	lock_contended(ctx, lock);
+	return 0;
+}
+
+SEC("fexit/mutex_lock_killable")
+int BPF_PROG(mutex_lock_killable_exit, struct mutex *lock, long ret)
+{
+	if (ret)
+		lock_aborted(lock);
+	else
+		lock_acquired(lock);
 	return 0;
 }
 
