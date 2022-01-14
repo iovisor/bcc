@@ -324,7 +324,7 @@ static char *symname(struct ksyms *ksyms, uint64_t pc, char *buf, size_t n)
 
 static void print_acq_header(void)
 {
-	printf("\n                               Caller  Avg Spin    Count   Max Spin   Total Spin\n");
+	printf("\n                               Caller  Avg Wait    Count   Max Wait   Total Wait\n");
 }
 
 static void print_acq_stat(struct ksyms *ksyms, struct stack_stat *ss,
