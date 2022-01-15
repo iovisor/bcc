@@ -37,12 +37,12 @@ BPF_PERF_OUTPUT(events);
 
 void kprobe__oom_kill_process(struct pt_regs *ctx, struct oom_control *oc, const char *message)
 {
-    unsigned long totalpages;
     struct task_struct *p = oc->chosen;
     struct data_t data = {};
     u32 pid = bpf_get_current_pid_tgid() >> 32;
+
     data.fpid = pid;
-    data.tpid = p->pid;
+    data.tpid = p->tgid;
     data.pages = oc->totalpages;
     bpf_get_current_comm(&data.fcomm, sizeof(data.fcomm));
     bpf_probe_read_kernel(&data.tcomm, sizeof(data.tcomm), p->comm);
