@@ -397,21 +397,21 @@ BPFPerfBuffer::BPFPerfBuffer(const TableDesc& desc)
                                 "' is not a perf buffer");
 }
 
-StatusTuple BPFPerfBuffer::open_on_cpu(perf_reader_raw_cb cb,
-                                       perf_reader_lost_cb lost_cb, int cpu,
-                                       void* cb_cookie, int page_cnt) {
-  if (cpu_readers_.find(cpu) != cpu_readers_.end())
-    return StatusTuple(-1, "Perf buffer already open on CPU %d", cpu);
+StatusTuple BPFPerfBuffer::open_on_cpu(perf_reader_raw_cb cb, perf_reader_lost_cb lost_cb,
+                                       void* cb_cookie, int page_cnt,
+                                       struct bcc_perf_buffer_opts& opts) {
+  if (cpu_readers_.find(opts.cpu) != cpu_readers_.end())
+    return StatusTuple(-1, "Perf buffer already open on CPU %d", opts.cpu);
 
   auto reader = static_cast<perf_reader*>(
-      bpf_open_perf_buffer(cb, lost_cb, cb_cookie, -1, cpu, page_cnt));
+      bpf_open_perf_buffer_opts(cb, lost_cb, cb_cookie, page_cnt, &opts));
   if (reader == nullptr)
     return StatusTuple(-1, "Unable to construct perf reader");
 
   int reader_fd = perf_reader_fd(reader);
-  if (!update(&cpu, &reader_fd)) {
+  if (!update(&opts.cpu, &reader_fd)) {
     perf_reader_free(static_cast<void*>(reader));
-    return StatusTuple(-1, "Unable to open perf buffer on CPU %d: %s", cpu,
+    return StatusTuple(-1, "Unable to open perf buffer on CPU %d: %s", opts.cpu,
                        std::strerror(errno));
   }
 
@@ -424,13 +424,21 @@ StatusTuple BPFPerfBuffer::open_on_cpu(perf_reader_raw_cb cb,
                        std::strerror(errno));
   }
 
-  cpu_readers_[cpu] = reader;
+  cpu_readers_[opts.cpu] = reader;
   return StatusTuple::OK();
 }
 
 StatusTuple BPFPerfBuffer::open_all_cpu(perf_reader_raw_cb cb,
                                         perf_reader_lost_cb lost_cb,
                                         void* cb_cookie, int page_cnt) {
+  return open_all_cpu(cb, lost_cb, cb_cookie, page_cnt, 1);
+}
+
+StatusTuple BPFPerfBuffer::open_all_cpu(perf_reader_raw_cb cb,
+                                        perf_reader_lost_cb lost_cb,
+                                        void* cb_cookie, int page_cnt,
+                                        int wakeup_events)
+{
   if (cpu_readers_.size() != 0 || epfd_ != -1)
     return StatusTuple(-1, "Previously opened perf buffer not cleaned");
 
@@ -439,7 +447,12 @@ StatusTuple BPFPerfBuffer::open_all_cpu(perf_reader_raw_cb cb,
   epfd_ = epoll_create1(EPOLL_CLOEXEC);
 
   for (int i : cpus) {
-    auto res = open_on_cpu(cb, lost_cb, i, cb_cookie, page_cnt);
+    struct bcc_perf_buffer_opts opts = {
+      .pid = -1,
+      .cpu = i,
+      .wakeup_events = wakeup_events,
+    };
+    auto res = open_on_cpu(cb, lost_cb, cb_cookie, page_cnt, opts);
     if (!res.ok()) {
       TRY2(close_all_cpu());
       return res;
@@ -498,6 +511,14 @@ int BPFPerfBuffer::poll(int timeout_ms) {
   for (int i = 0; i < cnt; i++)
     perf_reader_event_read(static_cast<perf_reader*>(ep_events_[i].data.ptr));
   return cnt;
+}
+
+int BPFPerfBuffer::consume() {
+  if (epfd_ < 0)
+    return -1;
+  for (auto it : cpu_readers_)
+    perf_reader_event_read(it.second);
+  return 0;
 }
 
 BPFPerfBuffer::~BPFPerfBuffer() {
