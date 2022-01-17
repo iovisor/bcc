@@ -88,6 +88,13 @@ struct entry_t {
     u64 args[5];
 #endif
 #endif
+#ifdef USER_STACKS
+    int user_stack_id;
+#endif
+#ifdef KERNEL_STACKS
+    int kernel_stack_id;
+    u64 kernel_ip;
+#endif
 };
 
 struct data_t {
@@ -143,6 +150,40 @@ static int trace_entry(struct pt_regs *ctx, int id)
 #endif
 #endif
 
+#ifdef USER_STACKS
+    entry.user_stack_id = stacks.get_stackid(ctx, BPF_F_USER_STACK);
+#endif
+
+#ifdef KERNEL_STACKS
+    entry.kernel_stack_id = stacks.get_stackid(ctx, 0);
+
+    if (entry.kernel_stack_id >= 0) {
+        u64 ip = PT_REGS_IP(ctx);
+        u64 page_offset;
+
+        // if ip isn't sane, leave key ips as zero for later checking
+#if defined(CONFIG_X86_64) && defined(__PAGE_OFFSET_BASE)
+        // x64, 4.16, ..., 4.11, etc., but some earlier kernel didn't have it
+        page_offset = __PAGE_OFFSET_BASE;
+#elif defined(CONFIG_X86_64) && defined(__PAGE_OFFSET_BASE_L4)
+        // x64, 4.17, and later
+#if defined(CONFIG_DYNAMIC_MEMORY_LAYOUT) && defined(CONFIG_X86_5LEVEL)
+        page_offset = __PAGE_OFFSET_BASE_L5;
+#else
+        page_offset = __PAGE_OFFSET_BASE_L4;
+#endif
+#else
+        // earlier x86_64 kernels, e.g., 4.6, comes here
+        // arm64, s390, powerpc, x86_32
+        page_offset = PAGE_OFFSET;
+#endif
+
+        if (ip > page_offset) {
+            entry.kernel_ip = ip;
+        }
+    }
+#endif
+
     entryinfo.update(&tgid_pid, &entry);
 
     return 0;
@@ -172,37 +213,12 @@ int trace_return(struct pt_regs *ctx)
     data.retval = PT_REGS_RC(ctx);
 
 #ifdef USER_STACKS
-    data.user_stack_id = stacks.get_stackid(ctx, BPF_F_USER_STACK);
+    data.user_stack_id = entryp->user_stack_id;
 #endif
 
 #ifdef KERNEL_STACKS
-    data.kernel_stack_id = stacks.get_stackid(ctx, 0);
-
-    if (data.kernel_stack_id >= 0) {
-        u64 ip = PT_REGS_IP(ctx);
-        u64 page_offset;
-
-        // if ip isn't sane, leave key ips as zero for later checking
-#if defined(CONFIG_X86_64) && defined(__PAGE_OFFSET_BASE)
-        // x64, 4.16, ..., 4.11, etc., but some earlier kernel didn't have it
-        page_offset = __PAGE_OFFSET_BASE;
-#elif defined(CONFIG_X86_64) && defined(__PAGE_OFFSET_BASE_L4)
-        // x64, 4.17, and later
-#if defined(CONFIG_DYNAMIC_MEMORY_LAYOUT) && defined(CONFIG_X86_5LEVEL)
-        page_offset = __PAGE_OFFSET_BASE_L5;
-#else
-        page_offset = __PAGE_OFFSET_BASE_L4;
-#endif
-#else
-        // earlier x86_64 kernels, e.g., 4.6, comes here
-        // arm64, s390, powerpc, x86_32
-        page_offset = PAGE_OFFSET;
-#endif
-
-        if (ip > page_offset) {
-            data.kernel_ip = ip;
-        }
-    }
+    data.kernel_stack_id = entryp->kernel_stack_id;
+    data.kernel_ip = entryp->kernel_ip;
 #endif
 
 #ifdef GRAB_ARGS
