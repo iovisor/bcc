@@ -250,8 +250,6 @@ and outer IP addresses traversing the interface, and the userspace component
 turns those statistics into a graph showing the traffic distribution at
 multiple granularities. See the code [here](examples/networking/tunnel_monitor).
 
-[![Screenshot](http://img.youtube.com/vi/yYy3Cwce02k/0.jpg)](https://youtu.be/yYy3Cwce02k)
-
 ## Contributing
 
 Already pumped up to commit some code? Here are some resources to join the
