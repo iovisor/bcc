@@ -5,7 +5,7 @@
 #           For Linux, uses BCC, eBPF.
 #
 # USAGE: sslsniff.py [-h] [-p PID] [-u UID] [-x] [-c COMM] [-o] [-g] [-n] [-d]
-#                    [--hexdump] [--max-buffer-size SIZE] [-v]
+#                    [--hexdump] [--max-buffer-size SIZE] [-l] [--handshake]
 #
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
@@ -31,7 +31,8 @@ examples = """examples:
     ./sslsniff --no-nss     # don't show NSS calls
     ./sslsniff --hexdump    # show data as hex instead of trying to decode it as UTF-8
     ./sslsniff -x           # show process UID and TID
-    ./sslsniff -v           # trace SSL handshake calls
+    ./sslsniff -l           # show function latency
+    ./sslsniff --handshake  # trace SSL handshake calls
 """
 parser = argparse.ArgumentParser(
     description="Sniff SSL data",
@@ -58,7 +59,9 @@ parser.add_argument("--hexdump", action="store_true", dest="hexdump",
                     help="show data as hexdump instead of trying to decode it as UTF-8")
 parser.add_argument('--max-buffer-size', type=int, default=8192,
                     help='Size of captured buffer')
-parser.add_argument("-v", "--verbose", action="store_true",
+parser.add_argument("-l", "--latency", action="store_true",
+                    help="show function latency")
+parser.add_argument("--handshake", action="store_true",
                     help="trace SSL handshake calls.")
 args = parser.parse_args()
 
@@ -128,7 +131,7 @@ int probe_SSL_write(struct pt_regs *ctx, void *ssl, void *buf, int num) {
         return 0;
 }
 
-int probe_SSL_write_end(struct pt_regs *ctx, void *ssl, void *buf, int num) {
+int probe_SSL_write_exit(struct pt_regs *ctx, void *ssl, void *buf, int num) {
         int ret;
         u32 zero = 0;
         u64 pid_tgid = bpf_get_current_pid_tgid();
@@ -323,13 +326,14 @@ if args.openssl:
                     pid=args.pid or -1)
     b.attach_uretprobe(name="ssl", sym="SSL_read",
                        fn_name="probe_SSL_read_exit", pid=args.pid or -1)
-    if args.verbose:
+    if args.latency:
+        b.attach_uretprobe(name="ssl", sym="SSL_write",
+                           fn_name="probe_SSL_write_exit", pid=args.pid or -1)
+    if args.handshake:
         b.attach_uprobe(name="ssl", sym="SSL_do_handshake",
                         fn_name="probe_SSL_do_handshake_enter", pid=args.pid or -1)
         b.attach_uretprobe(name="ssl", sym="SSL_do_handshake",
                            fn_name="probe_SSL_do_handshake_exit", pid=args.pid or -1)
-        b.attach_uretprobe(name="ssl", sym="SSL_write",
-                           fn_name="probe_SSL_write_end", pid=args.pid or -1)
 
 if args.gnutls:
     b.attach_uprobe(name="gnutls", sym="gnutls_record_send",
@@ -362,8 +366,8 @@ header = "%-12s %-18s %-16s %-7s %-6s" % ("FUNC", "TIME(s)", "COMM", "PID", "LEN
 if args.extra:
     header += " %-7s %-7s" % ("UID", "TID")
 
-if args.verbose:
-    header += " %-7s" % ("LATms")
+if args.latency:
+    header += " %-7s" % ("LAT(ms)")
 
 print(header)
 # process event
@@ -421,7 +425,7 @@ def print_event(cpu, data, size, rw, evt):
     if args.extra:
         base_fmt += " %(uid)-7d %(tid)-7d"
 
-    if args.verbose:
+    if args.latency:
         base_fmt += " %(lat)-7s"
 
     fmt = ''.join([base_fmt, "\n%(begin)s\n%(data)s\n%(end)s\n\n"])
