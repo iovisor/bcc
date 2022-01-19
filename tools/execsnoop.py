@@ -213,7 +213,7 @@ int do_ret_sys_execve(struct pt_regs *ctx)
 
 bpf_text = bpf_text.replace("MAXARG", args.max_args)
 
-if args.uid:
+if isinstance(args.uid, int):
     bpf_text = bpf_text.replace('UID_FILTER',
         'if (uid != %s) { return 0; }' % args.uid)
 else:
