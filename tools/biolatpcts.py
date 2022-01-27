@@ -56,6 +56,7 @@ parser.add_argument('--verbose', '-v', action='count', default = 0)
 bpf_source = """
 #include <linux/blk_types.h>
 #include <linux/blkdev.h>
+#include <linux/blk-mq.h>
 #include <linux/time64.h>
 
 BPF_PERCPU_ARRAY(rwdf_100ms, u64, 400);
