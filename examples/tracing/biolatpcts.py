@@ -11,6 +11,7 @@ from time import sleep
 
 bpf_source = """
 #include <linux/blk_types.h>
+#include <linux/blk-mq.h>
 #include <linux/blkdev.h>
 #include <linux/time64.h>
 
@@ -45,7 +46,10 @@ void kprobe_blk_account_io_done(struct pt_regs *ctx, struct request *rq, u64 now
 """
 
 bpf = BPF(text=bpf_source)
-bpf.attach_kprobe(event='blk_account_io_done', fn_name='kprobe_blk_account_io_done')
+if BPF.get_kprobe_functions(b'__blk_account_io_done'):
+    bpf.attach_kprobe(event="__blk_account_io_done", fn_name="kprobe_blk_account_io_done")
+else:
+    bpf.attach_kprobe(event="blk_account_io_done", fn_name="kprobe_blk_account_io_done")
 
 cur_lat_100ms = bpf['lat_100ms']
 cur_lat_1ms = bpf['lat_1ms']
