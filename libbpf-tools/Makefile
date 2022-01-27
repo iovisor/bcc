@@ -40,6 +40,7 @@ APPS = \
 	ksnoop \
 	llcstat \
 	mountsnoop \
+	memleak \
 	numamove \
 	offcputime \
 	opensnoop \
