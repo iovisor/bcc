@@ -3,7 +3,7 @@
 sslsniff \- Print data passed to OpenSSL, GnuTLS or NSS. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
 .B sslsniff [-h] [-p PID] [-u UID] [-x] [-c COMM] [-o] [-g] [-n] [-d]
-.B [--hexdump] [--max-buffer-size SIZE]
+.B [--hexdump] [--max-buffer-size SIZE] [-l] [--handshake]
 .SH DESCRIPTION
 sslsniff prints data sent to write/send and read/recv functions of
 OpenSSL, GnuTLS and NSS, allowing us to read plain text content before
@@ -46,6 +46,12 @@ Show data as hexdump instead of trying to decode it as UTF-8
 \-\-max-buffer-size SIZE
 Sets maximum buffer size of intercepted data. Longer values would be truncated.
 Default value is 8 Kib, maximum possible value is a bit less than 32 Kib.
+.TP
+\-l, \-\-latency
+Show function latency in ms.
+.TP
+\--handshake
+Show handshake latency, enabled only if latency option is on.
 .SH EXAMPLES
 .TP
 Print all calls to SSL write/send and read/recv system-wide:
@@ -55,6 +61,10 @@ Print all calls to SSL write/send and read/recv system-wide:
 Print only OpenSSL calls issued by user with UID 1000
 #
 .B sslsniff -u 1000 --no-nss --no-gnutls
+.TP
+Print SSL handshake event and latency for all traced functions:
+#
+.B sslsniff -l --handshake
 .SH FIELDS
 .TP
 FUNC
@@ -77,6 +87,9 @@ UID of the process, displayed only if launched with -x.
 .TP
 TID
 Thread ID, displayed only if launched with -x.
+.TP
+LAT(ms)
+Function latency in ms.
 .SH SOURCE
 This is from bcc.
 .IP
