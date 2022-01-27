@@ -51,7 +51,7 @@ Default value is 8 Kib, maximum possible value is a bit less than 32 Kib.
 Show function latency in ms.
 .TP
 \--handshake
-Trace SSL handshake calls.
+Show handshake latency, enabled only if latency option is on.
 .SH EXAMPLES
 .TP
 Print all calls to SSL write/send and read/recv system-wide:
@@ -89,7 +89,7 @@ TID
 Thread ID, displayed only if launched with -x.
 .TP
 LAT(ms)
-Function latency in ms, or N/A when in function entry.
+Function latency in ms.
 .SH SOURCE
 This is from bcc.
 .IP

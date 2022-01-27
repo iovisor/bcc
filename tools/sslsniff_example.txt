@@ -103,42 +103,58 @@ lot of characters that are not printable or even Unicode replacement
 characters.
 
 
-Function latency can be show by -l or --latency option, and SSL handshake calls
-can be trace by --handshake option. This is useful when analyzing SSL/TLS
-performance. Tracing output of "openssl s_client -connect example.com:443":
+Use -l or --latency option to show function latency, and show handshake latency
+by using both -l and --handshake. This is useful for SSL/TLS performance
+analysis. Tracing output of "echo | openssl s_client -connect example.com:443":
 
 # ./sslsniff.py -l --handshake
 FUNC         TIME(s)            COMM             PID     LEN    LAT(ms)
-WRITE/SEND   0.000000000        openssl          3260509 0      N/A
-WRITE/SEND   0.593772992        openssl          3260509 0      593.773
-WRITE/SEND   0.593898479        openssl          3260509 1      N/A
+WRITE/SEND   0.000000000        openssl          10377   1      0.005
 ----- DATA -----
 
 
 ----- END DATA -----
 
-
-WRITE/SEND   0.593906849        openssl          3260509 1      0.008
-
-
-Change example.com to localhost server. It takes 0.7ms for server handshake
-and 1.3ms before secure connection is ready for 1st SSL_read or SSL_write.
-Note that latency field shows "N/A" at function entry.
+Trace localhost server instead of example.com. It takes 0.7ms for server
+handshake before secure connection is ready for initial SSL_read or SSL_write.
 
 # ./sslsniff.py -l --handshake
 FUNC         TIME(s)            COMM             PID     LEN    LAT(ms)
-WRITE/SEND   0.000000000        openssl          3260362 0      N/A
-HANDSHAKE    0.001318467        nginx            3260106 1      0.689
-WRITE/SEND   0.001339752        openssl          3260362 0      1.340
-WRITE/SEND   0.001452343        openssl          3260362 1      N/A
+HANDSHAKE    0.000000000        nginx            7081    1      0.699
+WRITE/SEND   0.000132180        openssl          14800   1      0.010
 ----- DATA -----
 
 
 ----- END DATA -----
 
+READ/RECV    0.000136583        nginx            7081    1      0.004
+----- DATA -----
 
-WRITE/SEND   0.001467280        openssl          3260362 1      0.015
-READ/RECV    0.001470071        nginx            3260106 1      0.003
+
+----- END DATA -----
+
+Tracing output of "echo | gnutls-cli -p 443 example.com":
+
+# ./sslsniff.py -l --handshake
+FUNC         TIME(s)            COMM             PID     LEN    LAT(ms)
+WRITE/SEND   0.000000000        gnutls-cli       43554   1      0.012
+----- DATA -----
+
+
+----- END DATA -----
+
+Tracing output of "echo | gnutls-cli -p 443 --insecure localhost":
+
+# ./sslsniff.py -l --handshake
+FUNC         TIME(s)            COMM             PID     LEN    LAT(ms)
+HANDSHAKE    0.000000000        nginx            7081    1      0.710
+WRITE/SEND   0.000045126        gnutls-cli       43752   1      0.014
+----- DATA -----
+
+
+----- END DATA -----
+
+READ/RECV    0.000049464        nginx            7081    1      0.004
 ----- DATA -----
 
 
@@ -168,7 +184,8 @@ optional arguments:
   --max-buffer-size MAX_BUFFER_SIZE
                         Size of captured buffer
   -l, --latency         show function latency
-  --handshake           trace SSL handshake calls
+  --handshake           show SSL handshake latency, enabled only if latency
+                        option is on. 
 
 examples:
     ./sslsniff              # sniff OpenSSL and GnuTLS functions
@@ -181,4 +198,4 @@ examples:
     ./sslsniff --hexdump    # show data as hex instead of trying to decode it as UTF-8
     ./sslsniff -x           # show process UID and TID
     ./sslsniff -l           # show function latency
-    ./sslsniff --handshake  # trace SSL handshake calls
+    ./sslsniff -l --handshake  # show SSL handshake latency
