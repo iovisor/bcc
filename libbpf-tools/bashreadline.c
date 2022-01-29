@@ -132,7 +132,7 @@ cleanup:
 	if (line)
 		free(line);
 	if (fp)
-		fclose(fp);
+		pclose(fp);
 	return result;
 }
 
