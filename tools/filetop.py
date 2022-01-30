@@ -67,6 +67,7 @@ bpf_text = """
 struct info_t {
     unsigned long inode;
     dev_t dev;
+    dev_t rdev;
     u32 pid;
     u32 name_len;
     char comm[TASK_COMM_LEN];
@@ -105,7 +106,8 @@ static int do_entry(struct pt_regs *ctx, struct file *file,
     struct info_t info = {
         .pid = pid,
         .inode = file->f_inode->i_ino,
-        .dev = file->f_inode->i_rdev,
+        .dev = file->f_inode->i_sb->s_dev,
+        .rdev = file->f_inode->i_rdev,
     };
     bpf_get_current_comm(&info.comm, sizeof(info.comm));
     info.name_len = d_name.len;

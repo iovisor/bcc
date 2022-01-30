@@ -13,6 +13,7 @@ enum op {
 struct file_id {
 	__u64 inode;
 	__u32 dev;
+	__u32 rdev;
 	__u32 pid;
 	__u32 tid;
 };

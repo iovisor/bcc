@@ -44,7 +44,8 @@ static int probe_entry(struct pt_regs *ctx, struct file *file, size_t count, enu
 	if (regular_file_only && !S_ISREG(mode))
 		return 0;
 
-	key.dev = BPF_CORE_READ(file, f_inode, i_rdev);
+	key.dev = BPF_CORE_READ(file, f_inode, i_sb, s_dev);
+	key.rdev = BPF_CORE_READ(file, f_inode, i_rdev);
 	key.inode = BPF_CORE_READ(file, f_inode, i_ino);
 	key.pid = pid;
 	key.tid = tid;
