@@ -28,6 +28,7 @@
 /llcstat
 /nfsdist
 /nfsslower
+/memleak
 /mountsnoop
 /numamove
 /offcputime

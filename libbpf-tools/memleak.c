@@ -1,11 +1,11 @@
-// SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
-// Copyright (c) 2022 Jackie Dinh
-//
-// Based on memleak(8) from BCC by Sasha Goldshtein
+/* SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause) */
+/* Copyright (c) 2022 Jackie Dinh */
+/* Based on memleak(8) from BCC by Sasha Goldshtein */
 #include <argp.h>
 #include <errno.h>
-#include <signal.h>
 #include <stdio.h>
+#include <signal.h>
+#include <stdlib.h>
 #include <sys/resource.h>
 #include <time.h>
 #include <unistd.h>
@@ -19,6 +19,61 @@
 #include "uprobe_helpers.h"
 
 #define PATH_MAX	4096
+
+#define INIT_UPROBE(name, pid, path, sym) \
+{\
+	off_t addr = get_elf_func_offset(path,sym);\
+	if (addr < 0) {\
+		fprintf(stderr, "cannot get offset of %s (libc: %s)\n", sym, path);\
+		goto cleanup;\
+	}\
+	skel->links.uprobe_##name = bpf_program__attach_uprobe(skel->progs.uprobe_##name, \
+							false, pid, path, addr);\
+	err = libbpf_get_error(skel->links.uprobe_##name);\
+	if (err) { \
+		fprintf(stderr, "Failed to attach uprobe_##name: %d\n", err); \
+		goto cleanup; \
+	} \
+}
+
+#define INIT_URETPROBE(name, pid, path, sym) \
+{\
+	off_t addr = get_elf_func_offset(path,sym);\
+	if (addr < 0) {\
+		fprintf(stderr, "cannot get offset of %s (libc: %s)\n", sym, path);\
+		goto cleanup;\
+	}\
+	skel->links.uretprobe_##name = bpf_program__attach_uprobe(skel->progs.uretprobe_##name, \
+							true, pid, path, addr);\
+	err = libbpf_get_error(skel->links.uretprobe_##name);\
+	if (err) { \
+		fprintf(stderr, "Failed to attach uretprobe_##name: %d\n", err); \
+		goto cleanup; \
+	} \
+}
+
+#define INIT_UPROBE_URETPROBE(name, pid, path, sym) \
+{\
+	off_t addr = get_elf_func_offset(path,sym);\
+	if (addr < 0) {\
+		fprintf(stderr, "cannot get offset of %s (libc: %s)\n", sym, path);\
+		goto cleanup;\
+	}\
+	skel->links.uprobe_##name = bpf_program__attach_uprobe(skel->progs.uprobe_##name, \
+							false, pid, path, addr);\
+	err = libbpf_get_error(skel->links.uprobe_##name);\
+	if (err) { \
+		fprintf(stderr, "Failed to attach uprobe_##name: %d\n", err); \
+		goto cleanup; \
+	} \
+	skel->links.uretprobe_##name = bpf_program__attach_uprobe(skel->progs.uretprobe_##name, \
+							true, pid, path, addr);\
+	err = libbpf_get_error(skel->links.uretprobe_##name);\
+	if (err) { \
+		fprintf(stderr, "Failed to attach uretprobe_##name: %d\n", err); \
+		goto cleanup; \
+	} \
+}
 
 static struct env {
 	bool	print_help;
@@ -40,25 +95,12 @@ static struct env {
 	bool	percpu;
 	bool	kernel_trace;
 	int	max_stack_depth;
+	bool	verbose;
 } env = {
-	.print_help = false,
-	.pid = 0,
-	.child_pid = 0,
-	.trace_all = false,
 	.interval = 5,
-	.count = 0,
-	.show_allocs = false,
 	.min_age_ns = 500 * 1e6,
-	.command = NULL,
-	.combined_only = false,
-	.wa_missing_free = false,
 	.sample_rate = 1,
 	.top = 10,
-	.min_size = 0,
-	.max_size = 0,
-	.obj = NULL,
-	.percpu = false,
-	.kernel_trace = false,
 	.max_stack_depth = 127,
 };
 
@@ -109,19 +151,14 @@ static const struct argp_option opts[] = {
 	{ "obj", 'O', "OBJ", 0, "Attach to allocator functions in the specified object" },
 	{ "percpu", 'P', NULL, 0, "trace percpu allocations" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{},
 };
 
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
 	static int pos_args;
-	int pid;
-	int interval;
-	int count;
-	int older;
-	int sample_rate;
-	int min_size;
-	int max_size;
+	int pid, num;
 
 	switch (key) {
 	case 'p':
@@ -144,12 +181,12 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'o':
 		errno = 0;
-		older = strtol(arg, NULL, 10);
-		if (errno || older <= 0) {
+		num = strtol(arg, NULL, 10);
+		if (errno || num <= 0) {
 			fprintf(stderr, "Invalid time: %s\n", arg);
 			argp_usage(state);
 		}
-		env.min_age_ns = older * 1e6;
+		env.min_age_ns = num * 1e6;
 		break;
 	case 'C':
 		env.combined_only = true;
@@ -159,36 +196,39 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 's':
 		errno = 0;
-		sample_rate = strtol(arg, NULL, 10);
-		if (errno || sample_rate <= 0) {
+		num = strtol(arg, NULL, 10);
+		if (errno || num <= 0) {
 			fprintf(stderr, "Invalid sample rate: %s\n", arg);
 			argp_usage(state);
 		}
-		env.sample_rate = sample_rate;
+		env.sample_rate = num;
 		break;
 	case 'z':
 		errno = 0;
-		min_size = strtol(arg, NULL, 10);
-		if (errno || min_size <= 0) {
+		num = strtol(arg, NULL, 10);
+		if (errno || num <= 0) {
 			fprintf(stderr, "Invalid min size: %s\n", arg);
 			argp_usage(state);
 		}
-		env.min_size = min_size;
+		env.min_size = num;
 		break;
 	case 'Z':
 		errno = 0;
-		max_size = strtol(arg, NULL, 10);
-		if (errno || max_size <= 0) {
+		num = strtol(arg, NULL, 10);
+		if (errno || num <= 0) {
 			fprintf(stderr, "Invalid max size: %s\n", arg);
 			argp_usage(state);
 		}
-		env.max_size = max_size;
+		env.max_size = num;
 		break;
 	case 'P':
 		env.percpu = true;
 		break;
 	case 'h':
 		argp_state_help(state, stderr, ARGP_HELP_STD_HELP);
+		break;
+	case 'v':
+		env.verbose = true;
 		break;
 	case ARGP_KEY_ARG:
 		if (pos_args++ > 2) {
@@ -198,20 +238,20 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		}
 		errno = 0;
 		if (pos_args == 1) {
-			interval = strtoll(arg, NULL, 10);
-			if (errno || interval <= 0) {
+			num = strtoll(arg, NULL, 10);
+			if (errno || num <= 0) {
 				fprintf(stderr, "Invalid report interval: %s\n", arg);
 				argp_usage(state);
 			}
-			env.interval = interval;
+			env.interval = num;
 		}
 		if (pos_args == 2) {
-			count = strtoll(arg, NULL, 10);
-			if (errno || count <= 0) {
+			num = strtoll(arg, NULL, 10);
+			if (errno || num <= 0) {
 				fprintf(stderr, "Invalid number of times to print report: %s\n", arg);
 				argp_usage(state);
 			}
-			env.count = count;
+			env.count = num;
 		}
 		break;
 	default:
@@ -228,6 +268,8 @@ static const struct argp argp = {
 
 static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
+	if (level == LIBBPF_DEBUG && !env.verbose)
+		return 0;
 	return vfprintf(stderr, format, args);
 }
 
@@ -263,39 +305,10 @@ struct alloc_stack {
 	int nr;
 };
 
-static int partition(struct alloc_stack *list, int low, int high)
+static int alloc_stack_cmp(const void *p1, const void *p2)
 {
-	struct alloc_stack pivot = list[high];
-	struct alloc_stack temp;
-	int i = low - 1;
-	int j;
-
-	for (j = low; j <= high - 1; j++) {
-		if (list[j].size > pivot.size) {
-			i++;
-			temp = list[j];
-			list[j] = list[i];
-			list[i] = temp;
-		}
-	}
-
-	temp = list[i + 1];
-	list[i + 1] = list[high];
-	list[high] = temp;
-	return (i + 1);
-}
-
-static void quick_sort(struct alloc_stack *list, int low, int high)
-{
-	int pi;
-
-	if (list == NULL) return;
-
-	if (low < high) {
-		pi = partition(list, low, high);
-		quick_sort(list, low, pi - 1);
-		quick_sort(list, pi + 1, high);
-	}
+	const struct alloc_stack *s1 = p1, *s2 = p2;
+	return s1->size < s2->size;
 }
 
 static void print_combined_outstanding_allocations(struct ksyms *ksyms, struct syms_cache *syms_cache,
@@ -348,12 +361,11 @@ static void print_combined_outstanding_allocations(struct ksyms *ksyms, struct s
 		cnt++;
 	}
 
-	quick_sort(stacks, 0, cnt);
-	if (cnt < max_prints) {
+	qsort(stacks, cnt, sizeof(*stacks), alloc_stack_cmp);
+	if (cnt < max_prints)
 		max_prints = cnt;
-	}
 
-	for (i=0; i < max_prints; i++) {
+	for (i = 0; i < max_prints; i++) {
 		if (stacks[i].stack_id == 0) break;
 
 		if (bpf_map_lookup_elem(sfd, &stacks[i].stack_id, ip) != 0) {
@@ -443,12 +455,11 @@ static void print_outstanding_allocations(struct ksyms *ksyms, struct syms_cache
 			goto cleanup;
 		}
 		addr = next_addr;
-		if (now_ns - env.min_age_ns < info.timestamp_ns) {
+		if (now_ns - env.min_age_ns < info.timestamp_ns)
 			continue;
-		}
 
 		stack = NULL;
-		for (i=0; i < MAX_HASH_ENTRY_NUM; i++) {
+		for (i = 0; i < MAX_HASH_ENTRY_NUM; i++) {
 			if (stacks[i].stack_id == info.stack_id) {
 				stack = &stacks[i];
 				break;
@@ -463,17 +474,15 @@ static void print_outstanding_allocations(struct ksyms *ksyms, struct syms_cache
 		if (stack == NULL) continue;
 		stack->size += info.size;
 		stack->nr++;
-		if (env.show_allocs) {
+		if (env.show_allocs)
 			printf("\taddr = %lx size = %lld\n", addr, info.size);
-		}
 	}
 
-	quick_sort(stacks, 0, cnt);
-	if (cnt < max_prints) {
+	qsort(stacks, cnt, sizeof(*stacks), alloc_stack_cmp);
+	if (cnt < max_prints)
 		max_prints = cnt;
-	}
 
-	for (i=0; i < max_prints; i++) {
+	for (i = 0; i < max_prints; i++) {
 		if (stacks[i].stack_id == 0) break;
 
 		if (bpf_map_lookup_elem(sfd, &stacks[i].stack_id, ip) != 0) {
@@ -510,18 +519,54 @@ static void print_outstanding_allocations(struct ksyms *ksyms, struct syms_cache
 	}
 
 cleanup:
-	if (ip) free(ip);
 	if (stacks) free(stacks);
+	if (ip) free(ip);
 }
 
-void sig_handler(int signo)
+static void sig_handler(int signo)
 {
 	if (env.child_pid == 0)
 		return;
 
-	if (signo == SIGINT || signo == SIGTERM) {
-		// kill all child processes forked by command
+	/* kill all child processes forked by command */
+	if (signo == SIGINT || signo == SIGTERM)
 		kill(0, SIGKILL);
+}
+
+static void exec_command(const char *cmdstr)
+{
+	const char *delim = " ";
+	char *cmd = strdup(cmdstr);
+	char **argv, *ptr, *filepath;
+	int j;
+	argv = malloc(sizeof(char *) * strlen(cmd));
+	memset(argv, 0, sizeof(char *) * strlen(cmd));
+	ptr = strtok(cmd, delim);
+	if (ptr != NULL) {
+		filepath = ptr;
+		ptr = strtok(NULL, delim);
+	} else {
+		fprintf(stderr, "Failed to exec %s\n", cmdstr);
+		exit(-1);
+	}
+
+	j = 0;
+	while (ptr != NULL)
+	{
+		argv[j++] = ptr;
+		ptr = strtok(NULL, delim);
+	}
+
+	env.pid = fork();
+	if (env.pid == 0) {
+		execve(filepath, argv, NULL);
+	} else if (env.pid > 0) {
+		// main process
+		env.child_pid = env.pid;
+		signal(SIGINT, sig_handler);
+	} else {
+		fprintf(stderr, "Failed to exec %s\n", env.command);
+		exit(-1);
 	}
 }
 
@@ -538,47 +583,12 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
-	if (env.command != NULL) {
-		const char *delim = " ";
-		char *cmd = strdup(env.command);
-		char **argv, *ptr, *filepath;
-		int j;
-		argv = malloc(sizeof(char *) * strlen(cmd));
-		memset(argv, 0, sizeof(char *) * strlen(cmd));
-		ptr = strtok(cmd, delim);
-		if (ptr != NULL) {
-			filepath = ptr;
-			ptr = strtok(NULL, delim);
-		} else {
-			fprintf(stderr, "Failed to exec %s\n", env.command);
-			exit(-1);
-		}
-
-		j = 0;
-		while (ptr != NULL)
-		{
-			argv[j++] = ptr;
-			ptr = strtok(NULL, delim);
-		}
-
-		env.pid = fork();
-		if (env.pid == 0) {
-			execve(filepath, argv, NULL);
-		} else if (env.pid > 0) {
-			// main process
-			env.child_pid = env.pid;
-			signal(SIGINT, sig_handler);
-		} else {
-			fprintf(stderr, "Failed to exec %s\n", env.command);
-			exit(-1);
-		}
-	}
+	if (env.command != NULL)
+		exec_command(env.command);
 	env.kernel_trace = env.pid == 0;
 
 	/* Set up libbpf errors and debug info callback */
-	if (env.trace_all) {
-		libbpf_set_print(libbpf_print_fn);
-	}
+	libbpf_set_print(libbpf_print_fn);
 
 	skel = memleak_bpf__open();
 	if (!skel) {
@@ -590,11 +600,11 @@ int main(int argc, char **argv)
 	skel->rodata->min_size = env.min_size;
 	skel->rodata->max_size = env.max_size;
 	skel->rodata->trace_all = env.trace_all;
-	if (env.kernel_trace) {
+	if (env.kernel_trace)
 		skel->rodata->stack_flags = 0;
-	} else {
+	else
 		skel->rodata->stack_flags = BPF_F_USER_STACK;
-	}
+
 	skel->rodata->page_size = sysconf(_SC_PAGESIZE);
 	bpf_map__set_value_size(skel->maps.stack_traces, 127 * sizeof(unsigned long));
 	bpf_map__set_max_entries(skel->maps.stack_traces, 10*1024);
@@ -692,16 +702,18 @@ int main(int argc, char **argv)
 	}
 
 	for (i = 0; ; i++) {
-		if (env.count != 0 && i >= env.count) break;
+		if (env.count != 0 && i >= env.count)
+			 break;
 		sleep(env.interval);
-		if (env.combined_only) {
-	   	print_combined_outstanding_allocations(ksyms, syms_cache, skel);
-		} else {
+		if (env.combined_only)
+			print_combined_outstanding_allocations(ksyms, syms_cache, skel);
+		else
 	   	print_outstanding_allocations(ksyms, syms_cache, skel);
-		}
 	}
 
 cleanup:
+	if (syms_cache) syms_cache__free(syms_cache);
+	if (ksyms) ksyms__free(ksyms);
 	memleak_bpf__destroy(skel);
 	return -err;
 }

@@ -1,7 +1,6 @@
-// SPDX-License-Identifier: GPL-2.0
-// Copyright (c) 2022 Jackie Dinh
-//
-// Based on memleak(8) from BCC by Sasha Goldshtein
+/* SPDX-License-Identifier: GPL-2.0 */
+/* Copyright (c) 2022 Jackie Dinh */
+/* Based on memleak(8) from BCC by Sasha Goldshtein */
 #include <vmlinux.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
@@ -40,7 +39,7 @@ struct {
 
 struct {
 	__uint(type, BPF_MAP_TYPE_STACK_TRACE);
-	__uint(key_size, sizeof(__u32));
+	__type(key, __u32);
 } stack_traces SEC(".maps");
 
 struct {
@@ -57,82 +56,72 @@ struct {
 	__type(value, u64);
 } alloc_counters SEC(".maps");
 
-static __always_inline void update_statistics_add(__u64 stack_id, __u64 sz) {
+static void update_statistics_add(__u64 stack_id, __u64 sz) {
 	struct combined_alloc_info_t *existing_cinfo;
 	struct combined_alloc_info_t cinfo = {0};
 
 	existing_cinfo = bpf_map_lookup_elem(&combined_allocs, &stack_id);
-	if (existing_cinfo != 0) {
+	if (existing_cinfo != 0)
 		cinfo = *existing_cinfo;
-	}
 
 	cinfo.total_size += sz;
 	cinfo.number_of_allocs += 1;
 	bpf_map_update_elem(&combined_allocs, &stack_id, &cinfo, BPF_ANY);
 }
 
-static __always_inline void update_statistics_del(__u64 stack_id, __u64 sz) {
+static void update_statistics_del(__u64 stack_id, __u64 sz) {
 	struct combined_alloc_info_t *existing_cinfo;
 	struct combined_alloc_info_t cinfo = {0};
 
 	existing_cinfo = bpf_map_lookup_elem(&combined_allocs, &stack_id);
-	if (existing_cinfo != 0) {
+	if (existing_cinfo != 0)
 		cinfo = *existing_cinfo;
-	}
 
-	if (sz >= cinfo.total_size) {
+	if (sz >= cinfo.total_size)
 		cinfo.total_size = 0;
-	} else {
+	else
 		cinfo.total_size -= sz;
-	}
 
-	if (cinfo.number_of_allocs > 0) {
+	if (cinfo.number_of_allocs > 0)
 		cinfo.number_of_allocs -= 1;
-	}
 	bpf_map_update_elem(&combined_allocs, &stack_id, &cinfo, BPF_ANY);
 }
 
-static __always_inline int gen_alloc_enter(struct pt_regs *ctx, size_t size) {
+static int gen_alloc_enter(struct pt_regs *ctx, size_t size) {
 	__u64 pid = bpf_get_current_pid_tgid();
 	__u64 size64 = size;
 
-	if (min_size > 0 && size < min_size) {
+	if (min_size > 0 && size < min_size)
 		return 0;
-	}
 
-	if (max_size > 0 && size > max_size) {
+	if (max_size > 0 && size > max_size)
 		return 0;
-	}
 
 	if (sample_rate > 1) {
 		__u64 key = 0;
 		__u64 *cnt;
 		cnt = bpf_map_lookup_elem(&alloc_counters, &key);
-		if (cnt == NULL) {
+		if (cnt == NULL)
 			return 0;
-		}
 		*cnt += 1;
-		if (*cnt % sample_rate != 0) {
+		if (*cnt % sample_rate != 0)
 			return 0;
-		}
 	}
 
 	bpf_map_update_elem(&sizes, &pid, &size64, BPF_ANY);
 
-	if (trace_all) {
+	if (trace_all)
 		bpf_printk("alloc entered, size=%u\n", size);
-	}
 	return 0;
 }
 
-static __always_inline int gen_alloc_exit(struct pt_regs *ctx, __u64 address) {
+static int gen_alloc_exit(struct pt_regs *ctx, __u64 address) {
 	__u64  pid = bpf_get_current_pid_tgid();
 	__u64* size64 = bpf_map_lookup_elem(&sizes, &pid);
 	struct alloc_info_t info = {0};
 
-	if (size64 == 0) {
+	if (size64 == 0)
 		return 0;
-	}
 
 	info.size = *size64;
 	bpf_map_delete_elem(&sizes, &pid);
@@ -146,25 +135,22 @@ static __always_inline int gen_alloc_exit(struct pt_regs *ctx, __u64 address) {
 		update_statistics_add(info.stack_id, info.size);
 	}
 
-	if (trace_all) {
+	if (trace_all)
 		bpf_printk("alloc exited, size = %llu, result = %llx\n", info.size, address);
-	}
 	return 0;
 }
 
-static __always_inline int gen_free_enter(struct pt_regs *ctx, void *address) {
+static int gen_free_enter(struct pt_regs *ctx, void *address) {
 	__u64 addr = (__u64)address;
 	struct alloc_info_t *info = bpf_map_lookup_elem(&allocs, &addr);
-	if (info == 0) {
+	if (info == 0)
 		return 0;
-	}
 
 	bpf_map_delete_elem(&allocs, &addr);
 	update_statistics_del(info->stack_id, info->size);
 
-	if (trace_all) {
+	if (trace_all)
 	  bpf_printk("free entered, address = %lx, size = %lu\n", addr, info->size);
-	}
 	return 0;
 }
 
@@ -240,14 +226,12 @@ int BPF_KRETPROBE(uretprobe_posix_memalign, void *ret)
 	__u64 addr64;
 	void *addr;
 
-	if (memptr64 == 0) {
+	if (memptr64 == 0)
 		return 0;
-	}
 
 	bpf_map_delete_elem(&memptrs, &pid);
-	if (bpf_probe_read_user(&addr, sizeof(void*), (void*)(size_t)*memptr64)) {
+	if (bpf_probe_read_user(&addr, sizeof(void*), (void*)(size_t)*memptr64))
 		return 0;
-	}
 
 	addr64 = (u64)(size_t)addr;
 	return gen_alloc_exit(ctx, addr64);
@@ -298,9 +282,8 @@ int BPF_KPROBE(uprobe_free, void *addr)
 SEC("tracepoint/kmem/kmalloc")
 int tracepoint_kmalloc(struct trace_event_raw_kmem_alloc *args)
 {
-	if (wa_missing_free) {
+	if (wa_missing_free)
 		gen_free_enter((struct pt_regs*)args, (void *)args->ptr);
-	}
 	gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
 	return gen_alloc_exit((struct pt_regs*)args, (__u64)args->ptr);
 }
@@ -314,9 +297,8 @@ int tracepoint_kfree(struct trace_event_raw_kmem_free *args)
 SEC("tracepoint/kmem/kmalloc_node")
 int tracepoint_kmalloc_node(struct trace_event_raw_kmem_alloc_node *args)
 {
-	if (wa_missing_free) {
+	if (wa_missing_free)
 		gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
-	}
 	gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
 	return gen_alloc_exit((struct pt_regs*)args, (__u64)args->ptr);
 }
@@ -324,9 +306,8 @@ int tracepoint_kmalloc_node(struct trace_event_raw_kmem_alloc_node *args)
 SEC("tracepoint/kmem/kmem_cache_alloc")
 int tracepoint_kmem_cache_alloc(struct trace_event_raw_kmem_alloc *args)
 {
-	if (wa_missing_free) {
+	if (wa_missing_free)
 		gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
-	}
 	gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
 	return gen_alloc_exit((struct pt_regs*)args, (__u64)args->ptr);
 }
@@ -334,9 +315,8 @@ int tracepoint_kmem_cache_alloc(struct trace_event_raw_kmem_alloc *args)
 SEC("tracepoint/kmem/kmem_cache_alloc_node")
 int tracepoint_kmem_cache_alloc_node(struct trace_event_raw_kmem_alloc_node *args)
 {
-	if (wa_missing_free) {
+	if (wa_missing_free)
 		gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
-	}
 	gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
 	return gen_alloc_exit((struct pt_regs*)args, (__u64)args->ptr);
 }
