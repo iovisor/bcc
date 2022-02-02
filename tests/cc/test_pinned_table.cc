@@ -85,3 +85,65 @@ TEST_CASE("test pinned table", "[pinned_table]") {
   }
 }
 #endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 2, 0)
+TEST_CASE("test pinned sk_storage table", "[pinned_sk_storage_table]") {
+  bool mounted = false;
+  if (system("mount | grep /sys/fs/bpf")) {
+    REQUIRE(system("mkdir -p /sys/fs/bpf") == 0);
+    REQUIRE(system("mount -o nosuid,nodev,noexec,mode=700 -t bpf bpf /sys/fs/bpf") == 0);
+    mounted = true;
+  }
+  // prepare test by pinning table to bpffs
+  {
+    const std::string BPF_PROGRAM = R"(
+      BPF_SK_STORAGE(sk_stg, __u64);
+      int test(struct __sk_buff *skb) { return 0; }
+    )";
+
+    ebpf::BPF bpf;
+    ebpf::StatusTuple res(0);
+    res = bpf.init(BPF_PROGRAM);
+    REQUIRE(res.ok());
+
+    REQUIRE(bpf_obj_pin(bpf.get_sk_storage_table<unsigned long long>("sk_stg").get_fd(), "/sys/fs/bpf/test_pinned_table") == 0);
+  }
+
+  // exercise <pinned_map>.sk_storage_get().
+  {
+    const std::string BPF_PROGRAM = R"(
+      BPF_TABLE_PINNED("sk_storage", __u32, __u64, sk_stg, 0, "/sys/fs/bpf/test_pinned_table");
+      int test(struct __sk_buff *skb) {
+        struct bpf_sock *sk;
+        __u64 *val;
+
+        sk = skb->sk;
+        if (!sk)
+          return 0;
+        sk = bpf_sk_fullsock(sk);
+        if (!sk)
+          return 0;
+
+        val = sk_stg.sk_storage_get(sk, NULL, BPF_SK_STORAGE_GET_F_CREATE);
+        if (!val)
+          return 0;
+
+        return 1;
+      }
+    )";
+
+    ebpf::BPF bpf;
+    ebpf::StatusTuple res(0);
+    res = bpf.init(BPF_PROGRAM);
+    REQUIRE(res.ok());
+    int prog_fd;
+    res = bpf.load_func("test", BPF_PROG_TYPE_CGROUP_SKB, prog_fd);
+    REQUIRE(res.ok());
+  }
+
+  unlink("/sys/fs/bpf/test_pinned_table");
+  if (mounted) {
+    REQUIRE(umount("/sys/fs/bpf") == 0);
+  }
+}
+#endif

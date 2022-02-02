@@ -109,6 +109,12 @@ struct _name##_table_t { \
   void (*increment) (_key_type, ...); \
   void (*atomic_increment) (_key_type, ...); \
   int (*get_stackid) (void *, u64); \
+  void * (*sk_storage_get) (void *, void *, int); \
+  int (*sk_storage_delete) (void *); \
+  void * (*inode_storage_get) (void *, void *, int); \
+  int (*inode_storage_delete) (void *); \
+  void * (*task_storage_get) (void *, void *, int); \
+  int (*task_storage_delete) (void *); \
   u32 max_entries; \
   int flags; \
 }; \
