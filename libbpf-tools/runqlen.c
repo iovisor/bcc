@@ -29,7 +29,7 @@ struct env {
 	bool runqocc;
 	bool timestamp;
 	time_t interval;
-	bool freq;
+	int freq;
 	int times;
 	bool verbose;
 } env = {
