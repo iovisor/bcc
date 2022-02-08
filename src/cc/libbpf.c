@@ -289,7 +289,13 @@ static struct bpf_helper helpers[] = {
   {"strncmp", "5.17"},
   {"get_func_arg", "5.17"},
   {"get_func_ret", "5.17"},
-  {"get_func_arg_cnt", "5.17"},
+  {"get_func_ret", "5.17"},
+  {"get_retval", "5.18"},
+  {"set_retval", "5.18"},
+  {"xdp_get_buff_len", "5.18"},
+  {"xdp_load_bytes", "5.18"},
+  {"xdp_store_bytes", "5.18"},
+  {"copy_from_user_task", "5.18"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)

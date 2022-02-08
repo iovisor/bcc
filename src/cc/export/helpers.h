@@ -967,6 +967,16 @@ static long (*bpf_get_func_arg)(void *ctx, __u32 n, __u64 *value) =
   (void *)BPF_FUNC_get_func_arg;
 static long (*bpf_get_func_ret)(void *ctx, __u64 *value) = (void *)BPF_FUNC_get_func_ret;
 static long (*bpf_get_func_arg_cnt)(void *ctx) = (void *)BPF_FUNC_get_func_arg_cnt;
+static int (*bpf_get_retval)(void) = (void *)BPF_FUNC_get_retval;
+static int (*bpf_set_retval)(int retval) = (void *)BPF_FUNC_set_retval;
+static __u64 (*bpf_xdp_get_buff_len)(struct xdp_md *xdp_md) = (void *)BPF_FUNC_xdp_get_buff_len;
+static long (*bpf_xdp_load_bytes)(struct xdp_md *xdp_md, __u32 offset, void *buf, __u32 len) =
+  (void *)BPF_FUNC_xdp_load_bytes;
+static long (*bpf_xdp_store_bytes)(struct xdp_md *xdp_md, __u32 offset, void *buf, __u32 len) =
+  (void *)BPF_FUNC_xdp_store_bytes;
+static long (*bpf_copy_from_user_task)(void *dst, __u32 size, const void *user_ptr,
+				       struct task_struct *tsk, __u64 flags) =
+  (void *)BPF_FUNC_copy_from_user_task;
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
