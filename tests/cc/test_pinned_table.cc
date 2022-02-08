@@ -47,7 +47,7 @@ TEST_CASE("test pinned table", "[pinned_table]") {
   // test table access
   {
     const std::string BPF_PROGRAM = R"(
-      BPF_TABLE_PINNED("hash", u64, u64, ids, 1024, "/sys/fs/bpf/test_pinned_table");
+      BPF_TABLE_PINNED("hash", u64, u64, ids, 0, "/sys/fs/bpf/test_pinned_table", BPF_F_NO_PREALLOC);
     )";
 
     ebpf::BPF bpf;
