@@ -170,8 +170,17 @@ struct _name##_table_t __##_name
 #define BPF_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries) \
 BPF_F_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries, 0)
 
-#define BPF_TABLE_PINNED(_table_type, _key_type, _leaf_type, _name, _max_entries, _pinned) \
-BPF_TABLE(_table_type ":" _pinned, _key_type, _leaf_type, _name, _max_entries)
+#define BPF_TABLE_PINNED7(_table_type, _key_type, _leaf_type, _name, _max_entries, _pinned, _flags) \
+  BPF_F_TABLE(_table_type ":" _pinned, _key_type, _leaf_type, _name, _max_entries, _flags)
+
+#define BPF_TABLE_PINNED6(_table_type, _key_type, _leaf_type, _name, _max_entries, _pinned) \
+  BPF_F_TABLE(_table_type ":" _pinned, _key_type, _leaf_type, _name, _max_entries, 0)
+
+#define BPF_TABLE_PINNEDX(_1, _2, _3, _4, _5, _6, _7, NAME, ...) NAME
+
+// Define a pinned table with optional flags argument
+#define BPF_TABLE_PINNED(...) \
+  BPF_TABLE_PINNEDX(__VA_ARGS__, BPF_TABLE_PINNED7, BPF_TABLE_PINNED6)(__VA_ARGS__)
 
 // define a table same as above but allow it to be referenced by other modules
 #define BPF_TABLE_PUBLIC(_table_type, _key_type, _leaf_type, _name, _max_entries) \
