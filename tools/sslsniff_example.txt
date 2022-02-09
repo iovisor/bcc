@@ -160,12 +160,18 @@ READ/RECV    0.000049464        nginx            7081    1      0.004
 
 ----- END DATA -----
 
+Tracing few extra libraries (useful for docker containers and other isolated
+apps)
+
+# ./sslsniff.py --extra-lib openssl:/var/lib/docker/overlay2/l/S4EMHE/lib/libssl.so.1.1
+
+
 
 USAGE message:
 
 usage: sslsniff.py [-h] [-p PID] [-u UID] [-x] [-c COMM] [-o] [-g] [-n] [-d]
                    [--hexdump] [--max-buffer-size MAX_BUFFER_SIZE] [-l]
-                   [--handshake]
+                   [--handshake] [--extra-lib EXTRA_LIB]
 
 Sniff SSL data
 
@@ -186,6 +192,11 @@ optional arguments:
   -l, --latency         show function latency
   --handshake           show SSL handshake latency, enabled only if latency
                         option is on. 
+  --extra-lib EXTRA_LIB
+                        Intercept calls from extra library
+                        (format: lib_type:lib_path)
+
+
 
 examples:
     ./sslsniff              # sniff OpenSSL and GnuTLS functions
@@ -199,3 +210,4 @@ examples:
     ./sslsniff -x           # show process UID and TID
     ./sslsniff -l           # show function latency
     ./sslsniff -l --handshake  # show SSL handshake latency
+    ./sslsniff --extra-lib openssl:/path/libssl.so.1.1 # sniff extra library
