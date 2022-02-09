@@ -4,6 +4,7 @@ sslsniff \- Print data passed to OpenSSL, GnuTLS or NSS. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
 .B sslsniff [-h] [-p PID] [-u UID] [-x] [-c COMM] [-o] [-g] [-n] [-d]
 .B [--hexdump] [--max-buffer-size SIZE] [-l] [--handshake]
+.B [--extra-lib EXTRA_LIB]
 .SH DESCRIPTION
 sslsniff prints data sent to write/send and read/recv functions of
 OpenSSL, GnuTLS and NSS, allowing us to read plain text content before
@@ -52,6 +53,10 @@ Show function latency in ms.
 .TP
 \--handshake
 Show handshake latency, enabled only if latency option is on.
+.TP
+\--extra-lib EXTRA_LIB
+Consist type of the library and library path separated by colon. Supported
+library types are: openssl, gnutls, nss. Can be specified multiple times.
 .SH EXAMPLES
 .TP
 Print all calls to SSL write/send and read/recv system-wide:
@@ -65,6 +70,10 @@ Print only OpenSSL calls issued by user with UID 1000
 Print SSL handshake event and latency for all traced functions:
 #
 .B sslsniff -l --handshake
+.TP
+Print only calls to OpenSSL from /some/path/libssl.so
+.B sslsniff --no-openssl --no-gnutls --no-nss --extra-lib
+.B openssl:/some/path/libssl.so
 .SH FIELDS
 .TP
 FUNC

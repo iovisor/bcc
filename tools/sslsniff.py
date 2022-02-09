@@ -19,6 +19,7 @@ from bcc import BPF
 import argparse
 import binascii
 import textwrap
+import os.path
 
 # arguments
 examples = """examples:
@@ -33,7 +34,27 @@ examples = """examples:
     ./sslsniff -x           # show process UID and TID
     ./sslsniff -l           # show function latency
     ./sslsniff -l --handshake  # show SSL handshake latency
+    ./sslsniff --extra-lib openssl:/path/libssl.so.1.1 # sniff extra library
 """
+
+
+def ssllib_type(input_str):
+    valid_types = frozenset(['openssl', 'gnutls', 'nss'])
+
+    try:
+        lib_type, lib_path = input_str.split(':', 1)
+    except ValueError:
+        raise argparse.ArgumentTypeError("Invalid SSL library param: %r" % input_str)
+
+    if lib_type not in valid_types:
+        raise argparse.ArgumentTypeError("Invalid SSL library type: %r" % lib_type)
+
+    if not os.path.isfile(lib_path):
+        raise argparse.ArgumentTypeError("Invalid library path: %r" % lib_path)
+
+    return lib_type, lib_path
+
+
 parser = argparse.ArgumentParser(
     description="Sniff SSL data",
     formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -63,6 +84,8 @@ parser.add_argument("-l", "--latency", action="store_true",
                     help="show function latency")
 parser.add_argument("--handshake", action="store_true",
                     help="show SSL handshake latency, enabled only if latency option is on.")
+parser.add_argument("--extra-lib", type=ssllib_type, action='append',
+                    help="Intercept calls from extra library (format: lib_type:lib_path)")
 args = parser.parse_args()
 
 
@@ -253,14 +276,14 @@ b = BPF(text=prog)
 # need to stash the buffer address in a map on the function entry and read it
 # on its exit (Mark Drayton)
 #
-if args.openssl:
-    b.attach_uprobe(name="ssl", sym="SSL_write",
+def attach_openssl(lib):
+    b.attach_uprobe(name=lib, sym="SSL_write",
                     fn_name="probe_SSL_rw_enter", pid=args.pid or -1)
-    b.attach_uretprobe(name="ssl", sym="SSL_write",
+    b.attach_uretprobe(name=lib, sym="SSL_write",
                        fn_name="probe_SSL_write_exit", pid=args.pid or -1)
-    b.attach_uprobe(name="ssl", sym="SSL_read",
+    b.attach_uprobe(name=lib, sym="SSL_read",
                     fn_name="probe_SSL_rw_enter", pid=args.pid or -1)
-    b.attach_uretprobe(name="ssl", sym="SSL_read",
+    b.attach_uretprobe(name=lib, sym="SSL_read",
                        fn_name="probe_SSL_read_exit", pid=args.pid or -1)
     if args.latency and args.handshake:
         b.attach_uprobe(name="ssl", sym="SSL_do_handshake",
@@ -268,33 +291,53 @@ if args.openssl:
         b.attach_uretprobe(name="ssl", sym="SSL_do_handshake",
                            fn_name="probe_SSL_do_handshake_exit", pid=args.pid or -1)
 
-if args.gnutls:
-    b.attach_uprobe(name="gnutls", sym="gnutls_record_send",
+def attach_gnutls(lib):
+    b.attach_uprobe(name=lib, sym="gnutls_record_send",
                     fn_name="probe_SSL_rw_enter", pid=args.pid or -1)
-    b.attach_uretprobe(name="gnutls", sym="gnutls_record_send",
+    b.attach_uretprobe(name=lib, sym="gnutls_record_send",
                        fn_name="probe_SSL_write_exit", pid=args.pid or -1)
-    b.attach_uprobe(name="gnutls", sym="gnutls_record_recv",
+    b.attach_uprobe(name=lib, sym="gnutls_record_recv",
                     fn_name="probe_SSL_rw_enter", pid=args.pid or -1)
-    b.attach_uretprobe(name="gnutls", sym="gnutls_record_recv",
+    b.attach_uretprobe(name=lib, sym="gnutls_record_recv",
                        fn_name="probe_SSL_read_exit", pid=args.pid or -1)
 
+def attach_nss(lib):
+    b.attach_uprobe(name=lib, sym="PR_Write",
+                    fn_name="probe_SSL_rw_enter", pid=args.pid or -1)
+    b.attach_uretprobe(name=lib, sym="PR_Write",
+                       fn_name="probe_SSL_write_exit", pid=args.pid or -1)
+    b.attach_uprobe(name=lib, sym="PR_Send",
+                    fn_name="probe_SSL_rw_enter", pid=args.pid or -1)
+    b.attach_uretprobe(name=lib, sym="PR_Send",
+                       fn_name="probe_SSL_write_exit", pid=args.pid or -1)
+    b.attach_uprobe(name=lib, sym="PR_Read",
+                    fn_name="probe_SSL_rw_enter", pid=args.pid or -1)
+    b.attach_uretprobe(name=lib, sym="PR_Read",
+                       fn_name="probe_SSL_read_exit", pid=args.pid or -1)
+    b.attach_uprobe(name=lib, sym="PR_Recv",
+                    fn_name="probe_SSL_rw_enter", pid=args.pid or -1)
+    b.attach_uretprobe(name=lib, sym="PR_Recv",
+                       fn_name="probe_SSL_read_exit", pid=args.pid or -1)
+
+
+LIB_TRACERS = {
+    "openssl": attach_openssl,
+    "gnutls": attach_gnutls,
+    "nss": attach_nss,
+}
+
+
+if args.openssl:
+    attach_openssl("ssl")
+if args.gnutls:
+    attach_gnutls("gnutls")
 if args.nss:
-    b.attach_uprobe(name="nspr4", sym="PR_Write",
-                    fn_name="probe_SSL_rw_enter", pid=args.pid or -1)
-    b.attach_uretprobe(name="nspr4", sym="PR_Write",
-                       fn_name="probe_SSL_write_exit", pid=args.pid or -1)
-    b.attach_uprobe(name="nspr4", sym="PR_Send",
-                    fn_name="probe_SSL_rw_enter", pid=args.pid or -1)
-    b.attach_uretprobe(name="nspr4", sym="PR_Send",
-                       fn_name="probe_SSL_write_exit", pid=args.pid or -1)
-    b.attach_uprobe(name="nspr4", sym="PR_Read",
-                    fn_name="probe_SSL_rw_enter", pid=args.pid or -1)
-    b.attach_uretprobe(name="nspr4", sym="PR_Read",
-                       fn_name="probe_SSL_read_exit", pid=args.pid or -1)
-    b.attach_uprobe(name="nspr4", sym="PR_Recv",
-                    fn_name="probe_SSL_rw_enter", pid=args.pid or -1)
-    b.attach_uretprobe(name="nspr4", sym="PR_Recv",
-                       fn_name="probe_SSL_read_exit", pid=args.pid or -1)
+    attach_nss("nspr4")
+
+
+if args.extra_lib:
+    for lib_type, lib_path in args.extra_lib:
+        LIB_TRACERS[lib_type](lib_path)
 
 # define output data structure in Python
 
