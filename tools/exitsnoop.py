@@ -1,4 +1,4 @@
-#/usr/bin/python
+#!/usr/bin/python
 # @lint-avoid-python-3-compatibility-imports
 from __future__ import print_function
 
