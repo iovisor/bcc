@@ -64,21 +64,63 @@ TIME-UTC     LABEL PCOMM            PID    PPID   TID    AGE(s)  EXIT_CODE
 13:20:31.495 exit  bash             18317  17656  18317  1.38    signal 2 (INT)
 #
 
+The --max-args option can be used to show program arguments. That's useful, 
+for example, for distinguishing multiple java applications or Oracle 
+database versions running on the same server. Limitation: the program is able 
+to show only the arguments of the programs started with execve syscall since 
+exitsnoop was started.
+
+# for((i=1;i<=10;i++)); do touch arg$i; done
+
+# ./exitsnoop.py --max-args 5 > exitlog &
+[1] 2078819
+
+# for((i=1;i<=10;i++)); do args=""; for((j=1;j<=i;j++)); do args="$args arg$j"; done; /usr/bin/ls $args ; done
+arg1
+arg1  arg2
+arg1  arg2  arg3
+arg1  arg2  arg3  arg4
+arg1  arg2  arg3  arg4  arg5
+arg1  arg2  arg3  arg4  arg5  arg6
+arg1  arg2  arg3  arg4  arg5  arg6  arg7
+arg1  arg2  arg3  arg4  arg5  arg6  arg7  arg8
+arg1  arg2  arg3  arg4  arg5  arg6  arg7  arg8  arg9
+arg1  arg10  arg2  arg3  arg4  arg5  arg6  arg7  arg8  arg9
+
+# fg
+./exitsnoop.py --max-args 5 > exitlog &
+^C
+# cat exitlog
+PCOMM            PID    PPID   TID    AGE(s)  EXIT_CODE  ARGS
+ls               2086169 3466776 2086169 0.00    0 /usr/bin/ls arg1
+ls               2086171 3466776 2086171 0.00    0 /usr/bin/ls arg1 arg2
+ls               2086172 3466776 2086172 0.00    0 /usr/bin/ls arg1 arg2 arg3
+ls               2086174 3466776 2086174 0.00    0 /usr/bin/ls arg1 arg2 arg3 arg4 ...
+ls               2086175 3466776 2086175 0.00    0 /usr/bin/ls arg1 arg2 arg3 arg4 ...
+ls               2086176 3466776 2086176 0.00    0 /usr/bin/ls arg1 arg2 arg3 arg4 ...
+ls               2086177 3466776 2086177 0.00    0 /usr/bin/ls arg1 arg2 arg3 arg4 ...
+ls               2086178 3466776 2086178 0.00    0 /usr/bin/ls arg1 arg2 arg3 arg4 ...
+ls               2086179 3466776 2086179 0.00    0 /usr/bin/ls arg1 arg2 arg3 arg4 ...
+ls               2086180 3466776 2086180 0.00    0 /usr/bin/ls arg1 arg2 arg3 arg4 ...
+# for((i=1;i<=10;i++)); do rm arg$i; done
+
+
 USAGE message:
 
 # ./exitsnoop.py -h
-usage: exitsnoop.py [-h] [-t] [--utc] [-p PID] [--label LABEL] [-x] [--per-thread]
+usage: exitsnoop.py [-h] [-t] [--utc] [-p PID] [--label LABEL] [-x] [--per-thread] [--max-args MAX_ARGS]
 
 Trace all process termination (exit, fatal signal)
 
 optional arguments:
-  -h, --help         show this help message and exit
-  -t, --timestamp    include timestamp (local time default)
-  --utc              include timestamp in UTC (-t implied)
-  -p PID, --pid PID  trace this PID only
-  --label LABEL      label each line
-  -x, --failed       trace only fails, exclude exit(0)
-  --per-thread       trace per thread termination
+  -h, --help           show this help message and exit
+  -t, --timestamp      include timestamp (local time default)
+  --utc                include timestamp in UTC (-t implied)
+  -p PID, --pid PID    trace this PID only
+  --label LABEL        label each line
+  -x, --failed         trace only fails, exclude exit(0)
+  --per-thread         trace per thread termination
+  --max-args MAX_ARGS  trace program arguments
 
 examples:
     exitsnoop                # trace all process termination
@@ -88,6 +130,7 @@ examples:
     exitsnoop -p 181         # only trace PID 181
     exitsnoop --label=exit   # label each output line with 'exit'
     exitsnoop --per-thread   # trace per thread termination
+    exitsnoop --max-args  5  # show 5 program arguments
 
 Exit status:
 
