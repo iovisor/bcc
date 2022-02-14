@@ -62,12 +62,13 @@ APPS = \
 	solisten \
 	statsnoop \
 	syscount \
-	tcptracer \
+	tcpaccept \
 	tcpconnect \
 	tcpconnlat \
 	tcplife \
 	tcprtt \
 	tcpsynbl \
+	tcptracer \
 	vfsstat \
 	#
 

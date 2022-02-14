@@ -47,12 +47,13 @@
 /solisten
 /statsnoop
 /syscount
+/tcpaccept
 /tcpconnect
 /tcpconnlat
 /tcplife
-/tcptracer
 /tcprtt
 /tcpsynbl
+/tcptracer
 /vfsstat
 /xfsdist
 /xfsslower
