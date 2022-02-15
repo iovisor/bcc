@@ -401,7 +401,12 @@ int BPFModule::annotate() {
     GlobalValue *gvar = mod_->getNamedValue(table.name);
     if (!gvar) continue;
     if (PointerType *pt = dyn_cast<PointerType>(gvar->getType())) {
-      if (StructType *st = dyn_cast<StructType>(pt->getElementType())) {
+#if LLVM_MAJOR_VERSION >= 15
+      StructType *st = dyn_cast<StructType>(pt->getPointerElementType());
+#else
+      StructType *st = dyn_cast<StructType>(pt->getElementType());
+#endif
+      if (st) {
         if (st->getNumElements() < 2) continue;
         Type *key_type = st->elements()[0];
         Type *leaf_type = st->elements()[1];

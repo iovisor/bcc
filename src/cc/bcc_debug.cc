@@ -29,6 +29,9 @@
 #include <llvm/MC/MCInstrInfo.h>
 #include <llvm/MC/MCObjectFileInfo.h>
 #include <llvm/MC/MCRegisterInfo.h>
+#if LLVM_MAJOR_VERSION >= 15
+#include <llvm/MC/MCSubtargetInfo.h>
+#endif
 #if LLVM_MAJOR_VERSION >= 14
 #include <llvm/MC/TargetRegistry.h>
 #else
