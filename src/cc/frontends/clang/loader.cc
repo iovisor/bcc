@@ -249,6 +249,7 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts,
     return -1;
 #if LLVM_MAJOR_VERSION >= 9
   flags_cstr.push_back("-g");
+  flags_cstr.push_back("-gdwarf-4");
 #else
   if (flags_ & DEBUG_SOURCE)
     flags_cstr.push_back("-g");
