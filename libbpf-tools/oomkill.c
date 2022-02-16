@@ -30,7 +30,7 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	FILE *f;
 	char buf[256];
-	int n;
+	int n = 0;
 	struct tm *tm;
 	char ts[32];
 	time_t t;
