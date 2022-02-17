@@ -78,6 +78,7 @@ BPF attached to LIRC devices | 4.18 |  [`f4364dcfc86d`](https://git.kernel.org/c
 Pass map values to map helpers | 4.18 | [`d71962f3e627`](https://github.com/torvalds/linux/commit/d71962f3e627b5941804036755c844fabfb65ff5)
 BPF socket reuseport | 4.19 | [`2dbb9b9e6df6`](https://github.com/torvalds/linux/commit/2dbb9b9e6df67d444fbe425c7f6014858d337adf)
 BPF flow dissector | 4.20 | [`d58e468b1112`](https://github.com/torvalds/linux/commit/d58e468b1112dcd1d5193c0a89ff9f98b5a3e8b9)
+BPF 1M insn limit | 5.2 | [`c04c0d2b968a`](https://github.com/torvalds/linux/commit/c04c0d2b968ac45d6ef020316808ef6c82325a82)
 BPF cgroup sysctl | 5.2 | [`7b146cebe30c`](https://github.com/torvalds/linux/commit/7b146cebe30cb481b0f70d85779da938da818637)
 BPF raw tracepoint writable | 5.2 | [`9df1c28bb752`](https://github.com/torvalds/linux/commit/9df1c28bb75217b244257152ab7d788bb2a386d0)
 BPF trampoline | 5.5 | [`fec56f5890d9`](https://github.com/torvalds/linux/commit/fec56f5890d93fc2ed74166c397dc186b1c25951)
