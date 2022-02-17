@@ -19,6 +19,9 @@
 #include <tuple>
 #include <vector>
 
+#if LLVM_MAJOR_VERSION >= 15
+#include <llvm/DebugInfo/DWARF/DWARFCompileUnit.h>
+#endif
 #include <llvm/DebugInfo/DWARF/DWARFContext.h>
 #include <llvm/DebugInfo/DWARF/DWARFDebugLine.h>
 #include <llvm/IR/Module.h>
