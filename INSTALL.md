@@ -392,7 +392,7 @@ make -j10
 make install 
 
 ```
-after install , you may add bcc directory to your $PATH, which you can add to ~/.bashrc
+after install, you may add bcc directory to your $PATH, which you can add to ~/.bashrc
 ```
 bcctools=/usr/share/bcc/tools
 bccexamples=/usr/share/bcc/examples

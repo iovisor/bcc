@@ -195,7 +195,7 @@ static int print_stat(struct filetop_bpf *obj)
 		time(&t);
 		tm = localtime(&t);
 		strftime(ts, sizeof(ts), "%H:%M:%S", tm);
-		memset(buf, 0 , sizeof(buf));
+		memset(buf, 0, sizeof(buf));
 		n = fread(buf, 1, sizeof(buf), f);
 		if (n)
 			printf("%8s loadavg: %s\n", ts, buf);

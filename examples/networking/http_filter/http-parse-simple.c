@@ -71,7 +71,7 @@ int http_filter(struct __sk_buff *skb) {
 	unsigned long p[7];
 	int i = 0;
 	for (i = 0; i < 7; i++) {
-		p[i] = load_byte(skb , payload_offset + i);
+		p[i] = load_byte(skb, payload_offset + i);
 	}
 
 	//find a match with an HTTP message

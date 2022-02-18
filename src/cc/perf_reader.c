@@ -93,7 +93,7 @@ int perf_reader_mmap(struct perf_reader *reader) {
     return -1;
   }
 
-  reader->base = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE , MAP_SHARED, reader->fd, 0);
+  reader->base = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED, reader->fd, 0);
   if (reader->base == MAP_FAILED) {
     perror("mmap");
     return -1;

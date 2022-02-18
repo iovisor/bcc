@@ -38,7 +38,7 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 
 	f = fopen("/proc/loadavg", "r");
 	if (f) {
-		memset(buf, 0 , sizeof(buf));
+		memset(buf, 0, sizeof(buf));
 		n = fread(buf, 1, sizeof(buf), f);
 		fclose(f);
 	}

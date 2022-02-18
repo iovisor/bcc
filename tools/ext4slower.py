@@ -101,7 +101,7 @@ BPF_PERF_OUTPUT(events);
 // own function, for reads. So we need to trace that and then filter on ext4,
 // which I do by checking file->f_op.
 // The new Linux version (since form 4.10) uses ext4_file_read_iter(), And if the 'CONFIG_FS_DAX' 
-// is not set ,then ext4_file_read_iter() will call generic_file_read_iter(), else it will call 
+// is not set, then ext4_file_read_iter() will call generic_file_read_iter(), else it will call
 // ext4_dax_read_iter(), and trace generic_file_read_iter() will fail.
 int trace_read_entry(struct pt_regs *ctx, struct kiocb *iocb)
 {
