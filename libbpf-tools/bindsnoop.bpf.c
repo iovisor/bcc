@@ -6,7 +6,6 @@
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_endian.h>
 #include "bindsnoop.h"
-#include "maps.bpf.h"
 
 #define MAX_ENTRIES	10240
 #define MAX_PORTS	1024
