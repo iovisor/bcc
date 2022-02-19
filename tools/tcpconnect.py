@@ -178,7 +178,7 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
     u16 dport = skp->__sk_common.skc_dport;
 
     FILTER_PORT
-    
+
     FILTER_FAMILY
 
     if (ipver == 4) {
@@ -295,7 +295,7 @@ int trace_udp_ret_recvmsg(struct pt_regs *ctx)
         return 0;
 
     struct msghdr *msghdr = (struct msghdr *)*msgpp;
-    if (msghdr->msg_iter.type != ITER_IOVEC)
+    if (msghdr->msg_iter.TYPE_FIELD != ITER_IOVEC)
         goto delete_and_return;
 
     int copied = (int)PT_REGS_RC(ctx);
@@ -361,6 +361,10 @@ bpf_text = bpf_text.replace('FILTER_FAMILY', '')
 bpf_text = bpf_text.replace('FILTER_UID', '')
 
 if args.dns:
+    if BPF.kernel_struct_has_field(b'iov_iter', b'iter_type') == 1:
+        dns_bpf_text = dns_bpf_text.replace('TYPE_FIELD', 'iter_type')
+    else:
+        dns_bpf_text = dns_bpf_text.replace('TYPE_FIELD', 'type')
     bpf_text += dns_bpf_text
 
 if debug or args.ebpf:
