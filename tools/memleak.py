@@ -494,7 +494,7 @@ def print_outstanding():
                         stack = list(stack_traces.walk(info.stack_id))
                         combined = []
                         for addr in stack:
-                                combined.append(bpf.sym(addr, pid,
+                                combined.append(('0x'+format(addr, '016x')+'\t').encode('utf-8') + bpf.sym(addr, pid,
                                         show_module=True, show_offset=True))
                         alloc_info[info.stack_id] = Allocation(combined,
                                                                info.size)
