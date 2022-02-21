@@ -272,6 +272,19 @@ int realloc_exit(struct pt_regs *ctx) {
         return gen_alloc_exit(ctx);
 }
 
+int mmap_enter(struct pt_regs *ctx) {
+        size_t size = (size_t)PT_REGS_PARM2(ctx);
+        return gen_alloc_enter(ctx, size);
+}
+
+int mmap_exit(struct pt_regs *ctx) {
+        return gen_alloc_exit(ctx);
+}
+
+int munmap_enter(struct pt_regs *ctx, void *address) {
+        return gen_free_enter(ctx, address);
+}
+
 int posix_memalign_enter(struct pt_regs *ctx, void **memptr, size_t alignment,
                          size_t size) {
         u64 memptr64 = (u64)(size_t)memptr;
@@ -449,12 +462,15 @@ if not kernel_trace:
         attach_probes("malloc")
         attach_probes("calloc")
         attach_probes("realloc")
+        attach_probes("mmap")
         attach_probes("posix_memalign")
         attach_probes("valloc", can_fail=True) # failed on Android, is deprecated in libc.so from bionic directory
         attach_probes("memalign")
         attach_probes("pvalloc", can_fail=True) # failed on Android, is deprecated in libc.so from bionic directory
         attach_probes("aligned_alloc", can_fail=True)  # added in C11
         bpf.attach_uprobe(name=obj, sym="free", fn_name="free_enter",
+                                  pid=pid)
+        bpf.attach_uprobe(name=obj, sym="munmap", fn_name="munmap_enter",
                                   pid=pid)
 
 else:
