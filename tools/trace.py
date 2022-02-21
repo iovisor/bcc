@@ -630,7 +630,7 @@ BPF_PERF_OUTPUT(%s);
                 event = ct.cast(data, ct.POINTER(self.python_struct)).contents
                 if self.name not in event.comm:
                     return
-                values = [getattr(event, "v%d" % i)
+                values = [getattr(event, "v%d" % i).decode()
                           for i in range(len(self.values))]
                 msg = self._format_message(bpf, event.tgid, values)
                 if self.msg_filter and self.msg_filter not in msg:
