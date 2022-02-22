@@ -66,6 +66,44 @@ using std::vector;
 
 namespace ebpf {
 
+optional<FuncInfo &> ProgFuncInfo::get_func(std::string name) {
+  auto it = funcs_.find(name);
+  if (it != funcs_.end())
+    return it->second;
+  return nullopt;
+}
+
+optional<FuncInfo &> ProgFuncInfo::get_func(size_t id) {
+  auto it = func_idx_.find(id);
+  if (it != func_idx_.end())
+    return get_func(it->second);
+  return nullopt;
+}
+
+optional<std::string &> ProgFuncInfo::func_name(size_t id) {
+  auto it = func_idx_.find(id);
+  if (it != func_idx_.end())
+    return it->second;
+  return nullopt;
+}
+
+void ProgFuncInfo::for_each_func(
+    std::function<void(std::string, FuncInfo &)> cb) {
+  for (auto it = funcs_.begin(); it != funcs_.end(); ++it) {
+    cb(it->first, it->second);
+  }
+}
+
+optional<FuncInfo &> ProgFuncInfo::add_func(std::string name) {
+  auto fn = get_func(name);
+  if (fn)
+    return nullopt;
+  size_t current = funcs_.size();
+  funcs_.emplace(name, 0);
+  func_idx_.emplace(current, name);
+  return get_func(name);
+}
+
 ClangLoader::ClangLoader(llvm::LLVMContext *ctx, unsigned flags)
     : ctx_(ctx), flags_(flags)
 {
@@ -152,13 +190,12 @@ static int CreateFromArgs(clang::CompilerInvocation &invocation,
 
 }
 
-int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts,
-                       const string &file, bool in_memory, const char *cflags[],
-                       int ncflags, const std::string &id, FuncSource &func_src,
-                       std::string &mod_src,
-                       const std::string &maps_ns,
-                       fake_fd_map_def &fake_fd_map,
-                       std::map<std::string, std::vector<std::string>> &perf_events) {
+int ClangLoader::parse(
+    unique_ptr<llvm::Module> *mod, TableStorage &ts, const string &file,
+    bool in_memory, const char *cflags[], int ncflags, const std::string &id,
+    ProgFuncInfo &prog_func_info, std::string &mod_src,
+    const std::string &maps_ns, fake_fd_map_def &fake_fd_map,
+    std::map<std::string, std::vector<std::string>> &perf_events) {
   string main_path = "/virtual/main.c";
   unique_ptr<llvm::MemoryBuffer> main_buf;
   struct utsname un;
@@ -281,7 +318,8 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts,
 #endif
 
   if (do_compile(mod, ts, in_memory, flags_cstr, flags_cstr_rem, main_path,
-                 main_buf, id, func_src, mod_src, true, maps_ns, fake_fd_map, perf_events)) {
+                 main_buf, id, prog_func_info, mod_src, true, maps_ns,
+                 fake_fd_map, perf_events)) {
 #if BCC_BACKUP_COMPILE != 1
     return -1;
 #else
@@ -289,11 +327,12 @@ int ClangLoader::parse(unique_ptr<llvm::Module> *mod, TableStorage &ts,
     llvm::errs() << "WARNING: compilation failure, trying with system bpf.h\n";
 
     ts.DeletePrefix(Path({id}));
-    func_src.clear();
+    prog_func_info.clear();
     mod_src.clear();
     fake_fd_map.clear();
     if (do_compile(mod, ts, in_memory, flags_cstr, flags_cstr_rem, main_path,
-                   main_buf, id, func_src, mod_src, false, maps_ns, fake_fd_map, perf_events))
+                   main_buf, id, prog_func_info, mod_src, false, maps_ns,
+                   fake_fd_map, perf_events))
       return -1;
 #endif
   }
@@ -335,17 +374,14 @@ string get_clang_target(void) {
   return string(ret);
 }
 
-int ClangLoader::do_compile(unique_ptr<llvm::Module> *mod, TableStorage &ts,
-                            bool in_memory,
-                            const vector<const char *> &flags_cstr_in,
-                            const vector<const char *> &flags_cstr_rem,
-                            const std::string &main_path,
-                            const unique_ptr<llvm::MemoryBuffer> &main_buf,
-                            const std::string &id, FuncSource &func_src,
-                            std::string &mod_src, bool use_internal_bpfh,
-                            const std::string &maps_ns,
-                            fake_fd_map_def &fake_fd_map,
-                            std::map<std::string, std::vector<std::string>> &perf_events) {
+int ClangLoader::do_compile(
+    unique_ptr<llvm::Module> *mod, TableStorage &ts, bool in_memory,
+    const vector<const char *> &flags_cstr_in,
+    const vector<const char *> &flags_cstr_rem, const std::string &main_path,
+    const unique_ptr<llvm::MemoryBuffer> &main_buf, const std::string &id,
+    ProgFuncInfo &prog_func_info, std::string &mod_src, bool use_internal_bpfh,
+    const std::string &maps_ns, fake_fd_map_def &fake_fd_map,
+    std::map<std::string, std::vector<std::string>> &perf_events) {
   using namespace clang;
 
   vector<const char *> flags_cstr = flags_cstr_in;
@@ -445,7 +481,7 @@ int ClangLoader::do_compile(unique_ptr<llvm::Module> *mod, TableStorage &ts,
   // capture the rewritten c file
   string out_str1;
   llvm::raw_string_ostream os1(out_str1);
-  BFrontendAction bact(os1, flags_, ts, id, main_path, func_src, mod_src,
+  BFrontendAction bact(os1, flags_, ts, id, main_path, prog_func_info, mod_src,
                        maps_ns, fake_fd_map, perf_events);
   if (!compiler1.ExecuteAction(bact))
     return -1;
@@ -475,27 +511,4 @@ int ClangLoader::do_compile(unique_ptr<llvm::Module> *mod, TableStorage &ts,
 
   return 0;
 }
-
-const char * FuncSource::src(const std::string& name) {
-  auto src = funcs_.find(name);
-  if (src == funcs_.end())
-    return "";
-  return src->second.src_.data();
-}
-
-const char * FuncSource::src_rewritten(const std::string& name) {
-  auto src = funcs_.find(name);
-  if (src == funcs_.end())
-    return "";
-  return src->second.src_rewritten_.data();
-}
-
-void FuncSource::set_src(const std::string& name, const std::string& src) {
-  funcs_[name].src_ = src;
-}
-
-void FuncSource::set_src_rewritten(const std::string& name, const std::string& src) {
-  funcs_[name].src_rewritten_ = src;
-}
-
 }  // namespace ebpf

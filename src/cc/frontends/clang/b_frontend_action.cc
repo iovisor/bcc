@@ -811,10 +811,23 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
   if (fe_.is_rewritable_ext_func(D)) {
     current_fn_ = string(D->getName());
     string bd = rewriter_.getRewrittenText(expansionRange(D->getSourceRange()));
-    fe_.func_src_.set_src(current_fn_, bd);
+    auto func_info = fe_.prog_func_info_.add_func(current_fn_);
+    if (!func_info) {
+      // We should only reach add_func above once per function seen, but the
+      // BPF_PROG-helper using macros in export/helpers.h (KFUNC_PROBE ..
+      // LSM_PROBE) break this logic. TODO: adjust export/helpers.h to not
+      // do so and bail out here, or find a better place to do add_func
+      func_info = fe_.prog_func_info_.get_func(current_fn_);
+      //error(GET_BEGINLOC(D), "redefinition of existing function");
+      //return false;
+    }
+    func_info->src_ = bd;
     fe_.func_range_[current_fn_] = expansionRange(D->getSourceRange());
-    string attr = string("__attribute__((section(\"") + BPF_FN_PREFIX + D->getName().str() + "\")))\n";
-    rewriter_.InsertText(real_start_loc, attr);
+    if (!D->getAttr<SectionAttr>()) {
+      string attr = string("__attribute__((section(\"") + BPF_FN_PREFIX +
+                    D->getName().str() + "\")))\n";
+      rewriter_.InsertText(real_start_loc, attr);
+    }
     if (D->param_size() > MAX_CALLING_CONV_REGS + 1) {
       error(GET_BEGINLOC(D->getParamDecl(MAX_CALLING_CONV_REGS + 1)),
             "too many arguments, bcc only supports in-register parameters");
@@ -1689,13 +1702,12 @@ void BTypeConsumer::HandleTranslationUnit(ASTContext &Context) {
 
 }
 
-BFrontendAction::BFrontendAction(llvm::raw_ostream &os, unsigned flags,
-                                 TableStorage &ts, const std::string &id,
-                                 const std::string &main_path,
-                                 FuncSource &func_src, std::string &mod_src,
-                                 const std::string &maps_ns,
-                                 fake_fd_map_def &fake_fd_map,
-                                 std::map<std::string, std::vector<std::string>> &perf_events)
+BFrontendAction::BFrontendAction(
+    llvm::raw_ostream &os, unsigned flags, TableStorage &ts,
+    const std::string &id, const std::string &main_path,
+    ProgFuncInfo &prog_func_info, std::string &mod_src,
+    const std::string &maps_ns, fake_fd_map_def &fake_fd_map,
+    std::map<std::string, std::vector<std::string>> &perf_events)
     : os_(os),
       flags_(flags),
       ts_(ts),
@@ -1703,7 +1715,7 @@ BFrontendAction::BFrontendAction(llvm::raw_ostream &os, unsigned flags,
       maps_ns_(maps_ns),
       rewriter_(new Rewriter),
       main_path_(main_path),
-      func_src_(func_src),
+      prog_func_info_(prog_func_info),
       mod_src_(mod_src),
       next_fake_fd_(-1),
       fake_fd_map_(fake_fd_map),
@@ -1781,7 +1793,9 @@ void BFrontendAction::EndSourceFileAction() {
   for (auto func : func_range_) {
     auto f = func.first;
     string bd = rewriter_->getRewrittenText(func_range_[f]);
-    func_src_.set_src_rewritten(f, bd);
+    auto fn = prog_func_info_.get_func(f);
+    if (fn)
+      fn->src_rewritten_ = bd;
   }
   rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).write(os_);
   os_.flush();
