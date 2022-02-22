@@ -8,7 +8,7 @@ on:
 
 jobs:
   test_bcc:
-    runs-on: ubuntu-20.04
+    runs-on: self-hosted
     strategy:
       matrix:
         os: [{version: "18.04", nick: bionic}, {version: "20.04", nick: focal}]
