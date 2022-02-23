@@ -1,0 +1,78 @@
+.TH biopattern 8  "2022-02-21" "USER COMMANDS"
+.SH NAME
+biopattern \- Identify random/sequential disk access patterns.
+.SH SYNOPSIS
+.B biopattern [\-h] [\-d DISK] [interval] [count]
+.SH DESCRIPTION
+This traces block device I/O (disk I/O), and prints ratio of random/sequential I/O
+for each disk or the specified disk either on Ctrl-C, or after a given interval in seconds.
+
+This works by tracing kernel tracepoint block:block_rq_complete.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Show help message and exit.
+.TP
+\-d
+Trace this disk only.
+.TP
+interval
+Print output every interval seconds, if any.
+.TP
+count
+Number of interval summaries.
+.SH EXAMPLES
+.TP
+Trace access patterns of all disks, and print a summary on Ctrl-C:
+#
+.B biopattern
+.TP
+Trace disk sdb only:
+#
+.B biopattern -d sdb
+.TP
+Print 1 second summaries, 10 times:
+#
+.B biopattern 1 10
+.SH FIELDS
+.TP
+TIME
+Time of the output, in HH:MM:SS format.
+.TP
+DISK
+Disk device name.
+.TP
+%RND
+Ratio of random I/O.
+.TP
+%SEQ
+Ratio of sequential I/O.
+.TP
+COUNT
+Number of I/O during the interval.
+.TP
+KBYTES
+Total Kbytes for these I/O, during the interval.
+.SH OVERHEAD
+Since block device I/O usually has a relatively low frequency (< 10,000/s),
+the overhead for this tool is expected to be low or negligible. For high IOPS
+storage systems, test and quantify before use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Rocky Xing
+.SH SEE ALSO
+biosnoop(8), biolatency(8), iostat(1)
