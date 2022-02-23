@@ -64,7 +64,7 @@ if args.flags and args.disks:
 # define BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
-#include <linux/blkdev.h>
+#include <linux/blk-mq.h>
 
 typedef struct disk_key {
     char disk[DISK_NAME_LEN];
