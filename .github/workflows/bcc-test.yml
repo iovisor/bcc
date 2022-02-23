@@ -51,7 +51,7 @@ jobs:
                    -v /usr/include/linux:/usr/include/linux:ro \
                    bcc-docker \
                    /bin/bash -c \
-                   'mkdir -p /bcc/build && cd /bcc/build && \
+                   'ls /bcc && mkdir -p /bcc/build && cd /bcc/build && \
                     cmake -DCMAKE_BUILD_TYPE=${TYPE} -DENABLE_LLVM_NATIVECODEGEN=${RW_ENGINE_ENABLED} .. && make -j9'"
     - name: Run bcc's cc tests
       env: ${{ matrix.env }}
