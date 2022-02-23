@@ -27,6 +27,7 @@ jobs:
     - name: System info
       run: |
         sudo apt-get install -y iproute2 docker
+        sudo systemctl start docker
         uname -a
         ip addr
     - name: Build docker container with all deps
