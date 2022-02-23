@@ -42,7 +42,7 @@ jobs:
         ls $(pwd)
         echo "WORKDIR IS $RUNNER_WORKDIR"
         /bin/bash -c \
-                   "docker run --privileged \
+                   "echo $(pwd) && docker run --privileged \
                    --pid=host \
                    -v $(pwd):/bcc \
                    -v /sys/kernel/debug:/sys/kernel/debug:rw \
