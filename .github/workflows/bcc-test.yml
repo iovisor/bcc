@@ -39,6 +39,7 @@ jobs:
       env: ${{ matrix.env }}
       run: |
         echo "PWD IS $(pwd)"
+        ls $(pwd)
         echo "WORKDIR IS $RUNNER_WORKDIR"
         /bin/bash -c \
                    "docker run --privileged \
