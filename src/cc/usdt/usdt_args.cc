@@ -69,7 +69,13 @@ bool Argument::assign_to_local(std::ostream &stream,
   }
 
   if (!deref_offset_) {
-    tfm::format(stream, "%s = ctx->%s;", local_name, *base_register_name_);
+    if(base_register_name_->substr(0,3) == "xmm") {
+      // TODO: When we can read xmm registers from BPF, update this to read
+      // the actual value
+      tfm::format(stream, "%s = 0;", local_name);
+    } else {
+      tfm::format(stream, "%s = ctx->%s;", local_name, *base_register_name_);
+    }
     // Put a compiler barrier to prevent optimization
     // like llvm SimplifyCFG SinkThenElseCodeToEnd
     // Volatile marking is not sufficient to prevent such optimization.
@@ -532,6 +538,23 @@ const std::unordered_map<std::string, ArgumentParser_x64::RegInfo>
         {"r15w", {X64_REG_15, 2}}, {"r15b", {X64_REG_15, 1}},
 
         {"rip", {X64_REG_RIP, 8}},
+
+        {"xmm0", {X64_REG_XMM0, 16}},
+        {"xmm1", {X64_REG_XMM1, 16}},
+        {"xmm2", {X64_REG_XMM2, 16}},
+        {"xmm3", {X64_REG_XMM3, 16}},
+        {"xmm4", {X64_REG_XMM4, 16}},
+        {"xmm5", {X64_REG_XMM5, 16}},
+        {"xmm6", {X64_REG_XMM6, 16}},
+        {"xmm7", {X64_REG_XMM7, 16}},
+        {"xmm8", {X64_REG_XMM8, 16}},
+        {"xmm9", {X64_REG_XMM9, 16}},
+        {"xmm10", {X64_REG_XMM10, 16}},
+        {"xmm11", {X64_REG_XMM11, 16}},
+        {"xmm12", {X64_REG_XMM12, 16}},
+        {"xmm13", {X64_REG_XMM13, 16}},
+        {"xmm14", {X64_REG_XMM14, 16}},
+        {"xmm15", {X64_REG_XMM15, 16}},
 };
 
 void ArgumentParser_x64::reg_to_name(std::string *norm, Register reg) {
@@ -590,6 +613,56 @@ void ArgumentParser_x64::reg_to_name(std::string *norm, Register reg) {
   case X64_REG_RIP:
     *norm = "ip";
     break;
+
+  case X64_REG_XMM0:
+    *norm = "xmm0";
+    break;
+  case X64_REG_XMM1:
+    *norm = "xmm1";
+    break;
+  case X64_REG_XMM2:
+    *norm = "xmm2";
+    break;
+  case X64_REG_XMM3:
+    *norm = "xmm3";
+    break;
+  case X64_REG_XMM4:
+    *norm = "xmm4";
+    break;
+  case X64_REG_XMM5:
+    *norm = "xmm5";
+    break;
+  case X64_REG_XMM6:
+    *norm = "xmm6";
+    break;
+  case X64_REG_XMM7:
+    *norm = "xmm7";
+    break;
+  case X64_REG_XMM8:
+    *norm = "xmm8";
+    break;
+  case X64_REG_XMM9:
+    *norm = "xmm9";
+    break;
+  case X64_REG_XMM10:
+    *norm = "xmm10";
+    break;
+  case X64_REG_XMM11:
+    *norm = "xmm11";
+    break;
+  case X64_REG_XMM12:
+    *norm = "xmm12";
+    break;
+  case X64_REG_XMM13:
+    *norm = "xmm13";
+    break;
+  case X64_REG_XMM14:
+    *norm = "xmm14";
+    break;
+  case X64_REG_XMM15:
+    *norm = "xmm15";
+    break;
+
   }
 }
 

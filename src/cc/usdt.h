@@ -166,6 +166,22 @@ private:
     X64_REG_14,
     X64_REG_15,
     X64_REG_RIP,
+    X64_REG_XMM0,
+    X64_REG_XMM1,
+    X64_REG_XMM2,
+    X64_REG_XMM3,
+    X64_REG_XMM4,
+    X64_REG_XMM5,
+    X64_REG_XMM6,
+    X64_REG_XMM7,
+    X64_REG_XMM8,
+    X64_REG_XMM9,
+    X64_REG_XMM10,
+    X64_REG_XMM11,
+    X64_REG_XMM12,
+    X64_REG_XMM13,
+    X64_REG_XMM14,
+    X64_REG_XMM15,
   };
 
   struct RegInfo {
