@@ -202,6 +202,9 @@ Syntax: TRACEPOINT_PROBE(*category*, *event*)
 
 This is a macro that instruments the tracepoint defined by *category*:*event*.
 
+The tracepoint name is `<category>:<event>`.
+The probe function name is `tracepoint__<category>__<event>`.
+
 Arguments are available in an ```args``` struct, which are the tracepoint arguments. One way to list these is to cat the relevant format file under /sys/kernel/debug/tracing/events/*category*/*event*/format.
 
 The ```args``` struct can be used in place of ``ctx`` in each functions requiring a context as an argument. This includes notably [perf_submit()](#3-perf_submit).
@@ -216,7 +219,10 @@ TRACEPOINT_PROBE(random, urandom_read) {
 }
 ```
 
-This instruments the random:urandom_read tracepoint, and prints the tracepoint argument ```got_bits```.
+This instruments the tracepoint `random:urandom_read tracepoint`, and prints the tracepoint argument ```got_bits```.
+The name of the probe function is `tracepoint__random__urandom_read`.
+This tracepoint probe can be attached with:
+`BPF::attach_tracepoint("random:urandom_read", "tracepoint__random__urandom_read")`
 
 Examples in situ:
 [code](https://github.com/iovisor/bcc/blob/a4159da8c4ea8a05a3c6e402451f530d6e5a8b41/examples/tracing/urandomread.py#L19) ([output](https://github.com/iovisor/bcc/commit/e422f5e50ecefb96579b6391a2ada7f6367b83c4#diff-41e5ecfae4a3b38de5f4e0887ed160e5R10)),
