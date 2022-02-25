@@ -12,6 +12,7 @@
 #include <bpf/bpf.h>
 #include "bashreadline.h"
 #include "bashreadline.skel.h"
+#include "btf_helpers.h"
 #include "trace_helpers.h"
 #include "uprobe_helpers.h"
 
@@ -143,6 +144,7 @@ static void sig_int(int signo)
 
 int main(int argc, char **argv)
 {
+	LIBBPF_OPTS(bpf_object_open_opts, open_opts);
 	static const struct argp argp = {
 		.options = opts,
 		.parser = parse_arg,
@@ -168,9 +170,21 @@ int main(int argc, char **argv)
 	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
 
-	obj = bashreadline_bpf__open_and_load();
+	err = ensure_core_btf(&open_opts);
+	if (err) {
+		warn("failed to fetch necessary BTF for CO-RE: %s\n", strerror(-err));
+		goto cleanup;
+	}
+
+	obj = bashreadline_bpf__open_opts(&open_opts);
 	if (!obj) {
-		warn("failed to open and load BPF object\n");
+		warn("failed to open BPF object\n");
+		goto cleanup;
+	}
+
+	err = bashreadline_bpf__load(obj);
+	if (err) {
+		warn("failed to load BPF object: %d\n", err);
 		goto cleanup;
 	}
 
@@ -217,6 +231,7 @@ cleanup:
 		free(readline_so_path);
 	perf_buffer__free(pb);
 	bashreadline_bpf__destroy(obj);
+	cleanup_core_btf(&open_opts);
 
 	return err != 0;
 }
