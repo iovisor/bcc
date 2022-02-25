@@ -12,6 +12,7 @@ BPFCFLAGS := -g -O2 -Wall
 INSTALL ?= install
 prefix ?= /usr/local
 ARCH := $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/' | sed 's/ppc64le/powerpc/' | sed 's/mips.*/mips/')
+BTFHUB_ARCHIVE ?= $(abspath btfhub-archive)
 
 ifeq ($(wildcard $(ARCH)/),)
 $(error Architecture $(ARCH) is not supported yet. Please open an issue)
@@ -61,6 +62,9 @@ APPS = \
 	vfsstat \
 	#
 
+# export variables that are used in Makefile.btfgen as well.
+export OUTPUT BPFTOOL ARCH BTFHUB_ARCHIVE APPS
+
 FSDIST_ALIASES = btrfsdist ext4dist nfsdist xfsdist
 FSSLOWER_ALIASES = btrfsslower ext4slower nfsslower xfsslower
 APP_ALIASES = $(FSDIST_ALIASES) $(FSSLOWER_ALIASES)
@@ -71,6 +75,8 @@ COMMON_OBJ = \
 	$(OUTPUT)/errno_helpers.o \
 	$(OUTPUT)/map_helpers.o \
 	$(OUTPUT)/uprobe_helpers.o \
+	$(OUTPUT)/btf_helpers.o \
+	$(if $(ENABLE_MIN_CORE_BTFS),$(OUTPUT)/min_core_btf_tar.o) \
 	#
 
 .PHONY: all
@@ -119,6 +125,16 @@ $(OUTPUT)/%.bpf.o: %.bpf.c $(LIBBPF_OBJ) $(wildcard %.h) $(ARCH)/vmlinux.h | $(O
 		     -I$(ARCH)/ $(INCLUDES) -c $(filter %.c,$^) -o $@ &&      \
 	$(LLVM_STRIP) -g $@
 
+btfhub-archive: force
+	$(call msg,GIT,$@)
+	$(Q)[ -d "$(BTFHUB_ARCHIVE)" ] || git clone -q https://github.com/aquasecurity/btfhub-archive/ $(BTFHUB_ARCHIVE)
+	$(Q)cd $(BTFHUB_ARCHIVE) && git pull
+
+ifdef ENABLE_MIN_CORE_BTFS
+$(OUTPUT)/min_core_btf_tar.o: $(patsubst %,$(OUTPUT)/%.bpf.o,$(APPS)) btfhub-archive | bpftool
+	$(Q)$(MAKE) -f Makefile.btfgen
+endif
+
 # Build libbpf.a
 $(LIBBPF_OBJ): $(wildcard $(LIBBPF_SRC)/*.[ch]) | $(OUTPUT)/libbpf
 	$(call msg,LIB,$@)
@@ -140,6 +156,9 @@ install: $(APPS) $(APP_ALIASES)
 	$(Q)$(INSTALL) -m 0755 -d $(DESTDIR)$(prefix)/bin
 	$(Q)$(INSTALL) $(APPS) $(DESTDIR)$(prefix)/bin
 	$(Q)cp -a $(APP_ALIASES) $(DESTDIR)$(prefix)/bin
+
+.PHONY: force
+force:
 
 # delete failed targets
 .DELETE_ON_ERROR:
