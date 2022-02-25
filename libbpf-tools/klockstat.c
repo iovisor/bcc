@@ -54,6 +54,7 @@ static struct prog_env {
 	unsigned int iterations;
 	bool reset;
 	bool timestamp;
+	bool verbose;
 } env = {
 	.nr_locks = 99999999,
 	.nr_stack_entries = 1,
@@ -70,7 +71,7 @@ static const char args_doc[] = "FUNCTION";
 static const char program_doc[] =
 "Trace mutex lock acquisition and hold times, in nsec\n"
 "\n"
-"Usage: klockstat [-hRT] [-p PID] [-t TID] [-c FUNC] [-L LOCK] [-n NR_LOCKS]\n"
+"Usage: klockstat [-hRTv] [-p PID] [-t TID] [-c FUNC] [-L LOCK] [-n NR_LOCKS]\n"
 "                 [-s NR_STACKS] [-S SORT] [-d DURATION] [-i INTERVAL]\n"
 "\v"
 "Examples:\n"
@@ -104,6 +105,7 @@ static const struct argp_option opts[] = {
 	{ "interval", 'i', "SECONDS", 0, "Print interval" },
 	{ "reset", 'R', NULL, 0, "Reset stats each interval" },
 	{ "timestamp", 'T', NULL, 0, "Print timestamp" },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
@@ -229,6 +231,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'h':
 		argp_state_help(state, stderr, ARGP_HELP_STD_HELP);
+		break;
+	case 'v':
+		env->verbose = true;
 		break;
 	case ARGP_KEY_END:
 		if (env->duration) {
@@ -471,6 +476,13 @@ static void sig_hand(int signr)
 
 static struct sigaction sigact = {.sa_handler = sig_hand};
 
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
+{
+	if (level == LIBBPF_DEBUG && !env.verbose)
+		return 0;
+	return vfprintf(stderr, format, args);
+}
+
 int main(int argc, char **argv)
 {
 	static const struct argp argp = {
@@ -494,6 +506,7 @@ int main(int argc, char **argv)
 	sigaction(SIGINT, &sigact, 0);
 
 	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
+	libbpf_set_print(libbpf_print_fn);
 
 	ksyms = ksyms__load();
 	if (!ksyms) {
