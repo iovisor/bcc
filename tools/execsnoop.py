@@ -224,7 +224,7 @@ if args.ebpf:
     exit()
 
 # initialize BPF
-b = BPF(text=bpf_text)
+b = BPF(text=bpf_text, cflags=['-Wno-macro-redefined'])
 execve_fnname = b.get_syscall_fnname("execve")
 b.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
 b.attach_kretprobe(event=execve_fnname, fn_name="do_ret_sys_execve")
