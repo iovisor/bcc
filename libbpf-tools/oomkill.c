@@ -22,9 +22,39 @@
 
 static volatile sig_atomic_t exiting = 0;
 
+static bool verbose = false;
+
 const char *argp_program_version = "oomkill 0.1";
 const char *argp_program_bug_address =
 	"https://github.com/iovisor/bcc/tree/master/libbpf-tools";
+const char argp_program_doc[] =
+"Trace OOM kills.\n"
+"\n"
+"USAGE: oomkill [-h]\n"
+"\n"
+"EXAMPLES:\n"
+"    oomkill               # trace OOM kills\n";
+
+static const struct argp_option opts[] = {
+	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{},
+};
+
+static error_t parse_arg(int key, char *arg, struct argp_state *state)
+{
+	switch (key) {
+	case 'v':
+		verbose = true;
+		break;
+	case 'h':
+		argp_state_help(state, stderr, ARGP_HELP_STD_HELP);
+		break;
+	default:
+		return ARGP_ERR_UNKNOWN;
+	}
+	return 0;
+}
 
 static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
@@ -45,7 +75,7 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	time(&t);
 	tm = localtime(&t);
 	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
-	
+
 	if (n)
 		printf("%s Triggered by PID %d (\"%s\"), OOM kill of PID %d (\"%s\"), %lld pages, loadavg: %s\n",
 			ts, e->fpid, e->fcomm, e->tpid, e->tcomm, e->pages, buf);
@@ -66,16 +96,25 @@ static void sig_int(int signo)
 
 static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
-	if (level == LIBBPF_DEBUG)
+	if (level == LIBBPF_DEBUG && !verbose)
 		return 0;
 	return vfprintf(stderr, format, args);
 }
 
 int main(int argc, char **argv)
 {
+	static const struct argp argp = {
+		.options = opts,
+		.parser = parse_arg,
+		.doc = argp_program_doc,
+	};
 	struct perf_buffer *pb = NULL;
 	struct oomkill_bpf *obj;
 	int err;
+
+	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
+	if (err)
+		return err;
 
 	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
