@@ -80,6 +80,7 @@ APPS = \
 	tcplife \
 	tcprtt \
 	tcpsynbl \
+	tcptop \
 	vfsstat \
 	wakeuptime \
 	$(BZ_APPS) \

@@ -53,6 +53,7 @@
 /tcptracer
 /tcprtt
 /tcpsynbl
+/tcptop
 /vfsstat
 /wakeuptime
 /xfsdist
