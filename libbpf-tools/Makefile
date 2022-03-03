@@ -41,6 +41,7 @@ APPS = \
 	biopattern \
 	biosnoop \
 	biostacks \
+	biotop \
 	bitesize \
 	cachestat \
 	cpudist \
