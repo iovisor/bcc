@@ -30,6 +30,9 @@ Output in nanoseconds
 .TP
 \-d
 Show IRQ time distribution as histograms
+.TP
+\-c CPU
+Trace on this CPU only.
 .SH EXAMPLES
 .TP
 Sum soft IRQ event time until Ctrl-C:
@@ -47,6 +50,10 @@ Print 1 second summaries, 10 times:
 1 second summaries, printed in nanoseconds, with timestamps:
 #
 .B softirqs \-NT 1
+.TP
+Sum soft IRQ event time on CPU 1 until Ctrl-C:
+#
+.B softirqs \-c 1
 .SH FIELDS
 .TP
 SOFTIRQ
@@ -88,6 +95,6 @@ Linux
 .SH STABILITY
 Unstable - in development.
 .SH AUTHORS
-Brendan Gregg, Sasha Goldshtein
+Brendan Gregg, Sasha Goldshtein, Rocky Xing
 .SH SEE ALSO
 hardirqs(8)
