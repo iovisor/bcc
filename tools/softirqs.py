@@ -4,13 +4,14 @@
 # softirqs  Summarize soft IRQ (interrupt) event time.
 #           For Linux, uses BCC, eBPF.
 #
-# USAGE: softirqs [-h] [-T] [-N] [-d] [interval] [count]
+# USAGE: softirqs [-h] [-T] [-N] [-d] [-c CPU] [interval] [count]
 #
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 20-Oct-2015   Brendan Gregg     Created this.
 # 03-Apr-2017   Sasha Goldshtein  Migrated to kernel tracepoints.
+# 07-Mar-2022   Rocky Xing        Added CPU filter support.
 
 from __future__ import print_function
 from bcc import BPF
@@ -23,6 +24,7 @@ examples = """examples:
     ./softirqs -d         # show soft irq event time as histograms
     ./softirqs 1 10       # print 1 second summaries, 10 times
     ./softirqs -NT 1      # 1s summaries, nanoseconds, and timestamps
+    ./softirqs -c 1       # sum soft irq event time on CPU 1 only
 """
 parser = argparse.ArgumentParser(
     description="Summarize soft irq event time as histograms.",
@@ -34,6 +36,8 @@ parser.add_argument("-N", "--nanoseconds", action="store_true",
     help="output in nanoseconds")
 parser.add_argument("-d", "--dist", action="store_true",
     help="show distributions as histograms")
+parser.add_argument("-c", "--cpu", type=int,
+    help="trace this CPU only")
 parser.add_argument("interval", nargs="?", default=99999999,
     help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
@@ -77,9 +81,12 @@ TRACEPOINT_PROBE(irq, softirq_entry)
 {
     account_val_t val = {};
     entry_key_t key = {};
+    u32 cpu = bpf_get_smp_processor_id();
+
+    FILTER_CPU
 
     key.pid = bpf_get_current_pid_tgid();
-    key.cpu = bpf_get_smp_processor_id();
+    key.cpu = cpu;
     val.ts = bpf_ktime_get_ns();
     val.vec = args->vec;
 
@@ -95,9 +102,12 @@ TRACEPOINT_PROBE(irq, softirq_exit)
     account_val_t *valp;
     irq_key_t key = {0};
     entry_key_t entry_key = {};
+    u32 cpu = bpf_get_smp_processor_id();
+
+    FILTER_CPU
 
     entry_key.pid = bpf_get_current_pid_tgid();
-    entry_key.cpu = bpf_get_smp_processor_id();
+    entry_key.cpu = cpu;
 
     // fetch timestamp and calculate delta
     valp = start.lookup(&entry_key);
@@ -124,6 +134,11 @@ else:
     bpf_text = bpf_text.replace('STORE',
         'key.vec = valp->vec; ' +
         'dist.atomic_increment(key, delta);')
+if args.cpu is not None:
+    bpf_text = bpf_text.replace('FILTER_CPU',
+        'if (cpu != %d) { return 0; }' % int(args.cpu))
+else:
+    bpf_text = bpf_text.replace('FILTER_CPU', '')
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
