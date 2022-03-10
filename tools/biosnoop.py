@@ -180,7 +180,7 @@ else:
     b.attach_kprobe(event="blk_account_io_done", fn_name="trace_req_completion")
 
 # header
-print("%-11s %-14s %-6s %-7s %-1s %-10s %-7s" % ("TIME(s)", "COMM", "PID",
+print("%-11s %-14s %-6s %-9s %-1s %-10s %-7s" % ("TIME(s)", "COMM", "PID",
     "DISK", "T", "SECTOR", "BYTES"), end="")
 if args.queue:
     print("%7s " % ("QUE(ms)"), end="")
@@ -206,10 +206,13 @@ def print_event(cpu, data, size):
 
     delta = float(event.ts) - start_ts
 
-    print("%-11.6f %-14.14s %-6s %-7s %-1s %-10s %-7s" % (
+    disk_name = event.disk_name.decode('utf-8', 'replace')
+    if not disk_name:
+        disk_name = '<unknown>'
+
+    print("%-11.6f %-14.14s %-6s %-9s %-1s %-10s %-7s" % (
         delta / 1000000, event.name.decode('utf-8', 'replace'), event.pid,
-        event.disk_name.decode('utf-8', 'replace'), rwflg, event.sector,
-        event.len), end="")
+        disk_name, rwflg, event.sector, event.len), end="")
     if args.queue:
         print("%7.2f " % (float(event.qdelta) / 1000000), end="")
     print("%7.2f" % (float(event.delta) / 1000000))
