@@ -4,7 +4,7 @@
 # biolatency    Summarize block device I/O latency as a histogram.
 #       For Linux, uses BCC, eBPF.
 #
-# USAGE: biolatency [-h] [-T] [-Q] [-m] [-D] [-e] [interval] [count]
+# USAGE: biolatency [-h] [-T] [-Q] [-m] [-D] [-F] [-e] [-j] [interval] [count]
 #
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -188,6 +188,12 @@ else:
 if not args.json:
     print("Tracing block device I/O... Hit Ctrl-C to end.")
 
+def disk_print(s):
+    disk = s.decode('utf-8', 'replace')
+    if not disk:
+        disk = "<unknown>"
+    return disk
+
 # see blk_fill_rwbs():
 req_opf = {
     0: "Read",
@@ -256,9 +262,8 @@ while (1):
 
         if args.flags:
             dist.print_json_hist(label, "flags", flags_print)
-
         else:
-            dist.print_json_hist(label)
+            dist.print_json_hist(label, "disk", disk_print)
 
     else:
         if args.timestamp:
@@ -267,7 +272,7 @@ while (1):
         if args.flags:
             dist.print_log2_hist(label, "flags", flags_print)
         else:
-            dist.print_log2_hist(label, "disk")
+            dist.print_log2_hist(label, "disk", disk_print)
         if args.extension:
             total = extension[0].total
             counts = extension[0].count
