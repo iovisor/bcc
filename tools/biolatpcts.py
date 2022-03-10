@@ -72,9 +72,9 @@ void kprobe_blk_account_io_done(struct pt_regs *ctx, struct request *rq, u64 now
         if (!rq->__START_TIME_FIELD__)
                 return;
 
-        if (!rq->rq_disk ||
-            rq->rq_disk->major != __MAJOR__ ||
-            rq->rq_disk->first_minor != __MINOR__)
+        if (!rq->__RQ_DISK__ ||
+            rq->__RQ_DISK__->major != __MAJOR__ ||
+            rq->__RQ_DISK__->first_minor != __MINOR__)
                 return;
 
         cmd_flags = rq->cmd_flags;
@@ -141,6 +141,11 @@ else:
 bpf_source = bpf_source.replace('__START_TIME_FIELD__', start_time_field)
 bpf_source = bpf_source.replace('__MAJOR__', str(major))
 bpf_source = bpf_source.replace('__MINOR__', str(minor))
+
+if BPF.kernel_struct_has_field(b'request', b'rq_disk'):
+    bpf_source = bpf_source.replace('__RQ_DISK__', 'rq_disk')
+else:
+    bpf_source = bpf_source.replace('__RQ_DISK__', 'q->disk')
 
 bpf = BPF(text=bpf_source)
 if BPF.get_kprobe_functions(b'__blk_account_io_done'):

@@ -125,7 +125,7 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
         data.pid = valp->pid;
         data.sector = req->__sector;
         bpf_probe_read_kernel(&data.name, sizeof(data.name), valp->name);
-        struct gendisk *rq_disk = req->rq_disk;
+        struct gendisk *rq_disk = req->__RQ_DISK__;
         bpf_probe_read_kernel(&data.disk_name, sizeof(data.disk_name),
                        rq_disk->disk_name);
     }
@@ -156,6 +156,10 @@ if args.queue:
     bpf_text = bpf_text.replace('##QUEUE##', '1')
 else:
     bpf_text = bpf_text.replace('##QUEUE##', '0')
+if BPF.kernel_struct_has_field(b'request', b'rq_disk'):
+    bpf_text = bpf_text.replace('__RQ_DISK__', 'rq_disk')
+else:
+    bpf_text = bpf_text.replace('__RQ_DISK__', 'q->disk')
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:

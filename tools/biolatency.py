@@ -128,12 +128,16 @@ storage_str = ""
 store_str = ""
 if args.disks:
     storage_str += "BPF_HISTOGRAM(dist, disk_key_t);"
-    store_str += """
+    disks_str = """
     disk_key_t key = {.slot = bpf_log2l(delta)};
-    void *__tmp = (void *)req->rq_disk->disk_name;
+    void *__tmp = (void *)req->__RQ_DISK__->disk_name;
     bpf_probe_read(&key.disk, sizeof(key.disk), __tmp);
     dist.atomic_increment(key);
     """
+    if BPF.kernel_struct_has_field(b'request', b'rq_disk'):
+        store_str += disks_str.replace('__RQ_DISK__', 'rq_disk')
+    else:
+        store_str += disks_str.replace('__RQ_DISK__', 'q->disk')
 elif args.flags:
     storage_str += "BPF_HISTOGRAM(dist, flag_key_t);"
     store_str += """
