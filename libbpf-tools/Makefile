@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
-OUTPUT := .output
+OUTPUT := $(abspath .output)
 CLANG ?= clang
 LLVM_STRIP ?= llvm-strip
-BPFTOOL ?= bin/bpftool
+BPFTOOL_SRC := $(abspath ./bpftool/src)
+BPFTOOL ?= $(OUTPUT)/bpftool/bpftool
 LIBBPF_SRC := $(abspath ../src/cc/libbpf/src)
 LIBBPF_OBJ := $(abspath $(OUTPUT)/libbpf.a)
 INCLUDES := -I$(OUTPUT) -I../src/cc/libbpf/include/uapi
@@ -93,6 +94,11 @@ $(OUTPUT) $(OUTPUT)/libbpf:
 	$(call msg,MKDIR,$@)
 	$(Q)mkdir -p $@
 
+.PHONY: bpftool
+bpftool:
+	$(Q)mkdir -p $(OUTPUT)/bpftool
+	$(Q)$(MAKE) OUTPUT=$(OUTPUT)/bpftool/ -C $(BPFTOOL_SRC)
+
 $(APPS): %: $(OUTPUT)/%.o $(LIBBPF_OBJ) $(COMMON_OBJ) | $(OUTPUT)
 	$(call msg,BINARY,$@)
 	$(Q)$(CC) $(CFLAGS) $^ $(LDFLAGS) -lelf -lz -o $@
@@ -103,7 +109,7 @@ $(OUTPUT)/%.o: %.c $(wildcard %.h) $(LIBBPF_OBJ) | $(OUTPUT)
 	$(call msg,CC,$@)
 	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $(filter %.c,$^) -o $@
 
-$(OUTPUT)/%.skel.h: $(OUTPUT)/%.bpf.o | $(OUTPUT)
+$(OUTPUT)/%.skel.h: $(OUTPUT)/%.bpf.o | $(OUTPUT) bpftool
 	$(call msg,GEN-SKEL,$@)
 	$(Q)$(BPFTOOL) gen skeleton $< > $@
 
