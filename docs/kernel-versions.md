@@ -154,6 +154,7 @@ mmap() support for array maps | 5.5 | [`fc9702273e2e`](https://git.kernel.org/pu
 `LOOKUP_BATCH` | 5.6 | [`cb4d03ab499d`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=cb4d03ab499d4c040f4ab6fd4389d2b49f42b5a5)
 `UPDATE_BATCH`, `DELETE_BATCH` | 5.6 | [`aa2e93b8e58e`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=aa2e93b8e58e18442edfb2427446732415bc215e)
 `LOOKUP_AND_DELETE_BATCH` | 5.6 | [`057996380a42`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=057996380a42bb64ccc04383cfa9c0ace4ea11f0)
+`LOOKUP_AND_DELETE_ELEM` support for hash maps | 5.14 | [`bd513cd08f10`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=3e87f192b405960c0fe83e0925bd0dadf4f8cf43)
 
 ## XDP
 
