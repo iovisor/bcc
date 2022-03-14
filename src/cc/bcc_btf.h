@@ -26,6 +26,7 @@
 #include "bpf_module.h"
 
 struct btf;
+struct btf_type;
 
 namespace btf_ext_vendored {
 
