@@ -129,8 +129,8 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
 
     // setup info_t key
     struct info_t info = {};
-    info.major = req->rq_disk->major;
-    info.minor = req->rq_disk->first_minor;
+    info.major = req->__RQ_DISK__->major;
+    info.minor = req->__RQ_DISK__->first_minor;
 /*
  * The following deals with a kernel version change (in mainline 4.7, although
  * it may be backported to earlier kernels) with how block request write flags
@@ -173,6 +173,11 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
 if args.ebpf:
     print(bpf_text)
     exit()
+
+if BPF.kernel_struct_has_field(b'request', b'rq_disk'):
+    bpf_text = bpf_text.replace('__RQ_DISK__', 'rq_disk')
+else:
+    bpf_text = bpf_text.replace('__RQ_DISK__', 'q->disk')
 
 b = BPF(text=bpf_text)
 if BPF.get_kprobe_functions(b'__blk_account_io_start'):

@@ -4,7 +4,7 @@
 # hardirqs  Summarize hard IRQ (interrupt) event time.
 #           For Linux, uses BCC, eBPF.
 #
-# USAGE: hardirqs [-h] [-T] [-N] [-C] [-d] [interval] [outputs]
+# USAGE: hardirqs [-h] [-T] [-N] [-C] [-d] [-c CPU] [interval] [outputs]
 #
 # Thanks Amer Ather for help understanding irq behavior.
 #
@@ -13,6 +13,7 @@
 #
 # 19-Oct-2015   Brendan Gregg   Created this.
 # 22-May-2021   Hengqi Chen     Migrated to kernel tracepoints.
+# 07-Mar-2022   Rocky Xing      Added CPU filter support.
 
 from __future__ import print_function
 from bcc import BPF
@@ -25,6 +26,7 @@ examples = """examples:
     ./hardirqs -d         # show hard irq event time as histograms
     ./hardirqs 1 10       # print 1 second summaries, 10 times
     ./hardirqs -NT 1      # 1s summaries, nanoseconds, and timestamps
+    ./hardirqs -c 1       # sum hard irq event time on CPU 1 only
 """
 parser = argparse.ArgumentParser(
     description="Summarize hard irq event time as histograms",
@@ -38,6 +40,8 @@ parser.add_argument("-C", "--count", action="store_true",
     help="show event counts instead of timing")
 parser.add_argument("-d", "--dist", action="store_true",
     help="show distributions as histograms")
+parser.add_argument("-c", "--cpu", type=int,
+    help="trace this CPU only")
 parser.add_argument("interval", nargs="?", default=99999999,
     help="output interval, in seconds")
 parser.add_argument("outputs", nargs="?", default=99999999,
@@ -94,9 +98,12 @@ TRACEPOINT_PROBE(irq, irq_handler_entry)
 {
     struct entry_key key = {};
     irq_name_t name = {};
+    u32 cpu = bpf_get_smp_processor_id();
+
+    FILTER_CPU
 
     key.tid = bpf_get_current_pid_tgid();
-    key.cpu_id = bpf_get_smp_processor_id();
+    key.cpu_id = cpu;
 
     TP_DATA_LOC_READ_STR(&name.name, name, sizeof(name));
     irqnames.update(&key, &name);
@@ -106,9 +113,12 @@ TRACEPOINT_PROBE(irq, irq_handler_entry)
 TRACEPOINT_PROBE(irq, irq_handler_exit)
 {
     struct entry_key key = {};
+    u32 cpu = bpf_get_smp_processor_id();
+
+    FILTER_CPU
 
     key.tid = bpf_get_current_pid_tgid();
-    key.cpu_id = bpf_get_smp_processor_id();
+    key.cpu_id = cpu;
 
     // check ret value of irq handler is not IRQ_NONE to make sure
     // the current event belong to this irq handler
@@ -137,9 +147,12 @@ TRACEPOINT_PROBE(irq, irq_handler_entry)
     u64 ts = bpf_ktime_get_ns();
     irq_name_t name = {};
     struct entry_key key = {};
+    u32 cpu = bpf_get_smp_processor_id();
+
+    FILTER_CPU
 
     key.tid = bpf_get_current_pid_tgid();
-    key.cpu_id = bpf_get_smp_processor_id();
+    key.cpu_id = cpu;
 
     TP_DATA_LOC_READ_STR(&name.name, name, sizeof(name));
     irqnames.update(&key, &name);
@@ -152,9 +165,10 @@ TRACEPOINT_PROBE(irq, irq_handler_exit)
     u64 *tsp, delta;
     irq_name_t *namep;
     struct entry_key key = {};
+    u32 cpu = bpf_get_smp_processor_id();
 
     key.tid = bpf_get_current_pid_tgid();
-    key.cpu_id = bpf_get_smp_processor_id();
+    key.cpu_id = cpu;
 
     // check ret value of irq handler is not IRQ_NONE to make sure
     // the current event belong to this irq handler
@@ -195,6 +209,11 @@ else:
         'irq_key_t key = {.slot = 0 /* ignore */};' +
         'bpf_probe_read_kernel(&key.name, sizeof(key.name), name);' +
         'dist.atomic_increment(key, delta);')
+if args.cpu is not None:
+    bpf_text = bpf_text.replace('FILTER_CPU',
+        'if (cpu != %d) { return 0; }' % int(args.cpu))
+else:
+    bpf_text = bpf_text.replace('FILTER_CPU', '')
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:

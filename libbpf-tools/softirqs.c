@@ -39,10 +39,10 @@ const char argp_program_doc[] =
 "USAGE: softirqs [--help] [-T] [-N] [-d] [interval] [count]\n"
 "\n"
 "EXAMPLES:\n"
-"    softirqss            # sum soft irq event time\n"
-"    softirqss -d         # show soft irq event time as histograms\n"
-"    softirqss 1 10       # print 1 second summaries, 10 times\n"
-"    softirqss -NT 1      # 1s summaries, nanoseconds, and timestamps\n";
+"    softirqs            # sum soft irq event time\n"
+"    softirqs -d         # show soft irq event time as histograms\n"
+"    softirqs 1 10       # print 1 second summaries, 10 times\n"
+"    softirqs -NT 1      # 1s summaries, nanoseconds, and timestamps\n";
 
 static const struct argp_option opts[] = {
 	{ "distributed", 'd', NULL, 0, "Show distributions as histograms" },
