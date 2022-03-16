@@ -652,9 +652,47 @@ int BTF::get_btf_info(const char *fname,
 int BTF::get_map_tids(std::string map_name,
                       unsigned expected_ksize, unsigned expected_vsize,
                       unsigned *key_tid, unsigned *value_tid) {
-  return btf__get_map_kv_tids(btf_, map_name.c_str(),
-                              expected_ksize, expected_vsize,
-                              key_tid, value_tid);
+  auto struct_name = "____btf_map_" + map_name;
+  auto type_id = btf__find_by_name_kind(btf_, struct_name.c_str(), BTF_KIND_STRUCT);
+  if (type_id < 0) {
+    warning("struct %s not found in BTF\n", struct_name.c_str());
+    return -1;
+  }
+
+  auto struct_type = btf__type_by_id(btf_, type_id);
+  if (!struct_type || btf_vlen(struct_type) < 2) {
+    warning("struct %s is not a valid map struct\n", struct_name.c_str());
+    return -1;
+  }
+
+  auto members = btf_members(struct_type);
+  auto key = members[0];
+  auto key_name = btf__name_by_offset(btf_, key.name_off);
+  if (strcmp(key_name, "key")) {
+    warning("'key' should be the first member\n");
+    return -1;
+  }
+  auto key_size = btf__resolve_size(btf_, key.type);
+  if (key_size != expected_ksize) {
+    warning("expect key size to be %d, got %d\n", expected_ksize, key_size);
+    return -1;
+  }
+  *key_tid = key.type;
+
+  auto value = members[1];
+  auto value_name = btf__name_by_offset(btf_, value.name_off);
+  if (strcmp(value_name, "value")) {
+    warning("'value' should be the second member\n");
+    return -1;
+  }
+  auto value_size = btf__resolve_size(btf_, value.type);
+  if (value_size != expected_vsize) {
+    warning("expect value size to be %d, got %d\n", expected_vsize, value_size);
+    return -1;
+  }
+  *value_tid = value.type;
+
+  return 0;
 }
 
 } // namespace ebpf
