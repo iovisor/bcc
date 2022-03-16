@@ -1,8 +1,8 @@
-.TH tcpcongestdura 8  "2022-01-27" "USER COMMANDS"
+.TH tcpcong 8  "2022-01-27" "USER COMMANDS"
 .SH NAME
-tcpcongestdura \- Measure tcp congestion state duration. Uses Linux eBPF/bcc.
+tcpcong \- Measure tcp congestion state duration. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B tcpcongestdura [\-h] [\-T] [\-L] [\-R] [\-N] [\-d] [interval] [outputs]
+.B tcpcong [\-h] [\-T] [\-L] [\-R] [\-u] [\-d] [interval] [outputs]
 .SH DESCRIPTION
 this tool measures tcp sockets congestion control status duration, and
 prints a summary one state by one along with total state change number.
@@ -30,8 +30,8 @@ Specify local tcp port range.
 \-R
 Specify remote tcp port range.
 .TP
-\-N
-Output in nanoseconds.
+\-u
+Output in microseconds.
 .TP
 \-d
 Show congestion status duration distribution as histograms.
@@ -43,23 +43,23 @@ Show all tcp sockets congestion status duration until Ctrl-C:
 .TP
 Show all tcp sockets congestion status duration every 1 second and 10 times:
 #
-.B tcpcongestdura 1 10
+.B tcpcong 1 10
 .TP
 Show only local port 3000-3006 congestion status duration every 1 second:
 #
-.B tcpcongestdura \-L 3000-3006  1
+.B tcpcong \-L 3000-3006  1
 .TP
 Show only remote port 5000-5005 congestion status duration every 1 second:
 #
-.B tcpcongestdura \-R 5000-5005  1
+.B tcpcong \-R 5000-5005  1
 .TP
-Show 1 second summaries, printed in nanoseconds, with timestamps:
+Show 1 second summaries, printed in microseconds, with timestamps:
 #
-.B tcpcongestdura \-NT 1
+.B tcpcong \-uT 1
 .TP
 Show all tcp sockets congestion status duration as histograms:
 #
-.B tcpcongestdura \-d
+.B tcpcong \-d
 .SH FIELDS
 .TP
 LAddrPort
@@ -68,35 +68,35 @@ local ip address and tcp socket port.
 RAddrPort
 remote ip address and tcp socket port.
 .TP
-Open_usecs
+Open_us
 Total duration in open status for microseconds.
 .TP
-Dsod_usecs
+Dod_us
 Total duration in disorder status for microseconds.
 .TP
-Rcov_usecs
+Rcov_us
 Total duration in recovery status for microseconds.
 .TP
-Cwr_usecs
+Cwr_us
 Total duration in cwr status for microseconds.
 .TP
-Los_usecs
+Los_us
 Total duration in loss status for microseconds.
 .TP
-Open_nsecs
-Total duration in open status for nanoseconds.
+Open_ms
+Total duration in open status for milliseconds.
 .TP
-Dsod_nsecs
-Total duration in disorder status for nanoseconds.
+Dod_ms
+Total duration in disorder status for milliseconds.
 .TP
-Rcov_nsecs
-Total duration in recovery status for nanoseconds.
+Rcov_ms
+Total duration in recovery status for milliseconds.
 .TP
-Cwr_nsecs
-Total duration in cwr status for nanoseconds.
+Cwr_ms
+Total duration in cwr status for milliseconds.
 .TP
-Loss_nsecs
-Total duration in loss status for nanoseconds.
+Loss_ms
+Total duration in loss status for milliseconds.
 .TP
 Chgs
 Total number of status change.
@@ -104,8 +104,8 @@ Total number of status change.
 usecs
 Range of microseconds for this bucket.
 .TP
-nsecs
-Range of nanoseconds for this bucket.
+msecs
+Range of milliseconds for this bucket.
 .TP
 count
 Number of congestion status in this time range.

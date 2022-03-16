@@ -1,10 +1,10 @@
 #!/usr/bin/python
 # @lint-avoid-python-3-compatibility-imports
 #
-# tcpcongestdura  Measure tcp congestion control status duration.
+# tcpcong  Measure tcp congestion control status duration.
 #           For Linux, uses BCC, eBPF.
 #
-# USAGE: tcpcongestdura [-h] [-T] [-L] [-R] [-N] [-d] [interval] [outputs]
+# USAGE: tcpcong [-h] [-T] [-L] [-R] [-m] [-d] [interval] [outputs]
 #
 #
 #
@@ -21,12 +21,12 @@ from struct import pack
 import argparse
 
 examples = """examples:
-    ./tcpcongestdura                 #show tcp congestion status duration
-    ./tcpcongestdura 1 10            #show 1 second summaries, 10 times
-    ./tcpcongestdura -L 3000-3006 1  #1s summaries, local port 3000-3006
-    ./tcpcongestdura -R 5000-5005 1  #1s summaries, remote port 5000-5005
-    ./tcpcongestdura -NT 1           #1s summaries, nanoseconds, and timestamps
-    ./tcpcongestdura -d              #show the duration as histograms
+    ./tcpcong                 #show tcp congestion status duration
+    ./tcpcong 1 10            #show 1 second summaries, 10 times
+    ./tcpcong -L 3000-3006 1  #1s summaries, local port 3000-3006
+    ./tcpcong -R 5000-5005 1  #1s summaries, remote port 5000-5005
+    ./tcpcong -uT 1           #1s summaries, microseconds, and timestamps
+    ./tcpcong -d              #show the duration as histograms
 """
 
 parser = argparse.ArgumentParser(
@@ -41,8 +41,8 @@ parser.add_argument("-T", "--timestamp", action="store_true",
     help="include timestamp on output")
 parser.add_argument("-d", "--dist", action="store_true",
     help="show distributions as histograms")
-parser.add_argument("-N", "--nanoseconds", action="store_true",
-    help="output in nanoseconds")
+parser.add_argument("-u", "--microseconds", action="store_true",
+    help="output in microseconds")
 parser.add_argument("interval", nargs="?", default=99999999,
     help="output interval, in seconds")
 parser.add_argument("outputs", nargs="?", default=99999999,
@@ -113,7 +113,6 @@ typedef struct process_key {
     char comm[TASK_COMM_LEN];
     u32  pid;
     u32  tid;
-    u32  status;
 }process_key_t;
 
 typedef struct ipv4_flow_val {
@@ -141,7 +140,7 @@ BPF_HASH(ipv6_stat, ipv6_flow_key_t, data_val_t);
 
 HIST_TABLE
 
-static int entry_func(struct pt_regs *ctx, struct sock *sk, u32 status)
+int entry_state_update_func(struct pt_regs *ctx, struct sock *sk)
 {
     u32 tid = bpf_get_current_pid_tgid();
     u32 pid = (bpf_get_current_pid_tgid() >> 32);
@@ -149,7 +148,6 @@ static int entry_func(struct pt_regs *ctx, struct sock *sk, u32 status)
     bpf_get_current_comm(&key.comm, sizeof(key.comm));
     key.pid = pid;
     key.tid = tid;
-    key.status = status;
     u16 dport = 0, lport = 0;
     u64 family = sk->__sk_common.skc_family;
     struct inet_connection_sock *icsk = inet_csk(sk);
@@ -196,7 +194,7 @@ static int entry_func(struct pt_regs *ctx, struct sock *sk, u32 status)
     return 0;
 }
 
-static int ret_func(struct sock *sk, u32 status)
+int ret_state_update_func(struct pt_regs *ctx, struct sock *sk)
 {
     u64 *tsp, ts, ts1;
     u16 last_cong_state;
@@ -207,7 +205,6 @@ static int ret_func(struct sock *sk, u32 status)
     bpf_get_current_comm(&key.comm, sizeof(key.comm));
     key.pid = pid;
     key.tid = tid;
-    key.status = status;
 
     struct inet_connection_sock *icsk = inet_csk(sk);
     struct cong {
@@ -244,7 +241,7 @@ static int ret_func(struct sock *sk, u32 status)
                 ts = ts1 - datap->last_ts;
                 datap->last_ts = ts1;
                 datap->last_cong_stat = cong_status.cong_stat + 1;
-                TIME_UNIT
+                ts /= 1000;
                 STORE
             }
         }
@@ -273,7 +270,7 @@ static int ret_func(struct sock *sk, u32 status)
                 ts = ts1 - datap->last_ts;
                 datap->last_ts = ts1;
                 datap->last_cong_stat = (cong_status.cong_stat + 1);
-                TIME_UNIT
+                ts /= 1000;
                 STORE
             }
         }
@@ -282,65 +279,6 @@ static int ret_func(struct sock *sk, u32 status)
     return 0;
 }
 
-int trace_entry_tcp_enter_disorder(struct pt_regs *ctx, struct sock *sk)
-{
-    u32 status = 1;
-    return entry_func(ctx, sk, status);
-}
-
-int trace_ret_tcp_enter_disorder(struct pt_regs *ctx, struct sock *sk)
-{
-    u32 status = 1;
-    return ret_func(sk, status);
-}
-
-int trace_entry_tcp_enter_cwr(struct pt_regs *ctx, struct sock *sk)
-{
-    u32 status = 2;
-    return entry_func(ctx, sk, status);
-}
-
-int trace_ret_tcp_enter_cwr(struct pt_regs *ctx, struct sock *sk)
-{
-    u32 status = 2;
-    return ret_func(sk, status);
-}
-
-int trace_entry_tcp_enter_recovery(struct pt_regs *ctx, struct sock *sk)
-{
-    u32 status = 3;
-    return entry_func(ctx, sk, status);
-}
-
-int trace_ret_tcp_enter_recovery(struct pt_regs *ctx, struct sock *sk)
-{
-    u32 status = 3;
-    return ret_func(sk, status);
-}
-
-int trace_entry_tcp_enter_loss(struct pt_regs *ctx, struct sock *sk)
-{
-    u32 status = 4;
-    return entry_func(ctx, sk, status);
-}
-
-int trace_ret_tcp_enter_loss(struct pt_regs *ctx, struct sock *sk)
-{
-    u32 status = 4;
-    return ret_func(sk, status);
-}
-
-int trace_entry_tcp_enter_open(struct pt_regs *ctx, struct sock *sk)
-{
-    u32 status = 5;
-    return entry_func(ctx, sk, status);
-}
-
-int trace_ret_tcp_enter_open(struct pt_regs *ctx, struct sock *sk)
-{
-    u32 status = 5;
-    return ret_func(sk, status);
-}
 
 """
 
@@ -395,6 +333,7 @@ store_dist_text = """
                 } else if (last_cong_state == (TCP_CA_Loss + 1)) {
                     key_s.state = TCP_CA_Loss;
                 }
+                TIME_UNIT
                 key_s.slot = bpf_log2l(ts);
                 dist.atomic_increment(key_s);
 """
@@ -414,16 +353,16 @@ if args.dist:
     bpf_text = bpf_text.replace('STATE_KEY',
         'congest_state_key_t key_s = {0};')
     bpf_text = bpf_text.replace('HIST_TABLE', hist_table_text)
+    if args.microseconds:
+        bpf_text = bpf_text.replace('TIME_UNIT', '')
+    else:
+        bpf_text = bpf_text.replace('TIME_UNIT', 'ts /= 1000;')
 else:
     bpf_text = bpf_text.replace('DEF_TEXT', table_def_text)
     bpf_text = bpf_text.replace('STORE', store_text)
     bpf_text = bpf_text.replace('STATE_KEY', '')
     bpf_text = bpf_text.replace('HIST_TABLE', '')
 
-if args.nanoseconds:
-    bpf_text = bpf_text.replace('TIME_UNIT', '')
-else:
-    bpf_text = bpf_text.replace('TIME_UNIT', 'ts /= 1000;')
 
 if debug or args.ebpf:
     print(bpf_text)
@@ -433,45 +372,29 @@ if debug or args.ebpf:
 # load BPF program
 b = BPF(text=bpf_text)
 
-b.attach_kprobe(event="tcp_try_keep_open",
-    fn_name="trace_entry_tcp_enter_disorder")
-b.attach_kretprobe(event="tcp_try_keep_open",
-    fn_name="trace_ret_tcp_enter_disorder")
-b.attach_kprobe(event="tcp_enter_cwr", fn_name="trace_entry_tcp_enter_cwr")
-b.attach_kretprobe(event="tcp_enter_cwr",
-    fn_name="trace_ret_tcp_enter_cwr")
-b.attach_kprobe(event="tcp_process_tlp_ack",
-    fn_name="trace_entry_tcp_enter_cwr")
-b.attach_kretprobe(event="tcp_process_tlp_ack",
-    fn_name="trace_ret_tcp_enter_cwr")
-b.attach_kprobe(event="tcp_enter_recovery",
-    fn_name="trace_entry_tcp_enter_recovery")
-b.attach_kretprobe(event="tcp_enter_recovery",
-    fn_name="trace_ret_tcp_enter_recovery")
-b.attach_kprobe(event="tcp_enter_loss", fn_name="trace_entry_tcp_enter_loss")
-b.attach_kretprobe(event="tcp_enter_loss",
-    fn_name="trace_ret_tcp_enter_loss")
-b.attach_kprobe(event="tcp_simple_retransmit",
-    fn_name="trace_entry_tcp_enter_loss")
-b.attach_kretprobe(event="tcp_simple_retransmit",
-    fn_name="trace_ret_tcp_enter_loss")
-b.attach_kprobe(event="tcp_try_undo_recovery",
-    fn_name="trace_entry_tcp_enter_open")
-b.attach_kretprobe(event="tcp_try_undo_recovery",
-    fn_name="trace_ret_tcp_enter_open")
-b.attach_kprobe(event="tcp_try_undo_loss",
-    fn_name="trace_entry_tcp_enter_open")
-b.attach_kretprobe(event="tcp_try_undo_loss",
-    fn_name="trace_ret_tcp_enter_open")
+# all the tcp congestion control status update functions
+# are called by below 5 functions.
 b.attach_kprobe(event="tcp_fastretrans_alert",
-    fn_name="trace_entry_tcp_enter_open")
+    fn_name="entry_state_update_func")
 b.attach_kretprobe(event="tcp_fastretrans_alert",
-    fn_name="trace_ret_tcp_enter_open")
-b.attach_kprobe(event="tcp_disconnect", fn_name="trace_entry_tcp_enter_open")
-b.attach_kretprobe(event="tcp_disconnect",
-    fn_name="trace_ret_tcp_enter_open")
+    fn_name="ret_state_update_func")
+b.attach_kprobe(event="tcp_enter_cwr",
+    fn_name="entry_state_update_func")
+b.attach_kretprobe(event="tcp_enter_cwr",
+    fn_name="ret_state_update_func")
+b.attach_kprobe(event="tcp_process_tlp_ack",
+    fn_name="entry_state_update_func")
+b.attach_kretprobe(event="tcp_process_tlp_ack",
+    fn_name="ret_state_update_func")
+b.attach_kprobe(event="tcp_enter_loss", fn_name="entry_state_update_func")
+b.attach_kretprobe(event="tcp_enter_loss", fn_name="ret_state_update_func")
+b.attach_kprobe(event="tcp_enter_recovery",
+    fn_name="entry_state_update_func")
+b.attach_kretprobe(event="tcp_enter_recovery",
+    fn_name="ret_state_update_func")
 
-print("Tracing tcp socket congestion control status duration... Hit Ctrl-C to end.")
+
+print("Tracing tcp congestion control status duration... Hit Ctrl-C to end.")
 
 
 def cong_state_to_name(state):
@@ -485,9 +408,9 @@ ipv6_stat = b.get_table("ipv6_stat")
 ipv4_stat = b.get_table("ipv4_stat")
 if args.dist:
     dist = b.get_table("dist")
-label = "us"
-if args.nanoseconds:
-    label = "ns"
+label = "ms"
+if args.microseconds:
+    label = "us"
 while (1):
     try:
         sleep(int(args.interval))
@@ -498,17 +421,17 @@ while (1):
     if args.timestamp:
         print("%-8s\n" % strftime("%H:%M:%S"), end="")
     if args.dist:
-        if label == "ns":
-            label = "nsecs"
+        if args.microseconds:
+            dist.print_log2_hist("usecs", "tcp_congest_state",
+                section_print_fn=cong_state_to_name)
         else:
-            label = "msecs"
-        dist.print_log2_hist(label, "tcp_congest_state",
-            section_print_fn=cong_state_to_name)
+            dist.print_log2_hist("msecs", "tcp_congest_state",
+                section_print_fn=cong_state_to_name)
         dist.clear()
     else:
         if ipv4_stat:
-            print("%-21s% -21s %-7s %-7s %-7s %-6s %-6s %-5s" % ("LAddrPort",
-                "RAddrPort", "Open_" + label, "Dsod_" + label,
+            print("%-21s% -21s %-7s %-6s %-7s %-7s %-6s %-5s" % ("LAddrPort",
+                "RAddrPort", "Open_" + label, "Dod_" + label,
                 "Rcov_" + label, "Cwr_" + label, "Los_" + label, "Chgs"))
         laddr = ""
         raddr = ""
@@ -520,13 +443,19 @@ while (1):
             recover_dura = v.recover_dura
             cwr_dura = v.cwr_dura
             loss_dura = v.loss_dura
+            if not args.microseconds:
+                open_dura /= 1000
+                disorder_dura /= 1000
+                recover_dura /= 1000
+                cwr_dura /= 1000
+                loss_dura /= 1000
             if v.total_changes != 0:
-                print("%-21s %-21s %-7d %-7d %-7d %-6d %-6d %-5d" % (laddr +
+                print("%-21s %-21s %-7d %-6d %-7d %-7d %-6d %-5d" % (laddr +
                     "/" + str(k.lport), raddr + "/" + str(k.dport), open_dura,
                     disorder_dura, recover_dura, cwr_dura, loss_dura,
                     v.total_changes))
         if ipv6_stat:
-            print("%-32s %-32s %-7s %-7s %-7s %-6s %-6s %-5s" % ("LAddrPort6",
+            print("%-32s %-32s %-7s %-6s %-7s %-7s %-6s %-5s" % ("LAddrPort6",
                 "RAddrPort6", "Open_" + label, "Dsod_" + label, "Rcov_" + label,
                 "Cwr_" + label, "Los_" + label, "Chgs"))
         for k, v in sorted(ipv6_stat.items(), key=lambda ipv6_stat: ipv6_stat[0].lport):
@@ -537,6 +466,12 @@ while (1):
             recover_dura = v.recover_dura
             cwr_dura = v.cwr_dura
             loss_dura = v.loss_dura
+            if not args.microseconds:
+                open_dura /= 1000
+                disorder_dura /= 1000
+                recover_dura /= 1000
+                cwr_dura /= 1000
+                loss_dura /= 1000
             if v.total_changes != 0:
                 print("%-32s %-32s %-7d %-7d %-7d %-6d %-6d %-5d" % (laddr +
                     "/" + str(k.lport), raddr + "/" + str(k.dport), open_dura,

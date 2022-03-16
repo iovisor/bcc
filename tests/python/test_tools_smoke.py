@@ -359,8 +359,8 @@ class SmokeTests(TestCase):
         self.run_with_duration("tcptop.py 1 1")
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
-    def test_tcpcongestdura(self):
-        self.run_with_duration("tcpcongestdura.py 1 1")
+    def test_tcpcong(self):
+        self.run_with_duration("tcpcong.py 1 1")
 
     def test_tplist(self):
         self.run_with_duration("tplist.py -p %d" % os.getpid())
