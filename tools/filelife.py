@@ -118,12 +118,12 @@ b.attach_kprobe(event="security_inode_create", fn_name="trace_create")
 b.attach_kprobe(event="vfs_unlink", fn_name="trace_unlink")
 
 # header
-print("%-8s %-6s %-16s %-7s %s" % ("TIME", "PID", "COMM", "AGE(s)", "FILE"))
+print("%-8s %-7s %-16s %-7s %s" % ("TIME", "PID", "COMM", "AGE(s)", "FILE"))
 
 # process event
 def print_event(cpu, data, size):
     event = b["events"].event(data)
-    print("%-8s %-6d %-16s %-7.2f %s" % (strftime("%H:%M:%S"), event.pid,
+    print("%-8s %-7d %-16s %-7.2f %s" % (strftime("%H:%M:%S"), event.pid,
         event.comm.decode('utf-8', 'replace'), float(event.delta) / 1000,
         event.fname.decode('utf-8', 'replace')))
 

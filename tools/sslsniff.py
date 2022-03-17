@@ -343,7 +343,7 @@ if args.extra_lib:
 
 
 # header
-header = "%-12s %-18s %-16s %-7s %-6s" % ("FUNC", "TIME(s)", "COMM", "PID", "LEN")
+header = "%-12s %-18s %-16s %-7s %-7s" % ("FUNC", "TIME(s)", "COMM", "PID", "LEN")
 
 if args.extra:
     header += " %-7s %-7s" % ("UID", "TID")

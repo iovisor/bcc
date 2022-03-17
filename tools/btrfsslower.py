@@ -310,7 +310,7 @@ def print_event(cpu, data, size):
             type, event.size, event.offset, event.delta_us,
             event.file.decode('utf-8', 'replace')))
         return
-    print("%-8s %-14.14s %-6s %1s %-7s %-8d %7.2f %s" % (strftime("%H:%M:%S"),
+    print("%-8s %-14.14s %-7d %1s %-7s %-8d %7.2f %s" % (strftime("%H:%M:%S"),
         event.task.decode('utf-8', 'replace'), event.pid, type, event.size,
         event.offset / 1024, float(event.delta_us) / 1000,
         event.file.decode('utf-8', 'replace')))
@@ -336,7 +336,7 @@ else:
         print("Tracing btrfs operations")
     else:
         print("Tracing btrfs operations slower than %d ms" % min_ms)
-    print("%-8s %-14s %-6s %1s %-7s %-8s %7s %s" % ("TIME", "COMM", "PID", "T",
+    print("%-8s %-14s %-7s %1s %-7s %-8s %7s %s" % ("TIME", "COMM", "PID", "T",
         "BYTES", "OFF_KB", "LAT(ms)", "FILENAME"))
 
 # read events

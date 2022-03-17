@@ -108,7 +108,7 @@ b = BPF(text=bpf_text, usdt_contexts=[u])
 # header
 print("Tracing MySQL server queries for PID %d slower than %s ms..." % (pid,
     min_ms_text))
-print("%-14s %-6s %8s %s" % ("TIME(s)", "PID", "MS", "QUERY"))
+print("%-14s %-7s %8s %s" % ("TIME(s)", "PID", "MS", "QUERY"))
 
 # process event
 start = 0
@@ -117,7 +117,7 @@ def print_event(cpu, data, size):
     event = b["events"].event(data)
     if start == 0:
         start = event.ts
-    print("%-14.6f %-6d %8.3f %s" % (float(event.ts - start) / 1000000000,
+    print("%-14.6f %-7d %8.3f %s" % (float(event.ts - start) / 1000000000,
         event.pid, float(event.delta) / 1000000, event.query))
 
 # loop with callback to print_event
