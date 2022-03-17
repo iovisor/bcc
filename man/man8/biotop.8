@@ -2,7 +2,7 @@
 .SH NAME
 biotop \- Block device (disk) I/O by process top.
 .SH SYNOPSIS
-.B biotop [\-h] [\-C] [\-r MAXROWS] [interval] [count]
+.B biotop [\-h] [\-C] [\-r MAXROWS] [\-p PID] [interval] [count]
 .SH DESCRIPTION
 This is top for disks. 
 
@@ -29,6 +29,9 @@ Don't clear the screen.
 .TP
 \-r MAXROWS
 Maximum number of rows to print. Default is 20.
+.TP
+\-p PID
+Trace this PID only.
 .TP
 interval
 Interval between updates, seconds.
@@ -98,7 +101,7 @@ Linux
 .SH STABILITY
 Unstable - in development.
 .SH AUTHOR
-Brendan Gregg
+Brendan Gregg, Rocky Xing
 .SH INSPIRATION
 top(1) by William LeFebvre
 .SH SEE ALSO
