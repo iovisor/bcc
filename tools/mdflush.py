@@ -55,12 +55,12 @@ int kprobe__md_flush_request(struct pt_regs *ctx, void *mddev, struct bio *bio)
 
 # header
 print("Tracing md flush requests... Hit Ctrl-C to end.")
-print("%-8s %-6s %-16s %s" % ("TIME", "PID", "COMM", "DEVICE"))
+print("%-8s %-7s %-16s %s" % ("TIME", "PID", "COMM", "DEVICE"))
 
 # process event
 def print_event(cpu, data, size):
     event = b["events"].event(data)
-    print("%-8s %-6d %-16s %s" % (strftime("%H:%M:%S"), event.pid,
+    print("%-8s %-7d %-16s %s" % (strftime("%H:%M:%S"), event.pid,
         event.comm.decode('utf-8', 'replace'),
         event.disk.decode('utf-8', 'replace')))
 

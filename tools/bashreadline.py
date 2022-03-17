@@ -68,11 +68,11 @@ b = BPF(text=bpf_text)
 b.attach_uretprobe(name=name, sym="readline", fn_name="printret")
 
 # header
-print("%-9s %-6s %s" % ("TIME", "PID", "COMMAND"))
+print("%-9s %-7s %s" % ("TIME", "PID", "COMMAND"))
 
 def print_event(cpu, data, size):
     event = b["events"].event(data)
-    print("%-9s %-6d %s" % (strftime("%H:%M:%S"), event.pid,
+    print("%-9s %-7d %s" % (strftime("%H:%M:%S"), event.pid,
                             event.str.decode('utf-8', 'replace')))
 
 b["events"].open_perf_buffer(print_event)

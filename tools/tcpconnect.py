@@ -384,12 +384,12 @@ def print_ipv4_event(cpu, data, size):
         printb(b"%-6d" % event.uid, nl="")
     dest_ip = inet_ntop(AF_INET, pack("I", event.daddr)).encode()
     if args.lport:
-        printb(b"%-6d %-12.12s %-2d %-16s %-6d %-16s %-6d %s" % (event.pid,
+        printb(b"%-7d %-12.12s %-2d %-16s %-6d %-16s %-6d %s" % (event.pid,
             event.task, event.ip,
             inet_ntop(AF_INET, pack("I", event.saddr)).encode(), event.lport,
             dest_ip, event.dport, print_dns(dest_ip)))
     else:
-        printb(b"%-6d %-12.12s %-2d %-16s %-16s %-6d %s" % (event.pid,
+        printb(b"%-7d %-12.12s %-2d %-16s %-16s %-6d %s" % (event.pid,
             event.task, event.ip,
             inet_ntop(AF_INET, pack("I", event.saddr)).encode(),
             dest_ip, event.dport, print_dns(dest_ip)))
@@ -405,12 +405,12 @@ def print_ipv6_event(cpu, data, size):
         printb(b"%-6d" % event.uid, nl="")
     dest_ip = inet_ntop(AF_INET6, event.daddr).encode()
     if args.lport:
-        printb(b"%-6d %-12.12s %-2d %-16s %-6d %-16s %-6d %s" % (event.pid,
+        printb(b"%-7d %-12.12s %-2d %-16s %-6d %-16s %-6d %s" % (event.pid,
             event.task, event.ip,
             inet_ntop(AF_INET6, event.saddr).encode(), event.lport,
             dest_ip, event.dport, print_dns(dest_ip)))
     else:
-        printb(b"%-6d %-12.12s %-2d %-16s %-16s %-6d %s" % (event.pid,
+        printb(b"%-7d %-12.12s %-2d %-16s %-16s %-6d %s" % (event.pid,
             event.task, event.ip,
             inet_ntop(AF_INET6, event.saddr).encode(),
             dest_ip, event.dport, print_dns(dest_ip)))
@@ -532,10 +532,10 @@ else:
     if args.print_uid:
         print("%-6s" % ("UID"), end="")
     if args.lport:
-        print("%-6s %-12s %-2s %-16s %-6s %-16s %-6s" % ("PID", "COMM", "IP", "SADDR",
+        print("%-7s %-12s %-2s %-16s %-6s %-16s %-6s" % ("PID", "COMM", "IP", "SADDR",
             "LPORT", "DADDR", "DPORT"), end="")
     else:
-        print("%-6s %-12s %-2s %-16s %-16s %-6s" % ("PID", "COMM", "IP", "SADDR",
+        print("%-7s %-12s %-2s %-16s %-16s %-6s" % ("PID", "COMM", "IP", "SADDR",
             "DADDR", "DPORT"), end="")
     if args.dns:
         print(" QUERY")
