@@ -358,7 +358,6 @@ class SmokeTests(TestCase):
     def test_tcptop(self):
         self.run_with_duration("tcptop.py 1 1")
 
-    @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_tcpcong(self):
         self.run_with_duration("tcpcong.py 1 1")
 

@@ -6,11 +6,9 @@
 #
 # USAGE: tcpcong [-h] [-T] [-L] [-R] [-m] [-d] [interval] [outputs]
 #
+# Copyright (c) Ping Gan.
 #
-#
-# Copyright (c) ping gan.
-#
-# 27-Jan-2022   jacky_gam_2001@163.com   Created this.
+# 27-Jan-2022   Ping Gan   Created this.
 
 from __future__ import print_function
 from bcc import BPF
@@ -125,15 +123,22 @@ typedef struct ipv6_flow_val {
     u16  cong_state;
 }ipv6_flow_val_t;
 
-
 BPF_HASH(start_ipv4, process_key_t, ipv4_flow_val_t);
 BPF_HASH(start_ipv6, process_key_t, ipv6_flow_val_t);
+BPF_HASH(sock_store, process_key_t, struct sock *);
 
 typedef struct data_val {
     DEF_TEXT
     u64  last_ts;
     u16  last_cong_stat;
 }data_val_t;
+
+typedef struct cong {
+    u8  cong_stat:5,
+        ca_inited:1,
+        ca_setsockopt:1,
+        ca_dstlocked:1;
+}cong_status_t;
 
 BPF_HASH(ipv4_stat, ipv4_flow_key_t, data_val_t);
 BPF_HASH(ipv6_stat, ipv6_flow_key_t, data_val_t);
@@ -151,13 +156,7 @@ int entry_state_update_func(struct pt_regs *ctx, struct sock *sk)
     u16 dport = 0, lport = 0;
     u64 family = sk->__sk_common.skc_family;
     struct inet_connection_sock *icsk = inet_csk(sk);
-    struct cong {
-        u8  cong_stat:5,
-            ca_inited:1,
-            ca_setsockopt:1,
-            ca_dstlocked:1;
-    }cong_status;
-
+    cong_status_t cong_status;
     bpf_probe_read_kernel(&cong_status, sizeof(cong_status),
         (void *)((long)&icsk->icsk_retransmits) - 1);
     if (family == AF_INET) {
@@ -187,14 +186,15 @@ int entry_state_update_func(struct pt_regs *ctx, struct sock *sk)
         lport = ipv6_val.ipv6_key.lport;
         FILTER_LPORT
         FILTER_DPORT
-        ipv6_val.ipv6_key.dport = ntohs(dport);
+        ipv6_val.ipv6_key.dport = dport;
         ipv6_val.cong_state = cong_status.cong_stat + 1;
         start_ipv6.update(&key, &ipv6_val);
     }
+    sock_store.update(&key, &sk);
     return 0;
 }
 
-int ret_state_update_func(struct pt_regs *ctx, struct sock *sk)
+int ret_state_update_func(struct pt_regs *ctx)
 {
     u64 *tsp, ts, ts1;
     u16 last_cong_state;
@@ -206,13 +206,14 @@ int ret_state_update_func(struct pt_regs *ctx, struct sock *sk)
     key.pid = pid;
     key.tid = tid;
 
+    struct sock **sockpp;
+    sockpp = sock_store.lookup(&key);
+    if (sockpp == 0) {
+        return 0; //miss the entry
+    }
+    struct sock *sk = *sockpp;
     struct inet_connection_sock *icsk = inet_csk(sk);
-    struct cong {
-        u8  cong_stat:5,
-            ca_inited:1,
-            ca_setsockopt:1,
-            ca_dstlocked:1;
-    }cong_status;
+    cong_status_t cong_status;
     bpf_probe_read_kernel(&cong_status, sizeof(cong_status),
         (void *)((long)&icsk->icsk_retransmits) - 1);
     data_val_t *datap, data = {0};
@@ -220,6 +221,7 @@ int ret_state_update_func(struct pt_regs *ctx, struct sock *sk)
     if (*tsp == AF_INET) {
         ipv4_flow_val_t *val4 = start_ipv4.lookup(&key);
         if (val4 == 0) {
+            sock_store.delete(&key);
             return 0; //missed
         }
         ipv4_flow_key_t keyv4 = {0};
@@ -249,6 +251,7 @@ int ret_state_update_func(struct pt_regs *ctx, struct sock *sk)
     } else if (*tsp == AF_INET6) {
         ipv6_flow_val_t *val6 = start_ipv6.lookup(&key);
         if (val6 == 0) {
+            sock_store.delete(&key);
             return 0; //missed
         }
         ipv6_flow_key_t keyv6 = {0};
@@ -276,10 +279,9 @@ int ret_state_update_func(struct pt_regs *ctx, struct sock *sk)
         }
         start_ipv6.delete(&key);
     }
+    sock_store.delete(&key);
     return 0;
 }
-
-
 """
 
 # code replace
