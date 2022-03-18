@@ -125,7 +125,7 @@ typedef struct ipv6_flow_val {
 
 BPF_HASH(start_ipv4, process_key_t, ipv4_flow_val_t);
 BPF_HASH(start_ipv6, process_key_t, ipv6_flow_val_t);
-BPF_HASH(sock_store, process_key_t, struct sock *);
+SOCK_STORE_DEF
 
 typedef struct data_val {
     DEF_TEXT
@@ -145,15 +145,16 @@ BPF_HASH(ipv6_stat, ipv6_flow_key_t, data_val_t);
 
 HIST_TABLE
 
-int entry_state_update_func(struct pt_regs *ctx, struct sock *sk)
+static int entry_state_update_func(struct sock *sk)
 {
+    u16 dport = 0, lport = 0;
     u32 tid = bpf_get_current_pid_tgid();
     u32 pid = (bpf_get_current_pid_tgid() >> 32);
-    process_key_t key = {};
+    process_key_t key = {0};
     bpf_get_current_comm(&key.comm, sizeof(key.comm));
     key.pid = pid;
     key.tid = tid;
-    u16 dport = 0, lport = 0;
+
     u64 family = sk->__sk_common.skc_family;
     struct inet_connection_sock *icsk = inet_csk(sk);
     cong_status_t cong_status;
@@ -190,28 +191,22 @@ int entry_state_update_func(struct pt_regs *ctx, struct sock *sk)
         ipv6_val.cong_state = cong_status.cong_stat + 1;
         start_ipv6.update(&key, &ipv6_val);
     }
-    sock_store.update(&key, &sk);
+    SOCK_STORE_ADD
     return 0;
 }
 
-int ret_state_update_func(struct pt_regs *ctx)
+static int ret_state_update_func(struct sock *sk)
 {
     u64 *tsp, ts, ts1;
     u16 last_cong_state;
     u16 dport = 0, lport = 0;
     u32 tid = bpf_get_current_pid_tgid();
     u32 pid = (bpf_get_current_pid_tgid() >> 32);
-    process_key_t key;
+    process_key_t key = {0};
     bpf_get_current_comm(&key.comm, sizeof(key.comm));
     key.pid = pid;
     key.tid = tid;
 
-    struct sock **sockpp;
-    sockpp = sock_store.lookup(&key);
-    if (sockpp == 0) {
-        return 0; //miss the entry
-    }
-    struct sock *sk = *sockpp;
     struct inet_connection_sock *icsk = inet_csk(sk);
     cong_status_t cong_status;
     bpf_probe_read_kernel(&cong_status, sizeof(cong_status),
@@ -221,7 +216,7 @@ int ret_state_update_func(struct pt_regs *ctx)
     if (*tsp == AF_INET) {
         ipv4_flow_val_t *val4 = start_ipv4.lookup(&key);
         if (val4 == 0) {
-            sock_store.delete(&key);
+            SOCK_STORE_DEL
             return 0; //missed
         }
         ipv4_flow_key_t keyv4 = {0};
@@ -251,7 +246,7 @@ int ret_state_update_func(struct pt_regs *ctx)
     } else if (*tsp == AF_INET6) {
         ipv6_flow_val_t *val6 = start_ipv6.lookup(&key);
         if (val6 == 0) {
-            sock_store.delete(&key);
+            SOCK_STORE_DEL
             return 0; //missed
         }
         ipv6_flow_key_t keyv6 = {0};
@@ -279,12 +274,103 @@ int ret_state_update_func(struct pt_regs *ctx)
         }
         start_ipv6.delete(&key);
     }
-    sock_store.delete(&key);
+    SOCK_STORE_DEL
     return 0;
 }
 """
 
+kprobe_program = """
+int entry_func(struct pt_regs *ctx, struct sock *sk)
+{
+    return entry_state_update_func(sk);
+}
+
+int ret_func(struct pt_regs *ctx)
+{
+    u32 tid = bpf_get_current_pid_tgid();
+    u32 pid = (bpf_get_current_pid_tgid() >> 32);
+    process_key_t key = {0};
+    bpf_get_current_comm(&key.comm, sizeof(key.comm));
+    key.pid = pid;
+    key.tid = tid;
+    struct sock **sockpp;
+    sockpp = sock_store.lookup(&key);
+    if (sockpp == 0) {
+        return 0; //miss the entry
+    }
+    struct sock *sk = *sockpp;
+    return ret_state_update_func(sk);
+}
+"""
+
+kfunc_program = """
+KFUNC_PROBE(tcp_fastretrans_alert, struct sock *sk)
+{
+    return entry_state_update_func(sk);
+}
+
+KRETFUNC_PROBE(tcp_fastretrans_alert, struct sock *sk)
+{
+    return ret_state_update_func(sk);
+}
+
+KFUNC_PROBE(tcp_enter_cwr, struct sock *sk)
+{
+    return entry_state_update_func(sk);
+}
+
+KRETFUNC_PROBE(tcp_enter_cwr, struct sock *sk)
+{
+    return ret_state_update_func(sk);
+}
+
+KFUNC_PROBE(tcp_enter_loss, struct sock *sk)
+{
+    return entry_state_update_func(sk);
+}
+
+KRETFUNC_PROBE(tcp_enter_loss, struct sock *sk)
+{
+    return ret_state_update_func(sk);
+}
+
+KFUNC_PROBE(tcp_enter_recovery, struct sock *sk)
+{
+    return entry_state_update_func(sk);
+}
+
+KRETFUNC_PROBE(tcp_enter_recovery, struct sock *sk)
+{
+    return ret_state_update_func(sk);
+}
+
+KFUNC_PROBE(tcp_process_tlp_ack, struct sock *sk)
+{
+    return entry_state_update_func(sk);
+}
+
+KRETFUNC_PROBE(tcp_process_tlp_ack, struct sock *sk)
+{
+    return ret_state_update_func(sk);
+}
+"""
+
 # code replace
+is_support_kfunc = BPF.support_kfunc()
+if is_support_kfunc:
+    bpf_text += kfunc_program
+    bpf_text = bpf_text.replace('SOCK_STORE_DEF', '')
+    bpf_text = bpf_text.replace('SOCK_STORE_ADD', '')
+    bpf_text = bpf_text.replace('SOCK_STORE_DEL', '')
+else:
+    bpf_text += kprobe_program
+    bpf_text = bpf_text.replace('SOCK_STORE_DEF',
+                   'BPF_HASH(sock_store, process_key_t, struct sock *);')
+    bpf_text = bpf_text.replace('SOCK_STORE_ADD',
+                   'sock_store.update(&key, &sk);')
+    bpf_text = bpf_text.replace('SOCK_STORE_DEL',
+                   'sock_store.delete(&key);')
+
 if args.localport:
     bpf_text = bpf_text.replace('FILTER_LPORT',
         'if (lport < %d || lport > %d) { return 0; }'
@@ -374,27 +460,19 @@ if debug or args.ebpf:
 # load BPF program
 b = BPF(text=bpf_text)
 
-# all the tcp congestion control status update functions
-# are called by below 5 functions.
-b.attach_kprobe(event="tcp_fastretrans_alert",
-    fn_name="entry_state_update_func")
-b.attach_kretprobe(event="tcp_fastretrans_alert",
-    fn_name="ret_state_update_func")
-b.attach_kprobe(event="tcp_enter_cwr",
-    fn_name="entry_state_update_func")
-b.attach_kretprobe(event="tcp_enter_cwr",
-    fn_name="ret_state_update_func")
-b.attach_kprobe(event="tcp_process_tlp_ack",
-    fn_name="entry_state_update_func")
-b.attach_kretprobe(event="tcp_process_tlp_ack",
-    fn_name="ret_state_update_func")
-b.attach_kprobe(event="tcp_enter_loss", fn_name="entry_state_update_func")
-b.attach_kretprobe(event="tcp_enter_loss", fn_name="ret_state_update_func")
-b.attach_kprobe(event="tcp_enter_recovery",
-    fn_name="entry_state_update_func")
-b.attach_kretprobe(event="tcp_enter_recovery",
-    fn_name="ret_state_update_func")
-
+if not is_support_kfunc:
+    # all the tcp congestion control status update functions
+    # are called by below 5 functions.
+    b.attach_kprobe(event="tcp_fastretrans_alert", fn_name="entry_func")
+    b.attach_kretprobe(event="tcp_fastretrans_alert", fn_name="ret_func")
+    b.attach_kprobe(event="tcp_enter_cwr", fn_name="entry_func")
+    b.attach_kretprobe(event="tcp_enter_cwr", fn_name="ret_func")
+    b.attach_kprobe(event="tcp_process_tlp_ack", fn_name="entry_func")
+    b.attach_kretprobe(event="tcp_process_tlp_ack", fn_name="ret_func")
+    b.attach_kprobe(event="tcp_enter_loss", fn_name="entry_func")
+    b.attach_kretprobe(event="tcp_enter_loss", fn_name="ret_func")
+    b.attach_kprobe(event="tcp_enter_recovery", fn_name="entry_func")
+    b.attach_kretprobe(event="tcp_enter_recovery", fn_name="ret_func")
 
 print("Tracing tcp congestion control status duration... Hit Ctrl-C to end.")
 
