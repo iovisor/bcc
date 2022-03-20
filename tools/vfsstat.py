@@ -65,11 +65,11 @@ void do_create(struct pt_regs *ctx) { stats_increment(S_CREATE); }
 """
 
 bpf_text_kfunc = """
-KFUNC_PROBE(vfs_read)   { stats_increment(S_READ); return 0; }
-KFUNC_PROBE(vfs_write)  { stats_increment(S_WRITE); return 0; }
-KFUNC_PROBE(vfs_fsync)  { stats_increment(S_FSYNC); return 0; }
-KFUNC_PROBE(vfs_open)   { stats_increment(S_OPEN); return 0; }
-KFUNC_PROBE(vfs_create) { stats_increment(S_CREATE); return 0; }
+KFUNC_PROBE(vfs_read)         { stats_increment(S_READ); return 0; }
+KFUNC_PROBE(vfs_write)        { stats_increment(S_WRITE); return 0; }
+KFUNC_PROBE(vfs_fsync_range)  { stats_increment(S_FSYNC); return 0; }
+KFUNC_PROBE(vfs_open)         { stats_increment(S_OPEN); return 0; }
+KFUNC_PROBE(vfs_create)       { stats_increment(S_CREATE); return 0; }
 """
 
 is_support_kfunc = BPF.support_kfunc()
@@ -81,11 +81,11 @@ else:
 
 b = BPF(text=bpf_text)
 if not is_support_kfunc:
-    b.attach_kprobe(event="vfs_read",   fn_name="do_read")
-    b.attach_kprobe(event="vfs_write",  fn_name="do_write")
-    b.attach_kprobe(event="vfs_fsync",  fn_name="do_fsync")
-    b.attach_kprobe(event="vfs_open",   fn_name="do_open")
-    b.attach_kprobe(event="vfs_create", fn_name="do_create")
+    b.attach_kprobe(event="vfs_read",         fn_name="do_read")
+    b.attach_kprobe(event="vfs_write",        fn_name="do_write")
+    b.attach_kprobe(event="vfs_fsync_range",  fn_name="do_fsync")
+    b.attach_kprobe(event="vfs_open",         fn_name="do_open")
+    b.attach_kprobe(event="vfs_create",       fn_name="do_create")
 
 # stat column labels and indexes
 stat_types = {
