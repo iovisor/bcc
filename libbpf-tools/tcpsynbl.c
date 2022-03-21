@@ -124,14 +124,14 @@ static void disable_all_progs(struct tcpsynbl_bpf *obj)
 static void set_autoload_prog(struct tcpsynbl_bpf *obj, int version)
 {
 	if (version == 4) {
-		if (fentry_exists("tcp_v4_syn_recv_sock", NULL))
+		if (fentry_can_attach("tcp_v4_syn_recv_sock", NULL))
 			bpf_program__set_autoload(obj->progs.tcp_v4_syn_recv, true);
 		else
 			bpf_program__set_autoload(obj->progs.tcp_v4_syn_recv_kprobe, true);
 	}
 
 	if (version == 6){
-		if (fentry_exists("tcp_v6_syn_recv_sock", NULL))
+		if (fentry_can_attach("tcp_v6_syn_recv_sock", NULL))
 			bpf_program__set_autoload(obj->progs.tcp_v6_syn_recv, true);
 		else
 			bpf_program__set_autoload(obj->progs.tcp_v6_syn_recv_kprobe, true);

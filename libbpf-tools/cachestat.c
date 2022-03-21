@@ -152,7 +152,7 @@ int main(int argc, char **argv)
 	 * account_page_dirtied was renamed to folio_account_dirtied
 	 * in kernel commit 203a31516616 ("mm/writeback: Add __folio_mark_dirty()")
 	 */
-	if (fentry_exists("folio_account_dirtied", NULL)) {
+	if (fentry_can_attach("folio_account_dirtied", NULL)) {
 		err = bpf_program__set_attach_target(obj->progs.account_page_dirtied, 0,
 						     "folio_account_dirtied");
 		if (err) {
