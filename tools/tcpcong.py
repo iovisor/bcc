@@ -19,12 +19,12 @@ from struct import pack
 import argparse
 
 examples = """examples:
-    ./tcpcong                 #show tcp congestion status duration
-    ./tcpcong 1 10            #show 1 second summaries, 10 times
-    ./tcpcong -L 3000-3006 1  #1s summaries, local port 3000-3006
-    ./tcpcong -R 5000-5005 1  #1s summaries, remote port 5000-5005
-    ./tcpcong -uT 1           #1s summaries, microseconds, and timestamps
-    ./tcpcong -d              #show the duration as histograms
+    ./tcpcong                 # show tcp congestion status duration
+    ./tcpcong 1 10            # show 1 second summaries, 10 times
+    ./tcpcong -L 3000-3006 1  # 1s summaries, local port 3000-3006
+    ./tcpcong -R 5000-5005 1  # 1s summaries, remote port 5000-5005
+    ./tcpcong -uT 1           # 1s summaries, microseconds, and timestamps
+    ./tcpcong -d              # show the duration as histograms
 """
 
 parser = argparse.ArgumentParser(
@@ -98,30 +98,29 @@ typedef struct ipv4_flow_key {
     u32 daddr;
     u16 lport;
     u16 dport;
-}ipv4_flow_key_t;
+} ipv4_flow_key_t;
 
 typedef struct ipv6_flow_key {
     unsigned __int128 saddr;
     unsigned __int128 daddr;
     u16 lport;
     u16 dport;
-}ipv6_flow_key_t;
+} ipv6_flow_key_t;
 
 typedef struct process_key {
     char comm[TASK_COMM_LEN];
-    u32  pid;
     u32  tid;
-}process_key_t;
+} process_key_t;
 
 typedef struct ipv4_flow_val {
     ipv4_flow_key_t ipv4_key;
     u16  cong_state;
-}ipv4_flow_val_t;
+} ipv4_flow_val_t;
 
 typedef struct ipv6_flow_val {
     ipv6_flow_key_t ipv6_key;
     u16  cong_state;
-}ipv6_flow_val_t;
+} ipv6_flow_val_t;
 
 BPF_HASH(start_ipv4, process_key_t, ipv4_flow_val_t);
 BPF_HASH(start_ipv6, process_key_t, ipv6_flow_val_t);
@@ -131,14 +130,14 @@ typedef struct data_val {
     DEF_TEXT
     u64  last_ts;
     u16  last_cong_stat;
-}data_val_t;
+} data_val_t;
 
 typedef struct cong {
     u8  cong_stat:5,
         ca_inited:1,
         ca_setsockopt:1,
         ca_dstlocked:1;
-}cong_status_t;
+} cong_status_t;
 
 BPF_HASH(ipv4_stat, ipv4_flow_key_t, data_val_t);
 BPF_HASH(ipv6_stat, ipv6_flow_key_t, data_val_t);
@@ -149,10 +148,8 @@ static int entry_state_update_func(struct sock *sk)
 {
     u16 dport = 0, lport = 0;
     u32 tid = bpf_get_current_pid_tgid();
-    u32 pid = (bpf_get_current_pid_tgid() >> 32);
     process_key_t key = {0};
     bpf_get_current_comm(&key.comm, sizeof(key.comm));
-    key.pid = pid;
     key.tid = tid;
 
     u64 family = sk->__sk_common.skc_family;
@@ -197,14 +194,12 @@ static int entry_state_update_func(struct sock *sk)
 
 static int ret_state_update_func(struct sock *sk)
 {
-    u64 *tsp, ts, ts1;
-    u16 last_cong_state;
+    u64 ts, ts1;
+    u16 family, last_cong_state;
     u16 dport = 0, lport = 0;
     u32 tid = bpf_get_current_pid_tgid();
-    u32 pid = (bpf_get_current_pid_tgid() >> 32);
     process_key_t key = {0};
     bpf_get_current_comm(&key.comm, sizeof(key.comm));
-    key.pid = pid;
     key.tid = tid;
 
     struct inet_connection_sock *icsk = inet_csk(sk);
@@ -213,7 +208,9 @@ static int ret_state_update_func(struct sock *sk)
         (void *)((long)&icsk->icsk_retransmits) - 1);
     data_val_t *datap, data = {0};
     STATE_KEY
-    if (*tsp == AF_INET) {
+    bpf_probe_read_kernel(&family, sizeof(family),
+        &sk->__sk_common.skc_family);
+    if (family == AF_INET) {
         ipv4_flow_val_t *val4 = start_ipv4.lookup(&key);
         if (val4 == 0) {
             SOCK_STORE_DEL
@@ -243,7 +240,7 @@ static int ret_state_update_func(struct sock *sk)
             }
         }
         start_ipv4.delete(&key);
-    } else if (*tsp == AF_INET6) {
+    } else if (family == AF_INET6) {
         ipv6_flow_val_t *val6 = start_ipv6.lookup(&key);
         if (val6 == 0) {
             SOCK_STORE_DEL
@@ -288,10 +285,8 @@ int entry_func(struct pt_regs *ctx, struct sock *sk)
 int ret_func(struct pt_regs *ctx)
 {
     u32 tid = bpf_get_current_pid_tgid();
-    u32 pid = (bpf_get_current_pid_tgid() >> 32);
     process_key_t key = {0};
     bpf_get_current_comm(&key.comm, sizeof(key.comm));
-    key.pid = pid;
     key.tid = tid;
     struct sock **sockpp;
     sockpp = sock_store.lookup(&key);
@@ -536,7 +531,7 @@ while (1):
                     v.total_changes))
         if ipv6_stat:
             print("%-32s %-32s %-7s %-6s %-7s %-7s %-6s %-5s" % ("LAddrPort6",
-                "RAddrPort6", "Open_" + label, "Dsod_" + label, "Rcov_" + label,
+                "RAddrPort6", "Open_" + label, "Dod_" + label, "Rcov_" + label,
                 "Cwr_" + label, "Los_" + label, "Chgs"))
         for k, v in sorted(ipv6_stat.items(), key=lambda ipv6_stat: ipv6_stat[0].lport):
             laddr = inet_ntop(AF_INET6, bytes(k.saddr))

@@ -1,4 +1,4 @@
-Demonstrations of tcpcongestdura, the Linux eBPF/bcc version.
+Demonstrations of tcpcong, the Linux eBPF/bcc version.
 
 This tool traces linux kernel's tcp congestion control status change functions,
 then calculate duration of every status and record it, at last prints it as 
@@ -232,6 +232,34 @@ LAddrPort            RAddrPort             Open_us Dod_us Rcov_us Cwr_us  Los_us
 192.168.219.3/39098   192.168.219.1/19225   532986  5630   31624   345336  0      1319
 192.168.219.3/39112   192.168.219.1/19225   481936  1129   6244    510235  0      1909
 192.168.219.3/39120   192.168.219.1/19225   507196  316    6200    485737  0      1957
+
+
+the ipv6 example with (-u) option can be shown.
+Eg printing output every 1 second, and including timestamps (-T) and
+microseconds (-u) for local ports 30000-40000 and remote ports 19225-19227:
+./tcpcong.py -T -u -L 30000-40000 -R 19225-19227 1 3
+Tracing tcp congestion control status duration... Hit Ctrl-C to end.
+
+11:31:55
+LAddrPort6                       RAddrPort6                       Open_us Dod_us Rcov_us Cwr_us  Los_us Chgs
+fe80::bace:f6ff:fe14:d21c/32810  fe80::bace:f6ff:fe43:fe96/19226  876328  0       0       137957 0      235
+fe80::bace:f6ff:fe14:d21c/32812  fe80::bace:f6ff:fe43:fe96/19226  757739  0       0       283114 0      590
+fe80::bace:f6ff:fe14:d21c/32814  fe80::bace:f6ff:fe43:fe96/19226  855426  0       0       136134 0      231
+fe80::bace:f6ff:fe14:d21c/32816  fe80::bace:f6ff:fe43:fe96/19226  695271  0       0       345443 0      606
+
+11:31:56
+LAddrPort6                       RAddrPort6                       Open_us Dod_us Rcov_us Cwr_us  Los_us Chgs
+fe80::bace:f6ff:fe14:d21c/32810  fe80::bace:f6ff:fe43:fe96/19226  913925  0       0       81995  0      92
+fe80::bace:f6ff:fe14:d21c/32812  fe80::bace:f6ff:fe43:fe96/19226  785024  0       0       202819 0      777
+fe80::bace:f6ff:fe14:d21c/32814  fe80::bace:f6ff:fe43:fe96/19226  920963  0       0       80715  0      111
+fe80::bace:f6ff:fe14:d21c/32816  fe80::bace:f6ff:fe43:fe96/19226  765172  0       0       222897 0      734
+
+11:31:57
+LAddrPort6                       RAddrPort6                       Open_us Dod_us Rcov_us Cwr_us  Los_us Chgs
+fe80::bace:f6ff:fe14:d21c/32810  fe80::bace:f6ff:fe43:fe96/19226  839563  0       0       98313  0      149
+fe80::bace:f6ff:fe14:d21c/32812  fe80::bace:f6ff:fe43:fe96/19226  534816  0       0       329683 0      495
+fe80::bace:f6ff:fe14:d21c/32814  fe80::bace:f6ff:fe43:fe96/19226  841706  103     2404    91273  0      132
+fe80::bace:f6ff:fe14:d21c/32816  fe80::bace:f6ff:fe43:fe96/19226  633320  0       0       286584 0      565
 
 
 The distribution of congestion status duration can be printed as a histogram 

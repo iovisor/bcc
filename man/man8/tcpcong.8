@@ -5,7 +5,8 @@ tcpcong \- Measure tcp congestion state duration. Uses Linux eBPF/bcc.
 .B tcpcong [\-h] [\-T] [\-L] [\-R] [\-u] [\-d] [interval] [outputs]
 .SH DESCRIPTION
 this tool measures tcp sockets congestion control status duration, and
-prints a summary one state by one along with total state change number.
+prints a summary of tcp congestion state durations along with the number
+of total state changes.
   
 It uses dynamic tracing of kernel tcp congestion control status 
 updating functions,  and will need to be updated to match kernel changes.
