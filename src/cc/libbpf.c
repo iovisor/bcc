@@ -296,6 +296,8 @@ static struct bpf_helper helpers[] = {
   {"xdp_load_bytes", "5.18"},
   {"xdp_store_bytes", "5.18"},
   {"copy_from_user_task", "5.18"},
+  {"skb_set_tstamp", "5.18"},
+  {"ima_file_hash", "5.18"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
