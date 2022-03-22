@@ -977,6 +977,10 @@ static long (*bpf_xdp_store_bytes)(struct xdp_md *xdp_md, __u32 offset, void *bu
 static long (*bpf_copy_from_user_task)(void *dst, __u32 size, const void *user_ptr,
 				       struct task_struct *tsk, __u64 flags) =
   (void *)BPF_FUNC_copy_from_user_task;
+static long (*bpf_skb_set_tstamp)(struct __sk_buff *skb, __u64 tstamp, __u32 tstamp_type) =
+  (void *)BPF_FUNC_skb_set_tstamp;
+static long (*bpf_ima_file_hash)(struct file *file, void *dst, __u32 size) =
+  (void *)BPF_FUNC_ima_file_hash;
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
