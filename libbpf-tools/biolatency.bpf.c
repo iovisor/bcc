@@ -86,7 +86,7 @@ int block_rq_insert(u64 *ctx)
 	 * from TP_PROTO(struct request_queue *q, struct request *rq)
 	 * to TP_PROTO(struct request *rq)
 	 */
-	if (LINUX_KERNEL_VERSION <= KERNEL_VERSION(5, 10, 0))
+	if (LINUX_KERNEL_VERSION < KERNEL_VERSION(5, 11, 0))
 		return trace_rq_start((void *)ctx[1], false);
 	else
 		return trace_rq_start((void *)ctx[0], false);
@@ -103,7 +103,7 @@ int block_rq_issue(u64 *ctx)
 	 * from TP_PROTO(struct request_queue *q, struct request *rq)
 	 * to TP_PROTO(struct request *rq)
 	 */
-	if (LINUX_KERNEL_VERSION <= KERNEL_VERSION(5, 10, 0))
+	if (LINUX_KERNEL_VERSION < KERNEL_VERSION(5, 11, 0))
 		return trace_rq_start((void *)ctx[1], true);
 	else
 		return trace_rq_start((void *)ctx[0], true);
