@@ -483,9 +483,9 @@ optional arguments:
   -u, --microseconds    output in microseconds
 
 examples:
-    ./tcpcong                 #show tcp congestion status duration
-    ./tcpcong 1 10            #show 1 second summaries, 10 times
-    ./tcpcong -L 3000-3006 1  #1s summaries, local port 3000-3006
-    ./tcpcong -R 5000-5005 1  #1s summaries, remote port 5000-5005
-    ./tcpcong -uT 1           #1s summaries, microseconds, and timestamps
-    ./tcpcong -d              #show the duration as histograms
+    ./tcpcong                 # show tcp congestion status duration
+    ./tcpcong 1 10            # show 1 second summaries, 10 times
+    ./tcpcong -L 3000-3006 1  # 1s summaries, local port 3000-3006
+    ./tcpcong -R 5000-5005 1  # 1s summaries, remote port 5000-5005
+    ./tcpcong -uT 1           # 1s summaries, microseconds, and timestamps
+    ./tcpcong -d              # show the duration as histograms
