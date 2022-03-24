@@ -17,6 +17,7 @@ from __future__ import print_function
 from bcc import BPF
 from time import sleep, strftime
 import argparse
+import sys
 
 # arguments
 examples = """examples:
@@ -174,6 +175,8 @@ while (1):
         for k, v in sorted(dist.items(), key=lambda dist: dist[1].value):
             print("%-16s %11d" % (vec_to_name(k.vec), v.value / factor))
     dist.clear()
+
+    sys.stdout.flush()
 
     countdown -= 1
     if exiting or countdown == 0:

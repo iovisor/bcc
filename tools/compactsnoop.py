@@ -18,6 +18,7 @@ from bcc import BPF
 import argparse
 import platform
 from datetime import datetime, timedelta
+import sys
 
 # arguments
 examples = """examples:
@@ -389,6 +390,8 @@ def print_event(cpu, data, size):
             sym = b.ksym(addr, show_offset=True)
             print("\t%s" % sym)
         print("")
+
+    sys.stdout.flush()
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event, page_cnt=64)

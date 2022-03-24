@@ -420,6 +420,7 @@ def print_event(mounts, umounts, parent, cpu, data, size):
                 print('{:16} {:<7} {:<7} {:<11} {}'.format(
                     syscall['comm'].decode('utf-8', 'replace'), syscall['tgid'],
                     syscall['pid'], syscall['mnt_ns'], call))
+        sys.stdout.flush()
     except KeyError:
         # This might happen if we lost an event.
         pass

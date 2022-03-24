@@ -20,6 +20,7 @@ import argparse
 from datetime import datetime, timedelta
 import os
 import math
+import sys
 
 # symbols
 kallsyms = "/proc/kallsyms"
@@ -223,6 +224,8 @@ def print_event(cpu, data, size):
         print("%10d" % K(event.vm_stat[NR_FREE_PAGES]))
     else:
         print("")
+
+    sys.stdout.flush()
 
 
 # loop with callback to print_event
