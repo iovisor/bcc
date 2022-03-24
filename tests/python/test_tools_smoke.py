@@ -358,6 +358,9 @@ class SmokeTests(TestCase):
     def test_tcptop(self):
         self.run_with_duration("tcptop.py 1 1")
 
+    def test_tcpcong(self):
+        self.run_with_duration("tcpcong.py 1 1")
+
     def test_tplist(self):
         self.run_with_duration("tplist.py -p %d" % os.getpid())
 
