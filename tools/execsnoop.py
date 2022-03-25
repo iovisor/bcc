@@ -236,7 +236,7 @@ if args.timestamp:
     print("%-8s" % ("TIME(s)"), end="")
 if args.print_uid:
     print("%-6s" % ("UID"), end="")
-print("%-16s %-6s %-6s %3s %s" % ("PCOMM", "PID", "PPID", "RET", "ARGS"))
+print("%-16s %-7s %-7s %3s %s" % ("PCOMM", "PID", "PPID", "RET", "ARGS"))
 
 class EventType(object):
     EVENT_ARG = 0
@@ -290,7 +290,7 @@ def print_event(cpu, data, size):
             ppid = event.ppid if event.ppid > 0 else get_ppid(event.pid)
             ppid = b"%d" % ppid if ppid > 0 else b"?"
             argv_text = b' '.join(argv[event.pid]).replace(b'\n', b'\\n')
-            printb(b"%-16s %-6d %-6s %3d %s" % (event.comm, event.pid,
+            printb(b"%-16s %-7d %-7s %3d %s" % (event.comm, event.pid,
                    ppid, event.retval, argv_text))
         try:
             del(argv[event.pid])

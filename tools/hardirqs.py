@@ -19,6 +19,7 @@ from __future__ import print_function
 from bcc import BPF
 from time import sleep, strftime
 import argparse
+import sys
 
 # arguments
 examples = """examples:
@@ -247,6 +248,8 @@ while (1):
         for k, v in sorted(dist.items(), key=lambda dist: dist[1].value):
             print("%-26s %11d" % (k.name.decode('utf-8', 'replace'), v.value / factor))
     dist.clear()
+
+    sys.stdout.flush()
 
     countdown -= 1
     if exiting or countdown == 0:

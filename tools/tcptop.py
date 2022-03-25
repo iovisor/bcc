@@ -281,14 +281,14 @@ while i != args.count and not exiting:
     ipv4_recv_bytes.clear()
 
     if ipv4_throughput:
-        print("%-6s %-12s %-21s %-21s %6s %6s" % ("PID", "COMM",
+        print("%-7s %-12s %-21s %-21s %6s %6s" % ("PID", "COMM",
             "LADDR", "RADDR", "RX_KB", "TX_KB"))
 
     # output
     for k, (send_bytes, recv_bytes) in sorted(ipv4_throughput.items(),
                                               key=lambda kv: sum(kv[1]),
                                               reverse=True):
-        print("%-6d %-12.12s %-21s %-21s %6d %6d" % (k.pid,
+        print("%-7d %-12.12s %-21s %-21s %6d %6d" % (k.pid,
             k.name,
             k.laddr + ":" + str(k.lport),
             k.daddr + ":" + str(k.dport),
@@ -308,14 +308,14 @@ while i != args.count and not exiting:
 
     if ipv6_throughput:
         # more than 80 chars, sadly.
-        print("\n%-6s %-12s %-32s %-32s %6s %6s" % ("PID", "COMM",
+        print("\n%-7s %-12s %-32s %-32s %6s %6s" % ("PID", "COMM",
             "LADDR6", "RADDR6", "RX_KB", "TX_KB"))
 
     # output
     for k, (send_bytes, recv_bytes) in sorted(ipv6_throughput.items(),
                                               key=lambda kv: sum(kv[1]),
                                               reverse=True):
-        print("%-6d %-12.12s %-32s %-32s %6d %6d" % (k.pid,
+        print("%-7d %-12.12s %-32s %-32s %6d %6d" % (k.pid,
             k.name,
             k.laddr + ":" + str(k.lport),
             k.daddr + ":" + str(k.dport),

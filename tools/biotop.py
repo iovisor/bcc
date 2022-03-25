@@ -241,7 +241,7 @@ while 1:
         print()
     with open(loadavg) as stats:
         print("%-8s loadavg: %s" % (strftime("%H:%M:%S"), stats.read()))
-    print("%-6s %-16s %1s %-3s %-3s %-8s %5s %7s %6s" % ("PID", "COMM",
+    print("%-7s %-16s %1s %-3s %-3s %-8s %5s %7s %6s" % ("PID", "COMM",
         "D", "MAJ", "MIN", "DISK", "I/O", "Kbytes", "AVGms"))
 
     # by-PID output
@@ -259,7 +259,7 @@ while 1:
 
         # print line
         avg_ms = (float(v.us) / 1000) / v.io
-        print("%-6d %-16s %1s %-3d %-3d %-8s %5s %7s %6.2f" % (k.pid,
+        print("%-7d %-16s %1s %-3d %-3d %-8s %5s %7s %6.2f" % (k.pid,
             k.name.decode('utf-8', 'replace'), "W" if k.rwflag else "R",
             k.major, k.minor, diskname, v.io, v.bytes / 1024, avg_ms))
 
