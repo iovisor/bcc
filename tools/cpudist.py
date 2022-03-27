@@ -58,29 +58,36 @@ if not args.offcpu:
     bpf_text += "#define ONCPU\n"
 
 bpf_text += """
+typedef struct entry_key {
+    u32 pid;
+    u32 cpu;
+} entry_key_t;
+
 typedef struct pid_key {
     u64 id;
     u64 slot;
 } pid_key_t;
 
 
-BPF_HASH(start, u32, u64, MAX_PID);
+BPF_HASH(start, entry_key_t, u64, MAX_PID);
 STORAGE
 
-static inline void store_start(u32 tgid, u32 pid, u64 ts)
+static inline void store_start(u32 tgid, u32 pid, u32 cpu, u64 ts)
 {
     if (FILTER)
         return;
 
-    start.update(&pid, &ts);
+    entry_key_t entry_key = { .pid = pid, .cpu = cpu };
+    start.update(&entry_key, &ts);
 }
 
-static inline void update_hist(u32 tgid, u32 pid, u64 ts)
+static inline void update_hist(u32 tgid, u32 pid, u32 cpu, u64 ts)
 {
     if (FILTER)
         return;
 
-    u64 *tsp = start.lookup(&pid);
+    entry_key_t entry_key = { .pid = pid, .cpu = cpu };
+    u64 *tsp = start.lookup(&entry_key);
     if (tsp == 0)
         return;
 
@@ -99,20 +106,21 @@ int sched_switch(struct pt_regs *ctx, struct task_struct *prev)
     u64 ts = bpf_ktime_get_ns();
     u64 pid_tgid = bpf_get_current_pid_tgid();
     u32 tgid = pid_tgid >> 32, pid = pid_tgid;
+    u32 cpu = bpf_get_smp_processor_id();
 
     u32 prev_pid = prev->pid;
     u32 prev_tgid = prev->tgid;
 #ifdef ONCPU
-    update_hist(prev_tgid, prev_pid, ts);
+    update_hist(prev_tgid, prev_pid, cpu, ts);
 #else
-    store_start(prev_tgid, prev_pid, ts);
+    store_start(prev_tgid, prev_pid, cpu, ts);
 #endif
 
 BAIL:
 #ifdef ONCPU
-    store_start(tgid, pid, ts);
+    store_start(tgid, pid, cpu, ts);
 #else
-    update_hist(tgid, pid, ts);
+    update_hist(tgid, pid, cpu, ts);
 #endif
 
     return 0;
