@@ -3,13 +3,17 @@
 #
 # cpudist   Summarize on- and off-CPU time per task as a histogram.
 #
-# USAGE: cpudist [-h] [-O] [-T] [-m] [-P] [-L] [-p PID] [interval] [count]
+# USAGE: cpudist [-h] [-O] [-T] [-m] [-P] [-L] [-p PID] [-I] [interval] [count]
 #
 # This measures the time a task spends on or off the CPU, and shows this time
 # as a histogram, optionally per-process.
 #
+# By default CPU idle time are excluded by simply excluding PID 0.
+#
 # Copyright 2016 Sasha Goldshtein
 # Licensed under the Apache License, Version 2.0 (the "License")
+#
+# 27-Mar-2022   Rocky Xing      Changed to exclude CPU idle time by default.
 
 from __future__ import print_function
 from bcc import BPF
@@ -23,6 +27,7 @@ examples = """examples:
     cpudist -mT 1        # 1s summaries, milliseconds, and timestamps
     cpudist -P           # show each PID separately
     cpudist -p 185       # trace PID 185 only
+    cpudist -I           # include CPU idle time
 """
 parser = argparse.ArgumentParser(
     description="Summarize on-CPU time per task as a histogram.",
@@ -40,6 +45,8 @@ parser.add_argument("-L", "--tids", action="store_true",
     help="print a histogram per thread ID")
 parser.add_argument("-p", "--pid",
     help="trace this PID only")
+parser.add_argument("-I", "--include-idle", action="store_true",
+    help="include CPU idle time")
 parser.add_argument("interval", nargs="?", default=99999999,
     help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
@@ -74,7 +81,10 @@ STORAGE
 
 static inline void store_start(u32 tgid, u32 pid, u32 cpu, u64 ts)
 {
-    if (FILTER)
+    if (PID_FILTER)
+        return;
+
+    if (IDLE_FILTER)
         return;
 
     entry_key_t entry_key = { .pid = pid, .cpu = cpu };
@@ -83,7 +93,10 @@ static inline void store_start(u32 tgid, u32 pid, u32 cpu, u64 ts)
 
 static inline void update_hist(u32 tgid, u32 pid, u32 cpu, u64 ts)
 {
-    if (FILTER)
+    if (PID_FILTER)
+        return;
+
+    if (IDLE_FILTER)
         return;
 
     entry_key_t entry_key = { .pid = pid, .cpu = cpu };
@@ -128,9 +141,16 @@ BAIL:
 """
 
 if args.pid:
-    bpf_text = bpf_text.replace('FILTER', 'tgid != %s' % args.pid)
+    bpf_text = bpf_text.replace('PID_FILTER', 'tgid != %s' % args.pid)
 else:
-    bpf_text = bpf_text.replace('FILTER', '0')
+    bpf_text = bpf_text.replace('PID_FILTER', '0')
+
+# set idle filter
+idle_filter = 'pid == 0'
+if args.include_idle:
+    idle_filter = '0'
+bpf_text = bpf_text.replace('IDLE_FILTER', idle_filter)
+
 if args.milliseconds:
     bpf_text = bpf_text.replace('FACTOR', 'delta /= 1000000;')
     label = "msecs"
