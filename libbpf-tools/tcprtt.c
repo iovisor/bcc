@@ -243,7 +243,7 @@ int main(int argc, char **argv)
 	obj->rodata->targ_daddr = env.raddr;
 	obj->rodata->targ_ms = env.milliseconds;
 
-	if (fentry_exists("tcp_rcv_established", NULL))
+	if (fentry_can_attach("tcp_rcv_established", NULL))
 		bpf_program__set_autoload(obj->progs.tcp_rcv_kprobe, false);
 	else
 		bpf_program__set_autoload(obj->progs.tcp_rcv, false);

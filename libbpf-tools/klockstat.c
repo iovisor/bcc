@@ -534,7 +534,7 @@ int main(int argc, char **argv)
 	obj->rodata->targ_pid = env.tid;
 	obj->rodata->targ_lock = lock_addr;
 
-	if (fentry_exists("mutex_lock_nested", NULL)) {
+	if (fentry_can_attach("mutex_lock_nested", NULL)) {
 		bpf_program__set_attach_target(obj->progs.mutex_lock, 0,
 					       "mutex_lock_nested");
 		bpf_program__set_attach_target(obj->progs.mutex_lock_exit, 0,

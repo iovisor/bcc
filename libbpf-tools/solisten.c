@@ -156,7 +156,7 @@ int main(int argc, char **argv)
 
 	obj->rodata->target_pid = target_pid;
 
-	if (fentry_exists("inet_listen", NULL)) {
+	if (fentry_can_attach("inet_listen", NULL)) {
 		bpf_program__set_autoload(obj->progs.inet_listen_entry, false);
 		bpf_program__set_autoload(obj->progs.inet_listen_exit, false);
 	} else {
