@@ -14,6 +14,10 @@ const volatile bool targ_ms = false;
 const volatile bool filter_dev = false;
 const volatile __u32 targ_dev = -1;
 
+struct request_queue___x {
+	struct gendisk *disk;
+} __attribute__((preserve_access_index));
+
 struct internal_rqinfo {
 	u64 start_ts;
 	struct rqinfo rqinfo;
@@ -41,8 +45,14 @@ static __always_inline
 int trace_start(void *ctx, struct request *rq, bool merge_bio)
 {
 	struct internal_rqinfo *i_rqinfop = NULL, i_rqinfo = {};
-	struct gendisk *disk = BPF_CORE_READ(rq, rq_disk);
+	struct request_queue___x *q = (void *)BPF_CORE_READ(rq, q);
+	struct gendisk *disk;
 	u32 dev;
+
+	if (bpf_core_field_exists(q->disk))
+		disk = BPF_CORE_READ(q, disk);
+	else
+		disk = BPF_CORE_READ(rq, rq_disk);
 
 	dev = disk ? MKDEV(BPF_CORE_READ(disk, major),
 			BPF_CORE_READ(disk, first_minor)) : 0;
