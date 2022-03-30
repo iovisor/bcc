@@ -13,6 +13,10 @@ const volatile __u32 targ_dev = 0;
 
 extern __u32 LINUX_KERNEL_VERSION __kconfig;
 
+struct request_queue___x {
+	struct gendisk *disk;
+} __attribute__((preserve_access_index));
+
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, 10240);
@@ -41,8 +45,14 @@ static int trace_rq_issue(struct request *rq)
 	u64 slot;
 
 	if (filter_dev) {
-		struct gendisk *disk = BPF_CORE_READ(rq, rq_disk);
+		struct request_queue___x *q = (void *)BPF_CORE_READ(rq, q);
+		struct gendisk *disk;
 		u32 dev;
+
+		if (bpf_core_field_exists(q->disk))
+			disk = BPF_CORE_READ(q, disk);
+		else
+			disk = BPF_CORE_READ(rq, rq_disk);
 
 		dev = disk ? MKDEV(BPF_CORE_READ(disk, major),
 				BPF_CORE_READ(disk, first_minor)) : 0;
