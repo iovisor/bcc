@@ -13,7 +13,6 @@
 from __future__ import print_function
 from bcc import BPF
 import argparse
-import ctypes as ct
 import time
 
 # arguments
@@ -79,13 +78,6 @@ b.attach_kprobe(event=function, fn_name="trace_stack")
 
 TASK_COMM_LEN = 16  # linux/sched.h
 
-class Data(ct.Structure):
-    _fields_ = [
-        ("stack_id", ct.c_ulonglong),
-        ("pid", ct.c_uint),
-        ("comm", ct.c_char * TASK_COMM_LEN),
-    ]
-
 matched = b.num_open_kprobes()
 if matched == 0:
     print("Function \"%s\" not found. Exiting." % function)
@@ -102,18 +94,18 @@ else:
     print("%-18s %s" % ("TIME(s)", "FUNCTION"))
 
 def print_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data)).contents
+    event = b["events"].event(data)
 
     ts = time.time() - start_ts
 
     if verbose:
         print("%-18.9f %-12.12s %-6d %-3d %s" %
-              (ts, event.comm.decode(), event.pid, cpu, function))
+              (ts, event.comm.decode('utf-8', 'replace'), event.pid, cpu, function))
     else:
         print("%-18.9f %s" % (ts, function))
 
     for addr in stack_traces.walk(event.stack_id):
-        sym = b.ksym(addr, show_offset=offset)
+        sym = b.ksym(addr, show_offset=offset).decode('utf-8', 'replace')
         print("\t%s" % sym)
 
     print()
