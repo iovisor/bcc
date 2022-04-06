@@ -18,9 +18,9 @@ import time
 
 # arguments
 examples = """examples:
-    ./stacksnoop ext4_sync_fs    # print kernel stack traces for ext4_sync_fs
-    ./stacksnoop -s ext4_sync_fs    # ... also show symbol offsets
-    ./stacksnoop -v ext4_sync_fs    # ... show extra columns
+    ./stacksnoop ext4_sync_fs           # print kernel stack traces for ext4_sync_fs
+    ./stacksnoop -s ext4_sync_fs        # ... also show symbol offsets
+    ./stacksnoop -v ext4_sync_fs        # ... show extra columns
     ./stacksnoop -p 185 ext4_sync_fs    # ... only when PID 185 is on-CPU
 """
 parser = argparse.ArgumentParser(
@@ -56,7 +56,7 @@ BPF_STACK_TRACE(stack_traces, 128);
 BPF_PERF_OUTPUT(events);
 
 void trace_stack(struct pt_regs *ctx) {
-    u32 pid = bpf_get_current_pid_tgid();
+    u32 pid = bpf_get_current_pid_tgid() >> 32;
     FILTER
     struct data_t data = {};
     data.stack_id = stack_traces.get_stackid(ctx, 0),
