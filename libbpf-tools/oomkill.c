@@ -16,6 +16,7 @@
 #include <bpf/libbpf.h>
 #include "oomkill.skel.h"
 #include "oomkill.h"
+#include "btf_helpers.h"
 #include "trace_helpers.h"
 
 #define PERF_POLL_TIMEOUT_MS	100
@@ -103,6 +104,7 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 
 int main(int argc, char **argv)
 {
+	LIBBPF_OPTS(bpf_object_open_opts, open_opts);
 	static const struct argp argp = {
 		.options = opts,
 		.parser = parse_arg,
@@ -119,10 +121,22 @@ int main(int argc, char **argv)
 	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
 
-	obj = oomkill_bpf__open_and_load();
+	err = ensure_core_btf(&open_opts);
+	if (err) {
+		fprintf(stderr, "failed to fetch necessary BTF for CO-RE: %s\n", strerror(-err));
+		return 1;
+	}
+
+	obj = oomkill_bpf__open_opts(&open_opts);
 	if (!obj) {
 		fprintf(stderr, "failed to load and open BPF object\n");
 		return 1;
+	}
+
+	err = oomkill_bpf__load(obj);
+	if (err) {
+		fprintf(stderr, "failed to load BPF object: %d\n", err);
+		goto cleanup;
 	}
 
 	err = oomkill_bpf__attach(obj);
@@ -160,6 +174,7 @@ int main(int argc, char **argv)
 cleanup:
 	perf_buffer__free(pb);
 	oomkill_bpf__destroy(obj);
+	cleanup_core_btf(&open_opts);
 
 	return err != 0;
 }

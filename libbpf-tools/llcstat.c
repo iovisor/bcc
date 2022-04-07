@@ -14,6 +14,7 @@
 #include <bpf/bpf.h>
 #include "llcstat.h"
 #include "llcstat.skel.h"
+#include "btf_helpers.h"
 #include "trace_helpers.h"
 
 struct env {
@@ -170,6 +171,7 @@ static void print_map(struct bpf_map *map)
 int main(int argc, char **argv)
 {
 	struct bpf_link **rlinks = NULL, **mlinks = NULL;
+	LIBBPF_OPTS(bpf_object_open_opts, open_opts);
 	static const struct argp argp = {
 		.options = opts,
 		.parser = parse_arg,
@@ -198,9 +200,21 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	obj = llcstat_bpf__open_and_load();
+	err = ensure_core_btf(&open_opts);
+	if (err) {
+		fprintf(stderr, "failed to fetch necessary BTF for CO-RE: %s\n", strerror(-err));
+		return 1;
+	}
+
+	obj = llcstat_bpf__open_opts(&open_opts);
 	if (!obj) {
 		fprintf(stderr, "failed to open and/or load BPF object\n");
+		goto cleanup;
+	}
+
+	err = llcstat_bpf__load(obj);
+	if (err) {
+		fprintf(stderr, "failed to load BPF object: %d\n", err);
 		goto cleanup;
 	}
 
@@ -232,6 +246,7 @@ cleanup:
 	free(mlinks);
 	free(rlinks);
 	llcstat_bpf__destroy(obj);
+	cleanup_core_btf(&open_opts);
 
 	return err != 0;
 }
