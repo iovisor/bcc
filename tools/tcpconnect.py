@@ -322,6 +322,31 @@ delete_and_return:
     return 0;
 }
 
+#include <uapi/linux/udp.h>
+
+int trace_udpv6_recvmsg(struct pt_regs *ctx)
+{
+    struct sk_buff *skb = (struct sk_buff *)PT_REGS_PARM2(ctx);
+    struct udphdr *hdr = (void*)skb->head + skb->transport_header;
+    struct dns_data_t *event;
+    int zero = 0;
+    void *data;
+
+    /* hex(53) = 0x0035, htons(0x0035) = 0x3500 */
+    if (hdr->source != 0x3500)
+        return 0;
+
+    /* skip UDP header */
+    data = skb->data + 8;
+
+    event = dns_data.lookup(&zero);
+    if (!event)
+        return 0;
+
+    bpf_probe_read(event->pkt, sizeof(event->pkt), data);
+    dns_events.perf_submit(ctx, event, sizeof(*event));
+    return 0;
+}
 """
 
 if args.count and args.dns:
@@ -510,6 +535,7 @@ b.attach_kretprobe(event="tcp_v6_connect", fn_name="trace_connect_v6_return")
 if args.dns:
     b.attach_kprobe(event="udp_recvmsg", fn_name="trace_udp_recvmsg")
     b.attach_kretprobe(event="udp_recvmsg", fn_name="trace_udp_ret_recvmsg")
+    b.attach_kprobe(event="udpv6_queue_rcv_one_skb", fn_name="trace_udpv6_recvmsg")
 
 print("Tracing connect ... Hit Ctrl-C to end")
 if args.count:
