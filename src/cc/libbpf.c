@@ -1554,7 +1554,7 @@ int bpf_attach_xdp(const char *dev_name, int progfd, uint32_t flags) {
     return -1;
   }
 
-  ret = bpf_set_link_xdp_fd(ifindex, progfd, flags);
+  ret = bpf_xdp_attach(ifindex, progfd, flags, NULL);
   if (ret) {
     libbpf_strerror(ret, err_buf, sizeof(err_buf));
     fprintf(stderr, "bpf: Attaching prog to %s: %s\n", dev_name, err_buf);
