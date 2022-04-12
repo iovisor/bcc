@@ -33,7 +33,9 @@ RUN dnf -y install \
 	python3 \
 	python3-pip
 
-RUN ln -s $(readlink /usr/bin/python3) /usr/bin/python
+RUN if [[ ! -e /usr/bin/python && -e /usr/bin/python3 ]]; then \
+        ln -s $(readlink /usr/bin/python3) /usr/bin/python; \
+    fi
 
 RUN dnf -y install \
 	procps \
