@@ -64,12 +64,12 @@ static struct prog_env {
 	.iterations = 99999999,
 };
 
-const char *argp_program_version = "klockstat 0.1";
+const char *argp_program_version = "klockstat 0.2";
 const char *argp_program_bug_address =
 	"https://github.com/iovisor/bcc/tree/master/libbpf-tools";
 static const char args_doc[] = "FUNCTION";
 static const char program_doc[] =
-"Trace mutex lock acquisition and hold times, in nsec\n"
+"Trace mutex/sem lock acquisition and hold times, in nsec\n"
 "\n"
 "Usage: klockstat [-hRTv] [-p PID] [-t TID] [-c FUNC] [-L LOCK] [-n NR_LOCKS]\n"
 "                 [-s NR_STACKS] [-S SORT] [-d DURATION] [-i INTERVAL]\n"
@@ -549,6 +549,26 @@ int main(int argc, char **argv)
 					       "mutex_lock_killable_nested");
 	}
 
+	if (fentry_can_attach("down_read_nested", NULL)) {
+		bpf_program__set_attach_target(obj->progs.down_read, 0,
+					       "down_read_nested");
+		bpf_program__set_attach_target(obj->progs.down_read_exit, 0,
+					       "down_read_nested");
+		bpf_program__set_attach_target(obj->progs.down_read_killable, 0,
+					       "down_read_killable_nested");
+		bpf_program__set_attach_target(obj->progs.down_read_killable_exit, 0,
+					       "down_read_killable_nested");
+
+		bpf_program__set_attach_target(obj->progs.down_write, 0,
+					       "down_write_nested");
+		bpf_program__set_attach_target(obj->progs.down_write_exit, 0,
+					       "down_write_nested");
+		bpf_program__set_attach_target(obj->progs.down_write_killable, 0,
+					       "down_write_killable_nested");
+		bpf_program__set_attach_target(obj->progs.down_write_killable_exit, 0,
+					       "down_write_killable_nested");
+	}
+
 	err = klockstat_bpf__load(obj);
 	if (err) {
 		warn("failed to load BPF object\n");
@@ -560,7 +580,7 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	printf("Tracing mutex lock events...  Hit Ctrl-C to end\n");
+	printf("Tracing mutex/sem lock events...  Hit Ctrl-C to end\n");
 
 	for (i = 0; i < env.iterations && !exiting; i++) {
 		sleep(env.interval);
@@ -580,7 +600,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	printf("Exiting trace of mutex locks\n");
+	printf("Exiting trace of mutex/sem locks\n");
 
 cleanup:
 	klockstat_bpf__destroy(obj);
