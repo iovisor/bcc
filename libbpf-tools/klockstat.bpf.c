@@ -13,7 +13,7 @@
 
 const volatile pid_t targ_tgid = 0;
 const volatile pid_t targ_pid = 0;
-struct mutex *const volatile targ_lock = NULL;
+void *const volatile targ_lock = NULL;
 
 struct {
 	__uint(type, BPF_MAP_TYPE_STACK_TRACE);
@@ -72,7 +72,7 @@ static bool tracing_task(u64 task_id)
 	return true;
 }
 
-static void lock_contended(void *ctx, struct mutex *lock)
+static void lock_contended(void *ctx, void *lock)
 {
 	u64 task_id;
 	struct lockholder_info li[1] = {0};
@@ -107,7 +107,7 @@ static void lock_contended(void *ctx, struct mutex *lock)
 	bpf_map_update_elem(&lockholder_map, &tl, li, BPF_ANY);
 }
 
-static void lock_aborted(struct mutex *lock)
+static void lock_aborted(void *lock)
 {
 	u64 task_id;
 	struct task_lock tl = {};
@@ -122,7 +122,7 @@ static void lock_aborted(struct mutex *lock)
 	bpf_map_delete_elem(&lockholder_map, &tl);
 }
 
-static void lock_acquired(struct mutex *lock)
+static void lock_acquired(void *lock)
 {
 	u64 task_id;
 	struct lockholder_info *li;
@@ -188,7 +188,7 @@ static void account(struct lockholder_info *li)
 	}
 }
 
-static void lock_released(struct mutex *lock)
+static void lock_released(void *lock)
 {
 	u64 task_id;
 	struct lockholder_info *li;
