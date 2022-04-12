@@ -151,7 +151,8 @@ static void account(struct lockholder_info *li)
 	/*
 	 * Multiple threads may have the same stack_id.  Even though we are
 	 * holding the lock, dynamically allocated mutexes can have the same
-	 * callgraph but represent different locks.  They will be accounted as
+	 * callgraph but represent different locks.  Also, a rwsem can be held
+	 * by multiple readers at the same time.  They will be accounted as
 	 * the same lock, which is what we want, but we need to use atomics to
 	 * avoid corruption, especially for the total_time variables.
 	 */
@@ -271,6 +272,119 @@ int BPF_PROG(mutex_lock_killable_exit, struct mutex *lock, long ret)
 
 SEC("fentry/mutex_unlock")
 int BPF_PROG(mutex_unlock, struct mutex *lock)
+{
+	lock_released(lock);
+	return 0;
+}
+
+SEC("fentry/down_read")
+int BPF_PROG(down_read, struct rw_semaphore *lock)
+{
+	lock_contended(ctx, lock);
+	return 0;
+}
+
+SEC("fexit/down_read")
+int BPF_PROG(down_read_exit, struct rw_semaphore *lock, long ret)
+{
+	lock_acquired(lock);
+	return 0;
+}
+
+SEC("fexit/down_read_trylock")
+int BPF_PROG(down_read_trylock_exit, struct rw_semaphore *lock, long ret)
+{
+	if (ret == 1) {
+		lock_contended(ctx, lock);
+		lock_acquired(lock);
+	}
+	return 0;
+}
+
+SEC("fentry/down_read_interruptible")
+int BPF_PROG(down_read_interruptible, struct rw_semaphore *lock)
+{
+	lock_contended(ctx, lock);
+	return 0;
+}
+
+SEC("fexit/down_read_interruptible")
+int BPF_PROG(down_read_interruptible_exit, struct rw_semaphore *lock, long ret)
+{
+	if (ret)
+		lock_aborted(lock);
+	else
+		lock_acquired(lock);
+	return 0;
+}
+
+SEC("fentry/down_read_killable")
+int BPF_PROG(down_read_killable, struct rw_semaphore *lock)
+{
+	lock_contended(ctx, lock);
+	return 0;
+}
+
+SEC("fexit/down_read_killable")
+int BPF_PROG(down_read_killable_exit, struct rw_semaphore *lock, long ret)
+{
+	if (ret)
+		lock_aborted(lock);
+	else
+		lock_acquired(lock);
+	return 0;
+}
+
+SEC("fentry/up_read")
+int BPF_PROG(up_read, struct rw_semaphore *lock)
+{
+	lock_released(lock);
+	return 0;
+}
+
+SEC("fentry/down_write")
+int BPF_PROG(down_write, struct rw_semaphore *lock)
+{
+	lock_contended(ctx, lock);
+	return 0;
+}
+
+SEC("fexit/down_write")
+int BPF_PROG(down_write_exit, struct rw_semaphore *lock, long ret)
+{
+	lock_acquired(lock);
+	return 0;
+}
+
+SEC("fexit/down_write_trylock")
+int BPF_PROG(down_write_trylock_exit, struct rw_semaphore *lock, long ret)
+{
+	if (ret == 1) {
+		lock_contended(ctx, lock);
+		lock_acquired(lock);
+	}
+	return 0;
+}
+
+SEC("fentry/down_write_killable")
+int BPF_PROG(down_write_killable, struct rw_semaphore *lock)
+{
+	lock_contended(ctx, lock);
+	return 0;
+}
+
+SEC("fexit/down_write_killable")
+int BPF_PROG(down_write_killable_exit, struct rw_semaphore *lock, long ret)
+{
+	if (ret)
+		lock_aborted(lock);
+	else
+		lock_acquired(lock);
+	return 0;
+}
+
+SEC("fentry/up_write")
+int BPF_PROG(up_write, struct rw_semaphore *lock)
 {
 	lock_released(lock);
 	return 0;
