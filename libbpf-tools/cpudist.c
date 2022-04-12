@@ -219,11 +219,11 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	bpf_map__resize(obj->maps.start, pid_max);
+	bpf_map__set_max_entries(obj->maps.start, pid_max);
 	if (!env.per_process && !env.per_thread)
-		bpf_map__resize(obj->maps.hists, 1);
+		bpf_map__set_max_entries(obj->maps.hists, 1);
 	else
-		bpf_map__resize(obj->maps.hists, pid_max);
+		bpf_map__set_max_entries(obj->maps.hists, pid_max);
 
 	err = cpudist_bpf__load(obj);
 	if (err) {
