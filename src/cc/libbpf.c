@@ -617,12 +617,11 @@ int bpf_prog_get_tag(int fd, unsigned long long *ptag)
 /*    fprintf(stderr, "failed to open fdinfo %s\n", strerror(errno));*/
     return -1;
   }
-  fgets(fmt, sizeof(fmt), f); // pos
-  fgets(fmt, sizeof(fmt), f); // flags
-  fgets(fmt, sizeof(fmt), f); // mnt_id
-  fgets(fmt, sizeof(fmt), f); // prog_type
-  fgets(fmt, sizeof(fmt), f); // prog_jited
-  fgets(fmt, sizeof(fmt), f); // prog_tag
+  
+  do {
+      if (fgets(fmt, sizeof(fmt), f) == NULL) break; 
+  } while (strncmp(fmt, "prog_tag", 8) != 0);
+  
   fclose(f);
   char *p = strchr(fmt, ':');
   if (!p) {
