@@ -10,13 +10,13 @@
  *     when '-s' > 1 (otherwise it's cluttered).
  * - does not reset stats each interval by default. Can request with -R.
  */
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 #include <argp.h>
 #include <errno.h>
 #include <signal.h>
 #include <stdio.h>
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
