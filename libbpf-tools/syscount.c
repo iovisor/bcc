@@ -6,12 +6,14 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <time.h>
+#include <unistd.h>
 #include <argp.h>
 #include <bpf/bpf.h>
 #include "syscount.h"
 #include "syscount.skel.h"
 #include "errno_helpers.h"
 #include "syscall_helpers.h"
+#include "btf_helpers.h"
 #include "trace_helpers.h"
 
 /* This structure extends data_t by adding a key item which should be sorted
@@ -366,6 +368,7 @@ void sig_int(int signo)
 
 int main(int argc, char **argv)
 {
+	LIBBPF_OPTS(bpf_object_open_opts, open_opts);
 	void (*print)(struct data_ext_t *, size_t);
 	int (*compar)(const void *, const void *);
 	static const struct argp argp = {
@@ -393,7 +396,13 @@ int main(int argc, char **argv)
 	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
 
-	obj = syscount_bpf__open();
+	err = ensure_core_btf(&open_opts);
+	if (err) {
+		fprintf(stderr, "failed to fetch necessary BTF for CO-RE: %s\n", strerror(-err));
+		return 1;
+	}
+
+	obj = syscount_bpf__open_opts(&open_opts);
 	if (!obj) {
 		warn("failed to open BPF object\n");
 		err = 1;
@@ -467,6 +476,7 @@ cleanup_obj:
 	syscount_bpf__destroy(obj);
 free_names:
 	free_syscall_names();
+	cleanup_core_btf(&open_opts);
 
 	return err != 0;
 }

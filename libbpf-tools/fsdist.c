@@ -24,6 +24,7 @@
 
 #include "fsdist.h"
 #include "fsdist.skel.h"
+#include "btf_helpers.h"
 #include "trace_helpers.h"
 
 #define warn(...) fprintf(stderr, __VA_ARGS__)
@@ -233,7 +234,7 @@ static bool check_fentry()
 	for (i = 0; i < MAX_OP; i++) {
 		fn_name = fs_configs[fs_type].op_funcs[i];
 		module = fs_configs[fs_type].fs;
-		if (fn_name && !fentry_exists(fn_name, module)) {
+		if (fn_name && !fentry_can_attach(fn_name, module)) {
 			support_fentry = false;
 			break;
 		}
@@ -343,6 +344,7 @@ errout:
 
 int main(int argc, char **argv)
 {
+	LIBBPF_OPTS(bpf_object_open_opts, open_opts);
 	static const struct argp argp = {
 		.options = opts,
 		.parser = parse_arg,
@@ -367,7 +369,13 @@ int main(int argc, char **argv)
 	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
 
-	skel = fsdist_bpf__open();
+	err = ensure_core_btf(&open_opts);
+	if (err) {
+		fprintf(stderr, "failed to fetch necessary BTF for CO-RE: %s\n", strerror(-err));
+		return 1;
+	}
+
+	skel = fsdist_bpf__open_opts(&open_opts);
 	if (!skel) {
 		warn("failed to open BPF object\n");
 		return 1;
@@ -436,6 +444,7 @@ int main(int argc, char **argv)
 
 cleanup:
 	fsdist_bpf__destroy(skel);
+	cleanup_core_btf(&open_opts);
 
 	return err != 0;
 }

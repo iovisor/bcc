@@ -179,12 +179,27 @@ softirq = run_rebalance_domains
      16384 -> 32767      : 24       |**                                      |
 
 
+Sometimes you just want counts of events, and don't need the distribution
+of times. You can use the -C or --events option:
+
+# ./softirqs.py -C
+Tracing soft irq events... Hit Ctrl-C to end.
+^C
+SOFTIRQ          TOTAL_count
+block                      5
+tasklet                    6
+net_rx                   402
+sched                   5251
+rcu                     5748
+timer                   9530
+
+
 USAGE message:
 
 # ./softirqs -h
-usage: softirqs [-h] [-T] [-N] [-d] [interval] [count]
+usage: softirqs [-h] [-T] [-N] [-C] [-d] [-c CPU] [interval] [count]
 
-Summarize soft irq event time as histograms
+Summarize soft irq event time as histograms.
 
 positional arguments:
   interval           output interval, in seconds
@@ -194,10 +209,15 @@ optional arguments:
   -h, --help         show this help message and exit
   -T, --timestamp    include timestamp on output
   -N, --nanoseconds  output in nanoseconds
+  -C, --events       show the number of soft irq events
   -d, --dist         show distributions as histograms
+  -c CPU, --cpu CPU  trace this CPU only
 
 examples:
     ./softirqs            # sum soft irq event time
+    ./softirqs -C         # show the number of soft irq events
     ./softirqs -d         # show soft irq event time as histograms
     ./softirqs 1 10       # print 1 second summaries, 10 times
     ./softirqs -NT 1      # 1s summaries, nanoseconds, and timestamps
+    ./softirqs -c 1       # sum soft irq event time on CPU 1 only
+

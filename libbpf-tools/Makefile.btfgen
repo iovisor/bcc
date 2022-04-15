@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
+SOURCE_BTF_FILES = $(shell find $(BTFHUB_ARCHIVE)/ -iregex ".*$(subst x86,x86_64,$(ARCH)).*" -type f -name '*.btf.tar.xz')
+MIN_CORE_BTF_FILES = $(patsubst $(BTFHUB_ARCHIVE)/%.btf.tar.xz, $(OUTPUT)/min_core_btfs/%.btf, $(SOURCE_BTF_FILES))
+BPF_O_FILES = $(patsubst %,$(OUTPUT)/%.bpf.o,$(APPS))
+
+.PHONY: all
+all: $(OUTPUT)/min_core_btf_tar.o
+
+ifeq ($(V),1)
+Q =
+msg =
+else
+Q = @
+msg = @printf '  %-8s %s%s\n' "$(1)" "$(notdir $(2))" "$(if $(3), $(3))";
+MAKEFLAGS += --no-print-directory
+endif
+
+$(BTFHUB_ARCHIVE)/%.btf: $(BTFHUB_ARCHIVE)/%.btf.tar.xz
+	$(call msg,UNTAR,$@)
+	$(Q)tar xvfJ $< -C "$(@D)" > /dev/null
+	$(Q)touch $@
+
+$(MIN_CORE_BTF_FILES): $(BPF_O_FILES)
+
+# Create reduced version of BTF files to be embedded within the tools executables
+$(OUTPUT)/min_core_btfs/%.btf: $(BTFHUB_ARCHIVE)/%.btf
+	$(call msg,BTFGEN,$@)
+	$(Q)mkdir -p "$(@D)"
+	$(Q)$(BPFTOOL) gen min_core_btf $< $@ $(OUTPUT)/*.bpf.o
+
+# Compress reduced BTF files and create an object file with its content
+$(OUTPUT)/min_core_btf_tar.o: $(MIN_CORE_BTF_FILES)
+	$(call msg,TAR,$@)
+	$(Q)tar c --gz -f $(OUTPUT)/min_core_btfs.tar.gz -C $(OUTPUT)/min_core_btfs/ .
+	$(Q)cd $(OUTPUT) && ld -r -b binary min_core_btfs.tar.gz -o $@
+
+# delete failed targets
+.DELETE_ON_ERROR:
+# keep intermediate (.skel.h, .bpf.o, etc) targets
+.SECONDARY:

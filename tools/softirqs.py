@@ -4,7 +4,7 @@
 # softirqs  Summarize soft IRQ (interrupt) event time.
 #           For Linux, uses BCC, eBPF.
 #
-# USAGE: softirqs [-h] [-T] [-N] [-d] [-c CPU] [interval] [count]
+# USAGE: softirqs [-h] [-T] [-N] [-C] [-d] [-c CPU] [interval] [count]
 #
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -12,6 +12,7 @@
 # 20-Oct-2015   Brendan Gregg     Created this.
 # 03-Apr-2017   Sasha Goldshtein  Migrated to kernel tracepoints.
 # 07-Mar-2022   Rocky Xing        Added CPU filter support.
+# 24-Mar-2022   Rocky Xing        Added event counting support.
 
 from __future__ import print_function
 from bcc import BPF
@@ -22,6 +23,7 @@ import sys
 # arguments
 examples = """examples:
     ./softirqs            # sum soft irq event time
+    ./softirqs -C         # show the number of soft irq events
     ./softirqs -d         # show soft irq event time as histograms
     ./softirqs 1 10       # print 1 second summaries, 10 times
     ./softirqs -NT 1      # 1s summaries, nanoseconds, and timestamps
@@ -35,6 +37,8 @@ parser.add_argument("-T", "--timestamp", action="store_true",
     help="include timestamp on output")
 parser.add_argument("-N", "--nanoseconds", action="store_true",
     help="output in nanoseconds")
+parser.add_argument("-C", "--events", action="store_true",
+    help="show the number of soft irq events")
 parser.add_argument("-d", "--dist", action="store_true",
     help="show distributions as histograms")
 parser.add_argument("-c", "--cpu", type=int,
@@ -47,7 +51,13 @@ parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
 countdown = int(args.count)
-if args.nanoseconds:
+if args.events and (args.dist or args.nanoseconds):
+    print("The --events option can't be used with time-based options")
+    exit()
+if args.events:
+    factor = 1
+    label = "count"
+elif args.nanoseconds:
     factor = 1
     label = "nsecs"
 else:
@@ -76,7 +86,25 @@ typedef struct account_val {
 
 BPF_HASH(start, entry_key_t, account_val_t);
 BPF_HISTOGRAM(dist, irq_key_t);
+"""
 
+bpf_text_count = """
+TRACEPOINT_PROBE(irq, softirq_entry)
+{
+    u32 cpu = bpf_get_smp_processor_id();
+
+    FILTER_CPU
+
+    irq_key_t key = { .slot = 0 /* ignore */ };
+    key.vec = args->vec;
+
+    dist.atomic_increment(key);
+
+    return 0;
+}
+"""
+
+bpf_text_time = """
 TRACEPOINT_PROBE(irq, softirq_entry)
 {
     account_val_t val = {};
@@ -125,6 +153,11 @@ TRACEPOINT_PROBE(irq, softirq_exit)
 }
 """
 
+if args.events:
+    bpf_text += bpf_text_count
+else:
+    bpf_text += bpf_text_time
+
 # code substitutions
 if args.dist:
     bpf_text = bpf_text.replace('STORE',
@@ -153,7 +186,10 @@ def vec_to_name(vec):
     return ["hi", "timer", "net_tx", "net_rx", "block", "irq_poll",
             "tasklet", "sched", "hrtimer", "rcu"][vec]
 
-print("Tracing soft irq event time... Hit Ctrl-C to end.")
+if args.events:
+    print("Tracing soft irq events... Hit Ctrl-C to end.")
+else:
+    print("Tracing soft irq event time... Hit Ctrl-C to end.")
 
 # output
 exiting = 0 if args.interval else 1

@@ -8,6 +8,7 @@
 #include <bpf/bpf.h>
 #include "vfsstat.h"
 #include "vfsstat.skel.h"
+#include "btf_helpers.h"
 #include "trace_helpers.h"
 
 const char *argp_program_version = "vfsstat 0.1";
@@ -137,6 +138,7 @@ static void print_and_reset_stats(__u64 stats[S_MAXSTAT])
 
 int main(int argc, char **argv)
 {
+	LIBBPF_OPTS(bpf_object_open_opts, open_opts);
 	static const struct argp argp = {
 		.options = opts,
 		.parser = parse_arg,
@@ -153,6 +155,13 @@ int main(int argc, char **argv)
 	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
 
+
+	err = ensure_core_btf(&open_opts);
+	if (err) {
+		fprintf(stderr, "failed to fetch necessary BTF for CO-RE: %s\n", strerror(-err));
+		return 1;
+	}
+
 	skel = vfsstat_bpf__open();
 	if (!skel) {
 		fprintf(stderr, "failed to open BPF skelect\n");
@@ -160,7 +169,7 @@ int main(int argc, char **argv)
 	}
 
 	/* It fallbacks to kprobes when kernel does not support fentry. */
-	if (vmlinux_btf_exists() && fentry_exists("vfs_read", NULL)) {
+	if (vmlinux_btf_exists() && fentry_can_attach("vfs_read", NULL)) {
 		bpf_program__set_autoload(skel->progs.kprobe_vfs_read, false);
 		bpf_program__set_autoload(skel->progs.kprobe_vfs_write, false);
 		bpf_program__set_autoload(skel->progs.kprobe_vfs_fsync, false);
@@ -200,6 +209,7 @@ int main(int argc, char **argv)
 
 cleanup:
 	vfsstat_bpf__destroy(skel);
+	cleanup_core_btf(&open_opts);
 
 	return err != 0;
 }
