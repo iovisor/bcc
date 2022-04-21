@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <cmath>
 #include <unordered_map>
 #include <regex>
 
@@ -31,6 +32,17 @@ Argument::~Argument() {}
 std::string Argument::ctype() const {
   const int s = arg_size() * 8;
   return (s < 0) ? tfm::format("int%d_t", -s) : tfm::format("uint%d_t", s);
+}
+
+static const char *type_names[][4] = {
+  { "int8_t", "int16_t", "int32_t", "int64_t" },
+  { "uint8_t", "uint16_t", "uint32_t", "uint64_t" },
+};
+
+const char *Argument::ctype_name() const {
+  const int s = arg_size();
+  const int r = log2(abs(s));
+  return s < 0 ? type_names[0][r] : type_names[1][r];
 }
 
 bool Argument::get_global_address(uint64_t *address, const std::string &binpath,

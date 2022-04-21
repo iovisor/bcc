@@ -66,6 +66,7 @@ public:
 
   int arg_size() const { return arg_size_.value_or(sizeof(void *)); }
   std::string ctype() const;
+  const char *ctype_name() const;
 
   const optional<std::string> &deref_ident() const { return deref_ident_; }
   const optional<std::string> &base_register_name() const {
@@ -228,7 +229,7 @@ class Probe {
   optional<uint64_t> attached_semaphore_;
   uint8_t mod_match_inode_only_;
 
-  std::string largest_arg_type(size_t arg_n);
+  const char *largest_arg_type(size_t arg_n);
 
   bool add_to_semaphore(int16_t val);
   bool resolve_global_address(uint64_t *global, const std::string &bin_path,
@@ -253,6 +254,10 @@ public:
   bool usdt_getarg(std::ostream &stream);
   bool usdt_getarg(std::ostream &stream, const std::string& probe_func);
   std::string get_arg_ctype(int arg_index) {
+    return largest_arg_type(arg_index);
+  }
+
+  const char *get_arg_ctype_name(int arg_index) {
     return largest_arg_type(arg_index);
   }
 
