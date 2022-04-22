@@ -50,7 +50,7 @@ void BPFModule::cleanup_rw_engine() {
 static LoadInst *createLoad(IRBuilder<> &B, Value *addr, bool isVolatile = false)
 {
 #if LLVM_MAJOR_VERSION >= 14
-  return B.CreateLoad(addr->getType()->getPointerElementType(), addr, isVolatile);
+  return B.CreateLoad(addr->getType(), addr, isVolatile);
 #else
   return B.CreateLoad(addr, isVolatile);
 #endif
@@ -59,8 +59,7 @@ static LoadInst *createLoad(IRBuilder<> &B, Value *addr, bool isVolatile = false
 static Value *createInBoundsGEP(IRBuilder<> &B, Value *ptr, ArrayRef<Value *>idxlist)
 {
 #if LLVM_MAJOR_VERSION >= 14
-  return B.CreateInBoundsGEP(ptr->getType()->getScalarType()->getPointerElementType(),
-                             ptr, idxlist);
+  return B.CreateInBoundsGEP(ptr->getType(), ptr, idxlist);
 #else
   return B.CreateInBoundsGEP(ptr, idxlist);
 #endif
@@ -400,10 +399,12 @@ int BPFModule::annotate() {
     table_names_[table.name] = id++;
     GlobalValue *gvar = mod_->getNamedValue(table.name);
     if (!gvar) continue;
-    if (PointerType *pt = dyn_cast<PointerType>(gvar->getType())) {
 #if LLVM_MAJOR_VERSION >= 15
-      StructType *st = dyn_cast<StructType>(pt->getPointerElementType());
+    {
+      Type *t = gvar->getValueType();
+      StructType *st = dyn_cast<StructType>(t);
 #else
+    if (PointerType *pt = dyn_cast<PointerType>(gvar->getType())) {
       StructType *st = dyn_cast<StructType>(pt->getElementType());
 #endif
       if (st) {
