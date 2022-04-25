@@ -17,7 +17,6 @@
 
 from __future__ import print_function
 from bcc import BPF
-from ctypes import c_ushort, c_int, c_ulonglong
 from time import sleep
 from sys import argv
 
