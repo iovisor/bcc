@@ -19,6 +19,25 @@ enable_testing()
 
 # populate submodules (libbpf)
 if(NOT CMAKE_USE_LIBBPF_PACKAGE)
+   execute_process(COMMAND git config --global --add safe.directory ${CMAKE_CURRENT_SOURCE_DIR}
+                   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                   RESULT_VARIABLE CONFIG_RESULT)
+   if(CONFIG_RESULT AND NOT CONFIG_RESULT EQUAL 0)
+     message(WARNING "Failed to add root source directory to safe.directory")
+   endif()
+   execute_process(COMMAND git config --global --add safe.directory ${CMAKE_CURRENT_SOURCE_DIR}/src/cc/libbpf
+                   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                   RESULT_VARIABLE CONFIG_RESULT)
+   if(CONFIG_RESULT AND NOT CONFIG_RESULT EQUAL 0)
+     message(WARNING "Failed to add libbpf source directory to safe.directory")
+   endif()
+   execute_process(COMMAND git config --global --add safe.directory ${CMAKE_CURRENT_SOURCE_DIR}/libbpf-tools/bpftool
+                   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                   RESULT_VARIABLE CONFIG_RESULT)
+   if(CONFIG_RESULT AND NOT CONFIG_RESULT EQUAL 0)
+     message(WARNING "Failed to add bpftool source directory to safe.directory")
+   endif()
+
    if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/cc/libbpf/src)
 	execute_process(COMMAND git submodule update --init --recursive
                   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
