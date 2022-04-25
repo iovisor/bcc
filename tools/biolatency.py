@@ -134,7 +134,7 @@ if args.disks:
     bpf_probe_read(&key.disk, sizeof(key.disk), __tmp);
     dist.atomic_increment(key);
     """
-    if BPF.kernel_struct_has_field(b'request', b'rq_disk'):
+    if BPF.kernel_struct_has_field(b'request', b'rq_disk') == 1:
         store_str += disks_str.replace('__RQ_DISK__', 'rq_disk')
     else:
         store_str += disks_str.replace('__RQ_DISK__', 'q->disk')

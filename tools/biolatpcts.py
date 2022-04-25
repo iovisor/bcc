@@ -142,7 +142,7 @@ bpf_source = bpf_source.replace('__START_TIME_FIELD__', start_time_field)
 bpf_source = bpf_source.replace('__MAJOR__', str(major))
 bpf_source = bpf_source.replace('__MINOR__', str(minor))
 
-if BPF.kernel_struct_has_field(b'request', b'rq_disk'):
+if BPF.kernel_struct_has_field(b'request', b'rq_disk') == 1:
     bpf_source = bpf_source.replace('__RQ_DISK__', 'rq_disk')
 else:
     bpf_source = bpf_source.replace('__RQ_DISK__', 'q->disk')

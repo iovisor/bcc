@@ -194,7 +194,7 @@ if args.ebpf:
     print(bpf_text)
     exit()
 
-if BPF.kernel_struct_has_field(b'request', b'rq_disk'):
+if BPF.kernel_struct_has_field(b'request', b'rq_disk') == 1:
     bpf_text = bpf_text.replace('__RQ_DISK__', 'rq_disk')
 else:
     bpf_text = bpf_text.replace('__RQ_DISK__', 'q->disk')
