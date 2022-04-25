@@ -111,8 +111,7 @@ struct ipv6_key_t {
 BPF_HASH(ipv6_send_bytes, struct ipv6_key_t);
 BPF_HASH(ipv6_recv_bytes, struct ipv6_key_t);
 
-int kprobe__tcp_sendmsg(struct pt_regs *ctx, struct sock *sk,
-    struct msghdr *msg, size_t size)
+static int tcp_sendstat(struct sock *sk, size_t size)
 {
     if (container_should_be_filtered()) {
         return 0;
@@ -152,6 +151,17 @@ int kprobe__tcp_sendmsg(struct pt_regs *ctx, struct sock *sk,
     return 0;
 }
 
+int kprobe__tcp_sendmsg(struct pt_regs *ctx, struct sock *sk,
+    struct msghdr *msg, size_t size)
+{
+    return tcp_sendstat(sk, size);
+}
+
+int kprobe__tcp_sendpage(struct pt_regs *ctx, struct sock *sk,
+    struct page *page, int offset, size_t size)
+{
+    return tcp_sendstat(sk, size);
+}
 /*
  * tcp_recvmsg() would be obvious to trace, but is less suitable because:
  * - we'd need to trace both entry and return, to have both sock and size
