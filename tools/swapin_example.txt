@@ -30,6 +30,27 @@ gnome-shell      2239   2496
 While tracing, this showed that PID 2239 (gnome-shell) and PID 4536 (chrome)
 suffered over ten thousand swapins.
 
+#swapin.py -T
+Counting swap ins. Ctrl-C to end.
+COMM             PID    COUNT
+b'firefox'       60965  4
+
+COMM             PID    COUNT
+b'IndexedDB #1'  60965  1
+b'firefox'       60965  2
+
+COMM             PID    COUNT
+b'StreamTrans #9' 60965  1
+b'firefox'       60965  3
+
+COMM             PID    COUNT
+
+COMM             PID    COUNT
+b'sssd_kcm'      3605   384
+[--]
+
+While tracing along with -T flag, it does not show timestamp.
+
 
 
 USAGE:
