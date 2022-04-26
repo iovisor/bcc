@@ -15,7 +15,7 @@ swapping (if swap devices are in use). This can explain a significant source
 of application latency, if it has began swapping due to memory pressure on
 the system.
 
-This works by tracing the swap_readpage() kernel funciton
+This works by tracing the swap_readpage() kernel function
 using dynamic instrumentation. This tool may need maintenance to keep working
 if that function changes in later kernels.
 
