@@ -3,13 +3,19 @@
 swapin \- Count swapins by process. Uses BCC/eBPF.
 .SH SYNOPSIS
 .B swapin
+.TP
+.BR \-h ", " \-\-help\fR
+show this help message and exit
+.TP
+.BR \-T ", " \-\-notime\fR
+do not show the timestamp (HH:MM:SS)
 .SH DESCRIPTION
 This tool counts swapins by process, to show which process is affected by
 swapping (if swap devices are in use). This can explain a significant source
 of application latency, if it has began swapping due to memory pressure on
 the system.
 
-This works by tracing the swap_readpage() kernel funciton
+This works by tracing the swap_readpage() kernel function
 using dynamic instrumentation. This tool may need maintenance to keep working
 if that function changes in later kernels.
 
