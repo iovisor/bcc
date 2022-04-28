@@ -116,8 +116,8 @@ bpf_text = """
 #define MAXBLOCK_US    MAXBLOCK_US_VALUEULL
 
 struct key_t {
-    u64 pid;
-    u64 tgid;
+    u32 pid;
+    u32 tgid;
     int user_stack_id;
     int kernel_stack_id;
     char name[TASK_COMM_LEN];

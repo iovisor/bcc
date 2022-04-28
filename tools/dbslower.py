@@ -100,7 +100,7 @@ struct temp_t {
 };
 
 struct data_t {
-    u64 pid;
+    u32 pid;
     u64 timestamp;
     u64 duration;
     char query[256];

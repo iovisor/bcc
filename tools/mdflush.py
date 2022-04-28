@@ -23,7 +23,7 @@ bpf_text="""
 #include <linux/bio.h>
 
 struct data_t {
-    u64 pid;
+    u32 pid;
     char comm[TASK_COMM_LEN];
     char disk[DISK_NAME_LEN];
 };
@@ -32,8 +32,7 @@ BPF_PERF_OUTPUT(events);
 int kprobe__md_flush_request(struct pt_regs *ctx, void *mddev, struct bio *bio)
 {
     struct data_t data = {};
-    u32 pid = bpf_get_current_pid_tgid() >> 32;
-    data.pid = pid;
+    data.pid = bpf_get_current_pid_tgid() >> 32;
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
 /*
  * The following deals with kernel version changes (in mainline 4.14 and 5.12, although

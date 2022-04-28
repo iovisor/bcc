@@ -74,12 +74,12 @@ bpf_text = """
 #include <linux/init_task.h>
 
 typedef struct pid_key {
-    u64 id;    // work around
+    u32 id;
     u64 slot;
 } pid_key_t;
 
 typedef struct pidns_key {
-    u64 id;    // work around
+    u32 id;
     u64 slot;
 } pidns_key_t;
 
