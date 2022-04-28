@@ -22,11 +22,15 @@
 #include <llvm/ExecutionEngine/SectionMemoryManager.h>
 #include <llvm/IR/IRPrintingPasses.h>
 #include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
 
 #if LLVM_MAJOR_VERSION >= 15
 #include <llvm/Pass.h>
+#include <llvm/IR/PassManager.h>
+#include <llvm/Passes/PassBuilder.h>
+#include <llvm/Transforms/IPO/AlwaysInliner.h>
+#else
+#include <llvm/IR/LegacyPassManager.h>
 #endif
 
 #include <llvm/IR/Verifier.h>
@@ -232,9 +236,30 @@ void BPFModule::annotate_light() {
 }
 
 void BPFModule::dump_ir(Module &mod) {
+#if LLVM_MAJOR_VERSION >= 15
+  // Create the analysis managers
+  LoopAnalysisManager LAM;
+  FunctionAnalysisManager FAM;
+  CGSCCAnalysisManager CGAM;
+  ModuleAnalysisManager MAM;
+
+  // Create the pass manager
+  PassBuilder PB;
+  PB.registerModuleAnalyses(MAM);
+  PB.registerCGSCCAnalyses(CGAM);
+  PB.registerFunctionAnalyses(FAM);
+  PB.registerLoopAnalyses(LAM);
+  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+  auto MPM = PB.buildPerModuleDefaultPipeline(OptimizationLevel::O2);
+
+  // Add passes and run
+  MPM.addPass(PrintModulePass(errs()));
+  MPM.run(mod, MAM);
+#else
   legacy::PassManager PM;
   PM.add(createPrintModulePass(errs()));
   PM.run(mod);
+#endif
 }
 
 int BPFModule::run_pass_manager(Module &mod) {
@@ -244,6 +269,28 @@ int BPFModule::run_pass_manager(Module &mod) {
     return -1;
   }
 
+#if LLVM_MAJOR_VERSION >= 15
+  // Create the analysis managers
+  LoopAnalysisManager LAM;
+  FunctionAnalysisManager FAM;
+  CGSCCAnalysisManager CGAM;
+  ModuleAnalysisManager MAM;
+
+  // Create the pass manager
+  PassBuilder PB;
+  PB.registerModuleAnalyses(MAM);
+  PB.registerCGSCCAnalyses(CGAM);
+  PB.registerFunctionAnalyses(FAM);
+  PB.registerLoopAnalyses(LAM);
+  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+  auto MPM = PB.buildPerModuleDefaultPipeline(OptimizationLevel::O3);
+
+  // Add passes and run
+  MPM.addPass(AlwaysInlinerPass());
+  if (flags_ & DEBUG_LLVM_IR)
+    MPM.addPass(PrintModulePass(outs()));
+  MPM.run(mod, MAM);
+#else
   legacy::PassManager PM;
   PassManagerBuilder PMB;
   PMB.OptLevel = 3;
@@ -260,6 +307,8 @@ int BPFModule::run_pass_manager(Module &mod) {
   if (flags_ & DEBUG_LLVM_IR)
     PM.add(createPrintModulePass(outs()));
   PM.run(mod);
+#endif
+
   return 0;
 }
 
