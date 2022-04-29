@@ -130,10 +130,10 @@ int BPF_PROG(block_rq_insert)
 	 * from TP_PROTO(struct request_queue *q, struct request *rq)
 	 * to TP_PROTO(struct request *rq)
 	 */
-	if (LINUX_KERNEL_VERSION > KERNEL_VERSION(5, 10, 0))
-		return trace_rq_start((void *)ctx[0], true);
-	else
+	if (LINUX_KERNEL_VERSION < KERNEL_VERSION(5, 11, 0))
 		return trace_rq_start((void *)ctx[1], true);
+	else
+		return trace_rq_start((void *)ctx[0], true);
 }
 
 SEC("tp_btf/block_rq_issue")
@@ -147,10 +147,10 @@ int BPF_PROG(block_rq_issue)
 	 * from TP_PROTO(struct request_queue *q, struct request *rq)
 	 * to TP_PROTO(struct request *rq)
 	 */
-	if (LINUX_KERNEL_VERSION > KERNEL_VERSION(5, 10, 0))
-		return trace_rq_start((void *)ctx[0], false);
-	else
+	if (LINUX_KERNEL_VERSION < KERNEL_VERSION(5, 11, 0))
 		return trace_rq_start((void *)ctx[1], false);
+	else
+		return trace_rq_start((void *)ctx[0], false);
 }
 
 SEC("tp_btf/block_rq_complete")
