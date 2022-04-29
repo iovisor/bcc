@@ -326,7 +326,7 @@ __tcp_v4_send_check              30
 Detaching...
 
 A cpu is specified by "-c CPU", this will only trace the specified CPU. Eg,
-trace how many timers setting per sencond of CPU 1 on a x86(Intel) server:
+trace how many timers setting per second of CPU 1 on a x86(Intel) server:
 
 # funccount.py -i 1 -c 1 lapic_next_deadline
 Tracing 1 functions for "lapic_next_deadline"... Hit Ctrl-C to end.
