@@ -617,22 +617,17 @@ int bpf_prog_get_tag(int fd, unsigned long long *ptag)
 /*    fprintf(stderr, "failed to open fdinfo %s\n", strerror(errno));*/
     return -1;
   }
-  fgets(fmt, sizeof(fmt), f); // pos
-  fgets(fmt, sizeof(fmt), f); // flags
-  fgets(fmt, sizeof(fmt), f); // mnt_id
-  fgets(fmt, sizeof(fmt), f); // prog_type
-  fgets(fmt, sizeof(fmt), f); // prog_jited
-  fgets(fmt, sizeof(fmt), f); // prog_tag
-  fclose(f);
-  char *p = strchr(fmt, ':');
-  if (!p) {
-/*    fprintf(stderr, "broken fdinfo %s\n", fmt);*/
-    return -2;
-  }
   unsigned long long tag = 0;
-  sscanf(p + 1, "%llx", &tag);
-  *ptag = tag;
-  return 0;
+  // prog_tag: can appear in different lines
+  while (fgets(fmt, sizeof(fmt), f)) {
+    if (sscanf(fmt, "prog_tag:%llx", &tag) == 1) {
+      *ptag = tag;
+      fclose(f);
+      return 0;
+    }
+  }
+  fclose(f);
+  return -2;
 }
 
 static int libbpf_bpf_prog_load(const struct bpf_load_program_attr *load_attr,
