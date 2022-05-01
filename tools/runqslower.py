@@ -114,16 +114,16 @@ int trace_ttwu_do_wakeup(struct pt_regs *ctx, struct rq *rq, struct task_struct 
 // calculate latency
 int trace_run(struct pt_regs *ctx, struct task_struct *prev)
 {
-    u32 pid, tgid, prev_pid;
+    u32 pid, tgid;
 
     // ivcsw: treat like an enqueue event and store timestamp
-    prev_pid = prev->pid;
     if (prev->STATE_FIELD == TASK_RUNNING) {
         tgid = prev->tgid;
+        pid = prev->pid;
         u64 ts = bpf_ktime_get_ns();
-        if (prev_pid != 0) {
+        if (pid != 0) {
             if (!(FILTER_PID) && !(FILTER_TGID)) {
-                start.update(&prev_pid, &ts);
+                start.update(&pid, &ts);
             }
         }
     }
@@ -144,7 +144,7 @@ int trace_run(struct pt_regs *ctx, struct task_struct *prev)
 
     struct data_t data = {};
     data.pid = pid;
-    data.prev_pid = prev_pid;
+    data.prev_pid = prev->pid;
     data.delta_us = delta_us;
     bpf_get_current_comm(&data.task, sizeof(data.task));
     bpf_probe_read_kernel_str(&data.prev_task, sizeof(data.prev_task), prev->comm);
@@ -181,26 +181,28 @@ RAW_TRACEPOINT_PROBE(sched_switch)
     // TP_PROTO(bool preempt, struct task_struct *prev, struct task_struct *next)
     struct task_struct *prev = (struct task_struct *)ctx->args[1];
     struct task_struct *next= (struct task_struct *)ctx->args[2];
-    u32 tgid, pid, prev_pid;
+    u32 tgid, pid;
     long state;
 
     // ivcsw: treat like an enqueue event and store timestamp
     bpf_probe_read_kernel(&state, sizeof(long), (const void *)&prev->STATE_FIELD);
-    bpf_probe_read_kernel(&prev_pid, sizeof(prev->pid), &prev->pid);
+    bpf_probe_read_kernel(&pid, sizeof(prev->pid), &prev->pid);
     if (state == TASK_RUNNING) {
         bpf_probe_read_kernel(&tgid, sizeof(prev->tgid), &prev->tgid);
         u64 ts = bpf_ktime_get_ns();
-        if (prev_pid != 0) {
+        if (pid != 0) {
             if (!(FILTER_PID) && !(FILTER_TGID)) {
-                start.update(&prev_pid, &ts);
+                start.update(&pid, &ts);
             }
         }
 
     }
 
-    bpf_probe_read_kernel(&pid, sizeof(next->pid), &next->pid);
-
+    u32 prev_pid;
     u64 *tsp, delta_us;
+
+    prev_pid = pid;
+    bpf_probe_read_kernel(&pid, sizeof(next->pid), &next->pid);
 
     // fetch timestamp and calculate delta
     tsp = start.lookup(&pid);
