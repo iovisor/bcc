@@ -9,8 +9,16 @@
 
 #define MAX_ENTRIES	256
 
+const volatile bool filter_cg = false;
 const volatile bool targ_dist = false;
 const volatile bool targ_ns = false;
+
+struct {
+	__uint(type, BPF_MAP_TYPE_CGROUP_ARRAY);
+	__type(key, u32);
+	__type(value, u32);
+	__uint(max_entries, 1);
+} cgroup_map SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
@@ -34,6 +42,9 @@ int handle__irq_handler(struct trace_event_raw_irq_handler_entry *ctx)
 	struct irq_key key = {};
 	struct info *info;
 
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
+
 	bpf_probe_read_kernel_str(&key.name, sizeof(key.name), ctx->__data);
 	info = bpf_map_lookup_or_try_init(&infos, &key, &zero);
 	if (!info)
@@ -48,6 +59,9 @@ int BPF_PROG(irq_handler_entry)
 	u64 ts = bpf_ktime_get_ns();
 	u32 key = 0;
 
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
+
 	bpf_map_update_elem(&start, &key, &ts, 0);
 	return 0;
 }
@@ -60,6 +74,9 @@ int BPF_PROG(irq_handler_exit_exit, int irq, struct irqaction *action)
 	u32 key = 0;
 	s64 delta;
 	u64 *tsp;
+
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
 
 	tsp = bpf_map_lookup_elem(&start, &key);
 	if (!tsp || !*tsp)

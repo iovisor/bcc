@@ -9,6 +9,14 @@
 __u32 freqs_mhz[MAX_CPU_NR] = {};
 static struct hist zero;
 struct hist syswide = {};
+bool filter_cg = false;
+
+struct {
+	__uint(type, BPF_MAP_TYPE_CGROUP_ARRAY);
+	__type(key, u32);
+	__type(value, u32);
+	__uint(max_entries, 1);
+} cgroup_map SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
@@ -28,6 +36,9 @@ struct {
 SEC("tp_btf/cpu_frequency")
 int BPF_PROG(cpu_frequency, unsigned int state, unsigned int cpu_id)
 {
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
+
 	if (cpu_id >= MAX_CPU_NR)
 		return 0;
 
@@ -43,6 +54,9 @@ int do_sample(struct bpf_perf_event_data *ctx)
 	u64 slot, cpu = bpf_get_smp_processor_id();
 	struct hist *hist;
 	struct hkey hkey;
+
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
 
 	if (cpu >= MAX_CPU_NR)
 		return 0;

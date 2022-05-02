@@ -10,6 +10,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 #include "runqlat.h"
@@ -26,6 +27,8 @@ struct env {
 	bool per_pidns;
 	bool timestamp;
 	bool verbose;
+	char *cgroupspath;
+	bool cg;
 } env = {
 	.interval = 99999999,
 	.times = 99999999,
@@ -39,14 +42,15 @@ const char *argp_program_bug_address =
 const char argp_program_doc[] =
 "Summarize run queue (scheduler) latency as a histogram.\n"
 "\n"
-"USAGE: runqlat [--help] [-T] [-m] [--pidnss] [-L] [-P] [-p PID] [interval] [count]\n"
+"USAGE: runqlat [--help] [-T] [-m] [--pidnss] [-L] [-P] [-p PID] [interval] [count] [-c CG]\n"
 "\n"
 "EXAMPLES:\n"
 "    runqlat         # summarize run queue latency as a histogram\n"
 "    runqlat 1 10    # print 1 second summaries, 10 times\n"
 "    runqlat -mT 1   # 1s summaries, milliseconds, and timestamps\n"
 "    runqlat -P      # show each PID separately\n"
-"    runqlat -p 185  # trace PID 185 only\n";
+"    runqlat -p 185  # trace PID 185 only\n"
+"    runqlat -c CG   # Trace process under cgroupsPath CG\n";
 
 #define OPT_PIDNSS	1	/* --pidnss */
 
@@ -58,6 +62,7 @@ static const struct argp_option opts[] = {
 	{ "tids", 'L', NULL, 0, "Print a histogram per thread ID" },
 	{ "pid", 'p', "PID", 0, "Trace this PID only" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
+	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path"},
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
@@ -95,6 +100,10 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'T':
 		env.timestamp = true;
+		break;
+	case 'c':
+		env.cgroupspath = arg;
+		env.cg = true;
 		break;
 	case ARGP_KEY_ARG:
 		errno = 0;
@@ -182,6 +191,8 @@ int main(int argc, char **argv)
 	char ts[32];
 	time_t t;
 	int err;
+	int idx, cg_map_fd;
+	int cgfd = -1;
 
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
 	if (err)
@@ -208,11 +219,27 @@ int main(int argc, char **argv)
 	obj->rodata->targ_per_pidns = env.per_pidns;
 	obj->rodata->targ_ms = env.milliseconds;
 	obj->rodata->targ_tgid = env.pid;
+	obj->rodata->filter_cg = env.cg;
 
 	err = runqlat_bpf__load(obj);
 	if (err) {
 		fprintf(stderr, "failed to load BPF object: %d\n", err);
 		goto cleanup;
+	}
+
+	/* update cgroup path fd to map */
+	if (env.cg) {
+		idx = 0;
+		cg_map_fd = bpf_map__fd(obj->maps.cgroup_map);
+		cgfd = open(env.cgroupspath, O_RDONLY);
+		if (cgfd < 0) {
+			fprintf(stderr, "Failed opening Cgroup path: %s", env.cgroupspath);
+			goto cleanup;
+		}
+		if (bpf_map_update_elem(cg_map_fd, &idx, &cgfd, BPF_ANY)) {
+			fprintf(stderr, "Failed adding target cgroup to map");
+			goto cleanup;
+		}
 	}
 
 	err = runqlat_bpf__attach(obj);
@@ -247,6 +274,8 @@ int main(int argc, char **argv)
 
 cleanup:
 	runqlat_bpf__destroy(obj);
+	if (cgfd > 0)
+		close(cgfd);
 
 	return err != 0;
 }

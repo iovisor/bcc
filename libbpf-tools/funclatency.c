@@ -16,6 +16,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
@@ -37,6 +38,8 @@ static struct prog_env {
 	bool timestamp;
 	char *funcname;
 	bool verbose;
+	char *cgroupspath;
+	bool cg;
 } env = {
 	.interval = 99999999,
 	.iterations = 99999999,
@@ -49,7 +52,7 @@ static const char args_doc[] = "FUNCTION";
 static const char program_doc[] =
 "Time functions and print latency as a histogram\n"
 "\n"
-"Usage: funclatency [-h] [-m|-u] [-p PID] [-d DURATION] [ -i INTERVAL ]\n"
+"Usage: funclatency [-h] [-m|-u] [-p PID] [-d DURATION] [ -i INTERVAL ] [-c CG]\n"
 "                   [-T] FUNCTION\n"
 "       Choices for FUNCTION: FUNCTION         (kprobe)\n"
 "                             LIBRARY:FUNCTION (uprobe a library in -p PID)\n"
@@ -59,6 +62,7 @@ static const char program_doc[] =
 "Examples:\n"
 "  ./funclatency do_sys_open         # time the do_sys_open() kernel function\n"
 "  ./funclatency -m do_nanosleep     # time do_nanosleep(), in milliseconds\n"
+"  ./funclatency -c CG               # Trace process under cgroupsPath CG\n"
 "  ./funclatency -u vfs_read         # time vfs_read(), in microseconds\n"
 "  ./funclatency -p 181 vfs_read     # time process 181 only\n"
 "  ./funclatency -p 181 c:read       # time the read() C library function\n"
@@ -74,6 +78,7 @@ static const struct argp_option opts[] = {
 	{ "pid", 'p', "PID", 0, "Process ID to trace"},
 	{0, 0, 0, 0, ""},
 	{ "interval", 'i', "INTERVAL", 0, "Summary interval in seconds"},
+	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path" },
 	{ "duration", 'd', "DURATION", 0, "Duration to trace"},
 	{ "timestamp", 'T', NULL, 0, "Print timestamp"},
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
@@ -102,6 +107,10 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			argp_usage(state);
 		}
 		env->units = MSEC;
+		break;
+	case 'c':
+		env->cgroupspath = arg;
+		env->cg = true;
 		break;
 	case 'u':
 		if (env->units != NSEC) {
@@ -291,6 +300,8 @@ int main(int argc, char **argv)
 	struct tm *tm;
 	char ts[32];
 	time_t t;
+	int idx, cg_map_fd;
+	int cgfd = -1;
 
 	err = argp_parse(&argp, argc, argv, 0, NULL, &env);
 	if (err)
@@ -315,11 +326,27 @@ int main(int argc, char **argv)
 
 	obj->rodata->units = env.units;
 	obj->rodata->targ_tgid = env.pid;
+	obj->rodata->filter_cg = env.cg;
 
 	err = funclatency_bpf__load(obj);
 	if (err) {
 		warn("failed to load BPF object\n");
 		return 1;
+	}
+
+/* update cgroup path fd to map */
+	if (env.cg) {
+		idx = 0;
+		cg_map_fd = bpf_map__fd(obj->maps.cgroup_map);
+		cgfd = open(env.cgroupspath, O_RDONLY);
+		if (cgfd < 0) {
+			fprintf(stderr, "Failed opening Cgroup path: %s", env.cgroupspath);
+			goto cleanup;
+		}
+		if (bpf_map_update_elem(cg_map_fd, &idx, &cgfd, BPF_ANY)) {
+			fprintf(stderr, "Failed adding target cgroup to map");
+			goto cleanup;
+		}
 	}
 
 	if (!obj->bss) {
@@ -352,6 +379,8 @@ int main(int argc, char **argv)
 cleanup:
 	funclatency_bpf__destroy(obj);
 	cleanup_core_btf(&open_opts);
+	if (cgfd > 0)
+		close(cgfd);
 
 	return err != 0;
 }

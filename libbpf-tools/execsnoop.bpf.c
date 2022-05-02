@@ -4,11 +4,19 @@
 #include <bpf/bpf_core_read.h>
 #include "execsnoop.h"
 
+const volatile bool filter_cg = false;
 const volatile bool ignore_failed = true;
 const volatile uid_t targ_uid = INVALID_UID;
 const volatile int max_args = DEFAULT_MAXARGS;
 
 static const struct event empty_event = {};
+
+struct {
+	__uint(type, BPF_MAP_TYPE_CGROUP_ARRAY);
+	__type(key, u32);
+	__type(value, u32);
+	__uint(max_entries, 1);
+} cgroup_map SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
@@ -37,6 +45,10 @@ int tracepoint__syscalls__sys_enter_execve(struct trace_event_raw_sys_enter* ctx
 	struct task_struct *task;
 	const char **args = (const char **)(ctx->args[1]);
 	const char *argp;
+
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
+
 	uid_t uid = (u32)bpf_get_current_uid_gid();
 	int i;
 
@@ -103,6 +115,10 @@ int tracepoint__syscalls__sys_exit_execve(struct trace_event_raw_sys_exit* ctx)
 	pid_t pid;
 	int ret;
 	struct event *event;
+
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
+
 	u32 uid = (u32)bpf_get_current_uid_gid();
 
 	if (valid_uid(targ_uid) && targ_uid != uid)
