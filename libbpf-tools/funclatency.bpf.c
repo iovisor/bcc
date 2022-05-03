@@ -9,6 +9,14 @@
 
 const volatile pid_t targ_tgid = 0;
 const volatile int units = 0;
+const volatile bool filter_cg = false;
+
+struct {
+	__uint(type, BPF_MAP_TYPE_CGROUP_ARRAY);
+	__type(key, u32);
+	__type(value, u32);
+	__uint(max_entries, 1);
+} cgroup_map SEC(".maps");
 
 /* key: pid.  value: start time */
 struct {
@@ -28,6 +36,9 @@ int BPF_KPROBE(dummy_kprobe)
 	u32 pid = id;
 	u64 nsec;
 
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
+
 	if (targ_tgid && targ_tgid != tgid)
 		return 0;
 	nsec = bpf_ktime_get_ns();
@@ -44,6 +55,9 @@ int BPF_KRETPROBE(dummy_kretprobe)
 	u64 id = bpf_get_current_pid_tgid();
 	u32 pid = id;
 	u64 slot, delta;
+
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
 
 	start = bpf_map_lookup_elem(&starts, &pid);
 	if (!start)

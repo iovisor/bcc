@@ -14,6 +14,7 @@
 #include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
@@ -25,6 +26,11 @@
 #define PERF_BUFFER_PAGES	16
 #define PERF_POLL_TIMEOUT_MS	100
 #define warn(...) fprintf(stderr, __VA_ARGS__)
+
+static struct env {
+	char	*cgroupspath;
+	bool	cg;
+} env;
 
 static volatile sig_atomic_t exiting = 0;
 
@@ -40,13 +46,14 @@ const char *argp_program_bug_address =
 const char argp_program_doc[] =
 "Trace bind syscalls.\n"
 "\n"
-"USAGE: bindsnoop [-h] [-t] [-x] [-p PID] [-P ports]\n"
+"USAGE: bindsnoop [-h] [-t] [-x] [-p PID] [-P ports] [-c CG]\n"
 "\n"
 "EXAMPLES:\n"
 "    bindsnoop             # trace all bind syscall\n"
 "    bindsnoop -t          # include timestamps\n"
 "    bindsnoop -x          # include errors on output\n"
 "    bindsnoop -p 1216     # only trace PID 1216\n"
+"    bindsnoop -c CG       # Trace process under cgroupsPath CG\n"
 "    bindsnoop -P 80,81    # only trace port 80 and 81\n"
 "\n"
 "Socket options are reported as:\n"
@@ -58,6 +65,7 @@ const char argp_program_doc[] =
 
 static const struct argp_option opts[] = {
 	{ "timestamp", 't', NULL, 0, "Include timestamp on output" },
+	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path" },
 	{ "failed", 'x', NULL, 0, "Include errors on output." },
 	{ "pid", 'p', "PID", 0, "Process ID to trace" },
 	{ "ports", 'P', "PORTS", 0, "Comma-separated list of ports to trace." },
@@ -80,6 +88,10 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			argp_usage(state);
 		}
 		target_pid = pid;
+		break;
+	case 'c':
+		env.cgroupspath = arg;
+		env.cg = true;
 		break;
 	case 'P':
 		if (!arg) {
@@ -182,6 +194,8 @@ int main(int argc, char **argv)
 	int err, port_map_fd;
 	char *port;
 	short port_num;
+	int idx, cg_map_fd;
+	int cgfd = -1;
 
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
 	if (err)
@@ -202,6 +216,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	obj->rodata->filter_cg = env.cg;
 	obj->rodata->target_pid = target_pid;
 	obj->rodata->ignore_errors = ignore_errors;
 	obj->rodata->filter_by_port = target_ports != NULL;
@@ -210,6 +225,21 @@ int main(int argc, char **argv)
 	if (err) {
 		warn("failed to load BPF object: %d\n", err);
 		goto cleanup;
+	}
+
+	/* update cgroup path fd to map */
+	if (env.cg) {
+		idx = 0;
+		cg_map_fd = bpf_map__fd(obj->maps.cgroup_map);
+		cgfd = open(env.cgroupspath, O_RDONLY);
+		if (cgfd < 0) {
+			fprintf(stderr, "Failed opening Cgroup path: %s", env.cgroupspath);
+			goto cleanup;
+		}
+		if (bpf_map_update_elem(cg_map_fd, &idx, &cgfd, BPF_ANY)) {
+			fprintf(stderr, "Failed adding target cgroup to map");
+			goto cleanup;
+		}
 	}
 
 	if (target_ports) {
@@ -261,6 +291,8 @@ cleanup:
 	perf_buffer__free(pb);
 	bindsnoop_bpf__destroy(obj);
 	cleanup_core_btf(&open_opts);
+	if (cgfd > 0)
+		close(cgfd);
 
 	return err != 0;
 }

@@ -40,7 +40,8 @@ static const char argp_program_doc[] =
 "    syscount -L              # measure and sort output by latency\n"
 "    syscount -P              # group statistics by pid, not by syscall\n"
 "    syscount -x -i 5         # count only failed syscalls\n"
-"    syscount -e ENOENT -i 5  # count only syscalls failed with a given errno"
+"    syscount -e ENOENT -i 5  # count only syscalls failed with a given errno\n"
+"    syscount -c CG           # Trace process under cgroupsPath CG\n";
 ;
 
 static const struct argp_option opts[] = {
@@ -50,6 +51,7 @@ static const struct argp_option opts[] = {
 				" (seconds), 0 for infinite wait (default)" },
 	{ "duration", 'd', "DURATION", 0, "Total tracing duration (seconds)" },
 	{ "top", 'T', "TOP", 0, "Print only the top syscalls (default 10)" },
+	{ "cgroup", 'c', "/sys/fs/cgroup/unified/<CG>", 0, "Trace process in cgroup path"},
 	{ "failures", 'x', NULL, 0, "Trace only failed syscalls" },
 	{ "latency", 'L', NULL, 0, "Collect syscall latency" },
 	{ "milliseconds", 'm', NULL, 0, "Display latency in milliseconds"
@@ -74,6 +76,8 @@ static struct env {
 	int duration;
 	int top;
 	pid_t pid;
+	char *cgroupspath;
+	bool cg;
 } env = {
 	.top = 10,
 };
@@ -336,6 +340,10 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			argp_usage(state);
 		}
 		break;
+	case 'c':
+		env.cgroupspath = arg;
+		env.cg = true;
+		break;
 	case 'e':
 		err = get_int(arg, &number, 1, INT_MAX);
 		if (err) {
@@ -381,6 +389,8 @@ int main(int argc, char **argv)
 	int seconds = 0;
 	__u32 count;
 	int err;
+	int idx, cg_map_fd;
+	int cgfd = -1;
 
 	init_syscall_names();
 
@@ -419,11 +429,28 @@ int main(int argc, char **argv)
 		obj->rodata->count_by_process = true;
 	if (env.filter_errno)
 		obj->rodata->filter_errno = env.filter_errno;
+	if (env.cg)
+		obj->rodata->filter_cg = env.cg;
 
 	err = syscount_bpf__load(obj);
 	if (err) {
 		warn("failed to load BPF object: %s\n", strerror(-err));
 		goto cleanup_obj;
+	}
+
+	/* update cgroup path fd to map */
+	if (env.cg) {
+		idx = 0;
+		cg_map_fd = bpf_map__fd(obj->maps.cgroup_map);
+		cgfd = open(env.cgroupspath, O_RDONLY);
+		if (cgfd < 0) {
+			fprintf(stderr, "Failed opening Cgroup path: %s", env.cgroupspath);
+			goto cleanup_obj;
+		}
+		if (bpf_map_update_elem(cg_map_fd, &idx, &cgfd, BPF_ANY)) {
+			fprintf(stderr, "Failed adding target cgroup to map");
+			goto cleanup_obj;
+		}
 	}
 
 	obj->links.sys_exit = bpf_program__attach(obj->progs.sys_exit);
@@ -477,6 +504,8 @@ cleanup_obj:
 free_names:
 	free_syscall_names();
 	cleanup_core_btf(&open_opts);
+	if (cgfd > 0)
+		close(cgfd);
 
 	return err != 0;
 }

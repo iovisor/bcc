@@ -10,6 +10,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 #include "hardirqs.h"
@@ -24,6 +25,8 @@ struct env {
 	int times;
 	bool timestamp;
 	bool verbose;
+	char *cgroupspath;
+	bool cg;
 } env = {
 	.interval = 99999999,
 	.times = 99999999,
@@ -37,17 +40,19 @@ const char *argp_program_bug_address =
 const char argp_program_doc[] =
 "Summarize hard irq event time as histograms.\n"
 "\n"
-"USAGE: hardirqs [--help] [-T] [-N] [-d] [interval] [count]\n"
+"USAGE: hardirqs [--help] [-T] [-N] [-d] [interval] [count] [-c CG]\n"
 "\n"
 "EXAMPLES:\n"
 "    hardirqs            # sum hard irq event time\n"
 "    hardirqs -d         # show hard irq event time as histograms\n"
 "    hardirqs 1 10       # print 1 second summaries, 10 times\n"
+"    hardirqs -c CG      # Trace process under cgroupsPath CG\n"
 "    hardirqs -NT 1      # 1s summaries, nanoseconds, and timestamps\n";
 
 static const struct argp_option opts[] = {
 	{ "count", 'C', NULL, 0, "Show event counts instead of timing" },
 	{ "distributed", 'd', NULL, 0, "Show distributions as histograms" },
+	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path" },
 	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
 	{ "nanoseconds", 'N', NULL, 0, "Output in nanoseconds" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
@@ -71,6 +76,10 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'C':
 		env.count = true;
+		break;
+	case 'c':
+		env.cgroupspath = arg;
+		env.cg = true;
 		break;
 	case 'N':
 		env.nanoseconds = true;
@@ -175,6 +184,8 @@ int main(int argc, char **argv)
 	char ts[32];
 	time_t t;
 	int err;
+	int idx, cg_map_fd;
+	int cgfd = -1;
 
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
 	if (err)
@@ -194,6 +205,8 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	obj->rodata->filter_cg = env.cg;
+
 	/* initialize global data (filtering options) */
 	if (!env.count) {
 		obj->rodata->targ_dist = env.distributed;
@@ -204,6 +217,21 @@ int main(int argc, char **argv)
 	if (err) {
 		fprintf(stderr, "failed to load BPF object: %d\n", err);
 		goto cleanup;
+	}
+
+	/* update cgroup path fd to map */
+	if (env.cg) {
+		idx = 0;
+		cg_map_fd = bpf_map__fd(obj->maps.cgroup_map);
+		cgfd = open(env.cgroupspath, O_RDONLY);
+		if (cgfd < 0) {
+			fprintf(stderr, "Failed opening Cgroup path: %s", env.cgroupspath);
+			goto cleanup;
+		}
+		if (bpf_map_update_elem(cg_map_fd, &idx, &cgfd, BPF_ANY)) {
+			fprintf(stderr, "Failed adding target cgroup to map");
+			goto cleanup;
+		}
 	}
 
 	if (env.count) {
@@ -260,6 +288,8 @@ int main(int argc, char **argv)
 
 cleanup:
 	hardirqs_bpf__destroy(obj);
+	if (cgfd > 0)
+		close(cgfd);
 
 	return err != 0;
 }
