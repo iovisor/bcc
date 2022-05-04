@@ -511,7 +511,7 @@ mkdir llvm-build
 
 cd llvm-build
 cmake3 -G "Unix Makefiles" -DLLVM_TARGETS_TO_BUILD="BPF;X86" \
-  -DCMAKE_BUILD_TYPE=Release ../llvm-10.0.10.src
+  -DCMAKE_BUILD_TYPE=Release ../llvm-10.0.0.src
 make
 sudo make install
 
@@ -528,8 +528,8 @@ or install from centos-release-scl
 ```
 yum install -y centos-release-scl
 yum-config-manager --enable rhel-server-rhscl-7-rpms
-yum install -y devtoolset-7 llvm-toolset-7 llvm-toolset-7-llvm-devel llvm-toolset-7-llvm-static llvm-toolset-7-clang-devel
-source scl_source enable devtoolset-7 llvm-toolset-7
+yum install -y devtoolset-7 llvm-toolset-10 llvm-toolset-10-llvm-devel llvm-toolset-10-llvm-static llvm-toolset-10-clang-devel
+source scl_source enable devtoolset-7 llvm-toolset-10
 ```
 
 For permanently enable scl environment, please check https://access.redhat.com/solutions/527703.
