@@ -501,23 +501,23 @@ sudo yum install -y luajit luajit-devel  # for Lua support
 You could compile LLVM from source code
 
 ```
-curl -LO http://releases.llvm.org/7.0.1/llvm-7.0.1.src.tar.xz
-curl -LO http://releases.llvm.org/7.0.1/cfe-7.0.1.src.tar.xz
-tar -xf cfe-7.0.1.src.tar.xz
-tar -xf llvm-7.0.1.src.tar.xz
+curl -LO http://releases.llvm.org/10.0.0/llvm-10.0.0.src.tar.xz
+curl -LO http://releases.llvm.org/10.0.0/cfe-10.0.0.src.tar.xz
+tar -xf cfe-10.0.0.src.tar.xz
+tar -xf llvm-10.0.0.src.tar.xz
 
 mkdir clang-build
 mkdir llvm-build
 
 cd llvm-build
 cmake3 -G "Unix Makefiles" -DLLVM_TARGETS_TO_BUILD="BPF;X86" \
-  -DCMAKE_BUILD_TYPE=Release ../llvm-7.0.1.src
+  -DCMAKE_BUILD_TYPE=Release ../llvm-10.0.10.src
 make
 sudo make install
 
 cd ../clang-build
 cmake3 -G "Unix Makefiles" -DLLVM_TARGETS_TO_BUILD="BPF;X86" \
-  -DCMAKE_BUILD_TYPE=Release ../cfe-7.0.1.src
+  -DCMAKE_BUILD_TYPE=Release ../cfe-10.0.0.src
 make
 sudo make install
 cd ..
