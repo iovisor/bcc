@@ -341,8 +341,9 @@ sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
 sudo apt install -y bison build-essential cmake flex git libedit-dev \
   libllvm7 llvm-7-dev libclang-7-dev python zlib1g-dev libelf-dev libfl-dev python3-distutils
   
-# For Hirsute (21.04)  or Impish (21.10)
-sudo apt install -y bison build-essential cmake flex git libedit-dev   libllvm11 llvm-11-dev libclang-11-dev python zlib1g-dev libelf-dev libfl-dev python3-distutils
+# For Hirsute (21.04) or Impish (21.10)
+sudo apt install -y bison build-essential cmake flex git libedit-dev \
+  libllvm11 llvm-11-dev libclang-11-dev python zlib1g-dev libelf-dev libfl-dev python3-distutils
 
 # For other versions
 sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
@@ -387,7 +388,7 @@ mkdir bcc-build
 cd bcc-build/
 
 ## here llvm should always link shared library
-cmake ../bcc -DCMAKE_INSTALL_PREFIX=/usr -DENABLE_LLVM_SHARED=1  
+cmake ../bcc -DCMAKE_INSTALL_PREFIX=/usr -DENABLE_LLVM_SHARED=1
 make -j10
 make install 
 
@@ -501,8 +502,8 @@ sudo yum install -y luajit luajit-devel  # for Lua support
 You could compile LLVM from source code
 
 ```
-curl  -LO  http://releases.llvm.org/7.0.1/llvm-7.0.1.src.tar.xz
-curl  -LO  http://releases.llvm.org/7.0.1/cfe-7.0.1.src.tar.xz
+curl -LO http://releases.llvm.org/7.0.1/llvm-7.0.1.src.tar.xz
+curl -LO http://releases.llvm.org/7.0.1/cfe-7.0.1.src.tar.xz
 tar -xf cfe-7.0.1.src.tar.xz
 tar -xf llvm-7.0.1.src.tar.xz
 
