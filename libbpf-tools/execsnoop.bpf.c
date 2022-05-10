@@ -2,6 +2,7 @@
 #include <vmlinux.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_core_read.h>
+#include <bpf/bpf_tracing.h>
 #include "execsnoop.h"
 
 const volatile bool filter_cg = false;
@@ -35,22 +36,33 @@ static __always_inline bool valid_uid(uid_t uid) {
 	return uid != INVALID_UID;
 }
 
+#ifdef __TARGET_ARCH_arm64
+SEC("kprobe/do_execveat_common.isra.0")
+int BPF_KPROBE(execveat_entry)
+#else /* !__TARGET_ARCH_arm64 */
 SEC("tracepoint/syscalls/sys_enter_execve")
 int tracepoint__syscalls__sys_enter_execve(struct trace_event_raw_sys_enter* ctx)
+#endif /* !__TARGET_ARCH_arm64 */
 {
 	u64 id;
 	pid_t pid, tgid;
+#ifndef __TARGET_ARCH_arm64
 	unsigned int ret;
+#endif /* !__TARGET_ARCH_arm64 */
 	struct event *event;
 	struct task_struct *task;
+#ifndef __TARGET_ARCH_arm64
 	const char **args = (const char **)(ctx->args[1]);
 	const char *argp;
+#endif /* !__TARGET_ARCH_arm64 */
 
 	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
 		return 0;
 
 	uid_t uid = (u32)bpf_get_current_uid_gid();
+#ifndef __TARGET_ARCH_arm64
 	int i;
+#endif /* !__TARGET_ARCH_arm64 */
 
 	if (valid_uid(targ_uid) && targ_uid != uid)
 		return 0;
@@ -72,6 +84,7 @@ int tracepoint__syscalls__sys_enter_execve(struct trace_event_raw_sys_enter* ctx
 	event->args_count = 0;
 	event->args_size = 0;
 
+#ifndef __TARGET_ARCH_arm64
 	ret = bpf_probe_read_user_str(event->args, ARGSIZE, (const char*)ctx->args[0]);
 	if (ret <= ARGSIZE) {
 		event->args_size += ret;
@@ -105,11 +118,17 @@ int tracepoint__syscalls__sys_enter_execve(struct trace_event_raw_sys_enter* ctx
 
 	/* pointer to max_args+1 isn't null, asume we have more arguments */
 	event->args_count++;
+#endif /* !__TARGET_ARCH_arm64 */
 	return 0;
 }
 
+#ifdef __TARGET_ARCH_arm64
+SEC("kretprobe/do_execveat_common.isra.0")
+int BPF_KRETPROBE(execveat_exit)
+#else /* !__TARGET_ARCH_arm64 */
 SEC("tracepoint/syscalls/sys_exit_execve")
 int tracepoint__syscalls__sys_exit_execve(struct trace_event_raw_sys_exit* ctx)
+#endif /* !__TARGET_ARCH_arm64 */
 {
 	u64 id;
 	pid_t pid;
@@ -128,7 +147,11 @@ int tracepoint__syscalls__sys_exit_execve(struct trace_event_raw_sys_exit* ctx)
 	event = bpf_map_lookup_elem(&execs, &pid);
 	if (!event)
 		return 0;
+#ifdef __TARGET_ARCH_arm64
+	ret = PT_REGS_RC(ctx);
+#else /* !__TARGET_ARCH_arm64 */
 	ret = ctx->ret;
+#endif /* !__TARGET_ARCH_arm64 */
 	if (ignore_failed && ret < 0)
 		goto cleanup;
 
