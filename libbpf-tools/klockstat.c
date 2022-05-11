@@ -327,6 +327,32 @@ static char *symname(struct ksyms *ksyms, uint64_t pc, char *buf, size_t n)
 	return buf;
 }
 
+static char *print_time(char *buf, int size, uint64_t nsec)
+{
+	struct {
+		float base;
+		char *unit;
+	} table[] = {
+		{ 1e9 * 3600, "h " },
+		{ 1e9 * 60, "m " },
+		{ 1e9, "s " },
+		{ 1e6, "ms" },
+		{ 1e3, "us" },
+		{ 0, NULL },
+	};
+
+	for (int i = 0; table[i].base; i++) {
+		if (nsec < table[i].base)
+			continue;
+
+		snprintf(buf, size, "%.1f %s", nsec / table[i].base, table[i].unit);
+		return buf;
+	}
+
+	snprintf(buf, size, "%u ns", (unsigned)nsec);
+	return buf;
+}
+
 static void print_acq_header(void)
 {
 	printf("\n                               Caller  Avg Wait    Count   Max Wait   Total Wait\n");
@@ -336,14 +362,17 @@ static void print_acq_stat(struct ksyms *ksyms, struct stack_stat *ss,
 			   int nr_stack_entries)
 {
 	char buf[40];
+	char avg[40];
+	char max[40];
+	char tot[40];
 	int i;
 
-	printf("%37s %9llu %8llu %10llu %12llu\n",
+	printf("%37s %9s %8llu %10s %12s\n",
 	       symname(ksyms, ss->bt[0], buf, sizeof(buf)),
-	       ss->ls.acq_total_time / ss->ls.acq_count,
+	       print_time(avg, sizeof(avg), ss->ls.acq_total_time / ss->ls.acq_count),
 	       ss->ls.acq_count,
-	       ss->ls.acq_max_time,
-	       ss->ls.acq_total_time);
+	       print_time(max, sizeof(max), ss->ls.acq_max_time),
+	       print_time(tot, sizeof(tot), ss->ls.acq_total_time));
 	for (i = 1; i < nr_stack_entries; i++) {
 		if (!ss->bt[i])
 			break;
@@ -364,14 +393,17 @@ static void print_hld_stat(struct ksyms *ksyms, struct stack_stat *ss,
 			   int nr_stack_entries)
 {
 	char buf[40];
+	char avg[40];
+	char max[40];
+	char tot[40];
 	int i;
 
-	printf("%37s %9llu %8llu %10llu %12llu\n",
+	printf("%37s %9s %8llu %10s %12s\n",
 	       symname(ksyms, ss->bt[0], buf, sizeof(buf)),
-	       ss->ls.hld_total_time / ss->ls.hld_count,
+	       print_time(avg, sizeof(avg), ss->ls.hld_total_time / ss->ls.hld_count),
 	       ss->ls.hld_count,
-	       ss->ls.hld_max_time,
-	       ss->ls.hld_total_time);
+	       print_time(max, sizeof(max), ss->ls.hld_max_time),
+	       print_time(tot, sizeof(tot), ss->ls.hld_total_time));
 	for (i = 1; i < nr_stack_entries; i++) {
 		if (!ss->bt[i])
 			break;
