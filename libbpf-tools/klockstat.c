@@ -55,6 +55,7 @@ static struct prog_env {
 	bool reset;
 	bool timestamp;
 	bool verbose;
+	bool per_thread;
 } env = {
 	.nr_locks = 99999999,
 	.nr_stack_entries = 1,
@@ -71,7 +72,7 @@ static const char args_doc[] = "FUNCTION";
 static const char program_doc[] =
 "Trace mutex/sem lock acquisition and hold times, in nsec\n"
 "\n"
-"Usage: klockstat [-hRTv] [-p PID] [-t TID] [-c FUNC] [-L LOCK] [-n NR_LOCKS]\n"
+"Usage: klockstat [-hPRTv] [-p PID] [-t TID] [-c FUNC] [-L LOCK] [-n NR_LOCKS]\n"
 "                 [-s NR_STACKS] [-S SORT] [-d DURATION] [-i INTERVAL]\n"
 "\v"
 "Examples:\n"
@@ -86,8 +87,9 @@ static const char program_doc[] =
 "  klockstat -S acq_count        # sort lock acquired results by acquire count\n"
 "  klockstat -S hld_total        # sort lock held results by total held time\n"
 "  klockstat -S acq_count,hld_total  # combination of above\n"
-"  klockstat -n 3                # display top 3 locks\n"
+"  klockstat -n 3                # display top 3 locks/threads\n"
 "  klockstat -s 6                # display 6 stack entries per lock\n"
+"  klockstat -P                  # print stats per thread\n"
 ;
 
 static const struct argp_option opts[] = {
@@ -97,7 +99,7 @@ static const struct argp_option opts[] = {
 	{ "caller", 'c', "FUNC", 0, "Filter by caller string prefix" },
 	{ "lock", 'L', "LOCK", 0, "Filter by specific ksym lock name" },
 	{ 0, 0, 0, 0, "" },
-	{ "locks", 'n', "NR_LOCKS", 0, "Number of locks to print" },
+	{ "locks", 'n', "NR_LOCKS", 0, "Number of locks or threads to print" },
 	{ "stacks", 's', "NR_STACKS", 0, "Number of stack entries to print per lock" },
 	{ "sort", 'S', "SORT", 0, "Sort by field:\n  acq_[max|total|count]\n  hld_[max|total|count]" },
 	{ 0, 0, 0, 0, "" },
@@ -106,6 +108,7 @@ static const struct argp_option opts[] = {
 	{ "reset", 'R', NULL, 0, "Reset stats each interval" },
 	{ "timestamp", 'T', NULL, 0, "Print timestamp" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
+	{ "per-thread", 'P', NULL, 0, "Print per-thread stats" },
 
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
@@ -229,6 +232,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	case 'T':
 		env->timestamp = true;
 		break;
+	case 'P':
+		env->per_thread = true;
+		break;
 	case 'h':
 		argp_state_help(state, stderr, ARGP_HELP_STD_HELP);
 		break;
@@ -241,6 +247,10 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 				env->interval = env->duration;
 			env->iterations = env->duration / env->interval;
 		}
+                if (env->per_thread && env->nr_stack_entries != 1) {
+			warn("--per-thread and --stacks cannot be used together\n");
+			argp_usage(state);
+                }
 		break;
 	default:
 		return ARGP_ERR_UNKNOWN;
@@ -327,6 +337,12 @@ static char *symname(struct ksyms *ksyms, uint64_t pc, char *buf, size_t n)
 	return buf;
 }
 
+static char *print_caller(char *buf, int size, struct stack_stat *ss)
+{
+	snprintf(buf, size, "%u  %16s", ss->stack_id, ss->ls.acq_max_comm);
+	return buf;
+}
+
 static char *print_time(char *buf, int size, uint64_t nsec)
 {
 	struct {
@@ -355,7 +371,12 @@ static char *print_time(char *buf, int size, uint64_t nsec)
 
 static void print_acq_header(void)
 {
-	printf("\n                               Caller  Avg Wait    Count   Max Wait   Total Wait\n");
+	if (env.per_thread)
+		printf("\n                Tid              Comm");
+	else
+		printf("\n                               Caller");
+
+	printf("  Avg Wait    Count   Max Wait   Total Wait\n");
 }
 
 static void print_acq_stat(struct ksyms *ksyms, struct stack_stat *ss,
@@ -374,19 +395,39 @@ static void print_acq_stat(struct ksyms *ksyms, struct stack_stat *ss,
 	       print_time(max, sizeof(max), ss->ls.acq_max_time),
 	       print_time(tot, sizeof(tot), ss->ls.acq_total_time));
 	for (i = 1; i < nr_stack_entries; i++) {
-		if (!ss->bt[i])
+		if (!ss->bt[i] || env.per_thread)
 			break;
 		printf("%37s\n", symname(ksyms, ss->bt[i], buf, sizeof(buf)));
 	}
-	if (nr_stack_entries > 1)
+	if (nr_stack_entries > 1 && !env.per_thread)
 		printf("                              Max PID %llu, COMM %s\n",
 		       ss->ls.acq_max_id >> 32,
 		       ss->ls.acq_max_comm);
 }
 
+static void print_acq_task(struct stack_stat *ss)
+{
+	char buf[40];
+	char avg[40];
+	char max[40];
+	char tot[40];
+
+	printf("%37s %9s %8llu %10s %12s\n",
+	       print_caller(buf, sizeof(buf), ss),
+	       print_time(avg, sizeof(avg), ss->ls.acq_total_time / ss->ls.acq_count),
+	       ss->ls.acq_count,
+	       print_time(max, sizeof(max), ss->ls.acq_max_time),
+	       print_time(tot, sizeof(tot), ss->ls.acq_total_time));
+}
+
 static void print_hld_header(void)
 {
-	printf("\n                               Caller  Avg Hold    Count   Max Hold   Total Hold\n");
+	if (env.per_thread)
+		printf("\n                Tid              Comm");
+	else
+		printf("\n                               Caller");
+
+	printf("  Avg Hold    Count   Max Hold   Total Hold\n");
 }
 
 static void print_hld_stat(struct ksyms *ksyms, struct stack_stat *ss,
@@ -405,14 +446,29 @@ static void print_hld_stat(struct ksyms *ksyms, struct stack_stat *ss,
 	       print_time(max, sizeof(max), ss->ls.hld_max_time),
 	       print_time(tot, sizeof(tot), ss->ls.hld_total_time));
 	for (i = 1; i < nr_stack_entries; i++) {
-		if (!ss->bt[i])
+		if (!ss->bt[i] || env.per_thread)
 			break;
 		printf("%37s\n", symname(ksyms, ss->bt[i], buf, sizeof(buf)));
 	}
-	if (nr_stack_entries > 1)
+	if (nr_stack_entries > 1 && !env.per_thread)
 		printf("                              Max PID %llu, COMM %s\n",
 		       ss->ls.hld_max_id >> 32,
 		       ss->ls.hld_max_comm);
+}
+
+static void print_hld_task(struct stack_stat *ss)
+{
+	char buf[40];
+	char avg[40];
+	char max[40];
+	char tot[40];
+
+	printf("%37s %9s %8llu %10s %12s\n",
+	       print_caller(buf, sizeof(buf), ss),
+	       print_time(avg, sizeof(avg), ss->ls.hld_total_time / ss->ls.hld_count),
+	       ss->ls.hld_count,
+	       print_time(max, sizeof(max), ss->ls.hld_max_time),
+	       print_time(tot, sizeof(tot), ss->ls.hld_total_time));
 }
 
 static int print_stats(struct ksyms *ksyms, int stack_map, int stat_map)
@@ -423,6 +479,7 @@ static int print_stats(struct ksyms *ksyms, int stack_map, int stat_map)
 	uint32_t lookup_key = 0;
 	uint32_t stack_id;
 	int ret, i;
+	int nr_stack_entries;
 
 	stats = calloc(stats_sz, sizeof(void *));
 	if (!stats) {
@@ -458,31 +515,39 @@ static int print_stats(struct ksyms *ksyms, int stack_map, int stat_map)
 			free(ss);
 			continue;
 		}
-		if (bpf_map_lookup_elem(stack_map, &stack_id, &ss->bt)) {
+		if (!env.per_thread && bpf_map_lookup_elem(stack_map, &stack_id, &ss->bt)) {
 			/* Can still report the results without a backtrace. */
 			warn("failed to lookup stack_id %u\n", stack_id);
 		}
-		if (!caller_is_traced(ksyms, ss->bt[0])) {
+		if (!env.per_thread && !caller_is_traced(ksyms, ss->bt[0])) {
 			free(ss);
 			continue;
 		}
 		stats[stat_idx++] = ss;
 	}
 
+	nr_stack_entries = MIN(env.nr_stack_entries, PERF_MAX_STACK_DEPTH);
+
 	qsort(stats, stat_idx, sizeof(void*), sort_by_acq);
 	for (i = 0; i < MIN(env.nr_locks, stat_idx); i++) {
 		if (i == 0 || env.nr_stack_entries > 1)
 			print_acq_header();
-		print_acq_stat(ksyms, stats[i],
-			       MIN(env.nr_stack_entries, PERF_MAX_STACK_DEPTH));
+
+		if (env.per_thread)
+			print_acq_task(stats[i]);
+		else
+			print_acq_stat(ksyms, stats[i], nr_stack_entries);
 	}
 
 	qsort(stats, stat_idx, sizeof(void*), sort_by_hld);
 	for (i = 0; i < MIN(env.nr_locks, stat_idx); i++) {
 		if (i == 0 || env.nr_stack_entries > 1)
 			print_hld_header();
-		print_hld_stat(ksyms, stats[i],
-			       MIN(env.nr_stack_entries, PERF_MAX_STACK_DEPTH));
+
+		if (env.per_thread)
+			print_hld_task(stats[i]);
+		else
+			print_hld_stat(ksyms, stats[i], nr_stack_entries);
 	}
 
 	for (i = 0; i < stat_idx; i++)
@@ -565,6 +630,7 @@ int main(int argc, char **argv)
 	obj->rodata->targ_tgid = env.pid;
 	obj->rodata->targ_pid = env.tid;
 	obj->rodata->targ_lock = lock_addr;
+	obj->rodata->per_thread = env.per_thread;
 
 	if (fentry_can_attach("mutex_lock_nested", NULL)) {
 		bpf_program__set_attach_target(obj->progs.mutex_lock, 0,

@@ -14,6 +14,7 @@
 const volatile pid_t targ_tgid = 0;
 const volatile pid_t targ_pid = 0;
 void *const volatile targ_lock = NULL;
+const volatile int per_thread = 0;
 
 struct {
 	__uint(type, BPF_MAP_TYPE_STACK_TRACE);
@@ -147,6 +148,10 @@ static void account(struct lockholder_info *li)
 {
 	struct lock_stat *ls;
 	u64 delta;
+	u32 key = li->stack_id;
+
+	if (per_thread)
+		key = li->task_id;
 
 	/*
 	 * Multiple threads may have the same stack_id.  Even though we are
@@ -155,15 +160,19 @@ static void account(struct lockholder_info *li)
 	 * by multiple readers at the same time.  They will be accounted as
 	 * the same lock, which is what we want, but we need to use atomics to
 	 * avoid corruption, especially for the total_time variables.
+	 * But it should be ok for per-thread since it's not racy anymore.
 	 */
-	ls = bpf_map_lookup_elem(&stat_map, &li->stack_id);
+	ls = bpf_map_lookup_elem(&stat_map, &key);
 	if (!ls) {
 		struct lock_stat fresh = {0};
 
-		bpf_map_update_elem(&stat_map, &li->stack_id, &fresh, BPF_ANY);
-		ls = bpf_map_lookup_elem(&stat_map, &li->stack_id);
+		bpf_map_update_elem(&stat_map, &key, &fresh, BPF_ANY);
+		ls = bpf_map_lookup_elem(&stat_map, &key);
 		if (!ls)
 			return;
+
+		if (per_thread)
+			bpf_get_current_comm(ls->acq_max_comm, TASK_COMM_LEN);
 	}
 
 	delta = li->acq_at - li->try_at;
@@ -176,7 +185,8 @@ static void account(struct lockholder_info *li)
 		 * Potentially racy, if multiple threads think they are the max,
 		 * so you may get a clobbered write.
 		 */
-		bpf_get_current_comm(ls->acq_max_comm, TASK_COMM_LEN);
+		if (!per_thread)
+			bpf_get_current_comm(ls->acq_max_comm, TASK_COMM_LEN);
 	}
 
 	delta = li->rel_at - li->acq_at;
@@ -185,7 +195,8 @@ static void account(struct lockholder_info *li)
 	if (delta > READ_ONCE(ls->hld_max_time)) {
 		WRITE_ONCE(ls->hld_max_time, delta);
 		WRITE_ONCE(ls->hld_max_id, li->task_id);
-		bpf_get_current_comm(ls->hld_max_comm, TASK_COMM_LEN);
+		if (!per_thread)
+			bpf_get_current_comm(ls->hld_max_comm, TASK_COMM_LEN);
 	}
 }
 
