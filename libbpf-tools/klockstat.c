@@ -598,6 +598,7 @@ int main(int argc, char **argv)
 			warn("print_stats error, aborting.\n");
 			break;
 		}
+		fflush(stdout);
 	}
 
 	printf("Exiting trace of mutex/sem locks\n");
