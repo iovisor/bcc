@@ -36,6 +36,8 @@
 
 namespace ebpf {
 
+constexpr static size_t MAX_BATCH_SIZE = 128;
+
 template<class ValueType>
 class BPFQueueStackTableBase {
  public:
@@ -56,7 +58,7 @@ class BPFQueueStackTableBase {
   int get_fd() { return desc.fd; }
 
  protected:
-  explicit BPFQueueStackTableBase(const TableDesc& desc) : desc(desc) {}
+  explicit BPFQueueStackTableBase(const TableDesc& desc);
 
   bool pop(void *value) {
     return bpf_lookup_and_delete(desc.fd, nullptr, value) >= 0;
@@ -73,6 +75,19 @@ class BPFQueueStackTableBase {
 
   const TableDesc& desc;
 };
+
+template <>
+inline BPFQueueStackTableBase<void>::BPFQueueStackTableBase(
+    const TableDesc& desc) : desc(desc) {}
+
+template <class ValueType>
+inline BPFQueueStackTableBase<ValueType>::BPFQueueStackTableBase(
+    const TableDesc& desc) : desc(desc) {
+  if (desc.leaf_size != sizeof(ValueType)) {
+    throw std::invalid_argument("Table '" + desc.name +
+                                "' is ValueType is illegal");
+  }
+}
 
 template <class KeyType, class ValueType>
 class BPFTableBase {
@@ -108,10 +123,31 @@ class BPFTableBase {
   }
 
  protected:
-  explicit BPFTableBase(const TableDesc& desc) : desc(desc) {}
+  explicit BPFTableBase(const TableDesc& desc);
 
   bool lookup(void* key, void* value) {
     return bpf_lookup_elem(desc.fd, key, value) >= 0;
+  }
+
+  size_t lookup_batch(void* keys, void* values, void** cursor, const size_t count) {
+    __u32* out = nullptr;
+    __u32 n, n_read = 0;
+    int err = 0;
+
+    while (n_read < count && !err) {
+      n = count - n_read;
+      err = bpf_lookup_batch(desc.fd, reinterpret_cast<__u32*>(*cursor), out,
+                             reinterpret_cast<char*>(keys) + n_read * desc.key_size,
+                             reinterpret_cast<char*>(values) + n_read * desc.leaf_size,
+                             &n);
+      if (err && errno != ENOENT) {
+        return -1;
+      }
+      n_read += n;
+      *cursor = out;
+    }
+
+    return n_read;
   }
 
   bool first(void* key) {
@@ -130,6 +166,21 @@ class BPFTableBase {
 
   const TableDesc& desc;
 };
+
+template <>
+inline BPFTableBase<void, void>::BPFTableBase(const TableDesc& desc) : desc(desc) {}
+
+template <class KeyType, class ValueType>
+inline BPFTableBase<KeyType, ValueType>::BPFTableBase(const TableDesc& desc) : desc(desc) {
+  if (desc.leaf_size != sizeof(ValueType)) {
+    throw std::invalid_argument("Table '" + desc.name +
+                                "' is ValueType is illegal");
+  }
+  if (desc.key_size != sizeof(KeyType)) {
+    throw std::invalid_argument("Table '" + desc.name +
+                                "' is KeyType is illegal");
+  }
+}
 
 class BPFTable : public BPFTableBase<void, void> {
  public:
@@ -302,20 +353,22 @@ class BPFHashTable : public BPFTableBase<KeyType, ValueType> {
 
   std::vector<std::pair<KeyType, ValueType>> get_table_offline() {
     std::vector<std::pair<KeyType, ValueType>> res;
-    KeyType cur;
-    ValueType value;
+    size_t batch_size = std::min(MAX_BATCH_SIZE, this->capacity());
+    std::unique_ptr<KeyType[]> keys = std::make_unique<KeyType[]>(batch_size);
+    std::unique_ptr<ValueType[]> values = std::make_unique<ValueType[]>(batch_size);
 
-    StatusTuple r(0);
-
-    if (!this->first(&cur))
-      return res;
-
+    void* cursor = nullptr;
     while (true) {
-      r = get_value(cur, value);
-      if (!r.ok())
-        break;
-      res.emplace_back(cur, value);
-      if (!this->next(&cur, &cur))
+      size_t r = this->lookup_batch(keys.get(), values.get(), &cursor, batch_size);
+      if (r < 0) {
+        throw std::system_error(errno, std::generic_category(), "lookup_batch");
+      }
+
+      for (size_t i = 0; i < r; ++i) {
+        res.emplace_back(keys[i], values[i]);
+      }
+
+      if (r < batch_size)
         break;
     }
 
