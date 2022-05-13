@@ -79,6 +79,15 @@ COMMON_OBJ = \
 	$(if $(ENABLE_MIN_CORE_BTFS),$(OUTPUT)/min_core_btf_tar.o) \
 	#
 
+define allow-override
+  $(if $(or $(findstring environment,$(origin $(1))),\
+            $(findstring command line,$(origin $(1)))),,\
+    $(eval $(1) = $(2)))
+endef
+
+$(call allow-override,CC,$(CROSS_COMPILE)cc)
+$(call allow-override,LD,$(CROSS_COMPILE)ld)
+
 .PHONY: all
 all: $(APPS) $(APP_ALIASES)
 
@@ -89,6 +98,13 @@ else
 Q = @
 msg = @printf '  %-8s %s%s\n' "$(1)" "$(notdir $(2))" "$(if $(3), $(3))";
 MAKEFLAGS += --no-print-directory
+endif
+
+ifneq ($(EXTRA_CFLAGS),)
+CFLAGS += $(EXTRA_CFLAGS)
+endif
+ifneq ($(EXTRA_LDFLAGS),)
+LDFLAGS += $(EXTRA_LDFLAGS)
 endif
 
 .PHONY: clean
@@ -103,7 +119,7 @@ $(OUTPUT) $(OUTPUT)/libbpf:
 .PHONY: bpftool
 bpftool:
 	$(Q)mkdir -p $(OUTPUT)/bpftool
-	$(Q)$(MAKE) OUTPUT=$(OUTPUT)/bpftool/ -C $(BPFTOOL_SRC)
+	$(Q)$(MAKE) ARCH= CROSS_COMPILE=  OUTPUT=$(OUTPUT)/bpftool/ -C $(BPFTOOL_SRC)
 
 $(APPS): %: $(OUTPUT)/%.o $(LIBBPF_OBJ) $(COMMON_OBJ) | $(OUTPUT)
 	$(call msg,BINARY,$@)
