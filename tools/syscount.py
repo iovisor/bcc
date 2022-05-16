@@ -2,12 +2,14 @@
 #
 # syscount   Summarize syscall counts and latencies.
 #
-# USAGE: syscount [-p PID] [-i INTERVAL] [-T TOP] [-x] [-L] [-m] [-P] [-l]
+# USAGE: syscount [-h] [-p PID] [-t TID] [-i INTERVAL] [-d DURATION] [-T TOP]
+#                 [-x] [-e ERRNO] [-L] [-m] [-P] [-l]
 #
 # Copyright 2017, Sasha Goldshtein.
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 15-Feb-2017   Sasha Goldshtein    Created this.
+# 16-May-2022   Rocky Xing          Added TID filter support.
 
 from time import sleep, strftime
 import argparse
@@ -42,7 +44,10 @@ def handle_errno(errstr):
 
 parser = argparse.ArgumentParser(
     description="Summarize syscall counts and latencies.")
-parser.add_argument("-p", "--pid", type=int, help="trace only this pid")
+parser.add_argument("-p", "--pid", type=int,
+    help="trace only this pid")
+parser.add_argument("-t", "--tid", type=int,
+    help="trace only this tid")
 parser.add_argument("-i", "--interval", type=int,
     help="print summary at this interval (seconds)")
 parser.add_argument("-d", "--duration", type=int,
@@ -90,9 +95,16 @@ BPF_HASH(data, u32, u64);
 #ifdef LATENCY
 TRACEPOINT_PROBE(raw_syscalls, sys_enter) {
     u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 pid = pid_tgid >> 32;
+    u32 tid = (u32)pid_tgid;
 
 #ifdef FILTER_PID
-    if (pid_tgid >> 32 != FILTER_PID)
+    if (pid != FILTER_PID)
+        return 0;
+#endif
+
+#ifdef FILTER_TID
+    if (tid != FILTER_TID)
         return 0;
 #endif
 
@@ -104,9 +116,16 @@ TRACEPOINT_PROBE(raw_syscalls, sys_enter) {
 
 TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
     u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 pid = pid_tgid >> 32;
+    u32 tid = (u32)pid_tgid;
 
 #ifdef FILTER_PID
-    if (pid_tgid >> 32 != FILTER_PID)
+    if (pid != FILTER_PID)
+        return 0;
+#endif
+
+#ifdef FILTER_TID
+    if (tid != FILTER_TID)
         return 0;
 #endif
 
@@ -150,6 +169,8 @@ TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
 
 if args.pid:
     text = ("#define FILTER_PID %d\n" % args.pid) + text
+elif args.tid:
+    text = ("#define FILTER_TID %d\n" % args.tid) + text
 if args.failures:
     text = "#define FILTER_FAILED\n" + text
 if args.errno:

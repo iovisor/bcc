@@ -141,18 +141,19 @@ rmdir                         1
 
 USAGE:
 # syscount -h
-usage: syscount.py [-h] [-p PID] [-i INTERVAL] [-T TOP] [-x] [-e ERRNO] [-L]
-                   [-m] [-P] [-l]
+usage: syscount.py [-h] [-p PID] [-t TID] [-i INTERVAL] [-d DURATION] [-T TOP]
+                   [-x] [-e ERRNO] [-L] [-m] [-P] [-l]
 
 Summarize syscall counts and latencies.
 
 optional arguments:
   -h, --help            show this help message and exit
   -p PID, --pid PID     trace only this pid
+  -t TID, --tid TID     trace only this tid
   -i INTERVAL, --interval INTERVAL
                         print summary at this interval (seconds)
   -d DURATION, --duration DURATION
-			total duration of trace, in seconds
+                        total duration of trace, in seconds
   -T TOP, --top TOP     print only the top syscalls by count or latency
   -x, --failures        trace only failed syscalls (return < 0)
   -e ERRNO, --errno ERRNO
