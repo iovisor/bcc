@@ -200,7 +200,7 @@ if b.get_kprobe_functions(b"tcp_drop"):
     b.attach_kprobe(event="tcp_drop", fn_name="trace_tcp_drop")
 else:
     print("ERROR: tcp_drop() kernel function not found or traceable. "
-        "Older kernel versions not supported.")
+        "The kernel might be too old or the the function has been inlined.")
     exit()
 stack_traces = b.get_table("stack_traces")
 
