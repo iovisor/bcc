@@ -144,8 +144,7 @@ static int tcp_sendstat(int size)
         bpf_probe_read_kernel(&dport, sizeof(dport),
             &sk->__sk_common.skc_dport);
         ipv4_key.dport = ntohs(dport);
-        if (size >= 0)
-            ipv4_send_bytes.increment(ipv4_key, size);
+        ipv4_send_bytes.increment(ipv4_key, size);
 
     } else if (family == AF_INET6) {
         struct ipv6_key_t ipv6_key = {.pid = pid};
@@ -159,8 +158,7 @@ static int tcp_sendstat(int size)
         bpf_probe_read_kernel(&dport, sizeof(dport),
             &sk->__sk_common.skc_dport);
         ipv6_key.dport = ntohs(dport);
-        if (size >= 0)
-            ipv6_send_bytes.increment(ipv6_key, size);
+        ipv6_send_bytes.increment(ipv6_key, size);
     }
     sock_store.delete(&tid);
     // else drop
@@ -171,13 +169,19 @@ static int tcp_sendstat(int size)
 int kretprobe__tcp_sendmsg(struct pt_regs *ctx)
 {
     int size = PT_REGS_RC(ctx);
-    return tcp_sendstat(size);
+    if (size > 0)
+        return tcp_sendstat(size);
+    else
+        return 0;
 }
 
 int kretprobe__tcp_sendpage(struct pt_regs *ctx)
 {
     int size = PT_REGS_RC(ctx);
-    return tcp_sendstat(size);
+    if (size > 0)
+        return tcp_sendstat(size);
+    else
+        return 0;
 }
 
 static int tcp_send_entry(struct sock *sk)
