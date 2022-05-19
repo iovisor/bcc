@@ -495,7 +495,7 @@ class BPF(object):
 
         return fns
 
-    def load_func(self, func_name, prog_type, device = None, attach_type = 38):
+    def load_func(self, func_name, prog_type, device = None, attach_type = -1):
         func_name = _assert_is_bytes(func_name)
         if func_name in self.funcs:
             return self.funcs[func_name]
