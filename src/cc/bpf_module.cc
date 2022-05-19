@@ -985,7 +985,7 @@ int BPFModule::bcc_func_load(int prog_type, const char *name,
   int ret;
 
   attr.prog_type = (enum bpf_prog_type)prog_type;
-  if (expected_attach_type != MAX_BPF_ATTACH_TYPE) {
+  if (expected_attach_type != -1) {
     attr.expected_attach_type = (enum bpf_attach_type)expected_attach_type;
   }
   attr.name = name;

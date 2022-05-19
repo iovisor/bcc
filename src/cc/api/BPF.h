@@ -263,7 +263,7 @@ class BPF {
   int poll_perf_buffer(const std::string& name, int timeout_ms = -1);
 
   StatusTuple load_func(const std::string& func_name, enum bpf_prog_type type,
-                        int& fd, unsigned flags = 0, enum bpf_attach_type = (bpf_attach_type) MAX_BPF_ATTACH_TYPE);
+                        int& fd, unsigned flags = 0, enum bpf_attach_type = (bpf_attach_type) -1);
   StatusTuple unload_func(const std::string& func_name);
 
   StatusTuple attach_func(int prog_fd, int attachable_fd,
