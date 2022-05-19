@@ -1393,12 +1393,27 @@ bool bpf_has_kernel_btf(void)
   return true;
 }
 
+static int find_member_by_name(struct btf *btf, const struct btf_type *btf_type, const char *field_name) {
+  const struct btf_member *btf_member = btf_members(btf_type);
+  int i;
+
+  for (i = 0; i < btf_vlen(btf_type); i++, btf_member++) {
+    const char *name = btf__name_by_offset(btf, btf_member->name_off);
+    if (!strcmp(name, field_name)) {
+      return 1;
+    } else if (name[0] == '\0') {
+      if (find_member_by_name(btf, btf__type_by_id(btf, btf_member->type), field_name))
+        return 1;
+    }
+  }
+  return 0;
+}
+
 int kernel_struct_has_field(const char *struct_name, const char *field_name)
 {
   const struct btf_type *btf_type;
-  const struct btf_member *btf_member;
   struct btf *btf;
-  int i, ret, btf_id;
+  int ret, btf_id;
 
   btf = btf__load_vmlinux_btf();
   ret = libbpf_get_error(btf);
@@ -1412,14 +1427,7 @@ int kernel_struct_has_field(const char *struct_name, const char *field_name)
   }
 
   btf_type = btf__type_by_id(btf, btf_id);
-  btf_member = btf_members(btf_type);
-  for (i = 0; i < btf_vlen(btf_type); i++, btf_member++) {
-    if (!strcmp(btf__name_by_offset(btf, btf_member->name_off), field_name)) {
-      ret = 1;
-      goto cleanup;
-    }
-  }
-  ret = 0;
+  ret = find_member_by_name(btf, btf_type, field_name);
 
 cleanup:
   btf__free(btf);
