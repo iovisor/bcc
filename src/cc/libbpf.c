@@ -298,6 +298,8 @@ static struct bpf_helper helpers[] = {
   {"copy_from_user_task", "5.18"},
   {"skb_set_tstamp", "5.18"},
   {"ima_file_hash", "5.18"},
+  {"kptr_xchg", "5.19"},
+  {"map_lookup_percpu_elem", "5.19"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
