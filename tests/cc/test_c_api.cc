@@ -156,7 +156,7 @@ static int mntns_func(void *arg) {
     return -1;
   }
 
-  strncpy(libpath, lm->l_name, 1024);
+  strncpy(libpath, lm->l_name, sizeof(libpath) - 1);
   dlclose(dlhdl);
   dlhdl = NULL;
 
