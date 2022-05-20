@@ -63,19 +63,21 @@ BPF_PERCPU_ARRAY(rwdf_100ms, u64, 400);
 BPF_PERCPU_ARRAY(rwdf_1ms, u64, 400);
 BPF_PERCPU_ARRAY(rwdf_10us, u64, 400);
 
-void kprobe_blk_account_io_done(struct pt_regs *ctx, struct request *rq, u64 now)
+RAW_TRACEPOINT_PROBE(block_rq_complete)
 {
+        // TP_PROTO(struct request *rq, blk_status_t error, unsigned int nr_bytes)
+        struct request *rq = (void *)ctx->args[0];
         unsigned int cmd_flags;
         u64 dur;
         size_t base, slot;
 
         if (!rq->__START_TIME_FIELD__)
-                return;
+                return 0;
 
         if (!rq->__RQ_DISK__ ||
             rq->__RQ_DISK__->major != __MAJOR__ ||
             rq->__RQ_DISK__->first_minor != __MINOR__)
-                return;
+                return 0;
 
         cmd_flags = rq->cmd_flags;
         switch (cmd_flags & REQ_OP_MASK) {
@@ -92,23 +94,24 @@ void kprobe_blk_account_io_done(struct pt_regs *ctx, struct request *rq, u64 now
                 base = 300;
                 break;
         default:
-                return;
+                return 0;
         }
 
-        dur = now - rq->__START_TIME_FIELD__;
+        dur = bpf_ktime_get_ns() - rq->__START_TIME_FIELD__;
 
         slot = min_t(size_t, div_u64(dur, 100 * NSEC_PER_MSEC), 99);
         rwdf_100ms.increment(base + slot);
         if (slot)
-                return;
+                return 0;
 
         slot = min_t(size_t, div_u64(dur, NSEC_PER_MSEC), 99);
         rwdf_1ms.increment(base + slot);
         if (slot)
-                return;
+                return 0;
 
         slot = min_t(size_t, div_u64(dur, 10 * NSEC_PER_USEC), 99);
         rwdf_10us.increment(base + slot);
+        return 0;
 }
 """
 
@@ -148,10 +151,6 @@ else:
     bpf_source = bpf_source.replace('__RQ_DISK__', 'q->disk')
 
 bpf = BPF(text=bpf_source)
-if BPF.get_kprobe_functions(b'__blk_account_io_done'):
-    bpf.attach_kprobe(event="__blk_account_io_done", fn_name="kprobe_blk_account_io_done")
-else:
-    bpf.attach_kprobe(event="blk_account_io_done", fn_name="kprobe_blk_account_io_done")
 
 # times are in usecs
 MSEC = 1000
