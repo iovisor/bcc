@@ -127,8 +127,7 @@ class ArgumentParser_aarch64 : public ArgumentParser {
  private:
   bool parse_register(ssize_t pos, ssize_t &new_pos, std::string &reg_name);
   bool parse_size(ssize_t pos, ssize_t &new_pos, optional<int> *arg_size);
-  bool parse_mem(ssize_t pos, ssize_t &new_pos, std::string &reg_name,
-                 optional<int> *offset);
+  bool parse_mem(ssize_t pos, ssize_t &new_pos, Argument *dest);
 
  public:
   bool parse(Argument *dest);
