@@ -54,7 +54,7 @@ static LoadInst *createLoad(IRBuilder<> &B, Value *addr, bool isVolatile = false
     return B.CreateLoad(dyn_cast<AllocaInst>(addr)->getAllocatedType(), addr, isVolatile);
   else
     return B.CreateLoad(addr->getType(), addr, isVolatile);
-#elif LLVM_MAJOR_VERSION >= 14
+#elif LLVM_MAJOR_VERSION >= 13
   return B.CreateLoad(addr->getType()->getPointerElementType(), addr, isVolatile);
 #else
   return B.CreateLoad(addr, isVolatile);
@@ -68,7 +68,7 @@ static Value *createInBoundsGEP(IRBuilder<> &B, Value *ptr, ArrayRef<Value *>idx
     return B.CreateInBoundsGEP(dyn_cast<GlobalValue>(ptr)->getValueType(), ptr, idxlist);
   else
     return B.CreateInBoundsGEP(ptr->getType(), ptr, idxlist);
-#elif LLVM_MAJOR_VERSION >= 14
+#elif LLVM_MAJOR_VERSION >= 13
   return B.CreateInBoundsGEP(ptr->getType()->getScalarType()->getPointerElementType(),
                              ptr, idxlist);
 #else
