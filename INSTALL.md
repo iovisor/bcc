@@ -337,10 +337,10 @@ sudo apt-get update
 sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
   libllvm6.0 llvm-6.0-dev libclang-6.0-dev python zlib1g-dev libelf-dev libfl-dev python3-distutils
 
-# For Eoan (19.10) or Focal (20.04.1 LTS)
+# For Focal (20.04.1 LTS)
 sudo apt install -y bison build-essential cmake flex git libedit-dev \
-  libllvm7 llvm-7-dev libclang-7-dev python zlib1g-dev libelf-dev libfl-dev python3-distutils
-  
+  libllvm12 llvm-12-dev libclang-12-dev python zlib1g-dev libelf-dev libfl-dev python3-distutils
+
 # For Hirsute (21.04) or Impish (21.10)
 sudo apt install -y bison build-essential cmake flex git libedit-dev   libllvm11 llvm-11-dev libclang-11-dev python zlib1g-dev libelf-dev libfl-dev python3-distutils
 
