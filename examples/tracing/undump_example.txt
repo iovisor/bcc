@@ -29,7 +29,7 @@ Tracing PID=49264 UNIX socket packets ... Hit Ctrl-C to end
 
 # Here print bytes of receive
 PID 49264 Recv 13 bytes
-   48 65 6c 6c 6f 2c 20 57 6f 72 6c 64 0a 
+   48 65 6c 6c 6f 2c 20 57 6f 72 6c 64 0a
 PID 49264 Recv 8 bytes
    61 62 63 64 65 66 67 0a
 ```

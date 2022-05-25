@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # @lint-avoid-python-3-compatibility-imports
-# 
+#
 # undump        Dump UNIX socket packets.
 #               For Linux, uses BCC, eBPF. Embedded C.
 # USAGE: undump [-h] [-t] [-p PID]
@@ -35,7 +35,7 @@ parser = argparse.ArgumentParser(
     description="Dump UNIX socket packets",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
-    
+
 parser.add_argument("-p", "--pid",
         help="trace this PID only")
 args = parser.parse_args()
@@ -75,22 +75,22 @@ int trace_unix_stream_read_actor(struct pt_regs *ctx)
 
     FILTER_PID
 
-	struct sk_buff *skb = (struct sk_buff *)PT_REGS_PARM1(ctx);
+    struct sk_buff *skb = (struct sk_buff *)PT_REGS_PARM1(ctx);
 
     struct recv_data_t *data = unix_data.lookup(&zero);
-    if (!data) 
+    if (!data)
         return 0;
 
     unsigned int data_len = skb->len;
     if(data_len > MAX_PKT)
         return 0;
-        
+
     void *iodata = (void *)skb->data;
     data->recv_len = data_len;
-    
+
     bpf_probe_read(data->pkt, data_len, iodata);
     unix_recv_events.perf_submit(ctx, data, data_len+sizeof(u32));
-    
+
     return 0;
 }
 """
