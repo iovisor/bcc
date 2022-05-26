@@ -82,7 +82,6 @@ def _embedded_c(args):
     c = """
     EBPF_COMMENT
     #include <linux/sched.h>
-    BPF_STATIC_ASSERT_DEF
 
     struct data_t {
         u64 start_time;
@@ -93,7 +92,7 @@ def _embedded_c(args):
         int exit_code;
         u32 sig_info;
         char task[TASK_COMM_LEN];
-    } __attribute__((packed));
+    };
 
     BPF_PERF_OUTPUT(events);
 
@@ -102,27 +101,20 @@ def _embedded_c(args):
         struct task_struct *task = (typeof(task))bpf_get_current_task();
         if (FILTER_PID || FILTER_EXIT_CODE) { return 0; }
 
-        struct data_t data = {
-            .start_time = PROCESS_START_TIME_NS,
-            .exit_time = bpf_ktime_get_ns(),
-            .pid = task->tgid,
-            .tid = task->pid,
-            .ppid = task->parent->tgid,
-            .exit_code = task->exit_code >> 8,
-            .sig_info = task->exit_code & 0xFF,
-        };
+        struct data_t data = {};
+
+        data.start_time = PROCESS_START_TIME_NS,
+        data.exit_time = bpf_ktime_get_ns(),
+        data.pid = task->tgid,
+        data.tid = task->pid,
+        data.ppid = task->parent->tgid,
+        data.exit_code = task->exit_code >> 8,
+        data.sig_info = task->exit_code & 0xFF,
         bpf_get_current_comm(&data.task, sizeof(data.task));
 
         events.perf_submit(args, &data, sizeof(data));
         return 0;
     }
-    """
-    # TODO: this macro belongs in bcc/src/cc/export/helpers.h
-    bpf_static_assert_def = r"""
-    #ifndef BPF_STATIC_ASSERT
-    #define BPF_STATIC_ASSERT(condition) __attribute__((unused)) \
-    extern int bpf_static_assert[(condition) ? 1 : -1]
-    #endif
     """
 
     if Global.args.pid:
@@ -135,7 +127,6 @@ def _embedded_c(args):
 
     code_substitutions = [
         ('EBPF_COMMENT', '' if not Global.args.ebpf else _ebpf_comment()),
-        ("BPF_STATIC_ASSERT_DEF", bpf_static_assert_def),
         ('FILTER_PID', filter_pid),
         ('FILTER_EXIT_CODE', '0' if not Global.args.failed else 'task->exit_code == 0'),
         ('PROCESS_START_TIME_NS', 'task->start_time' if not Global.args.timespec else
