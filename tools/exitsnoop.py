@@ -11,6 +11,7 @@ import signal
 import sys
 
 from bcc import BPF
+from collections import defaultdict
 from datetime import datetime
 from time import strftime
 
@@ -18,7 +19,7 @@ from time import strftime
 # exitsnoop Trace all process termination (exit, fatal signal)
 #           For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: exitsnoop [-h] [-x] [-t] [--utc] [--label[=LABEL]] [-p PID]
+# USAGE: exitsnoop [-h] [-x] [-t] [--utc] [--label[=LABEL]] [-p PID] [--max-args MAX_ARGS]
 #
 _examples = """examples:
     exitsnoop                # trace all process termination
@@ -28,6 +29,7 @@ _examples = """examples:
     exitsnoop -p 181         # only trace PID 181
     exitsnoop --label=exit   # label each output line with 'exit'
     exitsnoop --per-thread   # trace per thread termination
+    exitsnoop --max-args 5   # include 5 arguments 
 """
 """
   Exit status (from <include/sysexits.h>):
@@ -50,6 +52,9 @@ _examples = """examples:
   07-Feb-2016   Brendan Gregg (Netflix)            Created execsnoop
   04-May-2019   Arturo Martin-de-Nicolas (Instana) Created exitsnoop
   13-May-2019   Jeroen Soeters (Instana) Refactor to import as module
+  10-Feb-2022   Nenad Noveljic                     --max-args option (embedded 
+                                                   Brendan Gregg's code from 
+                                                   execsnoop)
 """
 
 def _getParser():
@@ -68,6 +73,8 @@ def _getParser():
     a("--ebpf",            action="store_true", help=argparse.SUPPRESS)
     # RHEL 7.6 keeps task->start_time as struct timespec, convert to u64 nanoseconds
     a("--timespec",        action="store_true", help=argparse.SUPPRESS)
+    a("--max-args",        default=0,           help="number of arguments parsed and displayed, defaults to 0")
+
     return parser.parse_args
 
 
@@ -77,12 +84,14 @@ class Global():
     argv = None
     SIGNUM_TO_SIGNAME = dict((v, re.sub("^SIG", "", k))
         for k,v in signal.__dict__.items() if re.match("^SIG[A-Z]+$", k))
+    print_args = False
 
 
 class Data(ct.Structure):
     """Event data matching struct data_t in _embedded_c()."""
     _TASK_COMM_LEN = 16      # linux/sched.h
     _pack_ = 1
+    _ARGSIZE = 128
     _fields_ = [
         ("start_time", ct.c_ulonglong), # task->start_time, see --timespec arg
         ("exit_time", ct.c_ulonglong),  # bpf_ktime_get_ns()
@@ -91,8 +100,16 @@ class Data(ct.Structure):
         ("ppid", ct.c_uint),# task->parent->tgid, notified of exit
         ("exit_code", ct.c_int),
         ("sig_info", ct.c_uint),
-        ("task", ct.c_char * _TASK_COMM_LEN)
+        ("task", ct.c_char * _TASK_COMM_LEN),
+        ("type", ct.c_uint),
+        ("argv", ct.c_char * _ARGSIZE)
     ]
+
+class EventType(object):
+    EVENT_ARG = 0
+    EVENT_EXIT = 1
+
+argv = defaultdict(list)
 
 def _embedded_c(args):
     """Generate C program for sched_process_exit tracepoint in kernel/exit.c."""
@@ -100,6 +117,13 @@ def _embedded_c(args):
     EBPF_COMMENT
     #include <linux/sched.h>
     BPF_STATIC_ASSERT_DEF
+
+    #define ARGSIZE  128
+
+    enum event_type {
+        EVENT_ARG,
+        EVENT_EXIT,
+    };
 
     struct data_t {
         u64 start_time;
@@ -110,6 +134,8 @@ def _embedded_c(args):
         int exit_code;
         u32 sig_info;
         char task[TASK_COMM_LEN];
+        enum event_type type;
+        char argv[ARGSIZE];
     } __attribute__((packed));
 
     BPF_STATIC_ASSERT(sizeof(struct data_t) == CTYPES_SIZEOF_DATA);
@@ -128,10 +154,55 @@ def _embedded_c(args):
             .ppid = task->parent->tgid,
             .exit_code = task->exit_code >> 8,
             .sig_info = task->exit_code & 0xFF,
+            .type = EVENT_EXIT,
         };
         bpf_get_current_comm(&data.task, sizeof(data.task));
 
         events.perf_submit(args, &data, sizeof(data));
+        return 0;
+    }
+
+    static int __submit_arg(struct pt_regs *ctx, void *ptr, struct data_t *data)
+    {
+        bpf_probe_read_user(data->argv, sizeof(data->argv), ptr);
+        events.perf_submit(ctx, data, sizeof(struct data_t));
+        return 1;
+    }
+
+    static int submit_arg(struct pt_regs *ctx, void *ptr, struct data_t *data)
+    {
+        const char *argp = NULL;
+        bpf_probe_read_user(&argp, sizeof(argp), ptr);
+        if (argp) {
+            return __submit_arg(ctx, (void *)(argp), data);
+        }
+        return 0;
+    }
+
+    int syscall__execve(struct pt_regs *ctx,
+        const char __user *filename,
+        const char __user *const __user *__argv,
+        const char __user *const __user *__envp)
+    {
+
+        u32 uid = bpf_get_current_uid_gid() & 0xffffffff;
+        struct data_t data = {};
+        data.pid = bpf_get_current_pid_tgid() >> 32;
+        data.type = EVENT_ARG;
+
+        __submit_arg(ctx, (void *)filename, &data);
+
+        // skip first arg, as we submitted filename
+        #pragma unroll
+        for (int i = 1; i < MAXARG; i++) {
+            if (submit_arg(ctx, (void *)&__argv[i], &data) == 0)
+                goto out;
+        }
+
+        // handle truncated argument list
+        char ellipsis[] = "...";
+        __submit_arg(ctx, (void *)ellipsis, &data);
+out:
         return 0;
     }
     """
@@ -159,6 +230,7 @@ def _embedded_c(args):
         ('FILTER_EXIT_CODE', '0' if not Global.args.failed else 'task->exit_code == 0'),
         ('PROCESS_START_TIME_NS', 'task->start_time' if not Global.args.timespec else
              '(task->start_time.tv_sec * 1000000000L) + task->start_time.tv_nsec'),
+        ("MAXARG", str(args.max_args)),
     ]
     for old,new in code_substitutions:
         c = c.replace(old, new)
@@ -180,29 +252,46 @@ def _print_header():
     if Global.args.label is not None:
         print("%-6s" % "LABEL", end="")
     print("%-16s %-6s %-6s %-6s %-7s %-10s" %
-              ("PCOMM", "PID", "PPID", "TID", "AGE(s)", "EXIT_CODE"))
+              ("PCOMM", "PID", "PPID", "TID", "AGE(s)", "EXIT_CODE"), end="")
+    if Global.print_args:
+        print(" %s" % "ARGS", end="")
+    print()
 
 def _print_event(cpu, data, size): # callback
     """Print the exit event."""
     e = ct.cast(data, ct.POINTER(Data)).contents
-    if Global.args.timestamp:
-        now = datetime.utcnow() if Global.args.utc else datetime.now()
-        print("%-13s" % (now.strftime("%H:%M:%S.%f")[:-3]), end="")
-    if Global.args.label is not None:
-        label = Global.args.label if len(Global.args.label) else 'exit'
-        print("%-6s" % label, end="")
-    age = (e.exit_time - e.start_time) / 1e9
-    print("%-16s %-6d %-6d %-6d %-7.2f " %
-              (e.task.decode(), e.pid, e.ppid, e.tid, age), end="")
-    if e.sig_info == 0:
-        print("0" if e.exit_code == 0 else "code %d" % e.exit_code)
+
+    if e.type == EventType.EVENT_ARG:
+        argv[e.pid].append(e.argv)
     else:
-        sig = e.sig_info & 0x7F
-        if sig:
-            print("signal %d (%s)" % (sig, signum_to_signame(sig)), end="")
-        if e.sig_info & 0x80:
-            print(", core dumped ", end="")
+        if Global.args.timestamp:
+            now = datetime.utcnow() if Global.args.utc else datetime.now()
+            print("%-13s" % (now.strftime("%H:%M:%S.%f")[:-3]), end="")
+        if Global.args.label is not None:
+            label = Global.args.label if len(Global.args.label) else 'exit'
+            print("%-6s" % label, end="")
+        age = (e.exit_time - e.start_time) / 1e9
+        print("%-16s %-6d %-6d %-6d %-7.2f " %
+            (e.task.decode(), e.pid, e.ppid, e.tid, age), end="")
+        if e.sig_info == 0:
+            print("0" if e.exit_code == 0 else "code %d" % e.exit_code, end="")
+            print(" ", end="")
+        else:
+            sig = e.sig_info & 0x7F
+            if sig:
+                print("signal %d (%s)" % (sig, signum_to_signame(sig)), end="")
+            if e.sig_info & 0x80:
+                print(", core dumped ", end="")
+        if Global.print_args:
+            argv_text = b' '.join(argv[e.pid]).replace(b'\n', b'\\n')
+            if argv_text:
+                print("%s" % (argv_text.decode()), end="")
         print()
+        try:
+            del(argv[e.pid])
+        except Exception:
+            pass
+
 
 # =============================
 # Module: These functions are available for import
@@ -231,12 +320,18 @@ def initialize(arg_list = sys.argv[1:]):
         return (os.EX_NOPERM, "Need sudo (CAP_SYS_ADMIN) for BPF() system call")
     if re.match('^3\.10\..*el7.*$', platform.release()): # Centos/Red Hat
         Global.args.timespec = True
+    if Global.args.max_args:
+        Global.print_args = True
     for _ in range(2):
         c = _embedded_c(Global.args)
         if Global.args.ebpf:
             return (1, c)
         try:
-            return (os.EX_OK, BPF(text=c))
+            b = BPF(text=c)
+            if Global.print_args:
+                execve_fnname = b.get_syscall_fnname("execve")
+                b.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
+            return (os.EX_OK, b)
         except Exception as e:
             error = format(e)
             if (not Global.args.timespec
