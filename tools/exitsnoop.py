@@ -3,7 +3,6 @@
 from __future__ import print_function
 
 import argparse
-import ctypes as ct
 import os
 import platform
 import re
@@ -78,22 +77,6 @@ class Global():
     SIGNUM_TO_SIGNAME = dict((v, re.sub("^SIG", "", k))
         for k,v in signal.__dict__.items() if re.match("^SIG[A-Z]+$", k))
 
-
-class Data(ct.Structure):
-    """Event data matching struct data_t in _embedded_c()."""
-    _TASK_COMM_LEN = 16      # linux/sched.h
-    _pack_ = 1
-    _fields_ = [
-        ("start_time", ct.c_ulonglong), # task->start_time, see --timespec arg
-        ("exit_time", ct.c_ulonglong),  # bpf_ktime_get_ns()
-        ("pid", ct.c_uint), # task->tgid, thread group id == sys_getpid()
-        ("tid", ct.c_uint), # task->pid, thread id == sys_gettid()
-        ("ppid", ct.c_uint),# task->parent->tgid, notified of exit
-        ("exit_code", ct.c_int),
-        ("sig_info", ct.c_uint),
-        ("task", ct.c_char * _TASK_COMM_LEN)
-    ]
-
 def _embedded_c(args):
     """Generate C program for sched_process_exit tracepoint in kernel/exit.c."""
     c = """
@@ -112,7 +95,6 @@ def _embedded_c(args):
         char task[TASK_COMM_LEN];
     } __attribute__((packed));
 
-    BPF_STATIC_ASSERT(sizeof(struct data_t) == CTYPES_SIZEOF_DATA);
     BPF_PERF_OUTPUT(events);
 
     TRACEPOINT_PROBE(sched, sched_process_exit)
@@ -154,7 +136,6 @@ def _embedded_c(args):
     code_substitutions = [
         ('EBPF_COMMENT', '' if not Global.args.ebpf else _ebpf_comment()),
         ("BPF_STATIC_ASSERT_DEF", bpf_static_assert_def),
-        ("CTYPES_SIZEOF_DATA", str(ct.sizeof(Data))),
         ('FILTER_PID', filter_pid),
         ('FILTER_EXIT_CODE', '0' if not Global.args.failed else 'task->exit_code == 0'),
         ('PROCESS_START_TIME_NS', 'task->start_time' if not Global.args.timespec else
@@ -182,9 +163,12 @@ def _print_header():
     print("%-16s %-6s %-6s %-6s %-7s %-10s" %
               ("PCOMM", "PID", "PPID", "TID", "AGE(s)", "EXIT_CODE"))
 
+buffer = None
+
 def _print_event(cpu, data, size): # callback
     """Print the exit event."""
-    e = ct.cast(data, ct.POINTER(Data)).contents
+    global buffer
+    e = buffer["events"].event(data)
     if Global.args.timestamp:
         now = datetime.utcnow() if Global.args.utc else datetime.now()
         print("%-13s" % (now.strftime("%H:%M:%S.%f")[:-3]), end="")
@@ -271,6 +255,7 @@ def signum_to_signame(signum):
 # Script: invoked as a script
 # =============================
 def main():
+    global buffer
     try:
         rc, buffer = initialize()
         if rc:
