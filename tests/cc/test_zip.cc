@@ -25,17 +25,24 @@
 
 namespace {
 
-bcc_zip_entry get_uncompressed_entry(bcc_zip_archive* archive,
-                                     const char* asset_name) {
+void require_entry_name_is(const bcc_zip_entry& entry, const char* name) {
+  REQUIRE(entry.name_length == strlen(name));
+  REQUIRE(memcmp(entry.name, name, strlen(name)) == 0);
+}
+
+bcc_zip_entry get_required_entry(bcc_zip_archive* archive,
+                                 const char* asset_name) {
   bcc_zip_entry out;
   REQUIRE(bcc_zip_archive_find_entry(archive, asset_name, &out) == 0);
-
-  REQUIRE(out.compression == 0);
-  REQUIRE(out.name_length == strlen(asset_name));
-  REQUIRE(memcmp(out.name, asset_name, strlen(asset_name)) == 0);
-  REQUIRE(out.data_offset > 0);
-
+  require_entry_name_is(out, asset_name);
   return out;
+}
+
+const void* get_uncompressed_data(const bcc_zip_entry& entry) {
+  REQUIRE(entry.compression == 0);
+  REQUIRE(entry.data_offset > 0);
+  REQUIRE(entry.data != nullptr);
+  return entry.data;
 }
 
 }  // namespace
@@ -44,14 +51,15 @@ TEST_CASE("finds entries in a zip archive by name", "[zip]") {
   bcc_zip_archive* archive = bcc_zip_archive_open(TEST_ARCHIVE_PATH);
   REQUIRE(archive != nullptr);
 
-  bcc_zip_entry entry = get_uncompressed_entry(archive, LIB_ENTRY_NAME);
-  REQUIRE(memcmp(entry.data,
+  bcc_zip_entry entry = get_required_entry(archive, LIB_ENTRY_NAME);
+  REQUIRE(memcmp(get_uncompressed_data(entry),
                  "\x7f"
                  "ELF",
                  4) == 0);
 
-  entry = get_uncompressed_entry(archive, ENTRY_IN_SUBDIR_NAME);
-  REQUIRE(memcmp(entry.data, "This is a text file\n", 20) == 0);
+  entry = get_required_entry(archive, ENTRY_IN_SUBDIR_NAME);
+  REQUIRE(memcmp(get_uncompressed_data(entry), "This is a text file\n", 20) ==
+          0);
 
   REQUIRE(bcc_zip_archive_find_entry(archive, "missing", &entry) == -1);
 
@@ -64,11 +72,8 @@ TEST_CASE("finds entries in a zip archive by offset", "[zip]") {
 
   bcc_zip_entry entry;
   REQUIRE(bcc_zip_archive_find_entry_at_offset(archive, 100, &entry) == 0);
-  REQUIRE(entry.compression == 0);
-  REQUIRE(entry.name_length == strlen(LIB_ENTRY_NAME));
-  REQUIRE(memcmp(entry.name, LIB_ENTRY_NAME, strlen(LIB_ENTRY_NAME)) == 0);
-  REQUIRE(entry.data_offset > 0);
-  REQUIRE(memcmp(entry.data,
+  require_entry_name_is(entry, LIB_ENTRY_NAME);
+  REQUIRE(memcmp(get_uncompressed_data(entry),
                  "\x7f"
                  "ELF",
                  4) == 0);
@@ -76,4 +81,29 @@ TEST_CASE("finds entries in a zip archive by offset", "[zip]") {
   REQUIRE(bcc_zip_archive_find_entry_at_offset(archive, 100000, &entry) == -1);
 
   bcc_zip_archive_close(archive);
+}
+
+TEST_CASE("open zip archive and finds an entry", "[zip]") {
+  bcc_zip_entry entry;
+  bcc_zip_archive* archive = bcc_zip_archive_open_and_find(
+      TEST_ARCHIVE_PATH "!/" LIB_ENTRY_NAME, &entry);
+  REQUIRE(archive != nullptr);
+  require_entry_name_is(entry, LIB_ENTRY_NAME);
+  REQUIRE(memcmp(get_uncompressed_data(entry),
+                 "\x7f"
+                 "ELF",
+                 4) == 0);
+  bcc_zip_archive_close(archive);
+
+  archive = bcc_zip_archive_open_and_find(
+      TEST_ARCHIVE_PATH "!/" ENTRY_IN_SUBDIR_NAME, &entry);
+  REQUIRE(archive != nullptr);
+  require_entry_name_is(entry, ENTRY_IN_SUBDIR_NAME);
+  REQUIRE(memcmp(get_uncompressed_data(entry), "This is a text file\n", 20) ==
+          0);
+  bcc_zip_archive_close(archive);
+
+  archive =
+      bcc_zip_archive_open_and_find(TEST_ARCHIVE_PATH "!/NOT_FOUND", &entry);
+  REQUIRE(archive == nullptr);
 }

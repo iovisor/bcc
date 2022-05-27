@@ -17,6 +17,7 @@
 #include "bcc_zip.h"
 
 #include <fcntl.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -385,4 +386,28 @@ int bcc_zip_archive_find_entry_at_offset(struct bcc_zip_archive* archive,
   }
 
   return -1;
+}
+
+struct bcc_zip_archive* bcc_zip_archive_open_and_find(
+    const char* path, struct bcc_zip_entry* out) {
+  struct bcc_zip_archive* archive = NULL;
+  const char* separator = strstr(path, "!/");
+  if (separator == NULL || separator - path >= PATH_MAX) {
+    return NULL;
+  }
+
+  char archive_path[PATH_MAX];
+  strncpy(archive_path, path, separator - path);
+  archive_path[separator - path] = 0;
+  archive = bcc_zip_archive_open(archive_path);
+  if (archive == NULL) {
+    return NULL;
+  }
+
+  if (bcc_zip_archive_find_entry(archive, separator + 2, out)) {
+    bcc_zip_archive_close(archive);
+    return NULL;
+  }
+
+  return archive;
 }

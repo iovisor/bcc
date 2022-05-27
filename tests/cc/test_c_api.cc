@@ -112,6 +112,18 @@ TEST_CASE("resolve symbol name in external library using loaded libraries", "[c_
   bcc_procutils_free(sym.module);
 }
 
+TEST_CASE("resolve symbol name in external zipped library", "[c_api]") {
+  struct bcc_symbol sym;
+  std::string lib_path =
+      CMAKE_CURRENT_BINARY_DIR "/archive.zip!/libdebuginfo_test_lib.so";
+
+  REQUIRE(bcc_resolve_symname(lib_path.c_str(), "symbol", 0x0, 0, nullptr,
+                              &sym) == 0);
+  REQUIRE(sym.module == lib_path);
+  REQUIRE(sym.offset != 0);
+  bcc_procutils_free(sym.module);
+}
+
 namespace {
 
 void system(const std::string &command) {

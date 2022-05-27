@@ -65,6 +65,13 @@ int bcc_zip_archive_find_entry_at_offset(struct bcc_zip_archive* archive,
                                          uint32_t offset,
                                          struct bcc_zip_entry* out);
 
+// Opens a zip archives and looks up entry within the archive.
+// Provided path is interpreted as archive path followed by "!/"
+// characters and name of the zip entry. This convention is used
+// by Android tools.
+struct bcc_zip_archive* bcc_zip_archive_open_and_find(
+    const char* path, struct bcc_zip_entry* out);
+
 #ifdef __cplusplus
 }
 #endif
