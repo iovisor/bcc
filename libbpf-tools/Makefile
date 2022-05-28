@@ -44,6 +44,7 @@ APPS = \
 	llcstat \
 	mdflush \
 	mountsnoop \
+	mysqld_qslower \
 	numamove \
 	offcputime \
 	oomkill \
