@@ -412,6 +412,9 @@ class SmokeTests(TestCase):
     def test_wakeuptime(self):
         self.run_with_duration("wakeuptime.py 1")
 
+    def test_workqlat(self):
+        self.run_with_duration("workqlat.py 1 1")
+
     def test_xfsdist(self):
         # Doesn't work on build bot because xfs functions not present in the
         # kernel image.

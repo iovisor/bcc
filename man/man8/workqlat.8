@@ -1,0 +1,85 @@
+.TH worklat 8  "2022-01-06" "USER COMMANDS"
+.SH NAME
+workqlat \- Work queue latency as a histogram.
+.SH SYNOPSIS
+.B workqlat [\-h] [\-W] [\-w func] [interval] [count]
+.SH DESCRIPTION
+This measures the time a work item spends waiting on a work queue after being
+enqueued, and shows this time as a histogram.
+This time should be small, but worker threads may not get scheduled quickly
+enough due to CPU load causing work items to wait longer than usual.
+
+This makes use of 2 tracing events, workqueue:workqueue_queue_work and
+workqueue:workqueue_execute_start to record time when a work item was
+enqueued and dequeued respectively. Since kernel can use same work object
+with different handlers and also since same handler can be used with more
+than one work objects, this tool uses a combination of work object and its
+hanlder to identify each unique work.
+This tool uses in-kernel eBPF maps for storing timestamps and the histogram,
+for efficiency. Despite this, the overhead of this tool may become significant
+for some workloads: see the OVERHEAD section.
+
+It may need updating to match any changes to above mentioned tracing events.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-W
+Show each work-handler item separately.
+.TP
+\-w func
+Show work-handler named "func" only.
+.TP
+interval
+Output interval, in seconds.
+.TP
+count
+Number of outputs.
+.SH EXAMPLES
+.TP
+Summarize work queue latency as a histogram:
+#
+.B workqlat
+.TP
+Print 5 second summaries, 3 times:
+#
+.B workqlat 5 3
+.TP
+Trace work handler "func" only, 1 second summaries:
+#
+.B workqlat -w func 1
+.SH FIELDS
+.TP
+usecs
+Microsecond range
+.TP
+count
+How many times a task event fell into this range
+.TP
+distribution
+An ASCII bar chart to visualize the distribution (count column)
+.SH OVERHEAD
+This traces 2 workqueue events which should not be too frequent to cause any
+noticeable overhead for most workloads. While eBPF has very low overhead, and
+this tool uses in-kernel maps for efficiency, the frequency of above mentioned
+workqueue events for some workloads may be high enough that the overhead of this
+tool becomes significant. Measure in a lab environment to quantify the overhead
+before use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Imran Khan
