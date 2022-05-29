@@ -410,7 +410,7 @@ int BPFModule::annotate() {
     table_names_[table.name] = id++;
     GlobalValue *gvar = mod_->getNamedValue(table.name);
     if (!gvar) continue;
-#if LLVM_MAJOR_VERSION >= 15
+#if LLVM_MAJOR_VERSION >= 14
     {
       Type *t = gvar->getValueType();
       StructType *st = dyn_cast<StructType>(t);
