@@ -669,7 +669,7 @@ static int libbpf_bpf_prog_load(const struct bpf_load_program_attr *load_attr,
   p.line_info = load_attr->line_info;
   p.prog_flags = load_attr->prog_flags;
 
-  return bpf_prog_load(load_attr->prog_type, load_attr->name, load_attr->license,
+  return bpf_prog_load_v0_6_0(load_attr->prog_type, load_attr->name, load_attr->license,
                        load_attr->insns, load_attr->insns_cnt, &p);
 }
 
