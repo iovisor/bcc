@@ -342,7 +342,12 @@ sudo apt install -y bison build-essential cmake flex git libedit-dev \
   libllvm12 llvm-12-dev libclang-12-dev python zlib1g-dev libelf-dev libfl-dev python3-distutils
 
 # For Hirsute (21.04) or Impish (21.10)
-sudo apt install -y bison build-essential cmake flex git libedit-dev   libllvm11 llvm-11-dev libclang-11-dev python zlib1g-dev libelf-dev libfl-dev python3-distutils
+sudo apt install -y bison build-essential cmake flex git libedit-dev \
+libllvm11 llvm-11-dev libclang-11-dev python3 zlib1g-dev libelf-dev libfl-dev python3-distutils
+
+# For Jammy (22.04)
+sudo apt install -y bison build-essential cmake flex git libedit-dev \
+libllvm14 llvm-14-dev libclang-14-dev python3 zlib1g-dev libelf-dev libfl-dev python3-distutils
 
 # For other versions
 sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
