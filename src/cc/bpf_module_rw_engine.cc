@@ -416,7 +416,7 @@ int BPFModule::annotate() {
       StructType *st = dyn_cast<StructType>(t);
 #else
     if (PointerType *pt = dyn_cast<PointerType>(gvar->getType())) {
-      StructType *st = dyn_cast<StructType>(pt->getElementType());
+      StructType *st = dyn_cast<StructType>(pt->getPointerElementType());
 #endif
       if (st) {
         if (st->getNumElements() < 2) continue;
