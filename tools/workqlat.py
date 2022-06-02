@@ -67,33 +67,29 @@ BPF_HASH(record, work_key_t);
 STORAGE
 
 TRACEPOINT_PROBE(workqueue, workqueue_queue_work) {
-    work_key_t key = {.work = 0, .handle = 0};
+    work_key_t key = {};
 
     FILTER
 
     u64 ts = bpf_ktime_get_ns();
-    if (args != NULL) {
-        key.work = (u64)args->work;
-        key.handle = (u64)args->function;
-    }
+    key.work = (u64)args->work;
+    key.handle = (u64)args->function;
     record.update(&key, &ts);
 
     return 0;
 }
 
 TRACEPOINT_PROBE(workqueue, workqueue_execute_start) {
-    work_key_t key = {.work = 0, .handle = 0};
+    work_key_t key = {};
     u64 *ts = NULL;
     u64 delta = 0;
     u64 handle = 0;
 
     FILTER
 
-    if (args != NULL) {
-        key.work = (u64)args->work;
-        key.handle = (u64)args->function;
-        ts = record.lookup(&key);
-    }
+    key.work = (u64)args->work;
+    key.handle = (u64)args->function;
+    ts = record.lookup(&key);
     if (ts != NULL) {
         delta = bpf_ktime_get_ns() - *ts;
         delta = delta / 1000; //nanosec to microsec
