@@ -4,18 +4,20 @@
 # biolatency    Summarize block device I/O latency as a histogram.
 #       For Linux, uses BCC, eBPF.
 #
-# USAGE: biolatency [-h] [-T] [-Q] [-m] [-D] [-F] [-e] [-j] [interval] [count]
+# USAGE: biolatency [-h] [-T] [-Q] [-m] [-D] [-F] [-e] [-j] [-d DISK] [interval] [count]
 #
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 20-Sep-2015   Brendan Gregg   Created this.
+# 31-Mar-2022   Rocky Xing      Added disk filter support.
 
 from __future__ import print_function
 from bcc import BPF
 from time import sleep, strftime
 import argparse
 import ctypes as ct
+import os
 
 # arguments
 examples = """examples:
@@ -27,6 +29,7 @@ examples = """examples:
     ./biolatency -F                 # show I/O flags separately
     ./biolatency -j                 # print a dictionary
     ./biolatency -e                 # show extension summary(total, average)
+    ./biolatency -d sdc             # Trace sdc only
 """
 parser = argparse.ArgumentParser(
     description="Summarize block device I/O latency as a histogram",
@@ -52,6 +55,8 @@ parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 parser.add_argument("-j", "--json", action="store_true",
     help="json output")
+parser.add_argument("-d", "--disk", type=str,
+    help="Trace this disk only")
 
 args = parser.parse_args()
 countdown = int(args.count)
@@ -87,6 +92,8 @@ STORAGE
 // time block I/O
 int trace_req_start(struct pt_regs *ctx, struct request *req)
 {
+    DISK_FILTER
+
     u64 ts = bpf_ktime_get_ns();
     start.update(&req, &ts);
     return 0;
@@ -148,6 +155,33 @@ elif args.flags:
 else:
     storage_str += "BPF_HISTOGRAM(dist);"
     store_str += "dist.atomic_increment(bpf_log2l(delta));"
+
+if args.disk is not None:
+    disk_path = os.path.join('/dev', args.disk)
+    if not os.path.exists(disk_path):
+        print("no such disk '%s'" % args.disk)
+        exit(1)
+
+    stat_info = os.stat(disk_path)
+    major = os.major(stat_info.st_rdev)
+    minor = os.minor(stat_info.st_rdev)
+
+    disk_field_str = ""
+    if BPF.kernel_struct_has_field(b'request', b'rq_disk') == 1:
+        disk_field_str = 'req->rq_disk'
+    else:
+        disk_field_str = 'req->q->disk'
+
+    disk_filter_str = """
+    struct gendisk *disk = %s;
+    if (!(disk->major == %d && disk->first_minor == %d)) {
+        return 0;
+    }
+    """ % (disk_field_str, major, minor)
+
+    bpf_text = bpf_text.replace('DISK_FILTER', disk_filter_str)
+else:
+    bpf_text = bpf_text.replace('DISK_FILTER', '')
 
 if args.extension:
     storage_str += "BPF_ARRAY(extension, ext_val_t, 1);"

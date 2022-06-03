@@ -352,24 +352,25 @@ The -j with -m prints a millisecond histogram dictionary. The `value_type` key i
 USAGE message:
 
 # ./biolatency -h
-usage: biolatency.py [-h] [-T] [-Q] [-m] [-D] [-F] [-j]
-                              [interval] [count]
+usage: biolatency.py [-h] [-T] [-Q] [-m] [-D] [-F] [-e] [-j] [-d DISK]
+                     [interval] [count]
 
 Summarize block device I/O latency as a histogram
 
 positional arguments:
-  interval            output interval, in seconds
-  count               number of outputs
+  interval              output interval, in seconds
+  count                 number of outputs
 
 optional arguments:
-  -h, --help          show this help message and exit
-  -T, --timestamp     include timestamp on output
-  -Q, --queued        include OS queued time in I/O time
-  -m, --milliseconds  millisecond histogram
-  -D, --disks         print a histogram per disk device
-  -F, --flags         print a histogram per set of I/O flags
-  -e, --extension     also show extension summary(total, average)
-  -j, --json          json output
+  -h, --help            show this help message and exit
+  -T, --timestamp       include timestamp on output
+  -Q, --queued          include OS queued time in I/O time
+  -m, --milliseconds    millisecond histogram
+  -D, --disks           print a histogram per disk device
+  -F, --flags           print a histogram per set of I/O flags
+  -e, --extension       summarize average/total value
+  -j, --json            json output
+  -d DISK, --disk DISK  Trace this disk only
 
 examples:
     ./biolatency                    # summarize block I/O latency as a histogram
@@ -380,3 +381,4 @@ examples:
     ./biolatency -F                 # show I/O flags separately
     ./biolatency -j                 # print a dictionary
     ./biolatency -e                 # show extension summary(total, average)
+    ./biolatency -d sdc             # Trace sdc only
