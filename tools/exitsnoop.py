@@ -107,7 +107,7 @@ def _embedded_c(args):
         data.exit_time = bpf_ktime_get_ns(),
         data.pid = task->tgid,
         data.tid = task->pid,
-        data.ppid = task->parent->tgid,
+        data.ppid = task->real_parent->tgid,
         data.exit_code = task->exit_code >> 8,
         data.sig_info = task->exit_code & 0xFF,
         bpf_get_current_comm(&data.task, sizeof(data.task));
@@ -151,7 +151,7 @@ def _print_header():
         print("%-13s" % title, end="")
     if Global.args.label is not None:
         print("%-6s" % "LABEL", end="")
-    print("%-16s %-6s %-6s %-6s %-7s %-10s" %
+    print("%-16s %-7s %-7s %-7s %-7s %-10s" %
               ("PCOMM", "PID", "PPID", "TID", "AGE(s)", "EXIT_CODE"))
 
 buffer = None
@@ -167,7 +167,7 @@ def _print_event(cpu, data, size): # callback
         label = Global.args.label if len(Global.args.label) else 'exit'
         print("%-6s" % label, end="")
     age = (e.exit_time - e.start_time) / 1e9
-    print("%-16s %-6d %-6d %-6d %-7.2f " %
+    print("%-16s %-7d %-7d %-7d %-7.2f " %
               (e.task.decode(), e.pid, e.ppid, e.tid, age), end="")
     if e.sig_info == 0:
         print("0" if e.exit_code == 0 else "code %d" % e.exit_code)
