@@ -47,6 +47,7 @@
 /tcpconnect
 /tcpconnlat
 /tcplife
+/tcptracer
 /tcprtt
 /tcpsynbl
 /vfsstat
