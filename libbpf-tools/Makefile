@@ -45,6 +45,7 @@ APPS = \
 	mountsnoop \
 	numamove \
 	offcputime \
+	offwaketime \
 	oomkill \
 	opensnoop \
 	readahead \
