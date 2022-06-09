@@ -57,6 +57,7 @@ APPS = \
 	syscount \
 	tcpconnect \
 	tcpconnlat \
+        tcpretrans \
 	tcprtt \
 	tcpsynbl \
 	vfsstat \
