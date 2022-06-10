@@ -35,7 +35,6 @@ struct {
 	__uint(max_entries, MAX_ENTRIES);
 	__type(key, struct request *);
 	__type(value, u64);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } start SEC(".maps");
 
 static struct hist initial_hist;
@@ -45,7 +44,6 @@ struct {
 	__uint(max_entries, MAX_ENTRIES);
 	__type(key, struct hist_key);
 	__type(value, struct hist);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } hists SEC(".maps");
 
 static __always_inline

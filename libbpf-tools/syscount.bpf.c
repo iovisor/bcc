@@ -28,7 +28,6 @@ struct {
 	__uint(max_entries, MAX_ENTRIES);
 	__type(key, u32);
 	__type(value, u64);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } start SEC(".maps");
 
 struct {
@@ -36,7 +35,6 @@ struct {
 	__uint(max_entries, MAX_ENTRIES);
 	__type(key, u32);
 	__type(value, struct data_t);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } data SEC(".maps");
 
 static __always_inline

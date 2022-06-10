@@ -28,7 +28,6 @@ struct {
 	__uint(max_entries, MAX_ENTRIES);
 	__type(key, struct request *);
 	__type(value, struct internal_rqinfo);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } rqinfos SEC(".maps");
 
 struct {
@@ -36,7 +35,6 @@ struct {
 	__uint(max_entries, MAX_ENTRIES);
 	__type(key, struct rqinfo);
 	__type(value, struct hist);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } hists SEC(".maps");
 
 static struct hist zero;

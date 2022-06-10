@@ -26,7 +26,6 @@ struct {
 	__uint(max_entries, MAX_ENTRIES);
 	__type(key, u32);
 	__type(value, struct sock *);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } sockets SEC(".maps");
 
 struct {
@@ -34,7 +33,6 @@ struct {
 	__uint(max_entries, MAX_ENTRIES);
 	__type(key, struct ipv4_flow_key);
 	__type(value, u64);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } ipv4_count SEC(".maps");
 
 struct {
@@ -42,7 +40,6 @@ struct {
 	__uint(max_entries, MAX_ENTRIES);
 	__type(key, struct ipv6_flow_key);
 	__type(value, u64);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } ipv6_count SEC(".maps");
 
 struct {
