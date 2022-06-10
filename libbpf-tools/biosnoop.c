@@ -167,7 +167,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		start_ts = e->ts;
 	blk_fill_rwbs(rwbs, e->cmd_flags);
 	partition = partitions__get_by_dev(partitions, e->dev);
-	printf("%-11.6f %-14.14s %-6d %-7s %-4s %-10lld %-7d ",
+	printf("%-11.6f %-14.14s %-7d %-7s %-4s %-10lld %-7d ",
 		(e->ts - start_ts) / 1000000000.0,
 		e->comm, e->pid, partition ? partition->name : "Unknown", rwbs,
 		e->sector, e->len);
@@ -229,6 +229,13 @@ int main(int argc, char **argv)
 	}
 	obj->rodata->targ_queued = env.queued;
 	obj->rodata->filter_cg = env.cg;
+
+	if (fentry_can_attach("blk_account_io_start", NULL))
+		bpf_program__set_attach_target(obj->progs.blk_account_io_start, 0,
+					       "blk_account_io_start");
+	else
+		bpf_program__set_attach_target(obj->progs.blk_account_io_start, 0,
+					       "__blk_account_io_start");
 
 	err = biosnoop_bpf__load(obj);
 	if (err) {
@@ -304,7 +311,7 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	printf("%-11s %-14s %-6s %-7s %-4s %-10s %-7s ",
+	printf("%-11s %-14s %-7s %-7s %-4s %-10s %-7s ",
 		"TIME(s)", "COMM", "PID", "DISK", "T", "SECTOR", "BYTES");
 	if (env.queued)
 		printf("%7s ", "QUE(ms)");
