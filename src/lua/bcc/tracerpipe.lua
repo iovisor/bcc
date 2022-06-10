@@ -15,7 +15,7 @@ limitations under the License.
 ]]
 local TracerPipe = class("TracerPipe")
 
-TracerPipe.static.TRACEFS = "/sys/kernel/debug/tracing"
+TracerPipe.static.TRACEFS = "/sys/kernel/tracing"
 TracerPipe.static.fields = "%s+(.-)%-(%d+)%s+%[(%d+)%]%s+(....)%s+([%d%.]+):.-:%s+(.+)"
 
 function TracerPipe:close()

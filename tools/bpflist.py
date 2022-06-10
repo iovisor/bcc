@@ -42,7 +42,7 @@ counts = {}
 def parse_probes(typ):
     if args.verbosity > 1:
         print("open %ss:" % typ)
-    for probe in open("/sys/kernel/debug/tracing/%s_events" % typ):
+    for probe in open("/sys/kernel/tracing/%s_events" % typ):
         # Probes opened by bcc have a specific pattern that includes the pid
         # of the requesting process.
         match = re.search('_bcc_(\\d+)\\s', probe)

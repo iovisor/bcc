@@ -18,7 +18,7 @@ from bcc.utils import printb
 # load BPF program
 b = BPF(text="""
 TRACEPOINT_PROBE(random, urandom_read) {
-    // args is from /sys/kernel/debug/tracing/events/random/urandom_read/format
+    // args is from /sys/kernel/tracing/events/random/urandom_read/format
     bpf_trace_printk("%d\\n", args->got_bits);
     return 0;
 }

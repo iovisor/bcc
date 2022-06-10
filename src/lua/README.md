@@ -119,7 +119,7 @@ See `examples/lua` directory.
 
 ### Helpers
 
-* `print(...)` is a wrapper for `bpf_trace_printk`, the output is captured in `cat /sys/kernel/debug/tracing/trace_pipe`
+* `print(...)` is a wrapper for `bpf_trace_printk`, the output is captured in `cat /sys/kernel/tracing/trace_pipe`
 * `bit.*` library **is** supported (`lshift, rshift, arshift, bnot, band, bor, bxor`)
 * `math.*` library *partially* supported (`log2, log, log10`)
 * `ffi.cast()` is implemented (including structures and arrays)

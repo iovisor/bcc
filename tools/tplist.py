@@ -15,7 +15,7 @@ import sys
 
 from bcc import USDT
 
-trace_root = "/sys/kernel/debug/tracing"
+trace_root = "/sys/kernel/tracing"
 event_root = os.path.join(trace_root, "events")
 
 parser = argparse.ArgumentParser(

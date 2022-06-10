@@ -34,7 +34,7 @@ There are six things to learn from this:
 
 1. ```void *ctx```: ctx has arguments, but since we aren't using them here, we'll just cast it to ```void *```.
 
-1. ```bpf_trace_printk()```: A simple kernel facility for printf() to the common trace_pipe (/sys/kernel/debug/tracing/trace_pipe). This is ok for some quick examples, but has limitations: 3 args max, 1 %s only, and trace_pipe is globally shared, so concurrent programs will have clashing output. A better interface is via BPF_PERF_OUTPUT(), covered later.
+1. ```bpf_trace_printk()```: A simple kernel facility for printf() to the common trace_pipe (/sys/kernel/tracing/trace_pipe). This is ok for some quick examples, but has limitations: 3 args max, 1 %s only, and trace_pipe is globally shared, so concurrent programs will have clashing output. A better interface is via BPF_PERF_OUTPUT(), covered later.
 
 1. ```return 0;```: Necessary formality (if you want to know why, see [#139](https://github.com/iovisor/bcc/issues/139)).
 
@@ -460,7 +460,7 @@ from bcc import BPF
 # load BPF program
 b = BPF(text="""
 TRACEPOINT_PROBE(random, urandom_read) {
-    // args is from /sys/kernel/debug/tracing/events/random/urandom_read/format
+    // args is from /sys/kernel/tracing/events/random/urandom_read/format
     bpf_trace_printk("%d\\n", args->got_bits);
     return 0;
 }
@@ -484,7 +484,7 @@ Things to learn:
 1. ```args->got_bits```: ```args``` is auto-populated to be a structure of the tracepoint arguments. The comment above says where you can see that structure. Eg:
 
 ```
-# cat /sys/kernel/debug/tracing/events/random/urandom_read/format
+# cat /sys/kernel/tracing/events/random/urandom_read/format
 name: urandom_read
 ID: 972
 format:

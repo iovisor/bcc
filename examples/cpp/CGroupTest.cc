@@ -68,7 +68,7 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  std::ifstream pipe("/sys/kernel/debug/tracing/trace_pipe");
+  std::ifstream pipe("/sys/kernel/tracing/trace_pipe");
   std::string line;
 
   std::cout << "Started tracing open event, hit Ctrl-C to terminate." << std::endl;

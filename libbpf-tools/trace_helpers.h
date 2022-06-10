@@ -85,7 +85,7 @@ bool fentry_can_attach(const char *name, const char *mod);
  * uses a certain function name before attaching.
  *
  * It is achieved by scaning
- * 	/sys/kernel/debug/tracing/available_filter_functions
+ * 	/sys/kernel/tracing/available_filter_functions
  * If this file does not exist, it fallbacks to parse /proc/kallsyms,
  * which is slower.
  */

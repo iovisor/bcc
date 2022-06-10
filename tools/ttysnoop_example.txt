@@ -54,9 +54,9 @@ console:
 
 # ./ttysnoop /dev/console
 Oct 16 01:32:06 bgregg-xenial-bpf-i-xxx kernel: [780087.407428] bash (9888): drop_caches: 1
-Oct 16 01:32:38 bgregg-xenial-bpf-i-xxx snmpd[2708]: Cannot statfs /sys/kernel/debug/tracing: Permission denied
-Oct 16 01:33:32 bgregg-xenial-bpf-i-xxx snmpd[2708]: Cannot statfs /sys/kernel/debug/tracing: Permission denied
-Oct 16 01:34:26 bgregg-xenial-bpf-i-xxx snmpd[2708]: Cannot statfs /sys/kernel/debug/tracing: Permission denied
+Oct 16 01:32:38 bgregg-xenial-bpf-i-xxx snmpd[2708]: Cannot statfs /sys/kernel/tracing: Permission denied
+Oct 16 01:33:32 bgregg-xenial-bpf-i-xxx snmpd[2708]: Cannot statfs /sys/kernel/tracing: Permission denied
+Oct 16 01:34:26 bgregg-xenial-bpf-i-xxx snmpd[2708]: Cannot statfs /sys/kernel/tracing: Permission denied
 ^C
 
 Neat!

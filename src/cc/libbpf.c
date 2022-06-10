@@ -1098,7 +1098,7 @@ static int create_probe_event(char *buf, const char *ev_name,
   char ev_alias[256];
   bool is_kprobe = strncmp("kprobe", event_type, 6) == 0;
 
-  snprintf(buf, PATH_MAX, "/sys/kernel/debug/tracing/%s_events", event_type);
+  snprintf(buf, PATH_MAX, "/sys/kernel/tracing/%s_events", event_type);
   kfd = open(buf, O_WRONLY | O_APPEND, 0);
   if (kfd < 0) {
     fprintf(stderr, "%s: open(%s): %s\n", __func__, buf,
@@ -1143,7 +1143,7 @@ static int create_probe_event(char *buf, const char *ev_name,
     goto error;
   }
   close(kfd);
-  snprintf(buf, PATH_MAX, "/sys/kernel/debug/tracing/events/%ss/%s",
+  snprintf(buf, PATH_MAX, "/sys/kernel/tracing/events/%ss/%s",
            event_type, ev_alias);
   return 0;
 error:
@@ -1186,10 +1186,10 @@ static int bpf_attach_probe(int progfd, enum bpf_probe_attach_type attach_type,
       }
       if (access(fname, F_OK) == -1) {
         // Deleting kprobe event with incorrect name.
-        kfd = open("/sys/kernel/debug/tracing/kprobe_events",
+        kfd = open("/sys/kernel/tracing/kprobe_events",
                    O_WRONLY | O_APPEND, 0);
         if (kfd < 0) {
-          fprintf(stderr, "open(/sys/kernel/debug/tracing/kprobe_events): %s\n",
+          fprintf(stderr, "open(/sys/kernel/tracing/kprobe_events): %s\n",
                   strerror(errno));
           return -1;
         }
@@ -1257,7 +1257,7 @@ static int bpf_detach_probe(const char *ev_name, const char *event_type)
    * the %s_bcc_%d line in [k,u]probe_events. If the event is not found,
    * it is safe to skip the cleaning up process (write -:... to the file).
    */
-  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/%s_events", event_type);
+  snprintf(buf, sizeof(buf), "/sys/kernel/tracing/%s_events", event_type);
   fp = fopen(buf, "r");
   if (!fp) {
     fprintf(stderr, "open(%s): %s\n", buf, strerror(errno));
@@ -1282,7 +1282,7 @@ static int bpf_detach_probe(const char *ev_name, const char *event_type)
   if (!found_event)
     return 0;
 
-  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/%s_events", event_type);
+  snprintf(buf, sizeof(buf), "/sys/kernel/tracing/%s_events", event_type);
   kfd = open(buf, O_WRONLY | O_APPEND, 0);
   if (kfd < 0) {
     fprintf(stderr, "open(%s): %s\n", buf, strerror(errno));
@@ -1326,7 +1326,7 @@ int bpf_attach_tracepoint(int progfd, const char *tp_category,
   char buf[256];
   int pfd = -1;
 
-  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%s/%s",
+  snprintf(buf, sizeof(buf), "/sys/kernel/tracing/events/%s/%s",
            tp_category, tp_name);
   if (bpf_attach_tracing_event(progfd, buf, -1 /* PID */, &pfd) == 0)
     return pfd;

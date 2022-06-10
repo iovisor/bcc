@@ -11,7 +11,7 @@ WARNING: Make sure no other tracing sessions are active, as it will likely
 stop them from functioning (perhaps ungracefully).
 
 This specifically clears the state in at least the following files in
-/sys/kernel/debug/tracing: kprobe_events, uprobe_events, trace_pipe.
+/sys/kernel/tracing: kprobe_events, uprobe_events, trace_pipe.
 Other tracing facilities (ftrace) are checked, and if not in an expected state,
 a note is printed. All tracing files can be reset with -F for force, but this
 will interfere with any other running tracing sessions (eg, ftrace).
@@ -29,16 +29,16 @@ You can use -v to see what it does:
 # ./reset-trace.sh -v
 Resetting tracing state...
 
-Checking /sys/kernel/debug/tracing/kprobe_events
-Checking /sys/kernel/debug/tracing/uprobe_events
-Checking /sys/kernel/debug/tracing/trace
-Checking /sys/kernel/debug/tracing/current_tracer
-Checking /sys/kernel/debug/tracing/set_ftrace_filter
-Checking /sys/kernel/debug/tracing/set_graph_function
-Checking /sys/kernel/debug/tracing/set_ftrace_pid
-Checking /sys/kernel/debug/tracing/events/enable
-Checking /sys/kernel/debug/tracing/tracing_thresh
-Checking /sys/kernel/debug/tracing/tracing_on
+Checking /sys/kernel/tracing/kprobe_events
+Checking /sys/kernel/tracing/uprobe_events
+Checking /sys/kernel/tracing/trace
+Checking /sys/kernel/tracing/current_tracer
+Checking /sys/kernel/tracing/set_ftrace_filter
+Checking /sys/kernel/tracing/set_graph_function
+Checking /sys/kernel/tracing/set_ftrace_pid
+Checking /sys/kernel/tracing/events/enable
+Checking /sys/kernel/tracing/tracing_thresh
+Checking /sys/kernel/tracing/tracing_on
 
 Done.
 
@@ -134,9 +134,9 @@ state. Using reset-trace:
 # ./reset-trace.sh -v
 Resetting tracing state...
 
-Checking /sys/kernel/debug/tracing/kprobe_events
-Checking /sys/kernel/debug/tracing/uprobe_events
-Needed to reset /sys/kernel/debug/tracing/uprobe_events
+Checking /sys/kernel/tracing/kprobe_events
+Checking /sys/kernel/tracing/uprobe_events
+Needed to reset /sys/kernel/tracing/uprobe_events
 uprobe_events, before (line enumerated):
      1	p:uprobes/p__bin_bash_0xa2540 /bin/bash:0x00000000000a2540
      2	p:uprobes/p__bin_bash_0x21220 /bin/bash:0x0000000000021220
@@ -157,14 +157,14 @@ uprobe_events, before (line enumerated):
    317	p:uprobes/p__bin_bash_0x4a930 /bin/bash:0x000000000004a930
 uprobe_events, after (line enumerated):
 
-Checking /sys/kernel/debug/tracing/trace
-Checking /sys/kernel/debug/tracing/current_tracer
-Checking /sys/kernel/debug/tracing/set_ftrace_filter
-Checking /sys/kernel/debug/tracing/set_graph_function
-Checking /sys/kernel/debug/tracing/set_ftrace_pid
-Checking /sys/kernel/debug/tracing/events/enable
-Checking /sys/kernel/debug/tracing/tracing_thresh
-Checking /sys/kernel/debug/tracing/tracing_on
+Checking /sys/kernel/tracing/trace
+Checking /sys/kernel/tracing/current_tracer
+Checking /sys/kernel/tracing/set_ftrace_filter
+Checking /sys/kernel/tracing/set_graph_function
+Checking /sys/kernel/tracing/set_ftrace_pid
+Checking /sys/kernel/tracing/events/enable
+Checking /sys/kernel/tracing/tracing_thresh
+Checking /sys/kernel/tracing/tracing_on
 
 Done.
 
@@ -174,7 +174,7 @@ from uprobe_events.
 Here's the same situation, but without the verbose option:
 
 # ./reset-trace.sh
-Needed to reset /sys/kernel/debug/tracing/uprobe_events
+Needed to reset /sys/kernel/tracing/uprobe_events
 #
 
 And again with quiet:
@@ -186,19 +186,19 @@ And again with quiet:
 Here is an example of reset-trace detecting an unrelated tracing session:
 
 # ./reset-trace.sh 
-Noticed unrelated tracing file /sys/kernel/debug/tracing/set_ftrace_filter isn't set as expected. Not resetting (-F to force, -v for verbose).
+Noticed unrelated tracing file /sys/kernel/tracing/set_ftrace_filter isn't set as expected. Not resetting (-F to force, -v for verbose).
 
 And verbose:
 
 # ./reset-trace.sh -v
 Resetting tracing state...
 
-Checking /sys/kernel/debug/tracing/kprobe_events
-Checking /sys/kernel/debug/tracing/uprobe_events
-Checking /sys/kernel/debug/tracing/trace
-Checking /sys/kernel/debug/tracing/current_tracer
-Checking /sys/kernel/debug/tracing/set_ftrace_filter
-Noticed unrelated tracing file /sys/kernel/debug/tracing/set_ftrace_filter isn't set as expected. Not resetting (-F to force, -v for verbose).
+Checking /sys/kernel/tracing/kprobe_events
+Checking /sys/kernel/tracing/uprobe_events
+Checking /sys/kernel/tracing/trace
+Checking /sys/kernel/tracing/current_tracer
+Checking /sys/kernel/tracing/set_ftrace_filter
+Noticed unrelated tracing file /sys/kernel/tracing/set_ftrace_filter isn't set as expected. Not resetting (-F to force, -v for verbose).
 Contents of set_ftrace_filter is (line enumerated):
      1	tcp_send_mss
      2	tcp_sendpage
@@ -215,11 +215,11 @@ Contents of set_ftrace_filter is (line enumerated):
     13	tcp_send_window_probe
     14	tcp_send_probe0
 Expected "".
-Checking /sys/kernel/debug/tracing/set_graph_function
-Checking /sys/kernel/debug/tracing/set_ftrace_pid
-Checking /sys/kernel/debug/tracing/events/enable
-Checking /sys/kernel/debug/tracing/tracing_thresh
-Checking /sys/kernel/debug/tracing/tracing_on
+Checking /sys/kernel/tracing/set_graph_function
+Checking /sys/kernel/tracing/set_ftrace_pid
+Checking /sys/kernel/tracing/events/enable
+Checking /sys/kernel/tracing/tracing_thresh
+Checking /sys/kernel/tracing/tracing_on
 
 Done.
 

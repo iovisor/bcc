@@ -53,7 +53,7 @@ TracepointTypeVisitor::TracepointTypeVisitor(ASTContext &C, Rewriter &rewriter)
 
 string TracepointTypeVisitor::GenerateTracepointStruct(
     SourceLocation loc, string const& category, string const& event) {
-  string format_file = "/sys/kernel/debug/tracing/events/" +
+  string format_file = "/sys/kernel/tracing/events/" +
     category + "/" + event + "/format";
   ifstream input(format_file.c_str());
   if (!input)

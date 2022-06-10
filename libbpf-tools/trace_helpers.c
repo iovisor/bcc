@@ -1055,7 +1055,7 @@ bool kprobe_exists(const char *name)
 	FILE *f;
 	int ret;
 
-	f = fopen("/sys/kernel/debug/tracing/available_filter_functions", "r");
+	f = fopen("/sys/kernel/tracing/available_filter_functions", "r");
 	if (!f)
 		goto slow_path;
 

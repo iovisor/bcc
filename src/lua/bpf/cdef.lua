@@ -266,7 +266,7 @@ end
 
 function M.tracepoint_type(tp)
 	-- Read tracepoint format string
-	local fp = assert(io.open('/sys/kernel/debug/tracing/events/'..tp..'/format', 'r'))
+	local fp = assert(io.open('/sys/kernel/tracing/events/'..tp..'/format', 'r'))
 	local fmt = fp:read '*a'
 	fp:close()
 	-- Parse struct fields

@@ -205,7 +205,7 @@ This is a macro that instruments the tracepoint defined by *category*:*event*.
 The tracepoint name is `<category>:<event>`.
 The probe function name is `tracepoint__<category>__<event>`.
 
-Arguments are available in an ```args``` struct, which are the tracepoint arguments. One way to list these is to cat the relevant format file under /sys/kernel/debug/tracing/events/*category*/*event*/format.
+Arguments are available in an ```args``` struct, which are the tracepoint arguments. One way to list these is to cat the relevant format file under /sys/kernel/tracing/events/*category*/*event*/format.
 
 The ```args``` struct can be used in place of ``ctx`` in each functions requiring a context as an argument. This includes notably [perf_submit()](#3-perf_submit).
 
@@ -213,7 +213,7 @@ For example:
 
 ```C
 TRACEPOINT_PROBE(random, urandom_read) {
-    // args is from /sys/kernel/debug/tracing/events/random/urandom_read/format
+    // args is from /sys/kernel/tracing/events/random/urandom_read/format
     bpf_trace_printk("%d\\n", args->got_bits);
     return 0;
 }
@@ -676,7 +676,7 @@ Syntax: ```int bpf_trace_printk(const char *fmt, ...)```
 
 Return: 0 on success
 
-A simple kernel facility for printf() to the common trace_pipe (/sys/kernel/debug/tracing/trace_pipe). This is ok for some quick examples, but has limitations: 3 args max, 1 %s only, and trace_pipe is globally shared, so concurrent programs will have clashing output. A better interface is via BPF_PERF_OUTPUT(). Note that calling this helper is made simpler than the original kernel version, which has ```fmt_size``` as the second parameter.
+A simple kernel facility for printf() to the common trace_pipe (/sys/kernel/tracing/trace_pipe). This is ok for some quick examples, but has limitations: 3 args max, 1 %s only, and trace_pipe is globally shared, so concurrent programs will have clashing output. A better interface is via BPF_PERF_OUTPUT(). Note that calling this helper is made simpler than the original kernel version, which has ```fmt_size``` as the second parameter.
 
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=bpf_trace_printk+path%3Aexamples&type=Code),
@@ -1663,7 +1663,7 @@ bpf_text = """
 #include <uapi/linux/ptrace.h>
 
 struct urandom_read_args {
-    // from /sys/kernel/debug/tracing/events/random/urandom_read/format
+    // from /sys/kernel/tracing/events/random/urandom_read/format
     u64 __unused__;
     u32 got_bits;
     u32 pool_left;
@@ -1930,7 +1930,7 @@ b.detach_kretprobe(event="__page_cache_alloc", fn_name="trace_func_return")
 
 Syntax: ```BPF.trace_print(fmt="fields")```
 
-This method continually reads the globally shared /sys/kernel/debug/tracing/trace_pipe file and prints its contents. This file can be written to via BPF and the bpf_trace_printk() function, however, that method has limitations, including a lack of concurrent tracing support. The BPF_PERF_OUTPUT mechanism, covered earlier, is preferred.
+This method continually reads the globally shared /sys/kernel/tracing/trace_pipe file and prints its contents. This file can be written to via BPF and the bpf_trace_printk() function, however, that method has limitations, including a lack of concurrent tracing support. The BPF_PERF_OUTPUT mechanism, covered earlier, is preferred.
 
 Arguments:
 
@@ -1954,7 +1954,7 @@ Examples in situ:
 
 Syntax: ```BPF.trace_fields(nonblocking=False)```
 
-This method reads one line from the globally shared /sys/kernel/debug/tracing/trace_pipe file and returns it as fields. This file can be written to via BPF and the bpf_trace_printk() function, however, that method has limitations, including a lack of concurrent tracing support. The BPF_PERF_OUTPUT mechanism, covered earlier, is preferred.
+This method reads one line from the globally shared /sys/kernel/tracing/trace_pipe file and returns it as fields. This file can be written to via BPF and the bpf_trace_printk() function, however, that method has limitations, including a lack of concurrent tracing support. The BPF_PERF_OUTPUT mechanism, covered earlier, is preferred.
 
 Arguments:
 

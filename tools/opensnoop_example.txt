@@ -6,7 +6,7 @@ Example output:
 
 # ./opensnoop
 PID    COMM      FD ERR PATH
-17326  <...>      7   0 /sys/kernel/debug/tracing/trace_pipe
+17326  <...>      7   0 /sys/kernel/tracing/trace_pipe
 1576   snmpd      9   0 /proc/net/dev
 1576   snmpd     11   0 /proc/net/if_inet6
 1576   snmpd     11   0 /proc/sys/net/ipv4/neigh/eth0/retrans_time_ms

@@ -26,7 +26,7 @@ int main() {
     return 1;
   }
 
-  std::ifstream pipe("/sys/kernel/debug/tracing/trace_pipe");
+  std::ifstream pipe("/sys/kernel/tracing/trace_pipe");
   std::string line;
   std::string clone_fnname = bpf.get_syscall_fnname("clone");
 

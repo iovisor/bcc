@@ -14,7 +14,7 @@ Make sure no other tracing sessions are active. This tool might stop them from
 functioning (perhaps ungracefully).
 
 This specifically clears the state in at least the following files in
-/sys/kernel/debug/tracing: kprobe_events, uprobe_events, trace_pipe.
+/sys/kernel/tracing: kprobe_events, uprobe_events, trace_pipe.
 Other tracing facilities (ftrace) are checked, and if not in an expected state,
 a note is printed. All tracing files can be reset with \-F for force, but this
 will interfere with any other running tracing sessions (eg, ftrace).

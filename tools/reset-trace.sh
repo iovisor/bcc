@@ -23,7 +23,7 @@
 # 20-Jul-2014	Brendan Gregg	Created this.
 # 18-Oct-2016      "      "     Updated for bcc use.
 
-tracing=/sys/kernel/debug/tracing
+tracing=/sys/kernel/tracing
 opt_force=0; opt_verbose=0; opt_quiet=0
 
 function usage {
