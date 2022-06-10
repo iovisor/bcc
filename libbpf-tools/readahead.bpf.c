@@ -13,7 +13,6 @@ struct {
 	__uint(max_entries, MAX_ENTRIES);
 	__type(key, u32);
 	__type(value, u64);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } in_readahead SEC(".maps");
 
 struct {
@@ -21,7 +20,6 @@ struct {
 	__uint(max_entries, MAX_ENTRIES);
 	__type(key, struct page *);
 	__type(value, u64);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } birth SEC(".maps");
 
 struct hist hist = {};

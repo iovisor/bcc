@@ -14,7 +14,6 @@ struct {
 	__uint(max_entries, 64);
 	__type(key, u32);
 	__type(value, struct counter);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } counters SEC(".maps");
 
 SEC("tracepoint/block/block_rq_complete")
