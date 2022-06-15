@@ -144,12 +144,32 @@ b = BPF(text=bpf_text)
 # common file functions
 b.attach_kprobe(event="xfs_file_read_iter", fn_name="trace_entry")
 b.attach_kprobe(event="xfs_file_write_iter", fn_name="trace_entry")
+b.attach_kprobe(event="xfs_file_buffered_read", fn_name="trace_entry")
+b.attach_kprobe(event="xfs_file_buffered_write", fn_name="trace_entry")
 b.attach_kprobe(event="xfs_file_open", fn_name="trace_entry")
 b.attach_kprobe(event="xfs_file_fsync", fn_name="trace_entry")
 b.attach_kretprobe(event="xfs_file_read_iter", fn_name="trace_read_return")
 b.attach_kretprobe(event="xfs_file_write_iter", fn_name="trace_write_return")
+b.attach_kretprobe(event="xfs_file_buffered_read", fn_name="trace_read_return")
+b.attach_kretprobe(event="xfs_file_buffered_write", fn_name="trace_write_return")
 b.attach_kretprobe(event="xfs_file_open", fn_name="trace_open_return")
 b.attach_kretprobe(event="xfs_file_fsync", fn_name="trace_fsync_return")
+
+if b.get_kprobe_functions(b"xfs_file_dax_read"):
+    b.attach_kprobe(event="xfs_file_dax_read", fn_name="trace_entry")
+    b.attach_kretprobe(event="xfs_file_dax_read", fn_name="trace_read_return")
+if b.get_kprobe_functions(b"xfs_file_dax_write"):
+    b.attach_kprobe(event="xfs_file_dax_write", fn_name="trace_entry")
+    b.attach_kretprobe(event="xfs_file_dax_write", fn_name="trace_write_return")
+if b.get_kprobe_functions(b"xfs_file_dio_read"):
+    b.attach_kprobe(event="xfs_file_dio_read", fn_name="trace_entry")
+    b.attach_kretprobe(event="xfs_file_dio_read", fn_name="trace_read_return")
+if b.get_kprobe_functions(b"xfs_file_dio_write_aligned"):
+    b.attach_kprobe(event="xfs_file_dio_write_aligned", fn_name="trace_entry")
+    b.attach_kretprobe(event="xfs_file_dio_write_aligned", fn_name="trace_write_return")
+if b.get_kprobe_functions(b"xfs_file_dio_write_unaligned"):
+    b.attach_kprobe(event="xfs_file_dio_write_unaligned", fn_name="trace_entry")
+    b.attach_kretprobe(event="xfs_file_dio_write_unaligned", fn_name="trace_write_return")
 
 print("Tracing XFS operation latency... Hit Ctrl-C to end.")
 
