@@ -11,7 +11,7 @@
 #include "maps.bpf.h"
 #include "tcpconnect.h"
 
-SEC(".rodata") int filter_ports[MAX_PORTS];
+const volatile int filter_ports[MAX_PORTS];
 const volatile int filter_ports_len = 0;
 const volatile uid_t filter_uid = -1;
 const volatile pid_t filter_pid = 0;
@@ -26,7 +26,6 @@ struct {
 	__uint(max_entries, MAX_ENTRIES);
 	__type(key, u32);
 	__type(value, struct sock *);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } sockets SEC(".maps");
 
 struct {
@@ -34,7 +33,6 @@ struct {
 	__uint(max_entries, MAX_ENTRIES);
 	__type(key, struct ipv4_flow_key);
 	__type(value, u64);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } ipv4_count SEC(".maps");
 
 struct {
@@ -42,7 +40,6 @@ struct {
 	__uint(max_entries, MAX_ENTRIES);
 	__type(key, struct ipv6_flow_key);
 	__type(value, u64);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } ipv6_count SEC(".maps");
 
 struct {

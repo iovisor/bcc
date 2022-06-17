@@ -1736,6 +1736,20 @@ class BPF(object):
     def donothing(self):
         """the do nothing exit handler"""
 
+
+    def close(self):
+        """close(self)
+
+        Closes all associated files descriptors. Attached BPF programs are not
+        detached.
+        """
+        for name, fn in list(self.funcs.items()):
+            os.close(fn.fd)
+            del self.funcs[name]
+        if self.module:
+            lib.bpf_module_destroy(self.module)
+            self.module = None
+
     def cleanup(self):
         # Clean up opened probes
         for k, v in list(self.kprobe_fds.items()):
@@ -1763,12 +1777,8 @@ class BPF(object):
         if self.tracefile:
             self.tracefile.close()
             self.tracefile = None
-        for name, fn in list(self.funcs.items()):
-            os.close(fn.fd)
-            del self.funcs[name]
-        if self.module:
-            lib.bpf_module_destroy(self.module)
-            self.module = None
+
+        self.close()
 
         # Clean up ringbuf
         if self._ringbuf_manager:

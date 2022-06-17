@@ -9,7 +9,6 @@ struct {
 	__uint(max_entries, 10240);
 	__type(key, u32);
 	__type(value, u64);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } start SEC(".maps");
 
 __u64 latency = 0;

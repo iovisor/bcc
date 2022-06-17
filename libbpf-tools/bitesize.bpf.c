@@ -22,7 +22,6 @@ struct {
 	__uint(max_entries, 10240);
 	__type(key, struct hist_key);
 	__type(value, struct hist);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } hists SEC(".maps");
 
 static struct hist initial_hist;

@@ -36,7 +36,6 @@ struct {
 	__uint(max_entries, MAX_ENTRIES);
 	__type(key, struct request *);
 	__type(value, struct piddata);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } infobyreq SEC(".maps");
 
 struct stage {
