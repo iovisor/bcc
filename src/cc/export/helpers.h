@@ -390,7 +390,7 @@ struct _name##_table_t _name = { .max_entries = (_max_entries) }
 #define BPF_CPUMAP(_name, _max_entries) \
   BPF_XDP_REDIRECT_MAP("cpumap", u32, _name, _max_entries)
 
-#define BPF_XSKMAP(_name, _max_entries) \
+#define _BPF_XSKMAP(_name, _max_entries, _pinned) \
 struct _name##_table_t { \
   u32 key; \
   int leaf; \
@@ -399,8 +399,12 @@ struct _name##_table_t { \
   u64 (*redirect_map) (int, int); \
   u32 max_entries; \
 }; \
-__attribute__((section("maps/xskmap"))) \
+__attribute__((section("maps/xskmap" _pinned))) \
 struct _name##_table_t _name = { .max_entries = (_max_entries) }
+#define BPF_XSKMAP2(_name, _max_entries) _BPF_XSKMAP(_name, _max_entries, "")
+#define BPF_XSKMAP3(_name, _max_entries, _pinned) _BPF_XSKMAP(_name, _max_entries, ":" _pinned)
+#define BPF_XSKMAPX(_1, _2, _3, NAME, ...) NAME
+#define BPF_XSKMAP(...) BPF_XSKMAPX(__VA_ARGS__, BPF_XSKMAP3, BPF_XSKMAP2)(__VA_ARGS__)
 
 #define BPF_ARRAY_OF_MAPS(_name, _inner_map_name, _max_entries) \
   BPF_TABLE("array_of_maps$" _inner_map_name, int, int, _name, _max_entries)

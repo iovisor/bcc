@@ -1145,9 +1145,9 @@ Examples in situ:
 
 ### 13. BPF_XSKMAP
 
-Syntax: ```BPF_XSKMAP(name, size)```
+Syntax: ```BPF_XSKMAP(name, size [, "/sys/fs/bpf/xyz"])```
 
-This creates a xsk map named ```name``` with ```size``` entries. Each entry represents one NIC's queue id. This map is only used in XDP to redirect packet to an AF_XDP socket. If the AF_XDP socket is binded to a queue which is different than the current packet's queue id, the packet will be dropped. For kernel v5.3 and latter, `lookup` method is available and can be used to check whether and AF_XDP socket is available for the current packet's queue id. More details at [AF_XDP](https://www.kernel.org/doc/html/latest/networking/af_xdp.html).
+This creates a xsk map named ```name``` with ```size``` entries and pin it to the bpffs as a FILE. Each entry represents one NIC's queue id. This map is only used in XDP to redirect packet to an AF_XDP socket. If the AF_XDP socket is binded to a queue which is different than the current packet's queue id, the packet will be dropped. For kernel v5.3 and latter, `lookup` method is available and can be used to check whether and AF_XDP socket is available for the current packet's queue id. More details at [AF_XDP](https://www.kernel.org/doc/html/latest/networking/af_xdp.html).
 
 For example:
 ```C
