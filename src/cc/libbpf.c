@@ -307,7 +307,7 @@ static uint64_t ptr_to_u64(void *ptr)
   return (uint64_t) (unsigned long) ptr;
 }
 
-static int libbpf_bpf_map_create(struct bpf_create_map_attr *create_attr)
+static int libbpf_bpf_map_create(struct bcc_create_map_attr *create_attr)
 {
   LIBBPF_OPTS(bpf_map_create_opts, p);
 
@@ -326,7 +326,7 @@ static int libbpf_bpf_map_create(struct bpf_create_map_attr *create_attr)
                         create_attr->value_size, create_attr->max_entries, &p);
 }
 
-int bcc_create_map_xattr(struct bpf_create_map_attr *attr, bool allow_rlimit)
+int bcc_create_map_xattr(struct bcc_create_map_attr *attr, bool allow_rlimit)
 {
   unsigned name_len = attr->name ? strlen(attr->name) : 0;
   char map_name[BPF_OBJ_NAME_LEN] = {};
@@ -383,7 +383,7 @@ int bcc_create_map(enum bpf_map_type map_type, const char *name,
                    int key_size, int value_size,
                    int max_entries, int map_flags)
 {
-  struct bpf_create_map_attr attr = {};
+  struct bcc_create_map_attr attr = {};
 
   attr.map_type = map_type;
   attr.name = name;

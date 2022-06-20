@@ -404,7 +404,7 @@ int BPFModule::create_maps(std::map<std::string, std::pair<int, int>> &map_tids,
     }
 
     if (pinned_id <= 0) {
-      struct bpf_create_map_attr attr = {};
+      struct bcc_create_map_attr attr = {};
       attr.map_type = (enum bpf_map_type)map_type;
       attr.name = map_name;
       attr.key_size = key_size;
