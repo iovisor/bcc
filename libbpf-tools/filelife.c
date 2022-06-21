@@ -138,6 +138,9 @@ int main(int argc, char **argv)
 	/* initialize global data (filtering options) */
 	obj->rodata->targ_tgid = env.pid;
 
+	if (!kprobe_exists("security_inode_create"))
+		bpf_program__set_autoload(obj->progs.security_inode_create, false);
+
 	err = filelife_bpf__load(obj);
 	if (err) {
 		fprintf(stderr, "failed to load BPF object: %d\n", err);
