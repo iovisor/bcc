@@ -16,7 +16,6 @@
 
 from __future__ import print_function
 from bcc import BPF
-import re
 import argparse
 import os
 
