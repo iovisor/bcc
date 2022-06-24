@@ -42,6 +42,7 @@ APPS = \
 	klockstat \
 	ksnoop \
 	llcstat \
+	mdflush \
 	mountsnoop \
 	numamove \
 	offcputime \

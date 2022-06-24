@@ -29,6 +29,7 @@
 /llcstat
 /nfsdist
 /nfsslower
+/mdflush
 /mountsnoop
 /numamove
 /offcputime
