@@ -76,7 +76,7 @@ if not args.interval:
 
 if args.list:
     for grp in izip_longest(*(iter(sorted(syscalls.values())),) * 4):
-        print("   ".join(["%-20s" % s for s in grp if s is not None]))
+        print("   ".join(["%-22s" % s.decode() for s in grp if s is not None]))
     sys.exit(0)
 
 text = """
