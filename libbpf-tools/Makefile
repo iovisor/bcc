@@ -37,6 +37,7 @@ APPS = \
 	fsdist \
 	fsslower \
 	funclatency \
+	funcslower \
 	gethostlatency \
 	hardirqs \
 	klockstat \
