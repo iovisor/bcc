@@ -98,12 +98,18 @@ int trace_func_entry(struct pt_regs *ctx)
 {
     u64 pid_tgid = bpf_get_current_pid_tgid();
     u32 index = 0, tgid = pid_tgid >> 32;
-    u64 *tsp, ts = bpf_ktime_get_ns(), delta;
 
     FILTER
+
+    u64 *tsp, ts = bpf_ktime_get_ns(), delta;
+
     tsp = start.lookup(&index);
     if (tsp == 0)
         goto out;
+
+    if (ts < *tsp) {
+        return 0;
+    }
 
     delta = ts - *tsp;
     FACTOR
