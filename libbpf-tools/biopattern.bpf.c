@@ -5,6 +5,7 @@
 #include <bpf/bpf_tracing.h>
 #include "biopattern.h"
 #include "maps.bpf.h"
+#include "core_fixes.bpf.h"
 
 const volatile bool filter_dev = false;
 const volatile __u32 targ_dev = 0;
@@ -17,12 +18,24 @@ struct {
 } counters SEC(".maps");
 
 SEC("tracepoint/block/block_rq_complete")
-int handle__block_rq_complete(struct trace_event_raw_block_rq_complete *ctx)
+int handle__block_rq_complete(void *args)
 {
-	sector_t sector = ctx->sector;
 	struct counter *counterp, zero = {};
-	u32 nr_sector = ctx->nr_sector;
-	u32 dev = ctx->dev;
+	sector_t sector;
+	u32 nr_sector;
+	u32 dev;
+
+	if (has_block_rq_completion()) {
+		struct trace_event_raw_block_rq_completion___x *ctx = args;
+		sector = BPF_CORE_READ(ctx, sector);
+		nr_sector = BPF_CORE_READ(ctx, nr_sector);
+		dev = BPF_CORE_READ(ctx, dev);
+	} else {
+		struct trace_event_raw_block_rq_complete *ctx = args;
+		sector = BPF_CORE_READ(ctx, sector);
+		nr_sector = BPF_CORE_READ(ctx, nr_sector);
+		dev = BPF_CORE_READ(ctx, dev);
+	}
 
 	if (filter_dev && targ_dev != dev)
 		return 0;
