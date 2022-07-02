@@ -360,6 +360,9 @@ void *get_clang_target_cb(bcc_arch_t arch, bool for_syscall)
     case BCC_ARCH_MIPS:
       ret = "mips64el-unknown-linux-gnuabi64";
       break;
+    case BCC_ARCH_RISCV64:
+      ret = "riscv64-unknown-linux-gnu";
+      break;
     default:
       ret = "x86_64-unknown-linux-gnu";
   }
