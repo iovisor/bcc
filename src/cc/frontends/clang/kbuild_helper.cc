@@ -66,6 +66,8 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
     arch = "powerpc";
   } else if (!arch.compare(0, 4, "mips")) {
     arch = "mips";
+  } else if (!arch.compare(0, 5, "riscv")) {
+    arch = "riscv";
   } else if (!arch.compare(0, 2, "sh")) {
     arch = "sh";
   }
