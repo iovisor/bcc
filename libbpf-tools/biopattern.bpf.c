@@ -31,7 +31,7 @@ int handle__block_rq_complete(void *args)
 		nr_sector = BPF_CORE_READ(ctx, nr_sector);
 		dev = BPF_CORE_READ(ctx, dev);
 	} else {
-		struct trace_event_raw_block_rq_complete *ctx = args;
+		struct trace_event_raw_block_rq_complete___x *ctx = args;
 		sector = BPF_CORE_READ(ctx, sector);
 		nr_sector = BPF_CORE_READ(ctx, nr_sector);
 		dev = BPF_CORE_READ(ctx, dev);
