@@ -23,5 +23,12 @@ else()
   set(REVISION_LAST "${REVISION}")
 endif()
 
+if (REVISION MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)")
+    set(REVISION_MAJOR ${CMAKE_MATCH_1})
+    set(REVISION_MINOR ${CMAKE_MATCH_2})
+    set(REVISION_PATCH ${CMAKE_MATCH_3})
+else()
+  message(WARNING "Could not extract major/minor/patch from revision ${REVISION}" )
+endif()
 # strip leading 'v', and make unique for the tag
-message(STATUS "Revision is ${REVISION}")
+message(STATUS "Revision is ${REVISION} (major ${REVISION_MAJOR}, minor ${REVISION_MINOR}, patch ${REVISION_PATCH})")
