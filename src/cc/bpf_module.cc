@@ -179,6 +179,9 @@ BPFModule::~BPFModule() {
         return;
       delete[] info.start_;
     });
+    for (auto &section : sections_) {
+      delete[] std::get<0>(section.second);
+    }
   }
 
   engine_.reset();
