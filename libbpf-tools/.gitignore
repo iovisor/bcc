@@ -29,6 +29,7 @@
 /llcstat
 /nfsdist
 /nfsslower
+/mdflush
 /mountsnoop
 /numamove
 /offcputime
@@ -45,6 +46,7 @@
 /syscount
 /tcpconnect
 /tcpconnlat
+/tcplife
 /tcprtt
 /tcpsynbl
 /vfsstat

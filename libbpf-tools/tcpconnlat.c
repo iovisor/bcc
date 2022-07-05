@@ -182,6 +182,19 @@ int main(int argc, char **argv)
 	obj->rodata->targ_min_us = env.min_us;
 	obj->rodata->targ_tgid = env.pid;
 
+	if (fentry_can_attach("tcp_v4_connect", NULL)) {
+		bpf_program__set_attach_target(obj->progs.fentry_tcp_v4_connect, 0, "tcp_v4_connect");
+		bpf_program__set_attach_target(obj->progs.fentry_tcp_v6_connect, 0, "tcp_v6_connect");
+		bpf_program__set_attach_target(obj->progs.fentry_tcp_rcv_state_process, 0, "tcp_rcv_state_process");
+		bpf_program__set_autoload(obj->progs.tcp_v4_connect, false);
+		bpf_program__set_autoload(obj->progs.tcp_v6_connect, false);
+		bpf_program__set_autoload(obj->progs.tcp_rcv_state_process, false);
+	} else {
+		bpf_program__set_autoload(obj->progs.fentry_tcp_v4_connect, false);
+		bpf_program__set_autoload(obj->progs.fentry_tcp_v6_connect, false);
+		bpf_program__set_autoload(obj->progs.fentry_tcp_rcv_state_process, false);
+	}
+
 	err = tcpconnlat_bpf__load(obj);
 	if (err) {
 		fprintf(stderr, "failed to load BPF object: %d\n", err);

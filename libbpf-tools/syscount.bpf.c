@@ -28,7 +28,6 @@ struct {
 	__uint(max_entries, MAX_ENTRIES);
 	__type(key, u32);
 	__type(value, u64);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } start SEC(".maps");
 
 struct {
@@ -36,7 +35,6 @@ struct {
 	__uint(max_entries, MAX_ENTRIES);
 	__type(key, u32);
 	__type(value, struct data_t);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } data SEC(".maps");
 
 static __always_inline
@@ -80,7 +78,7 @@ int sys_exit(struct trace_event_raw_sys_exit *args)
 	static const struct data_t zero;
 	pid_t pid = id >> 32;
 	struct data_t *val;
-	u64 *start_ts;
+	u64 *start_ts, lat = 0;
 	u32 tid = id;
 	u32 key;
 
@@ -99,6 +97,7 @@ int sys_exit(struct trace_event_raw_sys_exit *args)
 		start_ts = bpf_map_lookup_elem(&start, &tid);
 		if (!start_ts)
 			return 0;
+		lat = bpf_ktime_get_ns() - *start_ts;
 	}
 
 	key = (count_by_process) ? pid : args->id;
@@ -108,7 +107,7 @@ int sys_exit(struct trace_event_raw_sys_exit *args)
 		if (count_by_process)
 			save_proc_name(val);
 		if (measure_latency)
-			__sync_fetch_and_add(&val->total_ns, bpf_ktime_get_ns() - *start_ts);
+			__sync_fetch_and_add(&val->total_ns, lat);
 	}
 	return 0;
 }

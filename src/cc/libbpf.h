@@ -27,7 +27,23 @@
 extern "C" {
 #endif
 
-struct bpf_create_map_attr;
+struct bcc_create_map_attr {
+	const char *name;
+	enum bpf_map_type map_type;
+	__u32 map_flags;
+	__u32 key_size;
+	__u32 value_size;
+	__u32 max_entries;
+	__u32 numa_node;
+	__u32 btf_fd;
+	__u32 btf_key_type_id;
+	__u32 btf_value_type_id;
+	__u32 map_ifindex;
+	union {
+		__u32 inner_map_fd;
+		__u32 btf_vmlinux_value_type_id;
+	};
+};
 struct bpf_load_program_attr;
 
 enum bpf_probe_attach_type {
@@ -44,7 +60,7 @@ struct bcc_perf_buffer_opts {
 int bcc_create_map(enum bpf_map_type map_type, const char *name,
                    int key_size, int value_size, int max_entries,
                    int map_flags);
-int bcc_create_map_xattr(struct bpf_create_map_attr *attr, bool allow_rlimit);
+int bcc_create_map_xattr(struct bcc_create_map_attr *attr, bool allow_rlimit);
 int bpf_update_elem(int fd, void *key, void *value, unsigned long long flags);
 int bpf_lookup_elem(int fd, void *key, void *value);
 int bpf_delete_elem(int fd, void *key);

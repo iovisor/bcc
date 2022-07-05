@@ -335,21 +335,21 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         # print folded stack output
         user_stack = list(user_stack)
         kernel_stack = list(kernel_stack)
-        line = [k.name]
+        line = [k.name.decode('utf-8', 'replace')]
         # if we failed to get the stack is, such as due to no space (-ENOMEM) or
         # hash collision (-EEXIST), we still print a placeholder for consistency
         if not args.kernel_stacks_only:
             if stack_id_err(k.user_stack_id):
-                line.append(b"[Missed User Stack]")
+                line.append("[Missed User Stack]")
             else:
-                line.extend([b.sym(addr, k.pid) for addr in reversed(user_stack)])
+                line.extend([b.sym(addr, k.pid).decode('utf-8', 'replace') for addr in reversed(user_stack)])
         if not args.user_stacks_only:
-            line.extend([b"-"] if (need_delimiter and k.kernel_stack_id >= 0 and k.user_stack_id >= 0) else [])
+            line.extend(["-"] if (need_delimiter and k.kernel_stack_id >= 0 and k.user_stack_id >= 0) else [])
             if stack_id_err(k.kernel_stack_id):
-                line.append(b"[Missed Kernel Stack]")
+                line.append("[Missed Kernel Stack]")
             else:
-                line.extend([aksym(addr) for addr in reversed(kernel_stack)])
-        print("%s %d" % (b";".join(line).decode('utf-8', 'replace'), v.value))
+                line.extend([aksym(addr).decode('utf-8', 'replace') for addr in reversed(kernel_stack)])
+        print("%s %d" % (";".join(line), v.value))
     else:
         # print default multi-line stack output
         if not args.user_stacks_only:
@@ -357,7 +357,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
                 print("    [Missed Kernel Stack]")
             else:
                 for addr in kernel_stack:
-                    print("    %s" % aksym(addr))
+                    print("    %s" % aksym(addr).decode('utf-8', 'replace'))
         if not args.kernel_stacks_only:
             if need_delimiter and k.user_stack_id >= 0 and k.kernel_stack_id >= 0:
                 print("    --")

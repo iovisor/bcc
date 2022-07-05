@@ -828,7 +828,8 @@ class BPF(object):
                     failed += 1
                     probes.append(line)
             if failed == len(matches):
-                raise Exception("Failed to attach BPF program %s to kprobe %s" %
+                raise Exception("Failed to attach BPF program %s to kprobe %s"
+                                ", it's not traceable (either non-existing, inlined, or marked as \"notrace\")" %
                                 (fn_name, '/'.join(probes)))
             return
 
@@ -837,7 +838,8 @@ class BPF(object):
         ev_name = b"p_" + event.replace(b"+", b"_").replace(b".", b"_")
         fd = lib.bpf_attach_kprobe(fn.fd, 0, ev_name, event, event_off, 0)
         if fd < 0:
-            raise Exception("Failed to attach BPF program %s to kprobe %s" %
+            raise Exception("Failed to attach BPF program %s to kprobe %s"
+                            ", it's not traceable (either non-existing, inlined, or marked as \"notrace\")" %
                             (fn_name, event))
         self._add_kprobe_fd(ev_name, fn_name, fd)
         return self
@@ -860,7 +862,8 @@ class BPF(object):
                     failed += 1
                     probes.append(line)
             if failed == len(matches):
-                raise Exception("Failed to attach BPF program %s to kretprobe %s" %
+                raise Exception("Failed to attach BPF program %s to kretprobe %s"
+                                ", it's not traceable (either non-existing, inlined, or marked as \"notrace\")" %
                                 (fn_name, '/'.join(probes)))
             return
 
@@ -869,7 +872,8 @@ class BPF(object):
         ev_name = b"r_" + event.replace(b"+", b"_").replace(b".", b"_")
         fd = lib.bpf_attach_kprobe(fn.fd, 1, ev_name, event, 0, maxactive)
         if fd < 0:
-            raise Exception("Failed to attach BPF program %s to kretprobe %s" %
+            raise Exception("Failed to attach BPF program %s to kretprobe %s"
+                            ", it's not traceable (either non-existing, inlined, or marked as \"notrace\")" %
                             (fn_name, event))
         self._add_kprobe_fd(ev_name, fn_name, fd)
         return self
@@ -1736,6 +1740,20 @@ class BPF(object):
     def donothing(self):
         """the do nothing exit handler"""
 
+
+    def close(self):
+        """close(self)
+
+        Closes all associated files descriptors. Attached BPF programs are not
+        detached.
+        """
+        for name, fn in list(self.funcs.items()):
+            os.close(fn.fd)
+            del self.funcs[name]
+        if self.module:
+            lib.bpf_module_destroy(self.module)
+            self.module = None
+
     def cleanup(self):
         # Clean up opened probes
         for k, v in list(self.kprobe_fds.items()):
@@ -1763,12 +1781,8 @@ class BPF(object):
         if self.tracefile:
             self.tracefile.close()
             self.tracefile = None
-        for name, fn in list(self.funcs.items()):
-            os.close(fn.fd)
-            del self.funcs[name]
-        if self.module:
-            lib.bpf_module_destroy(self.module)
-            self.module = None
+
+        self.close()
 
         # Clean up ringbuf
         if self._ringbuf_manager:
