@@ -102,6 +102,30 @@ int bcc_resolve_symname(const char *module, const char *symname,
                         struct bcc_symbol_option* option,
                         struct bcc_symbol *sym);
 
+/* Calculate the global address for 'offset' in a shared object loaded into
+ * a process
+ *
+ * Need to know (start_addr, file_offset) pairs for the /proc/PID/maps module
+ * entry containing the offset and the elf section containing the module's
+ * .text
+ */
+uint64_t __so_calc_global_addr(uint64_t mod_start_addr,
+                               uint64_t mod_file_offset,
+                               uint64_t elf_sec_start_addr,
+                               uint64_t elf_sec_file_offset, uint64_t offset);
+
+/* Given a global address which falls within a shared object's mapping in a
+ * process, calculate the corresponding 'offset' in the .so
+ *
+ * Need to know (start_addr, file_offset) pairs for the /proc/PID/maps module
+ * entry containing the offset and the elf section containing the module's
+ * .text
+ */
+uint64_t __so_calc_mod_offset(uint64_t mod_start_addr, uint64_t mod_file_offset,
+                              uint64_t elf_sec_start_addr,
+                              uint64_t elf_sec_file_offset,
+                              uint64_t global_addr);
+
 #ifdef __cplusplus
 }
 #endif
