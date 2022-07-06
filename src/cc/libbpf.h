@@ -44,7 +44,8 @@ struct bcc_create_map_attr {
 		__u32 btf_vmlinux_value_type_id;
 	};
 };
-struct bpf_load_program_attr;
+
+struct bpf_prog_load_opts;
 
 enum bpf_probe_attach_type {
 	BPF_PROBE_ENTRY,
@@ -88,10 +89,11 @@ int bcc_prog_load(enum bpf_prog_type prog_type, const char *name,
                   const struct bpf_insn *insns, int prog_len,
                   const char *license, unsigned kern_version,
                   int log_level, char *log_buf, unsigned log_buf_size);
-int bcc_prog_load_xattr(struct bpf_load_program_attr *attr,
+int bcc_prog_load_xattr(enum bpf_prog_type prog_type, const char *prog_name,
+						const char *license, const struct bpf_insn *insns,
+						struct bpf_prog_load_opts *opts,
                         int prog_len, char *log_buf,
                         unsigned log_buf_size, bool allow_rlimit);
-
 int bpf_attach_socket(int sockfd, int progfd);
 
 /* create RAW socket. If name is not NULL/a non-empty null-terminated string,

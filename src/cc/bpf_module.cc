@@ -982,26 +982,22 @@ int BPFModule::bcc_func_load(int prog_type, const char *name,
                 const char *license, unsigned kern_version,
                 int log_level, char *log_buf, unsigned log_buf_size,
                 const char *dev_name, unsigned flags, int expected_attach_type) {
-  struct bpf_load_program_attr attr = {};
+  struct bpf_prog_load_opts opts = {};
   unsigned func_info_cnt, line_info_cnt, finfo_rec_size, linfo_rec_size;
   void *func_info = NULL, *line_info = NULL;
   int ret;
 
-  attr.prog_type = (enum bpf_prog_type)prog_type;
   if (expected_attach_type != -1) {
-    attr.expected_attach_type = (enum bpf_attach_type)expected_attach_type;
+    opts.expected_attach_type = (enum bpf_attach_type)expected_attach_type;
   }
-  attr.name = name;
-  attr.insns = insns;
-  attr.license = license;
-  if (attr.prog_type != BPF_PROG_TYPE_TRACING &&
-      attr.prog_type != BPF_PROG_TYPE_EXT) {
-    attr.kern_version = kern_version;
+  if (prog_type != BPF_PROG_TYPE_TRACING &&
+      prog_type != BPF_PROG_TYPE_EXT) {
+    opts.kern_version = kern_version;
   }
-  attr.prog_flags = flags;
-  attr.log_level = log_level;
+  opts.prog_flags = flags;
+  opts.log_level = log_level;
   if (dev_name)
-    attr.prog_ifindex = if_nametoindex(dev_name);
+    opts.prog_ifindex = if_nametoindex(dev_name);
 
   if (btf_) {
     int btf_fd = btf_->get_fd();
@@ -1012,17 +1008,17 @@ int BPFModule::bcc_func_load(int prog_type, const char *name,
                              &finfo_rec_size, &line_info,
                              &line_info_cnt, &linfo_rec_size);
     if (!ret) {
-      attr.prog_btf_fd = btf_fd;
-      attr.func_info = func_info;
-      attr.func_info_cnt = func_info_cnt;
-      attr.func_info_rec_size = finfo_rec_size;
-      attr.line_info = line_info;
-      attr.line_info_cnt = line_info_cnt;
-      attr.line_info_rec_size = linfo_rec_size;
+      opts.prog_btf_fd = btf_fd;
+      opts.func_info = func_info;
+      opts.func_info_cnt = func_info_cnt;
+      opts.func_info_rec_size = finfo_rec_size;
+      opts.line_info = line_info;
+      opts.line_info_cnt = line_info_cnt;
+      opts.line_info_rec_size = linfo_rec_size;
     }
   }
 
-  ret = bcc_prog_load_xattr(&attr, prog_len, log_buf, log_buf_size, allow_rlimit_);
+  ret = bcc_prog_load_xattr((enum bpf_prog_type)prog_type, name, license, insns, &opts, prog_len, log_buf, log_buf_size, allow_rlimit_);
   if (btf_) {
     free(func_info);
     free(line_info);
