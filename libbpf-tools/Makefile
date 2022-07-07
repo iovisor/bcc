@@ -52,6 +52,7 @@ APPS = \
 	runqlat \
 	runqlen \
 	runqslower \
+	slabratetop \
 	softirqs \
 	solisten \
 	statsnoop \
