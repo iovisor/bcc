@@ -212,7 +212,7 @@ StatusTuple BPFTable::get_table_offline(
   std::unique_ptr<char[]> keys = std::make_unique<char[]>(count * desc.key_size);
   std::unique_ptr<char[]> values = std::make_unique<char[]>(count * desc.leaf_size);
   do {
-    size_t n_read = this->lookup_batch(keys.get(), values.get(), &cursor, count);
+    int64_t n_read = this->lookup_batch(keys.get(), values.get(), &cursor, count);
     if (n_read < 0) {
       r = StatusTuple(-1, "lookup_batch return error: %s", std::strerror(errno));
       return r;
