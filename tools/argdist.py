@@ -524,7 +524,7 @@ DATA_DECL
 class Tool(object):
         examples = """
 Probe specifier syntax:
-        {p,r,t,u}:{[library],category}:function(signature)[:type[,type...]:expr[,expr...][:filter]][#label]
+        {p,r,t,u}:{[library],category}:function(signature):type[,type...]:expr[,expr...][:filter]][#label]
 Where:
         p,r,t,u    -- probe at function entry, function exit, kernel
                       tracepoint, or USDT probe

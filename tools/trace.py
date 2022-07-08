@@ -827,7 +827,7 @@ trace -s /lib/x86_64-linux-gnu/libc.so.6,/bin/ping 'p:c:inet_pton' -U
                   help="allow to use STRCMP with binary values")
                 parser.add_argument('-s', "--sym_file_list", type=str,
                   metavar="SYM_FILE_LIST", dest="sym_file_list",
-                  help="coma separated list of symbol files to use \
+                  help="comma separated list of symbol files to use \
                   for symbol resolution")
                 parser.add_argument("-K", "--kernel-stack",
                   action="store_true", help="output kernel stack trace")
