@@ -144,14 +144,14 @@ class BPFTableBase {
   }
 
   int64_t lookup_batch(void* keys, void* values, void** cursor, const size_t count) {
-    __u32* out = nullptr;
+    __u32 out;
     __u32 n, n_read = 0;
     int err = 0;
 
     while (n_read < count && !err) {
       n = count - n_read;
       auto* in = static_cast<__u32*>(*cursor);
-      err = bpf_lookup_batch(desc.fd, in, out,
+      err = bpf_lookup_batch(desc.fd, in, &out,
                              static_cast<char*>(keys) + n_read * desc.key_size,
                              static_cast<char*>(values) + n_read * desc.leaf_size,
                              &n);
@@ -159,7 +159,8 @@ class BPFTableBase {
         return -1;
       }
       n_read += n;
-      *cursor = out;
+      if (in != nullptr)
+        *in = out;
     }
 
     return n_read;
@@ -192,7 +193,8 @@ inline BPFTableBase<void, void>::BPFTableBase(const typename std::enable_if<!is_
 template <class KeyType, class ValueType>
 template <typename T>
 inline BPFTableBase<KeyType, ValueType>::BPFTableBase(const typename std::enable_if<is_vector<T>::value, TableDesc>::type& desc) : desc(desc) {
-  if (desc.type == BPF_MAP_TYPE_PERCPU_ARRAY) {
+  if (desc.type == BPF_MAP_TYPE_PERCPU_ARRAY || desc.type == BPF_MAP_TYPE_PERCPU_CGROUP_STORAGE
+      || desc.type == BPF_MAP_TYPE_LRU_PERCPU_HASH || desc.type == BPF_MAP_TYPE_PERCPU_HASH) {
     if (desc.leaf_size != sizeof(typename ValueType::value_type)) {
       throw std::invalid_argument(
           "Table '" + desc.name +
