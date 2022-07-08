@@ -388,7 +388,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
                 print("    [Missed User Stack] %d" % k.w_u_stack_id)
             else:
                 for addr in waker_user_stack:
-                    print("    %s" % b.sym(addr, k.w_tgid))
+                    print("    %s" % b.sym(addr, k.w_tgid).decode('utf-8', 'replace'))
         if not args.user_stacks_only:
             if need_delimiter and k.w_u_stack_id > 0 and k.w_k_stack_id > 0:
                 print("    -")
@@ -396,7 +396,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
                 print("    [Missed Kernel Stack]")
             else:
                 for addr in waker_kernel_stack:
-                    print("    %s" % b.ksym(addr))
+                    print("    %s" % b.ksym(addr).decode('utf-8', 'replace'))
 
         # print waker/wakee delimiter
         print("    %-16s %s" % ("--", "--"))
@@ -406,7 +406,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
                 print("    [Missed Kernel Stack]")
             else:
                 for addr in target_kernel_stack:
-                    print("    %s" % b.ksym(addr))
+                    print("    %s" % b.ksym(addr).decode('utf-8', 'replace'))
         if not args.kernel_stacks_only:
             if need_delimiter and k.t_u_stack_id > 0 and k.t_k_stack_id > 0:
                 print("    -")
@@ -414,7 +414,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
                 print("    [Missed User Stack]")
             else:
                 for addr in target_user_stack:
-                    print("    %s" % b.sym(addr, k.t_tgid))
+                    print("    %s" % b.sym(addr, k.t_tgid).decode('utf-8', 'replace'))
         print("    %-16s %s %s" % ("target:", k.target.decode('utf-8', 'replace'), k.t_pid))
         print("        %d\n" % v.value)
 
