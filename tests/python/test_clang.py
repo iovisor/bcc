@@ -2,7 +2,7 @@
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-from bcc import BPF
+from bcc import BPF, BPFAttachType, BPFProgType
 from bcc.libbcc import lib
 import ctypes as ct
 from unittest import main, skipUnless, TestCase
@@ -54,6 +54,16 @@ int count_sched(struct pt_regs *ctx, struct task_struct *prev) {
 """
         b = BPF(text=text, debug=0)
         fn = b.load_func("count_sched", BPF.KPROBE)
+
+    def test_load_cgroup_sockopt_prog(self):
+        text = """
+int sockopt(struct bpf_sockopt* ctx){
+
+    return 0;
+}
+"""
+        b = BPF(text=text, debug=0)
+        fn =  b.load_func("sockopt", BPFProgType.CGROUP_SOCKOPT, device = None, attach_type = BPFAttachType.CGROUP_SETSOCKOPT)
 
     def test_probe_read2(self):
         text = """
