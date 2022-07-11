@@ -1281,6 +1281,9 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 #elif defined(__TARGET_ARCH_mips)
 #define bpf_target_mips
 #define bpf_target_defined
+#elif defined(__TARGET_ARCH_riscv64)
+#define bpf_target_riscv64
+#define bpf_target_defined
 #else
 #undef bpf_target_defined
 #endif
@@ -1297,6 +1300,8 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 #define bpf_target_powerpc
 #elif defined(__mips__)
 #define bpf_target_mips
+#elif defined(__riscv) && (__riscv_xlen == 64)
+#define bpf_target_riscv64
 #endif
 #endif
 
@@ -1357,6 +1362,18 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 #define PT_REGS_RC(x) ((x)->regs[2])
 #define PT_REGS_SP(x) ((x)->regs[29])
 #define PT_REGS_IP(x) ((x)->cp0_epc)
+#elif defined(bpf_target_riscv64)
+#define PT_REGS_PARM1(x) ((x)->a0)
+#define PT_REGS_PARM2(x) ((x)->a1)
+#define PT_REGS_PARM3(x) ((x)->a2)
+#define PT_REGS_PARM4(x) ((x)->a3)
+#define PT_REGS_PARM5(x) ((x)->a4)
+#define PT_REGS_PARM6(x) ((x)->a5)
+#define PT_REGS_RET(x) ((x)->ra)
+#define PT_REGS_FP(x) ((x)->s0) /* Works only with CONFIG_FRAME_POINTER */
+#define PT_REGS_RC(x) ((x)->a0)
+#define PT_REGS_SP(x) ((x)->sp)
+#define PT_REGS_IP(x) ((x)->pc)
 #else
 #error "bcc does not support this platform yet"
 #endif
