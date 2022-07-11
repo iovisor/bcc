@@ -989,6 +989,40 @@ static void *(*bpf_kptr_xchg)(void *map_value, void *ptr) = (void *)BPF_FUNC_kpt
 static void *(*bpf_map_lookup_percpu_elem)(void *map, const void *key, __u32 cpu) =
   (void *)BPF_FUNC_map_lookup_percpu_elem;
 
+struct mptcp_sock;
+struct bpf_dynptr;
+struct iphdr;
+struct ipv6hdr;
+struct tcphdr;
+static struct mptcp_sock *(*bpf_skc_to_mptcp_sock)(void *sk) =
+  (void *)BPF_FUNC_skc_to_mptcp_sock;
+static long (*bpf_dynptr_from_mem)(void *data, __u32 size, __u64 flags,
+				   struct bpf_dynptr *ptr) =
+  (void *)BPF_FUNC_dynptr_from_mem;
+static long (*bpf_ringbuf_reserve_dynptr)(void *ringbuf, __u32 size, __u64 flags,
+					  struct bpf_dynptr *ptr) =
+  (void *)BPF_FUNC_ringbuf_reserve_dynptr;
+static void (*bpf_ringbuf_submit_dynptr)(struct bpf_dynptr *ptr, __u64 flags) =
+  (void *)BPF_FUNC_ringbuf_submit_dynptr;
+static void (*bpf_ringbuf_discard_dynptr)(struct bpf_dynptr *ptr, __u64 flags) =
+  (void *)BPF_FUNC_ringbuf_discard_dynptr;
+static long (*bpf_dynptr_read)(void *dst, __u32 len, struct bpf_dynptr *src, __u32 offset) =
+  (void *)BPF_FUNC_dynptr_read;
+static long (*bpf_dynptr_write)(struct bpf_dynptr *dst, __u32 offset, void *src, __u32 len) =
+  (void *)BPF_FUNC_dynptr_write;
+static void *(*bpf_dynptr_data)(struct bpf_dynptr *ptr, __u32 offset, __u32 len) =
+  (void *)BPF_FUNC_dynptr_data;
+static __s64 (*bpf_tcp_raw_gen_syncookie_ipv4)(struct iphdr *iph, struct tcphdr *th,
+					       __u32 th_len) =
+  (void *)BPF_FUNC_tcp_raw_gen_syncookie_ipv4;
+static __s64 (*bpf_tcp_raw_gen_syncookie_ipv6)(struct ipv6hdr *iph, struct tcphdr *th,
+					       __u32 th_len) =
+  (void *)BPF_FUNC_tcp_raw_gen_syncookie_ipv6;
+static long (*bpf_tcp_raw_check_syncookie_ipv4)(struct iphdr *iph, struct tcphdr *th) =
+  (void *)BPF_FUNC_tcp_raw_check_syncookie_ipv4;
+static long (*bpf_tcp_raw_check_syncookie_ipv6)(struct ipv6hdr *iph, struct tcphdr *th) =
+  (void *)BPF_FUNC_tcp_raw_check_syncookie_ipv6;
+
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
  */

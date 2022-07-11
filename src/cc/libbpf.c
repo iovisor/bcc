@@ -300,6 +300,18 @@ static struct bpf_helper helpers[] = {
   {"ima_file_hash", "5.18"},
   {"kptr_xchg", "5.19"},
   {"map_lookup_percpu_elem", "5.19"},
+  {"skc_to_mptcp_sock", "5.19"},
+  {"dynptr_from_mem", "5.19"},
+  {"ringbuf_reserve_dynptr", "5.19"},
+  {"ringbuf_submit_dynptr", "5.19"},
+  {"ringbuf_discard_dynptr", "5.19"},
+  {"dynptr_read", "5.19"},
+  {"dynptr_write", "5.19"},
+  {"dynptr_data", "5.19"},
+  {"tcp_raw_gen_syncookie_ipv4", "5.20"},
+  {"tcp_raw_gen_syncookie_ipv6", "5.20"},
+  {"tcp_raw_check_syncookie_ipv4", "5.20"},
+  {"tcp_raw_check_syncookie_ipv6", "5.20"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
