@@ -13,17 +13,24 @@
  * see:
  *     https://github.com/torvalds/linux/commit/2f064a59a1
  */
-struct task_struct___x {
+struct task_struct___new {
 	unsigned int __state;
+} __attribute__((preserve_access_index));
+
+struct task_struct___old {
+	volatile long state;
 } __attribute__((preserve_access_index));
 
 static __always_inline __s64 get_task_state(void *task)
 {
-	struct task_struct___x *t = task;
+	struct task_struct___new *t = task;
+	struct task_struct___old *o = task;
 
 	if (bpf_core_field_exists(t->__state))
 		return BPF_CORE_READ(t, __state);
-	return BPF_CORE_READ((struct task_struct *)task, state);
+	else if (bpf_core_field_exists(o->state))
+		return BPF_CORE_READ(o, state);
+	return 0;
 }
 
 /**
@@ -32,17 +39,24 @@ static __always_inline __s64 get_task_state(void *task)
  * see:
  *     https://github.com/torvalds/linux/commit/309dca309fc3
  */
-struct bio___x {
+struct bio___new {
 	struct block_device *bi_bdev;
+} __attribute__((preserve_access_index));
+
+struct bio___old {
+	struct gendisk *bi_disk;
 } __attribute__((preserve_access_index));
 
 static __always_inline struct gendisk *get_gendisk(void *bio)
 {
-	struct bio___x *b = bio;
+	struct bio___new *b = bio;
+	struct bio___old *c = bio;
 
 	if (bpf_core_field_exists(b->bi_bdev))
 		return BPF_CORE_READ(b, bi_bdev, bd_disk);
-	return BPF_CORE_READ((struct bio *)bio, bi_disk);
+	else if (bpf_core_field_exists(c->bi_disk))
+		return BPF_CORE_READ(c, bi_disk);
+	return NULL;
 }
 
 /**
