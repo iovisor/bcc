@@ -51,6 +51,13 @@ def positive_int(val):
         raise argparse.ArgumentTypeError("must be positive")
     return ival
 
+def positive_int_list(val):
+    vlist = val.split(",")
+    if len(vlist) <= 0:
+        raise argparse.ArgumentTypeError("must be an integer list")
+
+    return [positive_int(v) for v in vlist]
+
 def positive_nonzero_int(val):
     ival = positive_int(val)
     if ival == 0:
@@ -81,10 +88,10 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
 thread_group = parser.add_mutually_exclusive_group()
-thread_group.add_argument("-p", "--pid", type=positive_int,
-    help="profile process with this PID only")
-thread_group.add_argument("-L", "--tid", type=positive_int,
-    help="profile thread with this TID only")
+thread_group.add_argument("-p", "--pid", type=positive_int_list,
+    help="profile process with one or more comma separated PIDs only")
+thread_group.add_argument("-L", "--tid", type=positive_int_list,
+    help="profile thread with one or more comma separated TIDs only")
 # TODO: add options for user/kernel threads only
 stack_group = parser.add_mutually_exclusive_group()
 stack_group.add_argument("-U", "--user-stacks-only", action="store_true",
@@ -122,7 +129,6 @@ parser.add_argument("--mntnsmap",
 
 # option logic
 args = parser.parse_args()
-pid = int(args.pid) if args.pid is not None else -1
 duration = int(args.duration)
 debug = 0
 need_delimiter = args.delimited and not (args.kernel_stacks_only or
@@ -214,12 +220,13 @@ bpf_text = bpf_text.replace('IDLE_FILTER', idle_filter)
 
 # set process/thread filter
 thread_context = ""
+thread_filter = ""
 if args.pid is not None:
     thread_context = "PID %s" % args.pid
-    thread_filter = 'tgid == %s' % args.pid
+    thread_filter = " || ".join("tgid == " + str(pid) for pid in args.pid)
 elif args.tid is not None:
     thread_context = "TID %s" % args.tid
-    thread_filter = 'pid == %s' % args.tid
+    thread_filter = " || ".join("pid == " + str(tid) for tid in args.tid)
 else:
     thread_context = "all threads"
     thread_filter = '1'
