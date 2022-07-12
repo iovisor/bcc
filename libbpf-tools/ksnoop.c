@@ -464,7 +464,7 @@ static int get_func_ip_mod(struct func *func)
 	f = fopen("/proc/kallsyms", "r");
 	if (!f) {
 		err = errno;
-		p_err("failed to open /proc/kallsyms: %d", strerror(err));
+		p_err("failed to open /proc/kallsyms: %s", strerror(err));
 		return err;
 	}
 
@@ -563,7 +563,7 @@ static int parse_trace(char *str, struct trace *trace)
 	trace->dump = btf_dump__new(trace->btf, NULL, &opts, trace_printf);
 	if (!trace->dump) {
 		ret = -errno;
-		p_err("could not create BTF dump : %n", strerror(-ret));
+		p_err("could not create BTF dump : %s", strerror(-ret));
 		return -EINVAL;
 	}
 
