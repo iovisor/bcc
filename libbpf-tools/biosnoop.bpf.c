@@ -5,6 +5,7 @@
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_tracing.h>
 #include "biosnoop.h"
+#include "core_fixes.bpf.h"
 
 #define MAX_ENTRIES	10240
 
@@ -14,10 +15,6 @@ const volatile bool filter_dev = false;
 const volatile __u32 targ_dev = 0;
 
 extern __u32 LINUX_KERNEL_VERSION __kconfig;
-
-struct request_queue___x {
-	struct gendisk *disk;
-} __attribute__((preserve_access_index));
 
 struct {
 	__uint(type, BPF_MAP_TYPE_CGROUP_ARRAY);
@@ -95,13 +92,7 @@ int trace_rq_start(struct request *rq, bool insert)
 
 	stagep = bpf_map_lookup_elem(&start, &rq);
 	if (!stagep) {
-		struct request_queue___x *q = (void *)BPF_CORE_READ(rq, q);
-		struct gendisk *disk;
-
-		if (bpf_core_field_exists(q->disk))
-			disk = BPF_CORE_READ(q, disk);
-		else
-			disk = BPF_CORE_READ(rq, rq_disk);
+		struct gendisk *disk = get_disk(rq);
 
 		stage.dev = disk ? MKDEV(BPF_CORE_READ(disk, major),
 				BPF_CORE_READ(disk, first_minor)) : 0;
