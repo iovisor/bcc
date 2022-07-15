@@ -109,45 +109,38 @@ static void *get_symbol_resolver(void) {
   return kresolver;
 }
 
-static std::string check_bpf_probe_read_kernel(void) {
-  bool is_probe_read_kernel;
-  void *resolver = get_symbol_resolver();
-  uint64_t addr = 0;
-  is_probe_read_kernel = bcc_symcache_resolve_name(resolver, nullptr,
-                          "bpf_probe_read_kernel", &addr) >= 0 ? true: false;
-
-  /* If bpf_probe_read is not found (ARCH_HAS_NON_OVERLAPPING_ADDRESS_SPACE) is
-   * not set in newer kernel, then bcc would anyway fail */
-  if (is_probe_read_kernel)
-    return "bpf_probe_read_kernel";
-  else
-    return "bpf_probe_read";
+static bool have_overlapping_address_spaces(void) {
+#if defined(__s390x__)
+  // On s390x, kernel and user address spaces might overlap, so it can be
+  // impossible to determine which address space a given address belongs to.
+  return true;
+#else
+  return false;
+#endif
 }
 
-static std::string check_bpf_probe_read_user(llvm::StringRef probe,
-        bool& overlap_addr) {
-  if (probe.str() == "bpf_probe_read_user" ||
-      probe.str() == "bpf_probe_read_user_str") {
-    // Check for probe_user symbols in backported kernel before fallback
-    void *resolver = get_symbol_resolver();
-    uint64_t addr = 0;
-    bool found = bcc_symcache_resolve_name(resolver, nullptr,
-                  "bpf_probe_read_user", &addr) >= 0 ? true: false;
-    if (found)
-      return probe.str();
+static std::string check_bpf_probe_read(bool probe_read_user) {
+  void *resolver = get_symbol_resolver();
+  uint64_t addr = 0;
+  const char *fn =
+    (probe_read_user ? "bpf_probe_read_user" : "bpf_probe_read_kernel");
 
-    /* For arch with overlapping address space, dont use bpf_probe_read for
-     * user read. Just error out */
-#if defined(__s390x__)
-    overlap_addr = true;
+  // Use bpf_probe_read_{kernel,user}() if available. If they are not, try
+  // bpf_probe_read().
+  if (bcc_symcache_resolve_name(resolver, nullptr, fn, &addr) >= 0)
+    return fn;
+
+  // bpf_probe_read() is unreliable if the system could have overlapping
+  // user and kernel address spaces. Just error out.
+  if (have_overlapping_address_spaces())
     return "";
-#endif
 
-    if (probe.str() == "bpf_probe_read_user")
-      return "bpf_probe_read";
-    else
-      return "bpf_probe_read_str";
-  }
+  fn = "bpf_probe_read";
+  if (bcc_symcache_resolve_name(resolver, nullptr, fn, &addr) >= 0)
+    return fn;
+
+  // There are no bpf_probe_read* functions, error should be reported by
+  // the caller.
   return "";
 }
 
@@ -335,8 +328,7 @@ ProbeVisitor::ProbeVisitor(ASTContext &C, Rewriter &rewriter,
                            set<Decl *> &m, bool track_helpers) :
   C(C), rewriter_(rewriter), m_(m), ctx_(nullptr), track_helpers_(track_helpers),
   addrof_stmt_(nullptr), is_addrof_(false) {
-  const char **calling_conv_regs = get_call_conv();
-  has_overlap_kuaddr_ = calling_conv_regs == calling_conv_regs_s390x;
+  probe_read_kernel_fn_ = check_bpf_probe_read(false);
 }
 
 bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbDerefs) {
@@ -507,12 +499,15 @@ bool ProbeVisitor::VisitUnaryOperator(UnaryOperator *E) {
   if (!ProbeChecker(sub, ptregs_, track_helpers_).needs_probe())
     return true;
   memb_visited_.insert(E);
+  if (probe_read_kernel_fn_ == "") {
+    error(GET_BEGINLOC(E), "bpf_probe_read_kernel() is not available in the kernel.");
+    return false;
+  }
+
   string pre, post;
-  pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
-  if (has_overlap_kuaddr_)
-    pre += " bpf_probe_read_kernel(&_val, sizeof(_val), (u64)";
-  else
-    pre += " bpf_probe_read(&_val, sizeof(_val), (u64)";
+  pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val)); ";
+  pre += probe_read_kernel_fn_;
+  pre += "(&_val, sizeof(_val), (u64)";
   post = "); _val; })";
   rewriter_.ReplaceText(expansionLoc(E->getOperatorLoc()), 1, pre);
   rewriter_.InsertTextAfterToken(expansionLoc(GET_ENDLOC(sub)), post);
@@ -569,14 +564,17 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   if (E->getType()->isArrayType())
     return true;
 
+  if (probe_read_kernel_fn_ == "") {
+    error(GET_BEGINLOC(E), "bpf_probe_read_kernel() is not available in the kernel.");
+    return false;
+  }
+
   string rhs = rewriter_.getRewrittenText(expansionRange(SourceRange(rhs_start, GET_ENDLOC(E))));
   string base_type = base->getType()->getPointeeType().getAsString();
   string pre, post;
-  pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
-  if (has_overlap_kuaddr_)
-    pre += " bpf_probe_read_kernel(&_val, sizeof(_val), (u64)&";
-  else
-    pre += " bpf_probe_read(&_val, sizeof(_val), (u64)&";
+  pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val)); ";
+  pre += probe_read_kernel_fn_;
+  pre += "(&_val, sizeof(_val), (u64)&";
   post = rhs + "); _val; })";
   rewriter_.InsertText(expansionLoc(GET_BEGINLOC(E)), pre);
   rewriter_.ReplaceText(expansionRange(SourceRange(member, GET_ENDLOC(E))), post);
@@ -626,11 +624,14 @@ bool ProbeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
   if (rewriter_.getRewrittenText(lbracket_range).size() == 0)
     return true;
 
-  pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
-  if (has_overlap_kuaddr_)
-    pre += " bpf_probe_read_kernel(&_val, sizeof(_val), (u64)((";
-  else
-    pre += " bpf_probe_read(&_val, sizeof(_val), (u64)((";
+  if (probe_read_kernel_fn_ == "") {
+    error(GET_BEGINLOC(E), "bpf_probe_read_kernel() is not available in the kernel.");
+    return false;
+  }
+
+  pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val)); ";
+  pre += probe_read_kernel_fn_;
+  pre += "(&_val, sizeof(_val), (u64)((";
   if (isMemberDereference(base)) {
     pre += "&";
     // If the base of the array subscript is a member dereference, we'll rewrite
@@ -723,8 +724,7 @@ DiagnosticBuilder ProbeVisitor::error(SourceLocation loc, const char (&fmt)[N]) 
 
 BTypeVisitor::BTypeVisitor(ASTContext &C, BFrontendAction &fe)
     : C(C), diag_(C.getDiagnostics()), fe_(fe), rewriter_(fe.rewriter()), out_(llvm::errs()) {
-  const char **calling_conv_regs = get_call_conv();
-  has_overlap_kuaddr_ = calling_conv_regs == calling_conv_regs_s390x;
+  probe_read_kernel_fn_ = check_bpf_probe_read(false);
 }
 
 void BTypeVisitor::genParamDirectAssign(FunctionDecl *D, string& preamble,
@@ -765,11 +765,12 @@ void BTypeVisitor::genParamIndirectAssign(FunctionDecl *D, string& preamble,
       string text = rewriter_.getRewrittenText(expansionRange(arg->getSourceRange()));
       size_t d = idx - 1;
       const char *reg = calling_conv_regs[d];
-      preamble += "\n " + text + ";";
-      if (has_overlap_kuaddr_)
-        preamble += " bpf_probe_read_kernel";
-      else
-        preamble += " bpf_probe_read";
+
+      if (probe_read_kernel_fn_ == "") {
+        error(GET_BEGINLOC(D), "bpf_probe_read_kernel() is not available in the kernel.");
+      }
+      preamble += "\n " + text + "; ";
+      preamble += probe_read_kernel_fn_;
       preamble += "(&" + arg->getName().str() + ", sizeof(" +
                   arg->getName().str() + "), &" + new_ctx + "->" +
                   string(reg) + ");";
@@ -1146,16 +1147,6 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
 
     string text;
 
-    // Bail out when bpf_probe_read_user is unavailable for overlapping address
-    // space arch.
-    bool overlap_addr = false;
-    std::string probe = check_bpf_probe_read_user(Decl->getName(),
-                          overlap_addr);
-    if (overlap_addr) {
-      error(GET_BEGINLOC(Call), "bpf_probe_read_user not found. Use latest kernel");
-      return false;
-    }
-
     if (AsmLabelAttr *A = Decl->getAttr<AsmLabelAttr>()) {
       // Functions with the tag asm("llvm.bpf.extra") are implemented in the
       // rewriter rather than as a macro since they may also include nested
@@ -1204,14 +1195,12 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           text += "_bpf_readarg_" + current_fn_ + "_" + args[0] + "(" +
                   args[1] + ", &__addr, sizeof(__addr));";
 
-          bool overlap_addr = false;
-          text += check_bpf_probe_read_user(StringRef("bpf_probe_read_user"),
-                  overlap_addr);
-          if (overlap_addr) {
+          std::string probe_fn = check_bpf_probe_read(true);
+          if (probe_fn == "") {
             error(GET_BEGINLOC(Call), "bpf_probe_read_user not found. Use latest kernel");
             return false;
           }
-
+          text += probe_fn;
           text += "(" + args[2] + ", " + args[3] + ", (void *)__addr);";
           text += "})";
           rewriter_.ReplaceText(expansionRange(Call->getSourceRange()), text);
@@ -1740,7 +1729,7 @@ void BFrontendAction::DoMiscWorkAround() {
   // to guard certain fields. The workaround here intends to define
   // CONFIG_CC_STACKPROTECTOR properly based on other configs, so it relieved any bpf
   // program (using task_struct, etc.) of patching the below code.
-  std::string probefunc = check_bpf_probe_read_kernel();
+  std::string probefunc = check_bpf_probe_read(false);
   if (kresolver) {
     bcc_free_symcache(kresolver, -1);
     kresolver = NULL;
