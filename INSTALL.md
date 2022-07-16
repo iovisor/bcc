@@ -12,7 +12,7 @@
   - [Amazon Linux 1](#amazon-linux-1---binary)
   - [Amazon Linux 2](#amazon-linux-2---binary)
   - [Alpine](#alpine---binary)
-  - [WSL](#wsl---binary)
+  - [WSL](#wslwindows-subsystem-for-linux---binary)
 * [Source](#source)
   - [libbpf Submodule](#libbpf-submodule)
   - [Debian](#debian---source)
@@ -271,17 +271,13 @@ sudo docker run --rm -it --privileged \
   alpine:3.12
 ```
 
-## WSL - Binary
+## WSL(Windows Subsystem for Linux) - Binary
 
 ### Install dependencies
 The compiling depends on the headers and lib of linux kernel module which was not found in wsl distribution packages repo. We have to compile the kernel moudle manually.
 ```bash
-apt-get install flex bison libssl-dev libelf-dev
+apt-get install flex bison libssl-dev libelf-dev dwarves
 ```
-For wsl kernel 5.10.y
-```
-apt-get install dwarves
-``` 
 ### Install packages
 ```
 cp Microsoft/config-wsl .config
