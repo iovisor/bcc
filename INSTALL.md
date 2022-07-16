@@ -12,6 +12,7 @@
   - [Amazon Linux 1](#amazon-linux-1---binary)
   - [Amazon Linux 2](#amazon-linux-2---binary)
   - [Alpine](#alpine---binary)
+  - [WSL](#wslwindows-subsystem-for-linux---binary)
 * [Source](#source)
   - [libbpf Submodule](#libbpf-submodule)
   - [Debian](#debian---source)
@@ -268,6 +269,29 @@ sudo docker run --rm -it --privileged \
   -v /sys:/sys:ro \
   -v /usr/src:/usr/src:ro \
   alpine:3.12
+```
+
+## WSL(Windows Subsystem for Linux) - Binary
+
+### Install dependencies
+The compiling depends on the headers and lib of linux kernel module which was not found in wsl distribution packages repo. We have to compile the kernel moudle manually.
+```bash
+apt-get install flex bison libssl-dev libelf-dev dwarves
+```
+### Install packages
+```
+cp Microsoft/config-wsl .config
+make oldconfig && make prepare
+make scripts
+make modules && make modules_install
+# if your kernel version is 4.19.y
+mv /lib/modules/x.y.z-microsoft-standard+ /lib/modules/x.y.z-microsoft-standard 
+````
+Then you can install bcc tools package according your distribution.
+
+If you met some problems, try to 
+```
+sudo mount -t debugfs debugfs /sys/kernel/debug
 ```
 
 # Source
