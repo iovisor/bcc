@@ -90,7 +90,7 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
   std::vector<clang::ParmVarDecl *> fn_args_;
   std::set<clang::Expr *> visited_;
   std::string current_fn_;
-  bool has_overlap_kuaddr_;
+  bool cannot_fall_back_safely;
 };
 
 // Do a depth-first search to rewrite all pointers that need to be probed
@@ -130,7 +130,7 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   std::list<int> ptregs_returned_;
   const clang::Stmt *addrof_stmt_;
   bool is_addrof_;
-  bool has_overlap_kuaddr_;
+  bool cannot_fall_back_safely;
 };
 
 // A helper class to the frontend action, walks the decls
