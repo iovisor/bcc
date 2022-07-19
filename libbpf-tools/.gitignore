@@ -34,6 +34,7 @@
 /klockstat
 /ksnoop
 /llcstat
+/lsan
 /memleak
 /mdflush
 /mountsnoop
