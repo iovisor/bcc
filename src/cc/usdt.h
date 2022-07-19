@@ -81,6 +81,7 @@ public:
 
   friend class ArgumentParser;
   friend class ArgumentParser_aarch64;
+  friend class ArgumentParser_loongarch64;
   friend class ArgumentParser_powerpc64;
   friend class ArgumentParser_s390x;
   friend class ArgumentParser_x64;
@@ -132,6 +133,17 @@ class ArgumentParser_aarch64 : public ArgumentParser {
  public:
   bool parse(Argument *dest);
   ArgumentParser_aarch64(const char *arg) : ArgumentParser(arg) {}
+};
+
+class ArgumentParser_loongarch64 : public ArgumentParser {
+ private:
+  bool parse_register(ssize_t pos, ssize_t &new_pos, std::string &reg_name);
+  bool parse_size(ssize_t pos, ssize_t &new_pos, optional<int> *arg_size);
+  bool parse_mem(ssize_t pos, ssize_t &new_pos, Argument *dest);
+
+ public:
+  bool parse(Argument *dest);
+  ArgumentParser_loongarch64(const char *arg) : ArgumentParser(arg) {}
 };
 
 class ArgumentParser_powerpc64 : public ArgumentParser {
