@@ -38,6 +38,8 @@ Location::Location(uint64_t addr, const std::string &bin_path, const char *arg_f
 
 #ifdef __aarch64__
   ArgumentParser_aarch64 parser(arg_fmt);
+#elif __loongarch64
+  ArgumentParser_loongarch64 parser(arg_fmt);
 #elif __powerpc64__
   ArgumentParser_powerpc64 parser(arg_fmt);
 #elif __s390x__

@@ -38,7 +38,7 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
   //uname -m | sed -e s/i.86/x86/ -e s/x86_64/x86/ -e s/sun4u/sparc64/ -e s/arm.*/arm/
   //               -e s/sa110/arm/ -e s/s390x/s390/ -e s/parisc64/parisc/
   //               -e s/ppc.*/powerpc/ -e s/mips.*/mips/ -e s/sh[234].*/sh/
-  //               -e s/aarch64.*/arm64/
+  //               -e s/aarch64.*/arm64/ -e s/loongarch.*/loongarch/
 
   string arch;
   const char *archenv = getenv("ARCH");
@@ -68,6 +68,8 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
     arch = "mips";
   } else if (!arch.compare(0, 5, "riscv")) {
     arch = "riscv";
+  } else if (!arch.compare(0, 9, "loongarch")) {
+    arch = "loongarch";
   } else if (!arch.compare(0, 2, "sh")) {
     arch = "sh";
   }

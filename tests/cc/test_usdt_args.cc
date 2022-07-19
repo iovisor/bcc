@@ -53,13 +53,16 @@ static void verify_register(USDT::ArgumentParser &parser, int arg_size,
 }
 
 /* supported arches only */
-#if defined(__aarch64__) || defined(__powerpc64__) || \
-    defined(__s390x__) || defined(__x86_64__)
+#if defined(__aarch64__) || defined(__loongarch64) || \
+    defined(__powerpc64__) || defined(__s390x__) || \
+    defined(__x86_64__)
 
 TEST_CASE("test usdt argument parsing", "[usdt]") {
   SECTION("parse failure") {
 #ifdef __aarch64__
     USDT::ArgumentParser_aarch64 parser("4@[x32,200]");
+#elif __loongarch64
+    USDT::ArgumentParser_loongarch64 parser("4@[$r32,200]");
 #elif __powerpc64__
     USDT::ArgumentParser_powerpc64 parser("4@-12(42)");
 #elif __s390x__
@@ -80,6 +83,15 @@ TEST_CASE("test usdt argument parsing", "[usdt]") {
 #ifdef __aarch64__
     USDT::ArgumentParser_aarch64 parser(
         "-1@x0 4@5 8@[x12] -4@[x30,-40] -4@[x31,-40] 8@[sp, 120]");
+    verify_register(parser, -1, "regs[0]");
+    verify_register(parser, 4, 5);
+    verify_register(parser, 8, "regs[12]", 0);
+    verify_register(parser, -4, "regs[30]", -40);
+    verify_register(parser, -4, "sp", -40);
+    verify_register(parser, 8, "sp", 120);
+#elif __loongarch64
+    USDT::ArgumentParser_loongarch64 parser(
+	"-1@$r0 4@5 8@[$r12] -4@[$r30,-40] -4@[$r3,-40] 8@[sp, 120]");
     verify_register(parser, -1, "regs[0]");
     verify_register(parser, 4, 5);
     verify_register(parser, 8, "regs[12]", 0);
