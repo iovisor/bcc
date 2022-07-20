@@ -76,8 +76,6 @@ bpf_text = """
 
 BPF_HASH(start, u32);
 
-struct rq;
-
 struct data_t {
     u32 pid;
     u32 prev_pid;
