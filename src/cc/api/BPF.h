@@ -23,10 +23,10 @@
 #include <string>
 
 #include "BPFTable.h"
+#include "bcc_bpf_uapi_inc.h"
 #include "bcc_exception.h"
 #include "bcc_syms.h"
 #include "bpf_module.h"
-#include "linux/bpf.h"
 #include "libbpf.h"
 #include "table_storage.h"
 

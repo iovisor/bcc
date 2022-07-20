@@ -18,10 +18,11 @@
 #ifndef LIBBPF_H
 #define LIBBPF_H
 
-#include "linux/bpf.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <sys/types.h>
+
+#include "bcc_bpf_uapi_inc.h"
 
 #ifdef __cplusplus
 extern "C" {

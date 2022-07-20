@@ -30,7 +30,6 @@
 #include <utility>
 #include <vector>
 #include <iostream>
-#include <linux/bpf.h>
 
 #include <clang/Basic/FileManager.h>
 #include <clang/Basic/TargetInfo.h>
@@ -50,6 +49,7 @@
 
 #include <llvm/IR/Module.h>
 
+#include "bcc_bpf_uapi_inc.h"
 #include "bcc_exception.h"
 #include "bpf_module.h"
 #include "exported_files.h"

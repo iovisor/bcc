@@ -26,13 +26,13 @@
 #include <utility>
 #include <vector>
 
+#include "bcc_bpf_uapi_inc.h"
 #include "bcc_exception.h"
 #include "bcc_syms.h"
 #include "bpf_module.h"
 #include "libbpf.h"
 #include "perf_reader.h"
 #include "table_desc.h"
-#include "linux/bpf.h"
 
 namespace ebpf {
 

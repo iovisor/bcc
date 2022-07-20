@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include <linux/bpf.h>
 #include <linux/perf_event.h>
 #include <unistd.h>
 #include <cstdio>

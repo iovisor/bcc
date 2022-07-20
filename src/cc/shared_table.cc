@@ -17,8 +17,8 @@
 #include <unistd.h>
 #include <iostream>
 
+#include "bcc_bpf_uapi_inc.h"
 #include "common.h"
-#include "linux/bpf.h"
 #include "table_storage.h"
 #include "table_storage_impl.h"
 

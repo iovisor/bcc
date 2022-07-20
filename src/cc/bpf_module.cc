@@ -16,7 +16,6 @@
 #include "bpf_module.h"
 
 #include <fcntl.h>
-#include <linux/bpf.h>
 #include <llvm-c/Transforms/IPO.h>
 #include <llvm/ExecutionEngine/MCJIT.h>
 #include <llvm/ExecutionEngine/SectionMemoryManager.h>
@@ -50,6 +49,7 @@
 #include <iostream>
 #include <vector>
 
+#include "bcc_bpf_uapi_inc.h"
 #include "bcc_btf.h"
 #include "bcc_debug.h"
 #include "bcc_elf.h"

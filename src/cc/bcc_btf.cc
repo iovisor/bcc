@@ -17,8 +17,8 @@
 #include "bcc_btf.h"
 #include <stdarg.h>
 #include <string.h>
-#include "linux/btf.h"
 #include "libbpf.h"
+#include "bcc_bpf_uapi_inc.h"
 #include "bcc_libbpf_inc.h"
 #include <vector>
 #include <byteswap.h>

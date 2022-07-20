@@ -21,7 +21,7 @@ extern "C" {
 #endif
 
 #include <stdint.h>
-#include "linux/bpf.h"
+#include "bcc_bpf_uapi_inc.h"
 #include "bcc_proc.h"
 
 struct bcc_symbol {

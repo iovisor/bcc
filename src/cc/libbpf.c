@@ -22,8 +22,6 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <limits.h>
-#include <linux/bpf.h>
-#include <linux/bpf_common.h>
 #include <linux/if_packet.h>
 #include <linux/types.h>
 #include <linux/perf_event.h>
@@ -48,6 +46,7 @@
 #include <unistd.h>
 #include <linux/if_alg.h>
 
+#include "bcc_bpf_uapi_inc.h"
 #include "libbpf.h"
 #include "perf_reader.h"
 

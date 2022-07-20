@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <linux/bpf.h>
 #include <linux/version.h>
 #include <sys/utsname.h>
 #include <unistd.h>
@@ -29,6 +28,7 @@
 
 #include "frontend_action_common.h"
 #include "b_frontend_action.h"
+#include "bcc_bpf_uapi_inc.h"
 #include "bpf_module.h"
 #include "common.h"
 #include "loader.h"
