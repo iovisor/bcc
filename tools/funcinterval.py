@@ -33,6 +33,10 @@ examples = """examples:
     ./funcinterval -p 181 vfs_read
     # time the interval of mm_vmscan_direct_reclaim_begin tracepoint
     ./funcinterval t:vmscan:mm_vmscan_direct_reclaim_begin
+    # time the interval of c:malloc used by top every 3 seconds
+    ./funcinterval -p `pidof -s top` -i 3 c:malloc
+    # time /usr/local/bin/python main function
+    ./funcinterval /usr/local/bin/python:main
 """
 parser = argparse.ArgumentParser(
     description="Time interval and print latency as a histogram",
@@ -69,8 +73,14 @@ def bail(error):
 
 parts = args.pattern.split(':')
 if len(parts) == 1:
-    attach_type = "function"
+    attach_type = "kprobe function"
     pattern = args.pattern
+elif len(parts) == 2:
+    attach_type = "uprobe function"
+    elf = BPF.find_library(parts[0]) or BPF.find_exe(parts[0])
+    if not elf:
+        bail("Can't find elf binary %s" % elf)
+    pattern = parts[1]
 elif len(parts) == 3:
     attach_type = "tracepoint"
     pattern = ':'.join(parts[1:])
@@ -99,7 +109,7 @@ int trace_func_entry(struct pt_regs *ctx)
     FACTOR
 
     // store as histogram
-    dist.increment(bpf_log2l(delta));
+    dist.atomic_increment(bpf_log2l(delta));
 
 out:
     start.update(&index, &ts);
@@ -140,6 +150,11 @@ b = BPF(text=bpf_text)
 if len(parts) == 1:
     b.attach_kprobe(event=pattern, fn_name="trace_func_entry")
     matched = b.num_open_kprobes()
+elif len(parts) == 2:
+    # sym_re is regular expression for symbols
+    b.attach_uprobe(name = elf, sym_re = pattern, fn_name = "trace_func_entry",
+                    pid = args.pid or -1)
+    matched = b.num_open_uprobes()
 elif len(parts) == 3:
     b.attach_tracepoint(tp=pattern, fn_name="trace_func_entry")
     matched = b.num_open_tracepoints()

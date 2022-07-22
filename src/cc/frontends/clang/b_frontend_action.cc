@@ -45,6 +45,9 @@ constexpr int MAX_CALLING_CONV_REGS = 6;
 const char *calling_conv_regs_x86[] = {
   "di", "si", "dx", "cx", "r8", "r9"
 };
+const char *calling_conv_syscall_regs_x86[] = {
+  "di", "si", "dx", "r10", "r8", "r9"
+};
 const char *calling_conv_regs_ppc[] = {"gpr[3]", "gpr[4]", "gpr[5]",
                                        "gpr[6]", "gpr[7]", "gpr[8]"};
 
@@ -54,7 +57,13 @@ const char *calling_conv_regs_s390x[] = {"gprs[2]", "gprs[3]", "gprs[4]",
 const char *calling_conv_regs_arm64[] = {"regs[0]", "regs[1]", "regs[2]",
                                        "regs[3]", "regs[4]", "regs[5]"};
 
-void *get_call_conv_cb(bcc_arch_t arch)
+const char *calling_conv_regs_mips[] = {"regs[4]", "regs[5]", "regs[6]",
+                                       "regs[7]", "regs[8]", "regs[9]"};
+
+const char *calling_conv_regs_riscv64[] = {"a0", "a1", "a2",
+                                       "a3", "a4", "a5"};
+
+void *get_call_conv_cb(bcc_arch_t arch, bool for_syscall)
 {
   const char **ret;
 
@@ -69,17 +78,26 @@ void *get_call_conv_cb(bcc_arch_t arch)
     case BCC_ARCH_ARM64:
       ret = calling_conv_regs_arm64;
       break;
+    case BCC_ARCH_MIPS:
+      ret = calling_conv_regs_mips;
+      break;
+    case BCC_ARCH_RISCV64:
+      ret = calling_conv_regs_riscv64;
+      break;
     default:
-      ret = calling_conv_regs_x86;
+      if (for_syscall)
+        ret = calling_conv_syscall_regs_x86;
+      else
+        ret = calling_conv_regs_x86;
   }
 
   return (void *)ret;
 }
 
-const char **get_call_conv(void) {
+const char **get_call_conv(bool for_syscall = false) {
   const char **ret;
 
-  ret = (const char **)run_arch_callback(get_call_conv_cb);
+  ret = (const char **)run_arch_callback(get_call_conv_cb, for_syscall);
   return ret;
 }
 
@@ -315,10 +333,10 @@ bool MapVisitor::VisitCallExpr(CallExpr *Call) {
 
 ProbeVisitor::ProbeVisitor(ASTContext &C, Rewriter &rewriter,
                            set<Decl *> &m, bool track_helpers) :
-  C(C), rewriter_(rewriter), m_(m), track_helpers_(track_helpers),
+  C(C), rewriter_(rewriter), m_(m), ctx_(nullptr), track_helpers_(track_helpers),
   addrof_stmt_(nullptr), is_addrof_(false) {
   const char **calling_conv_regs = get_call_conv();
-  has_overlap_kuaddr_ = calling_conv_regs == calling_conv_regs_s390x;
+  cannot_fall_back_safely = (calling_conv_regs == calling_conv_regs_s390x || calling_conv_regs == calling_conv_regs_riscv64);
 }
 
 bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbDerefs) {
@@ -491,7 +509,7 @@ bool ProbeVisitor::VisitUnaryOperator(UnaryOperator *E) {
   memb_visited_.insert(E);
   string pre, post;
   pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
-  if (has_overlap_kuaddr_)
+  if (cannot_fall_back_safely)
     pre += " bpf_probe_read_kernel(&_val, sizeof(_val), (u64)";
   else
     pre += " bpf_probe_read(&_val, sizeof(_val), (u64)";
@@ -555,7 +573,7 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   string base_type = base->getType()->getPointeeType().getAsString();
   string pre, post;
   pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
-  if (has_overlap_kuaddr_)
+  if (cannot_fall_back_safely)
     pre += " bpf_probe_read_kernel(&_val, sizeof(_val), (u64)&";
   else
     pre += " bpf_probe_read(&_val, sizeof(_val), (u64)&";
@@ -609,7 +627,7 @@ bool ProbeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
     return true;
 
   pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
-  if (has_overlap_kuaddr_)
+  if (cannot_fall_back_safely)
     pre += " bpf_probe_read_kernel(&_val, sizeof(_val), (u64)((";
   else
     pre += " bpf_probe_read(&_val, sizeof(_val), (u64)((";
@@ -706,7 +724,7 @@ DiagnosticBuilder ProbeVisitor::error(SourceLocation loc, const char (&fmt)[N]) 
 BTypeVisitor::BTypeVisitor(ASTContext &C, BFrontendAction &fe)
     : C(C), diag_(C.getDiagnostics()), fe_(fe), rewriter_(fe.rewriter()), out_(llvm::errs()) {
   const char **calling_conv_regs = get_call_conv();
-  has_overlap_kuaddr_ = calling_conv_regs == calling_conv_regs_s390x;
+  cannot_fall_back_safely = (calling_conv_regs == calling_conv_regs_s390x || calling_conv_regs == calling_conv_regs_riscv64);
 }
 
 void BTypeVisitor::genParamDirectAssign(FunctionDecl *D, string& preamble,
@@ -748,7 +766,7 @@ void BTypeVisitor::genParamIndirectAssign(FunctionDecl *D, string& preamble,
       size_t d = idx - 1;
       const char *reg = calling_conv_regs[d];
       preamble += "\n " + text + ";";
-      if (has_overlap_kuaddr_)
+      if (cannot_fall_back_safely)
         preamble += " bpf_probe_read_kernel";
       else
         preamble += " bpf_probe_read";
@@ -760,17 +778,20 @@ void BTypeVisitor::genParamIndirectAssign(FunctionDecl *D, string& preamble,
 }
 
 void BTypeVisitor::rewriteFuncParam(FunctionDecl *D) {
-  const char **calling_conv_regs = get_call_conv();
-
   string preamble = "{\n";
   if (D->param_size() > 1) {
+    bool is_syscall = false;
+    if (strncmp(D->getName().str().c_str(), "syscall__", 9) == 0 ||
+        strncmp(D->getName().str().c_str(), "kprobe____x64_sys_", 18) == 0)
+      is_syscall = true;
+    const char **calling_conv_regs = get_call_conv(is_syscall);
+
     // If function prefix is "syscall__" or "kprobe____x64_sys_",
     // the function will attach to a kprobe syscall function.
     // Guard parameter assiggnment with CONFIG_ARCH_HAS_SYSCALL_WRAPPER.
     // For __x64_sys_* syscalls, this is always true, but we guard
     // it in case of "syscall__" for other architectures.
-    if (strncmp(D->getName().str().c_str(), "syscall__", 9) == 0 ||
-        strncmp(D->getName().str().c_str(), "kprobe____x64_sys_", 18) == 0) {
+    if (is_syscall) {
       preamble += "#if defined(CONFIG_ARCH_HAS_SYSCALL_WRAPPER) && !defined(__s390x__)\n";
       genParamIndirectAssign(D, preamble, calling_conv_regs);
       preamble += "\n#else\n";
@@ -796,10 +817,23 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
   if (fe_.is_rewritable_ext_func(D)) {
     current_fn_ = string(D->getName());
     string bd = rewriter_.getRewrittenText(expansionRange(D->getSourceRange()));
-    fe_.func_src_.set_src(current_fn_, bd);
+    auto func_info = fe_.prog_func_info_.add_func(current_fn_);
+    if (!func_info) {
+      // We should only reach add_func above once per function seen, but the
+      // BPF_PROG-helper using macros in export/helpers.h (KFUNC_PROBE ..
+      // LSM_PROBE) break this logic. TODO: adjust export/helpers.h to not
+      // do so and bail out here, or find a better place to do add_func
+      func_info = fe_.prog_func_info_.get_func(current_fn_);
+      //error(GET_BEGINLOC(D), "redefinition of existing function");
+      //return false;
+    }
+    func_info->src_ = bd;
     fe_.func_range_[current_fn_] = expansionRange(D->getSourceRange());
-    string attr = string("__attribute__((section(\"") + BPF_FN_PREFIX + D->getName().str() + "\")))\n";
-    rewriter_.InsertText(real_start_loc, attr);
+    if (!D->getAttr<SectionAttr>()) {
+      string attr = string("__attribute__((section(\"") + BPF_FN_PREFIX +
+                    D->getName().str() + "\")))\n";
+      rewriter_.InsertText(real_start_loc, attr);
+    }
     if (D->param_size() > MAX_CALLING_CONV_REGS + 1) {
       error(GET_BEGINLOC(D->getParamDecl(MAX_CALLING_CONV_REGS + 1)),
             "too many arguments, bcc only supports in-register parameters");
@@ -884,7 +918,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           }
           txt += "}";
           txt += "leaf;})";
-        } else if (memb_name == "increment") {
+        } else if (memb_name == "increment" || memb_name == "atomic_increment") {
           string name = string(Ref->getDecl()->getName());
           string arg0 = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
 
@@ -898,8 +932,13 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           string update = "bpf_map_update_elem_(bpf_pseudo_fd(1, " + fd + ")";
           txt  = "({ typeof(" + name + ".key) _key = " + arg0 + "; ";
           txt += "typeof(" + name + ".leaf) *_leaf = " + lookup + ", &_key); ";
+          txt += "if (_leaf) ";
 
-          txt += "if (_leaf) (*_leaf) += " + increment_value + ";";
+          if (memb_name == "atomic_increment") {
+            txt += "lock_xadd(_leaf, " + increment_value + ");";
+          } else {
+            txt += "(*_leaf) += " + increment_value + ";";
+          }
           if (desc->second.type == BPF_MAP_TYPE_HASH) {
             txt += "else { typeof(" + name + ".leaf) _zleaf; __builtin_memset(&_zleaf, 0, sizeof(_zleaf)); ";
             txt += "_zleaf += " + increment_value + ";";
@@ -919,13 +958,16 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           // events.perf_submit(ctx, &data, sizeof(data));
           // ...
           //                       &data   ->     data    ->  typeof(data)        ->   data_t
-          auto type_arg1 = Call->getArg(1)->IgnoreCasts()->getType().getTypePtr()->getPointeeType().getTypePtr();
-          if (type_arg1->isStructureType()) {
+          auto type_arg1 = Call->getArg(1)->IgnoreCasts()->getType().getTypePtr()->getPointeeType().getTypePtrOrNull();
+          if (type_arg1 && type_arg1->isStructureType()) {
             auto event_type = type_arg1->getAsTagDecl();
             const auto *r = dyn_cast<RecordDecl>(event_type);
             std::vector<std::string> perf_event;
 
             for (auto it = r->field_begin(); it != r->field_end(); ++it) {
+              // After LLVM commit aee49255074f
+              // (https://github.com/llvm/llvm-project/commit/aee49255074fd4ef38d97e6e70cbfbf2f9fd0fa7)
+              // array type change from `comm#char [16]` to `comm#char[16]`
               perf_event.push_back(it->getNameAsString() + "#" + it->getType().getAsString()); //"pid#u32"
             }
             fe_.perf_events_[name] = perf_event;
@@ -1014,6 +1056,13 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
             }
             fe_.perf_events_[name] = perf_event;
           }
+        } else if (memb_name == "msg_redirect_hash" || memb_name == "sk_redirect_hash") {
+          string arg0 = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
+          string args_other = rewriter_.getRewrittenText(expansionRange(SourceRange(GET_BEGINLOC(Call->getArg(1)),
+                                                           GET_ENDLOC(Call->getArg(2)))));
+
+          txt = "bpf_" + string(memb_name) + "(" + arg0 + ", (void *)bpf_pseudo_fd(1, " + fd + "), ";
+          txt += args_other + ")";
         } else {
           if (memb_name == "lookup") {
             prefix = "bpf_map_lookup_elem";
@@ -1050,6 +1099,18 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
             suffix = ")";
           } else if (memb_name == "sk_storage_delete") {
             prefix = "bpf_sk_storage_delete";
+            suffix = ")";
+          } else if (memb_name == "inode_storage_get") {
+            prefix = "bpf_inode_storage_get";
+            suffix = ")";
+          } else if (memb_name == "inode_storage_delete") {
+            prefix = "bpf_inode_storage_delete";
+            suffix = ")";
+          } else if (memb_name == "task_storage_get") {
+            prefix = "bpf_task_storage_get";
+            suffix = ")";
+          } else if (memb_name == "task_storage_delete") {
+            prefix = "bpf_task_storage_delete";
             suffix = ")";
           } else if (memb_name == "get_local_storage") {
             prefix = "bpf_get_local_storage";
@@ -1377,24 +1438,36 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       ++i;
     }
 
-    std::string section_attr = string(A->getName());
+    std::string section_attr = string(A->getName()), pinned;
     size_t pinned_path_pos = section_attr.find(":");
-    unsigned int pinned_id = 0; // 0 is not a valid map ID, they start with 1
+    // 0 is not a valid map ID, -1 is to create and pin it to file
+    int pinned_id = 0;
 
     if (pinned_path_pos != std::string::npos) {
-      std::string pinned = section_attr.substr(pinned_path_pos + 1);
+      pinned = section_attr.substr(pinned_path_pos + 1);
       section_attr = section_attr.substr(0, pinned_path_pos);
       int fd = bpf_obj_get(pinned.c_str());
-      struct bpf_map_info info = {};
-      unsigned int info_len = sizeof(info);
+      if (fd < 0) {
+        if (bcc_make_parent_dir(pinned.c_str()) ||
+            bcc_check_bpffs_path(pinned.c_str())) {
+          return false;
+        }
 
-      if (bpf_obj_get_info_by_fd(fd, &info, &info_len)) {
-        error(GET_BEGINLOC(Decl), "map not found: %0") << pinned;
-        return false;
+        pinned_id = -1;
+      } else {
+        struct bpf_map_info info = {};
+        unsigned int info_len = sizeof(info);
+
+        if (bpf_obj_get_info_by_fd(fd, &info, &info_len)) {
+          error(GET_BEGINLOC(Decl), "get map info failed: %0")
+                << strerror(errno);
+          return false;
+        }
+
+        pinned_id = info.id;
       }
 
       close(fd);
-      pinned_id = info.id;
     }
 
     // Additional map specific information
@@ -1468,6 +1541,10 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       map_type = BPF_MAP_TYPE_ARRAY_OF_MAPS;
     } else if (section_attr == "maps/sk_storage") {
       map_type = BPF_MAP_TYPE_SK_STORAGE;
+    } else if (section_attr == "maps/inode_storage") {
+      map_type = BPF_MAP_TYPE_INODE_STORAGE;
+    } else if (section_attr == "maps/task_storage") {
+      map_type = BPF_MAP_TYPE_TASK_STORAGE;
     } else if (section_attr == "maps/sockmap") {
       map_type = BPF_MAP_TYPE_SOCKMAP;
     } else if (section_attr == "maps/sockhash") {
@@ -1520,7 +1597,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
       fe_.add_map_def(table.fake_fd, std::make_tuple((int)map_type, std::string(table.name),
                       (int)table.key_size, (int)table.leaf_size,
                       (int)table.max_entries, table.flags, pinned_id,
-                      inner_map_name));
+                      inner_map_name, pinned));
     }
 
     if (!table.is_extern)
@@ -1631,13 +1708,12 @@ void BTypeConsumer::HandleTranslationUnit(ASTContext &Context) {
 
 }
 
-BFrontendAction::BFrontendAction(llvm::raw_ostream &os, unsigned flags,
-                                 TableStorage &ts, const std::string &id,
-                                 const std::string &main_path,
-                                 FuncSource &func_src, std::string &mod_src,
-                                 const std::string &maps_ns,
-                                 fake_fd_map_def &fake_fd_map,
-                                 std::map<std::string, std::vector<std::string>> &perf_events)
+BFrontendAction::BFrontendAction(
+    llvm::raw_ostream &os, unsigned flags, TableStorage &ts,
+    const std::string &id, const std::string &main_path,
+    ProgFuncInfo &prog_func_info, std::string &mod_src,
+    const std::string &maps_ns, fake_fd_map_def &fake_fd_map,
+    std::map<std::string, std::vector<std::string>> &perf_events)
     : os_(os),
       flags_(flags),
       ts_(ts),
@@ -1645,7 +1721,7 @@ BFrontendAction::BFrontendAction(llvm::raw_ostream &os, unsigned flags,
       maps_ns_(maps_ns),
       rewriter_(new Rewriter),
       main_path_(main_path),
-      func_src_(func_src),
+      prog_func_info_(prog_func_info),
       mod_src_(mod_src),
       next_fake_fd_(-1),
       fake_fd_map_(fake_fd_map),
@@ -1694,7 +1770,11 @@ void BFrontendAction::DoMiscWorkAround() {
     false);
 
   rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).InsertTextAfter(
+#if LLVM_MAJOR_VERSION >= 12
+    rewriter_->getSourceMgr().getBufferOrFake(rewriter_->getSourceMgr().getMainFileID()).getBufferSize(),
+#else
     rewriter_->getSourceMgr().getBuffer(rewriter_->getSourceMgr().getMainFileID())->getBufferSize(),
+#endif
     "\n#include <bcc/footer.h>\n");
 }
 
@@ -1719,7 +1799,9 @@ void BFrontendAction::EndSourceFileAction() {
   for (auto func : func_range_) {
     auto f = func.first;
     string bd = rewriter_->getRewrittenText(func_range_[f]);
-    func_src_.set_src_rewritten(f, bd);
+    auto fn = prog_func_info_.get_func(f);
+    if (fn)
+      fn->src_rewritten_ = bd;
   }
   rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).write(os_);
   os_.flush();

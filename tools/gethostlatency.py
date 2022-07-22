@@ -61,14 +61,16 @@ int do_entry(struct pt_regs *ctx) {
         return 0;
 
     struct val_t val = {};
-    u32 pid = bpf_get_current_pid_tgid();
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 pid = pid_tgid >> 32;
+    u32 tid = (u32)pid_tgid;
 
     if (bpf_get_current_comm(&val.comm, sizeof(val.comm)) == 0) {
         bpf_probe_read_user(&val.host, sizeof(val.host),
                        (void *)PT_REGS_PARM1(ctx));
-        val.pid = bpf_get_current_pid_tgid();
+        val.pid = pid;
         val.ts = bpf_ktime_get_ns();
-        start.update(&pid, &val);
+        start.update(&tid, &val);
     }
 
     return 0;
@@ -78,11 +80,12 @@ int do_return(struct pt_regs *ctx) {
     struct val_t *valp;
     struct data_t data = {};
     u64 delta;
-    u32 pid = bpf_get_current_pid_tgid();
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 tid = (u32)pid_tgid;
 
     u64 tsp = bpf_ktime_get_ns();
 
-    valp = start.lookup(&pid);
+    valp = start.lookup(&tid);
     if (valp == 0)
         return 0;       // missed start
 
@@ -91,7 +94,7 @@ int do_return(struct pt_regs *ctx) {
     data.pid = valp->pid;
     data.delta = tsp - valp->ts;
     events.perf_submit(ctx, &data, sizeof(data));
-    start.delete(&pid);
+    start.delete(&tid);
     return 0;
 }
 """
@@ -113,11 +116,11 @@ b.attach_uretprobe(name="c", sym="gethostbyname2", fn_name="do_return",
                    pid=args.pid)
 
 # header
-print("%-9s %-6s %-16s %10s %s" % ("TIME", "PID", "COMM", "LATms", "HOST"))
+print("%-9s %-7s %-16s %10s %s" % ("TIME", "PID", "COMM", "LATms", "HOST"))
 
 def print_event(cpu, data, size):
     event = b["events"].event(data)
-    print("%-9s %-6d %-16s %10.2f %s" % (strftime("%H:%M:%S"), event.pid,
+    print("%-9s %-7d %-16s %10.2f %s" % (strftime("%H:%M:%S"), event.pid,
         event.comm.decode('utf-8', 'replace'), (float(event.delta) / 1000000),
         event.host.decode('utf-8', 'replace')))
 

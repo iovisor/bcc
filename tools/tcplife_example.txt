@@ -108,7 +108,7 @@ USAGE:
 
 # ./tcplife.py -h
 usage: tcplife.py [-h] [-T] [-t] [-w] [-s] [-p PID] [-L LOCALPORT]
-                  [-D REMOTEPORT]
+                  [-D REMOTEPORT] [-4 | -6]
 
 Trace the lifespan of TCP sessions and summarize
 
@@ -123,6 +123,8 @@ optional arguments:
                         comma-separated list of local ports to trace.
   -D REMOTEPORT, --remoteport REMOTEPORT
                         comma-separated list of remote ports to trace.
+  -4, --ipv4            trace IPv4 family only
+  -6, --ipv6            trace IPv6 family only
 
 examples:
     ./tcplife           # trace all TCP connect()s
@@ -133,3 +135,5 @@ examples:
     ./tcplife -L 80     # only trace local port 80
     ./tcplife -L 80,81  # only trace local ports 80 and 81
     ./tcplife -D 80     # only trace remote port 80
+    ./tcplife -4        # only trace IPv4 family
+    ./tcplife -6        # only trace IPv6 family

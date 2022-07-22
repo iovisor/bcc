@@ -9,9 +9,10 @@ show this time as either totals or histogram distributions. A system-wide
 summary of this time is shown by the %irq column of mpstat(1), and event
 counts (but not times) are shown by /proc/interrupts.
 
-WARNING: This currently uses dynamic tracing of hard interrupts. You should
-understand what this means before use. Try in a test environment. Future
-versions should switch to tracepoints.
+This tool uses the irq:irq_handler_entry and irq:irq_handler_exit kernel
+tracepoints, which is a stable tracing mechanism. BPF programs can attach to
+tracepoints from Linux 4.7 only. An older version of this tool is available
+in tools/old, and uses kprobes instead of tracepoints.
 
 Since this uses BPF, only the root user can use this tool.
 .SH REQUIREMENTS
@@ -32,6 +33,9 @@ Count events only.
 .TP
 \-d
 Show IRQ time distribution as histograms.
+.TP
+\-c CPU
+Trace on this CPU only.
 .SH EXAMPLES
 .TP
 Sum hard IRQ event time until Ctrl-C:
@@ -49,6 +53,10 @@ Print 1 second summaries, 10 times:
 1 second summaries, printed in nanoseconds, with timestamps:
 #
 .B hardirqs \-NT 1
+.TP
+Sum hard IRQ event time on CPU 1 until Ctrl-C:
+#
+.B hardirqs \-c 1
 .SH FIELDS
 .TP
 HARDIRQ
@@ -90,6 +98,6 @@ Linux
 .SH STABILITY
 Unstable - in development.
 .SH AUTHOR
-Brendan Gregg
+Brendan Gregg, Hengqi Chen, Rocky Xing
 .SH SEE ALSO
 softirqs(8)

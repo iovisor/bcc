@@ -48,7 +48,7 @@ int test(struct bpf_sock_ops *skops)
     ebpf::BPF bpf;
     ebpf::StatusTuple res(0);
     res = bpf.init(BPF_PROGRAM);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     auto cg_storage = bpf.get_cg_storage_table<int>("cg_storage1");
     struct bpf_cgroup_storage_key key = {0};
@@ -57,13 +57,14 @@ int test(struct bpf_sock_ops *skops)
     // all the following lookup/update will fail since
     // cgroup local storage only created during prog attachment time.
     res = cg_storage.get_value(key, val);
-    REQUIRE(res.code() != 0);
+    REQUIRE(!res.ok());
 
     res = cg_storage.update_value(key, val);
-    REQUIRE(res.code() != 0);
+    REQUIRE(!res.ok());
   }
 }
-
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0)
 TEST_CASE("test percpu cgroup storage", "[percpu_cgroup_storage]") {
   {
     const std::string BPF_PROGRAM = R"(
@@ -86,7 +87,7 @@ int test(struct bpf_sock_ops *skops)
     ebpf::BPF bpf;
     ebpf::StatusTuple res(0);
     res = bpf.init(BPF_PROGRAM);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     auto cg_storage = bpf.get_percpu_cg_storage_table<long long>("cg_storage1");
     struct bpf_cgroup_storage_key key = {0};
@@ -95,10 +96,10 @@ int test(struct bpf_sock_ops *skops)
     // all the following lookup/update will fail since
     // cgroup local storage only created during prog attachment time.
     res = cg_storage.get_value(key, val);
-    REQUIRE(res.code() != 0);
+    REQUIRE(!res.ok());
 
     res = cg_storage.update_value(key, val);
-    REQUIRE(res.code() != 0);
+    REQUIRE(!res.ok());
   }
 }
 

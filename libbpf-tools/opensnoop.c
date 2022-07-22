@@ -5,6 +5,7 @@
 // Based on opensnoop(8) from BCC by Brendan Gregg and others.
 // 14-Feb-2020   Brendan Gregg   Created this.
 #include <argp.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,6 +16,7 @@
 #include <bpf/bpf.h>
 #include "opensnoop.h"
 #include "opensnoop.skel.h"
+#include "btf_helpers.h"
 #include "trace_helpers.h"
 
 /* Tune the buffer size and wakeup rate. These settings cope with roughly
@@ -27,6 +29,8 @@
 #define PERF_POLL_TIMEOUT_MS	100
 
 #define NSEC_PER_SEC		1000000000ULL
+
+static volatile sig_atomic_t exiting = 0;
 
 static struct env {
 	pid_t pid;
@@ -44,7 +48,8 @@ static struct env {
 };
 
 const char *argp_program_version = "opensnoop 0.1";
-const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
+const char *argp_program_bug_address =
+	"https://github.com/iovisor/bcc/tree/master/libbpf-tools";
 const char argp_program_doc[] =
 "Trace open family syscalls\n"
 "\n"
@@ -156,12 +161,16 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	return 0;
 }
 
-int libbpf_print_fn(enum libbpf_print_level level,
-		    const char *format, va_list args)
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
 	if (level == LIBBPF_DEBUG && !env.verbose)
 		return 0;
 	return vfprintf(stderr, format, args);
+}
+
+static void sig_int(int signo)
+{
+	exiting = 1;
 }
 
 void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
@@ -206,12 +215,12 @@ void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 
 int main(int argc, char **argv)
 {
+	LIBBPF_OPTS(bpf_object_open_opts, open_opts);
 	static const struct argp argp = {
 		.options = opts,
 		.parser = parse_arg,
 		.doc = argp_program_doc,
 	};
-	struct perf_buffer_opts pb_opts;
 	struct perf_buffer *pb = NULL;
 	struct opensnoop_bpf *obj;
 	__u64 time_end = 0;
@@ -221,17 +230,18 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
+	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
 
-	err = bump_memlock_rlimit();
+	err = ensure_core_btf(&open_opts);
 	if (err) {
-		fprintf(stderr, "failed to increase rlimit: %d\n", err);
+		fprintf(stderr, "failed to fetch necessary BTF for CO-RE: %s\n", strerror(-err));
 		return 1;
 	}
 
-	obj = opensnoop_bpf__open();
+	obj = opensnoop_bpf__open_opts(&open_opts);
 	if (!obj) {
-		fprintf(stderr, "failed to open and/or load BPF object\n");
+		fprintf(stderr, "failed to open BPF object\n");
 		return 1;
 	}
 
@@ -240,6 +250,16 @@ int main(int argc, char **argv)
 	obj->rodata->targ_pid = env.tid;
 	obj->rodata->targ_uid = env.uid;
 	obj->rodata->targ_failed = env.failed;
+
+#ifdef __aarch64__
+	/* aarch64 has no open syscall, only openat variants.
+	 * Disable associated tracepoints that do not exist. See #3344.
+	 */
+	bpf_program__set_autoload(
+		obj->progs.tracepoint__syscalls__sys_enter_open, false);
+	bpf_program__set_autoload(
+		obj->progs.tracepoint__syscalls__sys_exit_open, false);
+#endif
 
 	err = opensnoop_bpf__load(obj);
 	if (err) {
@@ -264,13 +284,10 @@ int main(int argc, char **argv)
 	printf("%s\n", "PATH");
 
 	/* setup event callbacks */
-	pb_opts.sample_cb = handle_event;
-	pb_opts.lost_cb = handle_lost_events;
 	pb = perf_buffer__new(bpf_map__fd(obj->maps.events), PERF_BUFFER_PAGES,
-			      &pb_opts);
-	err = libbpf_get_error(pb);
-	if (err) {
-		pb = NULL;
+			      handle_event, handle_lost_events, NULL, NULL);
+	if (!pb) {
+		err = -errno;
 		fprintf(stderr, "failed to open perf buffer: %d\n", err);
 		goto cleanup;
 	}
@@ -279,19 +296,29 @@ int main(int argc, char **argv)
 	if (env.duration)
 		time_end = get_ktime_ns() + env.duration * NSEC_PER_SEC;
 
+	if (signal(SIGINT, sig_int) == SIG_ERR) {
+		fprintf(stderr, "can't set signal handler: %s\n", strerror(errno));
+		err = 1;
+		goto cleanup;
+	}
+
 	/* main: poll */
-	while (1) {
-		usleep(PERF_BUFFER_TIME_MS * 1000);
-		if ((err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS)) < 0)
-			break;
+	while (!exiting) {
+		err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS);
+		if (err < 0 && err != -EINTR) {
+			fprintf(stderr, "error polling perf buffer: %s\n", strerror(-err));
+			goto cleanup;
+		}
 		if (env.duration && get_ktime_ns() > time_end)
 			goto cleanup;
+		/* reset err to return 0 if exiting */
+		err = 0;
 	}
-	printf("Error polling perf buffer: %d\n", err);
 
 cleanup:
 	perf_buffer__free(pb);
 	opensnoop_bpf__destroy(obj);
+	cleanup_core_btf(&open_opts);
 
 	return err != 0;
 }

@@ -26,11 +26,15 @@ extern "C" {
 struct bcc_elf_usdt {
   uint64_t pc;
   uint64_t base_addr;
+  // Virtual address semaphore is found at
   uint64_t semaphore;
 
   const char *provider;
   const char *name;
   const char *arg_fmt;
+
+  // Offset from start of file where the semaphore is at
+  uint64_t semaphore_offset;
 };
 
 // Binary module path, bcc_elf_usdt struct, payload

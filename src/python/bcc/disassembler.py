@@ -15,7 +15,6 @@
 from os import linesep
 import ctypes as ct
 from .table import get_table_type_name
-from .libbcc import lib
 
 class OffsetUnion(ct.Union):
     _fields_ = [('offsetu', ct.c_uint16), ('offset', ct.c_int16)]
@@ -132,7 +131,7 @@ class BPFDecoder():
                    'msg_push_data',
                    'msg_pop_data',
                    'rc_pointer_rel']
-    
+
     opcodes = {0x04: ('add32',    'dstimm',     '+=',     32),
                0x05: ('ja',       'joff',       None,     64),
                0x07: ('add',      'dstimm',     '+=',     64),
@@ -230,34 +229,34 @@ class BPFDecoder():
                0xd5: ('jsle',     'jdstimmoff', 's<=',    64),
                0xdc: ('endian32', 'dstsrc',     'endian', 32),
                0xdd: ('jsle',     'jdstimmoff', 's<=',    64),}
-    
+
     @classmethod
     def decode(cls, i, w, w1):
         try:
             name, opclass, op, bits = cls.opcodes[w.opcode]
             if opclass == 'dstimm':
                 return 'r%d %s %d' % (w.dst, op, w.imm), 0
-            
+
             elif opclass == 'dstimm_bw':
                 return 'r%d %s 0x%x' % (w.dst, op, w.immu), 0
-            
+
             elif opclass == 'joff':
                 return 'goto %s <%d>' % ('%+d' % (w.offset),
                                          i + w.offset + 1), 0
-            
+
             elif opclass == 'dstsrc':
                 return 'r%d %s r%d' % (w.dst, op, w.src), 0
-            
+
             elif opclass == 'jdstimmoff':
                 return 'if r%d %s %d goto pc%s <%d>' % (w.dst, op, w.imm,
                                                       '%+d' % (w.offset),
                                                       i + w.offset + 1), 0
-            
+
             elif opclass == 'jdstsrcoff':
                 return 'if r%d %s r%d goto pc%s <%d>' % (w.dst, op, w.src,
                                                        '%+d' % (w.offset),
                                                        i + w.offset + 1), 0
-            
+
             elif opclass == 'lddw':
                 # imm contains the file descriptor (FD) of the map being loaded;
                 # the kernel will translate this into the proper address
@@ -267,29 +266,29 @@ class BPFDecoder():
                     return 'r%d = <map at fd #%d>' % (w.dst, w.imm), 1
                 imm = (w1.imm << 32) | w.imm
                 return 'r%d = 0x%x' % (w.dst, imm), 1
-        
+
             elif opclass == 'ldabs':
                 return 'r0 = *(u%s*)skb[%s]' % (bits, w.imm), 0
-            
+
             elif opclass == 'ldind':
                 return 'r0 = *(u%d*)skb[r%d %s]' % (bits, w.src,
                                                     '%+d' % (w.imm)), 0
-            
+
             elif opclass == 'ldstsrcoff':
                 return 'r%d = *(u%d*)(r%d %s)' % (w.dst, bits, w.src,
                                                   '%+d' % (w.offset)), 0
-            
+
             elif opclass == 'sdstoffimm':
                 return '*(u%d*)(r%d %s) = %d' % (bits, w.dst,
                                                  '%+d' % (w.offset), w.imm), 0
-            
+
             elif opclass == 'sdstoffsrc':
                 return '*(u%d*)(r%d %s) = r%d' % (bits, w.dst,
                                                   '%+d' % (w.offset), w.src), 0
-            
+
             elif opclass == 'dst':
                 return 'r%d = %s (u%s)r%d' % (w.dst, op, bits, w.dst), 0
-            
+
             elif opclass == 'call':
                 if w.src != cls.BPF_PSEUDO_CALL:
                     try:
@@ -431,7 +430,7 @@ class MapDecoder ():
     def print_map_ctype(cls, t, field_name, sizeinfo):
         is_structured = (issubclass(t, ct.Structure) or
                          issubclass(t, ct.Union))
-        type_name = cls.get_ct_name(t);
+        type_name = cls.get_ct_name(t)
         if is_structured:
             map_lines = ["  %s {" % (type_name)]
             map_lines += cls.print_ct_map(t, "    ", sizeinfo=sizeinfo)

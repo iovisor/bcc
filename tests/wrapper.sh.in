@@ -8,7 +8,7 @@ name=$1; shift
 kind=$1; shift
 cmd=$1; shift
 
-PYTHONPATH=@CMAKE_BINARY_DIR@/src/python/bcc-python
+PYTHONPATH=@CMAKE_BINARY_DIR@/src/python/bcc-python3
 LD_LIBRARY_PATH=@CMAKE_BINARY_DIR@:@CMAKE_BINARY_DIR@/src/cc
 
 ns=$name

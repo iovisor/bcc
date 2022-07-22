@@ -37,6 +37,32 @@ TIME(s)  PID    COMM         IP SADDR            DADDR            DPORT
 The output shows some periodic connections (or attempts) from a "local_agent"
 process to various other addresses. A few connections occur every minute.
 
+The -d option tracks DNS responses and tries to associate each connection with
+the a previous DNS query issued before it.  If a DNS response matching the IP
+is found, it will be printed. If no match was found, "No DNS Query" is printed
+in this column. Queries for 127.0.0.1 and ::1 are automatically associated with
+"localhost". If the time between when the DNS response was received and a
+connect call was traced exceeds 100ms, the tool will print the time delta
+after the query name.  See below for www.domain.com for an example.
+
+# ./tcpconnect -d
+PID    COMM         IP SADDR            DADDR            DPORT QUERY
+1543   amazon-ssm-a 4  10.66.75.54      176.32.119.67    443   ec2messages.us-west-1.amazonaws.com
+1479   telnet       4  127.0.0.1        127.0.0.1        23    localhost
+1469   curl         4  10.201.219.236   54.245.105.25    80    www.domain.com (123.342ms)
+1469   curl         4  10.201.219.236   54.67.101.145    80    No DNS Query
+1991   telnet       6  ::1              ::1              23    localhost
+2015   ssh          6  fe80::2000:bff:fe82:3ac fe80::2000:bff:fe82:3ac 22    anotherhost.org
+
+
+The -L option prints a LPORT column:
+
+# ./tcpconnect -L
+PID    COMM         IP SADDR            LPORT  DADDR            DPORT
+3706   nc           4  192.168.122.205  57266  192.168.122.150  5000
+3722   ssh          4  192.168.122.205  50966  192.168.122.150  22
+3779   ssh          6  fe80::1          52328  fe80::2          22
+
 
 The -U option prints a UID column:
 
@@ -79,8 +105,9 @@ For more details, see docs/special_filtering.md
 USAGE message:
 
 # ./tcpconnect -h
-usage: tcpconnect.py [-h] [-t] [-p PID] [-P PORT] [-U] [-u UID] [-c]
-                     [--cgroupmap CGROUPMAP] [--mntnsmap MNTNSMAP]
+
+usage: tcpconnect.py [-h] [-t] [-p PID] [-P PORT] [-4 | -6] [-L] [-U] [-u UID]
+                     [-c] [--cgroupmap CGROUPMAP] [--mntnsmap MNTNSMAP] [-d]
 
 Trace TCP connects
 
@@ -89,20 +116,29 @@ optional arguments:
   -t, --timestamp       include timestamp on output
   -p PID, --pid PID     trace this PID only
   -P PORT, --port PORT  comma-separated list of destination ports to trace.
+  -4, --ipv4            trace IPv4 family only
+  -6, --ipv6            trace IPv6 family only
+  -L, --lport           include LPORT on output
   -U, --print-uid       include UID on output
   -u UID, --uid UID     trace this UID only
   -c, --count           count connects per src ip and dest ip/port
   --cgroupmap CGROUPMAP
                         trace cgroups in this BPF map only
+  --mntnsmap MNTNSMAP   trace mount namespaces in this BPF map only
+  -d, --dns             include likely DNS query associated with each connect
 
 examples:
     ./tcpconnect           # trace all TCP connect()s
     ./tcpconnect -t        # include timestamps
+    ./tcpconnect -d        # include DNS queries associated with connects
     ./tcpconnect -p 181    # only trace PID 181
     ./tcpconnect -P 80     # only trace port 80
     ./tcpconnect -P 80,81  # only trace port 80 and 81
+    ./tcpconnect -4        # only trace IPv4 family
+    ./tcpconnect -6        # only trace IPv6 family
     ./tcpconnect -U        # include UID
     ./tcpconnect -u 1000   # only trace UID 1000
     ./tcpconnect -c        # count connects per src ip and dest ip/port
+    ./tcpconnect -L        # include LPORT while printing outputs
     ./tcpconnect --cgroupmap mappath  # only trace cgroups in this BPF map
     ./tcpconnect --mntnsmap mappath   # only trace mount namespaces in the map

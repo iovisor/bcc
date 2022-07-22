@@ -13,39 +13,52 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <fcntl.h>
-#include <map>
-#include <string>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <vector>
-#include <set>
-#include <linux/bpf.h>
-#include <net/if.h>
+#include "bpf_module.h"
 
+#include <fcntl.h>
+#include <linux/bpf.h>
+#include <llvm-c/Transforms/IPO.h>
 #include <llvm/ExecutionEngine/MCJIT.h>
 #include <llvm/ExecutionEngine/SectionMemoryManager.h>
 #include <llvm/IR/IRPrintingPasses.h>
-#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
+
+#if LLVM_MAJOR_VERSION >= 15
+#include <llvm/Pass.h>
+#include <llvm/IR/PassManager.h>
+#include <llvm/Passes/PassBuilder.h>
+#include <llvm/Transforms/IPO/AlwaysInliner.h>
+#else
+#include <llvm/IR/LegacyPassManager.h>
+#endif
+
 #include <llvm/IR/Verifier.h>
+#include <llvm/Object/ObjectFile.h>
+#include <llvm/Object/ELFObjectFile.h>
+#include <llvm/Object/SymbolSize.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Transforms/IPO.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
-#include <llvm-c/Transforms/IPO.h>
+#include <net/if.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
-#include "common.h"
+#include <map>
+#include <set>
+#include <string>
+#include <iostream>
+#include <vector>
+
+#include "bcc_btf.h"
 #include "bcc_debug.h"
 #include "bcc_elf.h"
-#include "frontends/b/loader.h"
-#include "frontends/clang/loader.h"
-#include "frontends/clang/b_frontend_action.h"
-#include "bpf_module.h"
-#include "exported_files.h"
-#include "libbpf.h"
-#include "bcc_btf.h"
 #include "bcc_libbpf_inc.h"
+#include "common.h"
+#include "exported_files.h"
+#include "frontends/clang/b_frontend_action.h"
+#include "frontends/clang/loader.h"
+#include "libbpf.h"
 
 namespace ebpf {
 
@@ -59,15 +72,11 @@ using std::unique_ptr;
 using std::vector;
 using namespace llvm;
 
-const string BPFModule::FN_PREFIX = BPF_FN_PREFIX;
-
 // Snooping class to remember the sections as the JIT creates them
 class MyMemoryManager : public SectionMemoryManager {
  public:
-
-  explicit MyMemoryManager(sec_map_def *sections)
-      : sections_(sections) {
-  }
+  explicit MyMemoryManager(sec_map_def *sections, ProgFuncInfo *prog_func_info)
+      : sections_(sections), prog_func_info_(prog_func_info) {}
 
   virtual ~MyMemoryManager() {}
   uint8_t *allocateCodeSection(uintptr_t Size, unsigned Alignment,
@@ -75,8 +84,6 @@ class MyMemoryManager : public SectionMemoryManager {
                                StringRef SectionName) override {
     // The programs need to change from fake fd to real map fd, so not allocate ReadOnly regions.
     uint8_t *Addr = SectionMemoryManager::allocateDataSection(Size, Alignment, SectionID, SectionName, false);
-    //printf("allocateDataSection: %s Addr %p Size %ld Alignment %d SectionID %d\n",
-    //       SectionName.str().c_str(), (void *)Addr, Size, Alignment, SectionID);
     (*sections_)[SectionName.str()] = make_tuple(Addr, Size, SectionID);
     return Addr;
   }
@@ -86,12 +93,38 @@ class MyMemoryManager : public SectionMemoryManager {
     // The lines in .BTF.ext line_info, if corresponding to remapped files, will have empty source line.
     // The line_info will be fixed in place, so not allocate ReadOnly regions.
     uint8_t *Addr = SectionMemoryManager::allocateDataSection(Size, Alignment, SectionID, SectionName, false);
-    //printf("allocateDataSection: %s Addr %p Size %ld Alignment %d SectionID %d\n",
-    //       SectionName.str().c_str(), (void *)Addr, Size, Alignment, SectionID);
     (*sections_)[SectionName.str()] = make_tuple(Addr, Size, SectionID);
     return Addr;
   }
+
+  void notifyObjectLoaded(ExecutionEngine *EE,
+                          const object::ObjectFile &o) override {
+    auto sizes = llvm::object::computeSymbolSizes(o);
+    for (auto ss : sizes) {
+      auto maybe_name = ss.first.getName();
+      if (!maybe_name)
+        continue;
+
+      std::string name = maybe_name->str();
+      auto info = prog_func_info_->get_func(name);
+      if (!info)
+        continue;
+
+      auto section = ss.first.getSection();
+      if (!section)
+        continue;
+
+      auto sec_name = section.get()->getName();
+      if (!sec_name)
+        continue;
+
+      info->section_ = sec_name->str();
+      info->size_ = ss.second;
+    }
+  }
+
   sec_map_def *sections_;
+  ProgFuncInfo *prog_func_info_;
 };
 
 BPFModule::BPFModule(unsigned flags, TableStorage *ts, bool rw_engine_enabled,
@@ -121,7 +154,7 @@ BPFModule::BPFModule(unsigned flags, TableStorage *ts, bool rw_engine_enabled,
     local_ts_ = createSharedTableStorage();
     ts_ = &*local_ts_;
   }
-  func_src_ = ebpf::make_unique<FuncSource>();
+  prog_func_info_ = ebpf::make_unique<ProgFuncInfo>();
 }
 
 static StatusTuple unimplemented_sscanf(const char *, void *) {
@@ -140,14 +173,21 @@ BPFModule::~BPFModule() {
   }
 
   if (!rw_engine_enabled_) {
-    for (auto section : sections_)
-      delete[] get<0>(section.second);
+    prog_func_info_->for_each_func(
+        [&](std::string name, FuncInfo &info) {
+      if (!info.start_)
+        return;
+      delete[] info.start_;
+    });
+    for (auto &section : sections_) {
+      delete[] std::get<0>(section.second);
+    }
   }
 
   engine_.reset();
   cleanup_rw_engine();
   ctx_.reset();
-  func_src_.reset();
+  prog_func_info_.reset();
 
   if (btf_)
     delete btf_;
@@ -163,7 +203,8 @@ int BPFModule::free_bcc_memory() {
 int BPFModule::load_cfile(const string &file, bool in_memory, const char *cflags[], int ncflags) {
   ClangLoader clang_loader(&*ctx_, flags_);
   if (clang_loader.parse(&mod_, *ts_, file, in_memory, cflags, ncflags, id_,
-                         *func_src_, mod_src_, maps_ns_, fake_fd_map_, perf_events_))
+                         *prog_func_info_, mod_src_, maps_ns_, fake_fd_map_,
+                         perf_events_))
     return -1;
   return 0;
 }
@@ -175,8 +216,10 @@ int BPFModule::load_cfile(const string &file, bool in_memory, const char *cflags
 // build an ExecutionEngine.
 int BPFModule::load_includes(const string &text) {
   ClangLoader clang_loader(&*ctx_, flags_);
-  if (clang_loader.parse(&mod_, *ts_, text, true, nullptr, 0, "", *func_src_,
-                         mod_src_, "", fake_fd_map_, perf_events_))
+  const char *cflags[] = {"-DB_WORKAROUND"};
+  if (clang_loader.parse(&mod_, *ts_, text, true, cflags, 1, "",
+                         *prog_func_info_, mod_src_, "", fake_fd_map_,
+                         perf_events_))
     return -1;
   return 0;
 }
@@ -196,9 +239,30 @@ void BPFModule::annotate_light() {
 }
 
 void BPFModule::dump_ir(Module &mod) {
+#if LLVM_MAJOR_VERSION >= 15
+  // Create the analysis managers
+  LoopAnalysisManager LAM;
+  FunctionAnalysisManager FAM;
+  CGSCCAnalysisManager CGAM;
+  ModuleAnalysisManager MAM;
+
+  // Create the pass manager
+  PassBuilder PB;
+  PB.registerModuleAnalyses(MAM);
+  PB.registerCGSCCAnalyses(CGAM);
+  PB.registerFunctionAnalyses(FAM);
+  PB.registerLoopAnalyses(LAM);
+  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+  auto MPM = PB.buildPerModuleDefaultPipeline(OptimizationLevel::O2);
+
+  // Add passes and run
+  MPM.addPass(PrintModulePass(errs()));
+  MPM.run(mod, MAM);
+#else
   legacy::PassManager PM;
   PM.add(createPrintModulePass(errs()));
   PM.run(mod);
+#endif
 }
 
 int BPFModule::run_pass_manager(Module &mod) {
@@ -208,6 +272,28 @@ int BPFModule::run_pass_manager(Module &mod) {
     return -1;
   }
 
+#if LLVM_MAJOR_VERSION >= 15
+  // Create the analysis managers
+  LoopAnalysisManager LAM;
+  FunctionAnalysisManager FAM;
+  CGSCCAnalysisManager CGAM;
+  ModuleAnalysisManager MAM;
+
+  // Create the pass manager
+  PassBuilder PB;
+  PB.registerModuleAnalyses(MAM);
+  PB.registerCGSCCAnalyses(CGAM);
+  PB.registerFunctionAnalyses(FAM);
+  PB.registerLoopAnalyses(LAM);
+  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+  auto MPM = PB.buildPerModuleDefaultPipeline(OptimizationLevel::O3);
+
+  // Add passes and run
+  MPM.addPass(AlwaysInlinerPass());
+  if (flags_ & DEBUG_LLVM_IR)
+    MPM.addPass(PrintModulePass(outs()));
+  MPM.run(mod, MAM);
+#else
   legacy::PassManager PM;
   PassManagerBuilder PMB;
   PMB.OptLevel = 3;
@@ -224,6 +310,8 @@ int BPFModule::run_pass_manager(Module &mod) {
   if (flags_ & DEBUG_LLVM_IR)
     PM.add(createPrintModulePass(outs()));
   PM.run(mod);
+#endif
+
   return 0;
 }
 
@@ -287,8 +375,9 @@ int BPFModule::create_maps(std::map<std::string, std::pair<int, int>> &map_tids,
 
   for (auto map : fake_fd_map_) {
     int fd, fake_fd, map_type, key_size, value_size, max_entries, map_flags;
+    int pinned_id;
     const char *map_name;
-    unsigned int pinned_id;
+    const char *pinned;
     std::string inner_map_name;
     int inner_map_fd = 0;
 
@@ -317,32 +406,41 @@ int BPFModule::create_maps(std::map<std::string, std::pair<int, int>> &map_tids,
         inner_map_fd = inner_map_fds[inner_map_name];
     }
 
-    if (pinned_id) {
-        fd = bpf_map_get_fd_by_id(pinned_id);
+    if (pinned_id <= 0) {
+      struct bcc_create_map_attr attr = {};
+      attr.map_type = (enum bpf_map_type)map_type;
+      attr.name = map_name;
+      attr.key_size = key_size;
+      attr.value_size = value_size;
+      attr.max_entries = max_entries;
+      attr.map_flags = map_flags;
+      attr.map_ifindex = ifindex_;
+      attr.inner_map_fd = inner_map_fd;
+
+      if (map_tids.find(map_name) != map_tids.end()) {
+        attr.btf_fd = btf_->get_fd();
+        attr.btf_key_type_id = map_tids[map_name].first;
+        attr.btf_value_type_id = map_tids[map_name].second;
+      }
+
+      fd = bcc_create_map_xattr(&attr, allow_rlimit_);
     } else {
-        struct bpf_create_map_attr attr = {};
-        attr.map_type = (enum bpf_map_type)map_type;
-        attr.name = map_name;
-        attr.key_size = key_size;
-        attr.value_size = value_size;
-        attr.max_entries = max_entries;
-        attr.map_flags = map_flags;
-        attr.map_ifindex = ifindex_;
-        attr.inner_map_fd = inner_map_fd;
-
-        if (map_tids.find(map_name) != map_tids.end()) {
-          attr.btf_fd = btf_->get_fd();
-          attr.btf_key_type_id = map_tids[map_name].first;
-          attr.btf_value_type_id = map_tids[map_name].second;
-        }
-
-        fd = bcc_create_map_xattr(&attr, allow_rlimit_);
+      fd = bpf_map_get_fd_by_id(pinned_id);
     }
 
     if (fd < 0) {
       fprintf(stderr, "could not open bpf map: %s, error: %s\n",
               map_name, strerror(errno));
       return -1;
+    }
+
+    if (pinned_id == -1) {
+      pinned = get<8>(map.second).c_str();
+      if (bpf_obj_pin(fd, pinned)) {
+        fprintf(stderr, "failed to pin map: %s, error: %s\n",
+                pinned, strerror(errno));
+        return -1;
+      }
     }
 
     if (for_inner_map)
@@ -416,26 +514,19 @@ int BPFModule::load_maps(sec_map_def &sections) {
   }
 
   // update instructions
-  for (auto section : sections) {
-    auto sec_name = section.first;
-    if (strncmp(".bpf.fn.", sec_name.c_str(), 8) == 0) {
-      uint8_t *addr = get<0>(section.second);
-      uintptr_t size = get<1>(section.second);
-      struct bpf_insn *insns = (struct bpf_insn *)addr;
-      int i, num_insns;
-
-      num_insns = size/sizeof(struct bpf_insn);
-      for (i = 0; i < num_insns; i++) {
-        if (insns[i].code == (BPF_LD | BPF_DW | BPF_IMM)) {
-          // change map_fd is it is a ld_pseudo */
-          if (insns[i].src_reg == BPF_PSEUDO_MAP_FD &&
-              map_fds.find(insns[i].imm) != map_fds.end())
-            insns[i].imm = map_fds[insns[i].imm];
-          i++;
-        }
+  prog_func_info_->for_each_func([&](std::string name, FuncInfo &info) {
+    struct bpf_insn *insns = (struct bpf_insn *)info.start_;
+    uint32_t i, num_insns = info.size_ / sizeof(struct bpf_insn);
+    for (i = 0; i < num_insns; i++) {
+      if (insns[i].code == (BPF_LD | BPF_DW | BPF_IMM)) {
+        // change map_fd is it is a ld_pseudo
+        if (insns[i].src_reg == BPF_PSEUDO_MAP_FD &&
+            map_fds.find(insns[i].imm) != map_fds.end())
+          insns[i].imm = map_fds[insns[i].imm];
+        i++;
       }
     }
-  }
+  });
 
   return 0;
 }
@@ -464,29 +555,31 @@ int BPFModule::finalize() {
   string err;
   EngineBuilder builder(move(mod_));
   builder.setErrorStr(&err);
-  builder.setMCJITMemoryManager(ebpf::make_unique<MyMemoryManager>(sections_p));
+  builder.setMCJITMemoryManager(
+      ebpf::make_unique<MyMemoryManager>(sections_p, &*prog_func_info_));
   builder.setMArch("bpf");
+#if LLVM_MAJOR_VERSION <= 11
   builder.setUseOrcMCJITReplacement(false);
+#endif
   engine_ = unique_ptr<ExecutionEngine>(builder.create());
   if (!engine_) {
     fprintf(stderr, "Could not create ExecutionEngine: %s\n", err.c_str());
     return -1;
   }
 
-#if LLVM_MAJOR_VERSION >= 9
   engine_->setProcessAllSections(true);
-#else
-  if (flags_ & DEBUG_SOURCE)
-    engine_->setProcessAllSections(true);
-#endif
 
   if (int rc = run_pass_manager(*mod))
     return rc;
 
   engine_->finalizeObject();
+  prog_func_info_->for_each_func([&](std::string name, FuncInfo &info) {
+    info.start_ = (uint8_t *)engine_->getFunctionAddress(name);
+  });
+  finalize_prog_func_info();
 
   if (flags_ & DEBUG_SOURCE) {
-    SourceDebugger src_debugger(mod, *sections_p, FN_PREFIX, mod_src_,
+    SourceDebugger src_debugger(mod, *sections_p, *prog_func_info_, mod_src_,
                                 src_dbg_fmap_);
     src_debugger.dump();
   }
@@ -509,51 +602,74 @@ int BPFModule::finalize() {
       }
       sections_[fname] = make_tuple(tmp_p, size, get<2>(section.second));
     }
+
+    prog_func_info_->for_each_func([](std::string name, FuncInfo &info) {
+      uint8_t *tmp_p = new uint8_t[info.size_];
+      memcpy(tmp_p, info.start_, info.size_);
+      info.start_ = tmp_p;
+    });
     engine_.reset();
     ctx_.reset();
   }
 
-  // give functions an id
-  for (auto section : sections_)
-    if (!strncmp(FN_PREFIX.c_str(), section.first.c_str(), FN_PREFIX.size()))
-      function_names_.push_back(section.first);
-
   return 0;
 }
 
-size_t BPFModule::num_functions() const {
-  return function_names_.size();
+void BPFModule::finalize_prog_func_info() {
+  // prog_func_info_'s FuncInfo data is gradually populated (first in frontend
+  // action, then bpf_module). It's possible for a FuncInfo to have been
+  // created by FrontendAction but no corresponding start location found in
+  // bpf_module - filter out these functions
+  //
+  // The numeric function ids in the new prog_func_info_ are considered
+  // canonical
+  std::unique_ptr<ProgFuncInfo> finalized = ebpf::make_unique<ProgFuncInfo>();
+  prog_func_info_->for_each_func([&](std::string name, FuncInfo &info) {
+    if(info.start_) {
+      auto i = finalized->add_func(name);
+      if (i) { // should always be true
+        *i = info;
+      }
+    }
+  });
+  prog_func_info_.swap(finalized);
 }
 
+size_t BPFModule::num_functions() const { return prog_func_info_->num_funcs(); }
+
 const char * BPFModule::function_name(size_t id) const {
-  if (id >= function_names_.size())
-    return nullptr;
-  return function_names_[id].c_str() + FN_PREFIX.size();
+  auto name = prog_func_info_->func_name(id);
+  if (name)
+    return name->c_str();
+  return nullptr;
 }
 
 uint8_t * BPFModule::function_start(size_t id) const {
-  if (id >= function_names_.size())
-    return nullptr;
-  auto section = sections_.find(function_names_[id]);
-  if (section == sections_.end())
-    return nullptr;
-  return get<0>(section->second);
+  auto fn = prog_func_info_->get_func(id);
+  if (fn)
+    return fn->start_;
+  return nullptr;
 }
 
 uint8_t * BPFModule::function_start(const string &name) const {
-  auto section = sections_.find(FN_PREFIX + name);
-  if (section == sections_.end())
-    return nullptr;
-
-  return get<0>(section->second);
+  auto fn = prog_func_info_->get_func(name);
+  if (fn)
+    return fn->start_;
+  return nullptr;
 }
 
 const char * BPFModule::function_source(const string &name) const {
-  return func_src_->src(name);
+  auto fn = prog_func_info_->get_func(name);
+  if (fn)
+    return fn->src_.c_str();
+  return "";
 }
 
 const char * BPFModule::function_source_rewritten(const string &name) const {
-  return func_src_->src_rewritten(name);
+  auto fn = prog_func_info_->get_func(name);
+  if (fn)
+    return fn->src_rewritten_.c_str();
+  return "";
 }
 
 int BPFModule::annotate_prog_tag(const string &name, int prog_fd,
@@ -625,20 +741,17 @@ int BPFModule::annotate_prog_tag(const string &name, int prog_fd,
 }
 
 size_t BPFModule::function_size(size_t id) const {
-  if (id >= function_names_.size())
-    return 0;
-  auto section = sections_.find(function_names_[id]);
-  if (section == sections_.end())
-    return 0;
-  return get<1>(section->second);
+  auto fn = prog_func_info_->get_func(id);
+  if (fn)
+    return fn->size_;
+  return 0;
 }
 
 size_t BPFModule::function_size(const string &name) const {
-  auto section = sections_.find(FN_PREFIX + name);
-  if (section == sections_.end())
-    return 0;
-
-  return get<1>(section->second);
+  auto fn = prog_func_info_->get_func(name);
+  if (fn)
+    return fn->size_;
+  return 0;
 }
 
 char * BPFModule::license() const {
@@ -821,43 +934,6 @@ int BPFModule::table_leaf_scanf(size_t id, const char *leaf_str, void *leaf) {
   return 0;
 }
 
-// load a B file, which comes in two parts
-int BPFModule::load_b(const string &filename, const string &proto_filename) {
-  if (!sections_.empty()) {
-    fprintf(stderr, "Program already initialized\n");
-    return -1;
-  }
-  if (filename.empty() || proto_filename.empty()) {
-    fprintf(stderr, "Invalid filenames\n");
-    return -1;
-  }
-
-  // Helpers are inlined in the following file (C). Load the definitions and
-  // pass the partially compiled module to the B frontend to continue with.
-  auto helpers_h = ExportedFiles::headers().find("/virtual/include/bcc/helpers.h");
-  if (helpers_h == ExportedFiles::headers().end()) {
-    fprintf(stderr, "Internal error: missing bcc/helpers.h");
-    return -1;
-  }
-  if (int rc = load_includes(helpers_h->second))
-    return rc;
-
-  BLoader b_loader(flags_);
-  used_b_loader_ = true;
-  if (int rc = b_loader.parse(&*mod_, filename, proto_filename, *ts_, id_,
-                              maps_ns_))
-    return rc;
-  if (rw_engine_enabled_) {
-    if (int rc = annotate())
-      return rc;
-  } else {
-    annotate_light();
-  }
-  if (int rc = finalize())
-    return rc;
-  return 0;
-}
-
 // load a C file
 int BPFModule::load_c(const string &filename, const char *cflags[], int ncflags) {
   if (!sections_.empty()) {
@@ -905,44 +981,44 @@ int BPFModule::bcc_func_load(int prog_type, const char *name,
                 const struct bpf_insn *insns, int prog_len,
                 const char *license, unsigned kern_version,
                 int log_level, char *log_buf, unsigned log_buf_size,
-                const char *dev_name) {
-  struct bpf_load_program_attr attr = {};
+                const char *dev_name, unsigned flags, int expected_attach_type) {
+  struct bpf_prog_load_opts opts = {};
   unsigned func_info_cnt, line_info_cnt, finfo_rec_size, linfo_rec_size;
   void *func_info = NULL, *line_info = NULL;
   int ret;
 
-  attr.prog_type = (enum bpf_prog_type)prog_type;
-  attr.name = name;
-  attr.insns = insns;
-  attr.license = license;
-  if (attr.prog_type != BPF_PROG_TYPE_TRACING &&
-      attr.prog_type != BPF_PROG_TYPE_EXT) {
-    attr.kern_version = kern_version;
+  if (expected_attach_type != -1) {
+    opts.expected_attach_type = (enum bpf_attach_type)expected_attach_type;
   }
-  attr.log_level = log_level;
+  if (prog_type != BPF_PROG_TYPE_TRACING &&
+      prog_type != BPF_PROG_TYPE_EXT) {
+    opts.kern_version = kern_version;
+  }
+  opts.prog_flags = flags;
+  opts.log_level = log_level;
   if (dev_name)
-    attr.prog_ifindex = if_nametoindex(dev_name);
+    opts.prog_ifindex = if_nametoindex(dev_name);
 
   if (btf_) {
     int btf_fd = btf_->get_fd();
     char secname[256];
 
-    ::snprintf(secname, sizeof(secname), ".bpf.fn.%s", name);
+    ::snprintf(secname, sizeof(secname), "%s%s", BPF_FN_PREFIX, name);
     ret = btf_->get_btf_info(secname, &func_info, &func_info_cnt,
                              &finfo_rec_size, &line_info,
                              &line_info_cnt, &linfo_rec_size);
     if (!ret) {
-      attr.prog_btf_fd = btf_fd;
-      attr.func_info = func_info;
-      attr.func_info_cnt = func_info_cnt;
-      attr.func_info_rec_size = finfo_rec_size;
-      attr.line_info = line_info;
-      attr.line_info_cnt = line_info_cnt;
-      attr.line_info_rec_size = linfo_rec_size;
+      opts.prog_btf_fd = btf_fd;
+      opts.func_info = func_info;
+      opts.func_info_cnt = func_info_cnt;
+      opts.func_info_rec_size = finfo_rec_size;
+      opts.line_info = line_info;
+      opts.line_info_cnt = line_info_cnt;
+      opts.line_info_rec_size = linfo_rec_size;
     }
   }
 
-  ret = bcc_prog_load_xattr(&attr, prog_len, log_buf, log_buf_size, allow_rlimit_);
+  ret = bcc_prog_load_xattr((enum bpf_prog_type)prog_type, name, license, insns, &opts, prog_len, log_buf, log_buf_size, allow_rlimit_);
   if (btf_) {
     free(func_info);
     free(line_info);

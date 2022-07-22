@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) Clevernet
 # Licensed under the Apache License, Version 2.0 (the "License")
 
@@ -151,7 +151,25 @@ class TestDisassembler(TestCase):
    1: (95) exit""",
             b.disassemble_func("test_func"))
         
-        self.assertEqual(
+        def _assert_equal_ignore_fd_id(s1, s2):
+            # In first line of string like
+            #    Layout of BPF map test_map (type HASH, FD 3, ID 0):
+            # Ignore everything from FD to end-of-line
+            # Compare rest of string normally
+            s1_lines = s1.split('\n')
+            s2_lines = s2.split('\n')
+            s1_first_cut = s1_lines[0]
+            s1_first_cut = s1_first_cut[0:s1_first_cut.index("FD")]
+            s2_first_cut = s2_lines[0]
+            s2_first_cut = s2_first_cut[0:s2_first_cut.index("FD")]
+
+            self.assertEqual(s1_first_cut, s2_first_cut)
+
+            s1_rest = '\n'.join(s1_lines[1:])
+            s2_rest = '\n'.join(s2_lines[1:])
+            self.assertEqual(s1_rest, s2_rest)
+
+        _assert_equal_ignore_fd_id(
             """Layout of BPF map test_map (type HASH, FD 3, ID 0):
   struct {
     int a;

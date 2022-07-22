@@ -24,6 +24,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
+#ifdef HAVE_LIBDEBUGINFOD
+#include <elfutils/debuginfod.h>
+#endif
 
 #include <gelf.h>
 #include "bcc_elf.h"
@@ -58,6 +61,7 @@ static int openelf(const char *path, Elf **elf_out, int *fd_out) {
 }
 
 static const char *parse_stapsdt_note(struct bcc_elf_usdt *probe,
+                                      GElf_Shdr *probes_shdr,
                                       const char *desc, int elf_class) {
   if (elf_class == ELFCLASS32) {
     probe->pc = *((uint32_t *)(desc));
@@ -71,6 +75,13 @@ static const char *parse_stapsdt_note(struct bcc_elf_usdt *probe,
     desc = desc + 24;
   }
 
+  // Offset from start of file
+  if (probe->semaphore && probes_shdr)
+    probe->semaphore_offset =
+      probe->semaphore - probes_shdr->sh_addr + probes_shdr->sh_offset;
+  else
+    probe->semaphore_offset = 0;
+
   probe->provider = desc;
   desc += strlen(desc) + 1;
 
@@ -83,7 +94,7 @@ static const char *parse_stapsdt_note(struct bcc_elf_usdt *probe,
   return desc;
 }
 
-static int do_note_segment(Elf_Scn *section, int elf_class,
+static int do_note_segment(Elf_Scn *section, GElf_Shdr *probes_shdr, int elf_class,
                            bcc_elf_probecb callback, const char *binpath,
                            uint64_t first_inst_offset, void *payload) {
   Elf_Data *data = NULL;
@@ -110,7 +121,7 @@ static int do_note_segment(Elf_Scn *section, int elf_class,
       desc = (const char *)data->d_buf + desc_off;
       desc_end = desc + hdr.n_descsz;
 
-      if (parse_stapsdt_note(&probe, desc, elf_class) == desc_end) {
+      if (parse_stapsdt_note(&probe, probes_shdr, desc, elf_class) == desc_end) {
         if (probe.pc < first_inst_offset)
           fprintf(stderr,
                   "WARNING: invalid address 0x%lx for probe (%s,%s) in binary %s\n",
@@ -126,9 +137,11 @@ static int do_note_segment(Elf_Scn *section, int elf_class,
 static int listprobes(Elf *e, bcc_elf_probecb callback, const char *binpath,
                       void *payload) {
   Elf_Scn *section = NULL;
+  bool found_probes_shdr;
   size_t stridx;
   int elf_class = gelf_getclass(e);
   uint64_t first_inst_offset = 0;
+  GElf_Shdr probes_shdr = {};
 
   if (elf_getshdrstrndx(e, &stridx) != 0)
     return -1;
@@ -148,6 +161,18 @@ static int listprobes(Elf *e, bcc_elf_probecb callback, const char *binpath,
     }
   }
 
+  found_probes_shdr = false;
+  while ((section = elf_nextscn(e, section)) != 0) {
+    if (!gelf_getshdr(section, &probes_shdr))
+      continue;
+
+    char *name = elf_strptr(e, stridx, probes_shdr.sh_name);
+    if (name && !strcmp(name, ".probes")) {
+      found_probes_shdr = true;
+      break;
+    }
+  }
+
   while ((section = elf_nextscn(e, section)) != 0) {
     GElf_Shdr header;
     char *name;
@@ -160,7 +185,8 @@ static int listprobes(Elf *e, bcc_elf_probecb callback, const char *binpath,
 
     name = elf_strptr(e, stridx, header.sh_name);
     if (name && !strcmp(name, ".note.stapsdt")) {
-      if (do_note_segment(section, elf_class, callback, binpath,
+      GElf_Shdr *shdr_ptr = found_probes_shdr ? &probes_shdr : NULL;
+      if (do_note_segment(section, shdr_ptr, elf_class, callback, binpath,
                           first_inst_offset, payload) < 0)
         return -1;
     }
@@ -598,6 +624,31 @@ out:
   return result;
 }
 
+#ifdef HAVE_LIBDEBUGINFOD
+static char *find_debug_via_debuginfod(Elf *e){
+  char buildid[128];
+  char *debugpath = NULL;
+  int fd = -1;
+
+  if (!find_buildid(e, buildid))
+    return NULL;
+
+  debuginfod_client *client = debuginfod_begin();
+  if (!client)
+    return NULL;
+
+  // In case of an error, the function returns a negative error code and
+  // debugpath stays NULL.
+  fd = debuginfod_find_debuginfo(client, (const unsigned char *) buildid, 0,
+                                 &debugpath);
+  if (fd >= 0)
+    close(fd);
+
+  debuginfod_end(client);
+  return debugpath;
+}
+#endif
+
 static char *find_debug_file(Elf* e, const char* path, int check_crc) {
   char *debug_file = NULL;
 
@@ -612,6 +663,10 @@ static char *find_debug_file(Elf* e, const char* path, int check_crc) {
     debug_file = find_debug_via_buildid(e);
   if (!debug_file)
     debug_file = find_debug_via_debuglink(e, path, check_crc);
+#ifdef HAVE_LIBDEBUGINFOD
+  if (!debug_file)
+    debug_file = find_debug_via_debuginfod(e);
+#endif
 
   return debug_file;
 }

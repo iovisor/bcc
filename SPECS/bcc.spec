@@ -20,6 +20,13 @@
 %bcond_with python3
 %endif
 
+# Build with debuginfod support for Fedora >= 32
+%if 0%{?fedora} >= 32
+%bcond_without libdebuginfod
+%else
+%bcond_with libdebuginfod
+%endif
+
 %if %{with python3}
 %global __python %{__python3}
 %global python_bcc python3-bcc
@@ -31,6 +38,8 @@
 %endif
 
 %define debug_package %{nil}
+%define _unpackaged_files_terminate_build 0
+
 
 Name:           bcc
 Version:        @REVISION@
@@ -45,6 +54,9 @@ Source0:        bcc.tar.gz
 ExclusiveArch: x86_64 ppc64 aarch64 ppc64le
 BuildRequires: bison cmake >= 2.8.7 flex make
 BuildRequires: gcc gcc-c++ python2-devel elfutils-libelf-devel-static
+%if %{with libdebuginfod}
+BuildRequires: elfutils-debuginfod-client-devel
+%endif
 %if %{with python3}
 BuildRequires: python3-devel
 %endif
@@ -96,6 +108,9 @@ find %{buildroot}/usr/share/bcc/{tools,examples} -type f -exec \
 %package -n libbcc
 Summary: Shared Library for BPF Compiler Collection (BCC)
 Requires: elfutils-libelf
+%if %{with libdebuginfod}
+Requires: elfutils-debuginfod-client
+%endif
 %description -n libbcc
 Shared Library for BPF Compiler Collection (BCC)
 

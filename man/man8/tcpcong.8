@@ -1,0 +1,136 @@
+.TH tcpcong 8  "2022-01-27" "USER COMMANDS"
+.SH NAME
+tcpcong \- Measure tcp congestion state duration. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B tcpcong [\-h] [\-T] [\-L] [\-R] [\-u] [\-d] [interval] [outputs]
+.SH DESCRIPTION
+this tool measures tcp sockets congestion control status duration, and
+prints a summary of tcp congestion state durations along with the number
+of total state changes.
+  
+It uses dynamic tracing of kernel tcp congestion control status 
+updating functions,  and will need to be updated to match kernel changes.
+
+The traced functions are only called when there is congestion state update,
+and therefore have low overhead. we also use BPF map to store traced data 
+to reduce overhead. See the OVERHEAD section for more details.
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-T
+Include a timestamp column.
+.TP
+\-L
+Specify local tcp port range.
+.TP
+\-R
+Specify remote tcp port range.
+.TP
+\-u
+Output in microseconds.
+.TP
+\-d
+Show congestion status duration distribution as histograms.
+.SH EXAMPLES
+.TP
+Show all tcp sockets congestion status duration until Ctrl-C:
+#
+.B tcpcongestdura
+.TP
+Show all tcp sockets congestion status duration every 1 second and 10 times:
+#
+.B tcpcong 1 10
+.TP
+Show only local port 3000-3006 congestion status duration every 1 second:
+#
+.B tcpcong \-L 3000-3006  1
+.TP
+Show only remote port 5000-5005 congestion status duration every 1 second:
+#
+.B tcpcong \-R 5000-5005  1
+.TP
+Show 1 second summaries, printed in microseconds, with timestamps:
+#
+.B tcpcong \-uT 1
+.TP
+Show all tcp sockets congestion status duration as histograms:
+#
+.B tcpcong \-d
+.SH FIELDS
+.TP
+LAddrPort
+local ip address and tcp socket port.
+.TP
+RAddrPort
+remote ip address and tcp socket port.
+.TP
+Open_us
+Total duration in open status for microseconds.
+.TP
+Dod_us
+Total duration in disorder status for microseconds.
+.TP
+Rcov_us
+Total duration in recovery status for microseconds.
+.TP
+Cwr_us
+Total duration in cwr status for microseconds.
+.TP
+Los_us
+Total duration in loss status for microseconds.
+.TP
+Open_ms
+Total duration in open status for milliseconds.
+.TP
+Dod_ms
+Total duration in disorder status for milliseconds.
+.TP
+Rcov_ms
+Total duration in recovery status for milliseconds.
+.TP
+Cwr_ms
+Total duration in cwr status for milliseconds.
+.TP
+Loss_ms
+Total duration in loss status for milliseconds.
+.TP
+Chgs
+Total number of status change.
+.TP
+usecs
+Range of microseconds for this bucket.
+.TP
+msecs
+Range of milliseconds for this bucket.
+.TP
+count
+Number of congestion status in this time range.
+.TP
+distribution
+ASCII representation of the distribution (the count column).
+.SH OVERHEAD
+This traces the kernel tcp congestion status change functions. 
+As called rate per second of these functions per socket is low(<10000), the 
+overhead is also expected to be negligible. If you have an application that 
+will create thousands of tcp connections, then test and understand overhead 
+before use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+jacky gan
+.SH SEE ALSO
+tcpretrans(8), tcpconnect(8), tcptop(8), tcpdrop(8)

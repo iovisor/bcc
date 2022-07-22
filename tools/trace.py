@@ -5,6 +5,7 @@
 #
 # usage: trace [-h] [-p PID] [-L TID] [-v] [-Z STRING_SIZE] [-S] [-c cgroup_path]
 #              [-M MAX_EVENTS] [-s SYMBOLFILES] [-T] [-t] [-K] [-U] [-a] [-I header]
+#              [-A]
 #              probe [probe ...]
 #
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -13,7 +14,7 @@
 from __future__ import print_function
 from bcc import BPF, USDT, StrcmpRewrite
 from functools import partial
-from time import sleep, strftime
+from time import strftime
 import time
 import argparse
 import re
@@ -37,8 +38,11 @@ class Probe(object):
         print_address = False
         tgid = -1
         pid = -1
+        uid = -1
         page_cnt = None
         build_id_enabled = False
+        aggregate = False
+        symcount = {}
 
         @classmethod
         def configure(cls, args):
@@ -53,9 +57,14 @@ class Probe(object):
                 cls.first_ts_real = time.time()
                 cls.tgid = args.tgid or -1
                 cls.pid = args.pid or -1
+                cls.uid = args.uid or -1
                 cls.page_cnt = args.buffer_pages
                 cls.bin_cmp = args.bin_cmp
                 cls.build_id_enabled = args.sym_file_list is not None
+                cls.aggregate = args.aggregate
+                if cls.aggregate and cls.max_events is None:
+                        raise ValueError("-M/--max-events should be specified"
+                                         " with -A/--aggregate")
 
         def __init__(self, probe, string_size, kernel_stack, user_stack,
                      cgroup_map_name, name, msg_filter):
@@ -74,7 +83,12 @@ class Probe(object):
                 self.probe_name = re.sub(r'[^A-Za-z0-9_]', '_',
                                          self.probe_name)
                 self.cgroup_map_name = cgroup_map_name
-                self.name = name
+                if name is None:
+                    # An empty bytestring is always contained in the command
+                    # name so this will always succeed.
+                    self.name = b''
+                else:
+                    self.name = name.encode('ascii')
                 self.msg_filter = msg_filter
                 # compiler can generate proper codes for function
                 # signatures with "syscall__" prefix
@@ -275,7 +289,7 @@ class Probe(object):
                 "$pid": "(unsigned)(bpf_get_current_pid_tgid() & 0xffffffff)",
                 "$tgid": "(unsigned)(bpf_get_current_pid_tgid() >> 32)",
                 "$cpu": "bpf_get_smp_processor_id()",
-                "$task" : "((struct task_struct *)bpf_get_current_task())"
+                "$task": "((struct task_struct *)bpf_get_current_task())"
         }
 
         def _rewrite_expr(self, expr):
@@ -372,7 +386,7 @@ class Probe(object):
                 self.stacks_name = "%s_stacks" % self.probe_name
                 stack_type = "BPF_STACK_TRACE" if self.build_id_enabled is False \
                              else "BPF_STACK_TRACE_BUILDID"
-                stack_table = "%s(%s, 1024);" % (stack_type,self.stacks_name) \
+                stack_table = "%s(%s, 1024);" % (stack_type, self.stacks_name) \
                               if (self.kernel_stack or self.user_stack) else ""
                 data_fields = ""
                 for i, field_type in enumerate(self.types):
@@ -396,6 +410,7 @@ struct %s
 %s
 %s
 %s
+        u32 uid;
 };
 
 BPF_PERF_OUTPUT(%s);
@@ -480,6 +495,13 @@ BPF_PERF_OUTPUT(%s);
                 else:
                         pid_filter = ""
 
+                if Probe.uid != -1:
+                        uid_filter = """
+        if (__uid != %d) { return 0; }
+                """ % Probe.uid
+                else:
+                        uid_filter = ""
+
                 if self.cgroup_map_name is not None:
                         cgroup_filter = """
         if (%s.check_current_task(0) <= 0) { return 0; }
@@ -525,6 +547,8 @@ BPF_PERF_OUTPUT(%s);
         u64 __pid_tgid = bpf_get_current_pid_tgid();
         u32 __tgid = __pid_tgid >> 32;
         u32 __pid = __pid_tgid; // implicit cast to u32 for bottom half
+        u32 __uid = bpf_get_current_uid_gid();
+        %s
         %s
         %s
         %s
@@ -536,6 +560,7 @@ BPF_PERF_OUTPUT(%s);
         %s
         __data.tgid = __tgid;
         __data.pid = __pid;
+        __data.uid = __uid;
         bpf_get_current_comm(&__data.comm, sizeof(__data.comm));
 %s
 %s
@@ -543,7 +568,7 @@ BPF_PERF_OUTPUT(%s);
         return 0;
 }
 """
-                text = text % (pid_filter, cgroup_filter, prefix,
+                text = text % (pid_filter, uid_filter, cgroup_filter, prefix,
                                self._generate_usdt_filter_read(), self.filter,
                                self.struct_name, time_str, cpu_str, data_fields,
                                stack_trace, self.events_name, ctx_name)
@@ -566,18 +591,20 @@ BPF_PERF_OUTPUT(%s);
                 else:   # self.probe_type == 't'
                         return self.tp_event
 
-        def print_stack(self, bpf, stack_id, tgid):
+        def _stack_to_string(self, bpf, stack_id, tgid):
             if stack_id < 0:
-                print("        %d" % stack_id)
-                return
+                return ("        %d" % stack_id)
 
+            stackstr = ''
             stack = list(bpf.get_table(self.stacks_name).walk(stack_id))
             for addr in stack:
-                print("        ", end="")
+                stackstr += '        '
                 if Probe.print_address:
-                    print("%16x " % addr, end="")
-                print("%s" % (bpf.sym(addr, tgid,
-                                     show_module=True, show_offset=True)))
+                    stackstr += ("%16x " % addr)
+                symstr = bpf.sym(addr, tgid, show_module=True, show_offset=True)
+                stackstr += ('%s\n' % (symstr.decode('utf-8')))
+
+            return stackstr
 
         def _format_message(self, bpf, tgid, values):
                 # Replace each %K with kernel sym and %U with user sym in tgid
@@ -592,43 +619,59 @@ BPF_PERF_OUTPUT(%s);
                                            show_module=True, show_offset=True)
                 return self.python_format % tuple(values)
 
+        def print_aggregate_events(self):
+                for k, v in sorted(self.symcount.items(), key=lambda item: \
+                                   item[1], reverse=True):
+                    print("%s-->COUNT %d\n\n" % (k, v), end="")
+
         def print_event(self, bpf, cpu, data, size):
                 # Cast as the generated structure type and display
                 # according to the format string in the probe.
                 event = ct.cast(data, ct.POINTER(self.python_struct)).contents
-                if self.name and bytes(self.name) not in event.comm:
+                if self.name not in event.comm:
                     return
                 values = map(lambda i: getattr(event, "v%d" % i),
                              range(0, len(self.values)))
                 msg = self._format_message(bpf, event.tgid, values)
-                if self.msg_filter and bytes(self.msg_filter) not in msg:
+                if self.msg_filter and self.msg_filter not in msg:
                     return
+                eventstr = ''
                 if Probe.print_time:
                     time = strftime("%H:%M:%S") if Probe.use_localtime else \
                            Probe._time_off_str(event.timestamp_ns)
                     if Probe.print_unix_timestamp:
-                        print("%-17s " % time[:17], end="")
+                        eventstr += ("%-17s " % time[:17])
                     else:
-                        print("%-8s " % time[:8], end="")
+                        eventstr += ("%-8s " % time[:8])
                 if Probe.print_cpu:
-                    print("%-3s " % event.cpu, end="")
-                print("%-7d %-7d %-15s %-16s %s" %
+                    eventstr += ("%-3s " % event.cpu)
+                eventstr += ("%-7d %-7d %-15s %-16s %s\n" %
                       (event.tgid, event.pid,
                        event.comm.decode('utf-8', 'replace'),
                        self._display_function(), msg))
 
                 if self.kernel_stack:
-                        self.print_stack(bpf, event.kernel_stack_id, -1)
+                        eventstr += self._stack_to_string(bpf, event.kernel_stack_id, -1)
                 if self.user_stack:
-                        self.print_stack(bpf, event.user_stack_id, event.tgid)
-                if self.user_stack or self.kernel_stack:
+                        eventstr += self._stack_to_string(bpf, event.user_stack_id, event.tgid)
+
+                if self.aggregate is False:
+                    print(eventstr, end="")
+                    if self.kernel_stack or self.user_stack:
                         print("")
+                else:
+                    if eventstr in self.symcount:
+                        self.symcount[eventstr] += 1
+                    else:
+                        self.symcount[eventstr] = 1
 
                 Probe.event_count += 1
                 if Probe.max_events is not None and \
                    Probe.event_count >= Probe.max_events:
-                        exit()
-                sys.stdout.flush()
+                    if self.aggregate:
+                        self.print_aggregate_events()
+                    sys.stdout.flush()
+                    exit()
 
         def attach(self, bpf, verbose):
                 if len(self.library) == 0:
@@ -681,11 +724,17 @@ trace do_sys_open
         Trace the open syscall and print a default trace message when entered
 trace kfree_skb+0x12
         Trace the kfree_skb kernel function after the instruction on the 0x12 offset
-trace 'do_sys_open "%s", arg2'
-        Trace the open syscall and print the filename being opened
-trace 'do_sys_open "%s", arg2' -n main
+trace 'do_sys_open "%s", arg2@user'
+        Trace the open syscall and print the filename being opened @user is
+        added to arg2 in kprobes to ensure that char * should be copied from
+        the userspace stack to the bpf stack. If not specified, previous
+        behaviour is expected.
+
+trace 'do_sys_open "%s", arg2@user' -n main
         Trace the open syscall and only print event that process names containing "main"
-trace 'do_sys_open "%s", arg2' -f config
+trace 'do_sys_open "%s", arg2@user' --uid 1001
+        Trace the open syscall and only print event that processes with user ID 1001
+trace 'do_sys_open "%s", arg2@user' -f config
         Trace the open syscall and print the filename being opened filtered by "config"
 trace 'sys_read (arg3 > 20000) "read %d bytes", arg3'
         Trace the read syscall and print a message for reads >20000 bytes
@@ -728,6 +777,9 @@ trace -I 'net/sock.h' \\
         to 53 (DNS; 13568 in big endian order)
 trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
         Trace the number of users accessing the file system of the current task
+trace -s /lib/x86_64-linux-gnu/libc.so.6,/bin/ping 'p:c:inet_pton' -U
+        Trace inet_pton system call and use the specified libraries/executables for
+        symbol resolution.
 """
 
         def __init__(self):
@@ -745,6 +797,8 @@ trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
                   dest="tgid", help="id of the process to trace (optional)")
                 parser.add_argument("-L", "--tid", type=int, metavar="TID",
                   dest="pid", help="id of the thread to trace (optional)")
+                parser.add_argument("--uid", type=int, metavar="UID",
+                  dest="uid", help="id of the user to trace (optional)")
                 parser.add_argument("-v", "--verbose", action="store_true",
                   help="print resulting BPF program code before executing")
                 parser.add_argument("-Z", "--string-size", type=int,
@@ -762,8 +816,8 @@ trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
                   help="print time column")
                 parser.add_argument("-C", "--print_cpu", action="store_true",
                   help="print CPU id")
-                parser.add_argument("-c", "--cgroup-path", type=str, \
-                  metavar="CGROUP_PATH", dest="cgroup_path", \
+                parser.add_argument("-c", "--cgroup-path", type=str,
+                  metavar="CGROUP_PATH", dest="cgroup_path",
                   help="cgroup path")
                 parser.add_argument("-n", "--name", type=str,
                                     help="only print process names containing this name")
@@ -771,9 +825,9 @@ trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
                                     help="only print the msg of event containing this string")
                 parser.add_argument("-B", "--bin_cmp", action="store_true",
                   help="allow to use STRCMP with binary values")
-                parser.add_argument('-s', "--sym_file_list", type=str, \
-                  metavar="SYM_FILE_LIST", dest="sym_file_list", \
-                  help="coma separated list of symbol files to use \
+                parser.add_argument('-s', "--sym_file_list", type=str,
+                  metavar="SYM_FILE_LIST", dest="sym_file_list",
+                  help="comma separated list of symbol files to use \
                   for symbol resolution")
                 parser.add_argument("-K", "--kernel-stack",
                   action="store_true", help="output kernel stack trace")
@@ -789,6 +843,8 @@ trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
                        "as either full path, "
                        "or relative to current working directory, "
                        "or relative to default kernel header search path")
+                parser.add_argument("-A", "--aggregate", action="store_true",
+                  help="aggregate amount of each trace")
                 parser.add_argument("--ebpf", action="store_true",
                   help=argparse.SUPPRESS)
                 self.args = parser.parse_args()
@@ -868,9 +924,9 @@ trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
                 # Print header
                 if self.args.timestamp or self.args.time:
                     col_fmt = "%-17s " if self.args.unix_timestamp else "%-8s "
-                    print(col_fmt % "TIME", end="");
+                    print(col_fmt % "TIME", end="")
                 if self.args.print_cpu:
-                    print("%-3s " % "CPU", end="");
+                    print("%-3s " % "CPU", end="")
                 print("%-7s %-7s %-15s %-16s %s" %
                       ("PID", "TID", "COMM", "FUNC",
                       "-" if not all_probes_trivial else ""))

@@ -11,6 +11,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 13-Jul-2016   Emmanuel Bretelle first version
+# 17-Mar-2022   Rocky Xing        Added PID filter support.
 
 from __future__ import absolute_import
 from __future__ import division
@@ -152,13 +153,16 @@ def handle_loop(stdscr, args):
     BPF_HASH(counts, struct key_t);
 
     int do_count(struct pt_regs *ctx) {
+        u32 pid = bpf_get_current_pid_tgid() >> 32;
+        if (FILTER_PID)
+            return 0;
+
         struct key_t key = {};
-        u64 pid = bpf_get_current_pid_tgid();
         u32 uid = bpf_get_current_uid_gid();
 
         key.ip = PT_REGS_IP(ctx);
-        key.pid = pid & 0xFFFFFFFF;
-        key.uid = uid & 0xFFFFFFFF;
+        key.pid = pid;
+        key.uid = uid;
         bpf_get_current_comm(&(key.comm), 16);
 
         counts.increment(key);
@@ -166,11 +170,22 @@ def handle_loop(stdscr, args):
     }
 
     """
+
+    if args.pid:
+        bpf_text = bpf_text.replace('FILTER_PID', 'pid != %d' % args.pid)
+    else:
+        bpf_text = bpf_text.replace('FILTER_PID', '0')
+
     b = BPF(text=bpf_text)
     b.attach_kprobe(event="add_to_page_cache_lru", fn_name="do_count")
     b.attach_kprobe(event="mark_page_accessed", fn_name="do_count")
-    b.attach_kprobe(event="account_page_dirtied", fn_name="do_count")
     b.attach_kprobe(event="mark_buffer_dirty", fn_name="do_count")
+
+    # Function account_page_dirtied() is changed to folio_account_dirtied() in 5.15.
+    if BPF.get_kprobe_functions(b'folio_account_dirtied'):
+        b.attach_kprobe(event="folio_account_dirtied", fn_name="do_count")
+    elif BPF.get_kprobe_functions(b'account_page_dirtied'):
+        b.attach_kprobe(event="account_page_dirtied", fn_name="do_count")
 
     exiting = 0
 
@@ -246,9 +261,11 @@ def handle_loop(stdscr, args):
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
-        description='show Linux page cache hit/miss statistics including read '
+        description='Show Linux page cache hit/miss statistics including read '
                     'and write hit % per processes in a UI like top.'
     )
+    parser.add_argument("-p", "--pid", type=int, metavar="PID",
+        help="trace this PID only")
     parser.add_argument(
         'interval', type=int, default=5, nargs='?',
         help='Interval between probes.'

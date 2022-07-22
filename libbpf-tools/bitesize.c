@@ -15,6 +15,7 @@
 #include "trace_helpers.h"
 
 static struct env {
+	char *disk;
 	char *comm;
 	int comm_len;
 	time_t interval;
@@ -29,11 +30,12 @@ static struct env {
 static volatile bool exiting;
 
 const char *argp_program_version = "bitesize 0.1";
-const char *argp_program_bug_address = "<ethercflow@gmail.com>";
+const char *argp_program_bug_address =
+	"https://github.com/iovisor/bcc/tree/master/libbpf-tools";
 const char argp_program_doc[] =
 "Summarize block device I/O size as a histogram.\n"
 "\n"
-"USAGE: bitesize [-h] [-T] [-m] [interval] [count]\n"
+"USAGE: bitesize [--help] [-T] [-c COMM] [-d DISK] [interval] [count]\n"
 "\n"
 "EXAMPLES:\n"
 "    bitesize              # summarize block I/O latency as a histogram\n"
@@ -42,10 +44,11 @@ const char argp_program_doc[] =
 "    bitesize -c fio       # trace fio only\n";
 
 static const struct argp_option opts[] = {
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
 	{ "comm",  'c', "COMM",  0, "Trace this comm only" },
+	{ "disk",  'd', "DISK",  0, "Trace this disk only" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
 
@@ -54,16 +57,23 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	static int pos_args, len;
 
 	switch (key) {
+	case 'h':
+		argp_state_help(state, stderr, ARGP_HELP_STD_HELP);
+		break;
 	case 'v':
 		env.verbose = true;
-		break;
-	case 'h':
-		argp_usage(state);
 		break;
 	case 'c':
 		env.comm = arg;
 		len = strlen(arg) + 1;
 		env.comm_len = len > TASK_COMM_LEN ? TASK_COMM_LEN : len;
+		break;
+	case 'd':
+		env.disk = arg;
+		if (strlen(arg) + 1 > DISK_NAME_LEN) {
+			fprintf(stderr, "invaild disk name: too long\n");
+			argp_usage(state);
+		}
 		break;
 	case 'T':
 		env.timestamp = true;
@@ -95,8 +105,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	return 0;
 }
 
-int libbpf_print_fn(enum libbpf_print_level level,
-		    const char *format, va_list args)
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
 	if (level == LIBBPF_DEBUG && !env.verbose)
 		return 0;
@@ -141,6 +150,8 @@ static int print_log2_hists(int fd)
 
 int main(int argc, char **argv)
 {
+	struct partitions *partitions = NULL;
+	const struct partition *partition;
 	static const struct argp argp = {
 		.options = opts,
 		.parser = parse_arg,
@@ -156,23 +167,33 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
+	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
-
-	err = bump_memlock_rlimit();
-	if (err) {
-		fprintf(stderr, "failed to increase rlimit: %d\n", err);
-		return 1;
-	}
 
 	obj = bitesize_bpf__open();
 	if (!obj) {
-		fprintf(stderr, "failed to open and/or load BPF ojbect\n");
+		fprintf(stderr, "failed to open BPF object\n");
 		return 1;
+	}
+
+	partitions = partitions__load();
+	if (!partitions) {
+		fprintf(stderr, "failed to load partitions info\n");
+		goto cleanup;
 	}
 
 	/* initialize global data (filtering options) */
 	if (env.comm)
 		strncpy((char*)obj->rodata->targ_comm, env.comm, env.comm_len);
+	if (env.disk) {
+		partition = partitions__get_by_name(partitions, env.disk);
+		if (!partition) {
+			fprintf(stderr, "invaild partition name: not exist\n");
+			goto cleanup;
+		}
+		obj->rodata->filter_dev = true;
+		obj->rodata->targ_dev = partition->dev;
+	}
 
 	err = bitesize_bpf__load(obj);
 	if (err) {
@@ -214,6 +235,7 @@ int main(int argc, char **argv)
 
 cleanup:
 	bitesize_bpf__destroy(obj);
+	partitions__free(partitions);
 
 	return err != 0;
 }

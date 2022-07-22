@@ -46,7 +46,7 @@ static const std::string COMPILER_BARRIER =
 class Argument {
 private:
   optional<int> arg_size_;
-  optional<int> constant_;
+  optional<long long> constant_;
   optional<int> deref_offset_;
   optional<std::string> deref_ident_;
   optional<std::string> base_register_name_;
@@ -66,6 +66,7 @@ public:
 
   int arg_size() const { return arg_size_.value_or(sizeof(void *)); }
   std::string ctype() const;
+  const char *ctype_name() const;
 
   const optional<std::string> &deref_ident() const { return deref_ident_; }
   const optional<std::string> &base_register_name() const {
@@ -75,7 +76,7 @@ public:
     return index_register_name_;
   }
   const optional<int> scale() const { return scale_; }
-  const optional<int> constant() const { return constant_; }
+  const optional<long long> constant() const { return constant_; }
   const optional<int> deref_offset() const { return deref_offset_; }
 
   friend class ArgumentParser;
@@ -100,6 +101,13 @@ class ArgumentParser {
       *result = number;
     return endp - arg_;
   }
+  ssize_t parse_number(ssize_t pos, optional<long long> *result) {
+    char *endp;
+    long long number = (long long)strtoull(arg_ + pos, &endp, 0);
+    if (endp > arg_ + pos)
+      *result = number;
+    return endp - arg_;
+  }
   bool error_return(ssize_t error_start, ssize_t skip_start) {
     print_error(error_start);
     if (isspace(arg_[skip_start]))
@@ -119,8 +127,7 @@ class ArgumentParser_aarch64 : public ArgumentParser {
  private:
   bool parse_register(ssize_t pos, ssize_t &new_pos, std::string &reg_name);
   bool parse_size(ssize_t pos, ssize_t &new_pos, optional<int> *arg_size);
-  bool parse_mem(ssize_t pos, ssize_t &new_pos, std::string &reg_name,
-                 optional<int> *offset);
+  bool parse_mem(ssize_t pos, ssize_t &new_pos, Argument *dest);
 
  public:
   bool parse(Argument *dest);
@@ -142,23 +149,39 @@ public:
 class ArgumentParser_x64 : public ArgumentParser {
 private:
   enum Register {
-    REG_A,
-    REG_B,
-    REG_C,
-    REG_D,
-    REG_SI,
-    REG_DI,
-    REG_BP,
-    REG_SP,
-    REG_8,
-    REG_9,
-    REG_10,
-    REG_11,
-    REG_12,
-    REG_13,
-    REG_14,
-    REG_15,
-    REG_RIP,
+    X64_REG_A,
+    X64_REG_B,
+    X64_REG_C,
+    X64_REG_D,
+    X64_REG_SI,
+    X64_REG_DI,
+    X64_REG_BP,
+    X64_REG_SP,
+    X64_REG_8,
+    X64_REG_9,
+    X64_REG_10,
+    X64_REG_11,
+    X64_REG_12,
+    X64_REG_13,
+    X64_REG_14,
+    X64_REG_15,
+    X64_REG_RIP,
+    X64_REG_XMM0,
+    X64_REG_XMM1,
+    X64_REG_XMM2,
+    X64_REG_XMM3,
+    X64_REG_XMM4,
+    X64_REG_XMM5,
+    X64_REG_XMM6,
+    X64_REG_XMM7,
+    X64_REG_XMM8,
+    X64_REG_XMM9,
+    X64_REG_XMM10,
+    X64_REG_XMM11,
+    X64_REG_XMM12,
+    X64_REG_XMM13,
+    X64_REG_XMM14,
+    X64_REG_XMM15,
   };
 
   struct RegInfo {
@@ -194,6 +217,7 @@ class Probe {
   std::string provider_;
   std::string name_;
   uint64_t semaphore_;
+  uint64_t semaphore_offset_;
 
   std::vector<Location> locations_;
 
@@ -204,7 +228,7 @@ class Probe {
   optional<uint64_t> attached_semaphore_;
   uint8_t mod_match_inode_only_;
 
-  std::string largest_arg_type(size_t arg_n);
+  const char *largest_arg_type(size_t arg_n);
 
   bool add_to_semaphore(int16_t val);
   bool resolve_global_address(uint64_t *global, const std::string &bin_path,
@@ -214,11 +238,13 @@ class Probe {
 
 public:
   Probe(const char *bin_path, const char *provider, const char *name,
-        uint64_t semaphore, const optional<int> &pid, uint8_t mod_match_inode_only = 1);
+        uint64_t semaphore, uint64_t semaphore_offset,
+        const optional<int> &pid, uint8_t mod_match_inode_only = 1);
 
   size_t num_locations() const { return locations_.size(); }
   size_t num_arguments() const { return locations_.front().arguments_.size(); }
   uint64_t semaphore()   const { return semaphore_; }
+  uint64_t semaphore_offset() const { return semaphore_offset_; }
 
   uint64_t address(size_t n = 0) const { return locations_[n].address_; }
   const char *location_bin_path(size_t n = 0) const { return locations_[n].bin_path_.c_str(); }
@@ -227,6 +253,10 @@ public:
   bool usdt_getarg(std::ostream &stream);
   bool usdt_getarg(std::ostream &stream, const std::string& probe_func);
   std::string get_arg_ctype(int arg_index) {
+    return largest_arg_type(arg_index);
+  }
+
+  const char *get_arg_ctype_name(int arg_index) {
     return largest_arg_type(arg_index);
   }
 

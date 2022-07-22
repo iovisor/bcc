@@ -7,7 +7,7 @@
 # This script traces high scheduling delays between tasks being
 # ready to run and them running on CPU after that.
 #
-# USAGE: runqslower [-p PID] [-t TID] [min_us]
+# USAGE: runqslower [-p PID] [-t TID] [-P] [min_us]
 #
 # REQUIRES: Linux 4.9+ (BPF_PROG_TYPE_PERF_EVENT support).
 #
@@ -44,6 +44,7 @@ examples = """examples:
     ./runqslower 1000    # trace run queue latency higher than 1000 us
     ./runqslower -p 123  # trace pid 123
     ./runqslower -t 123  # trace tid 123 (use for threads only)
+    ./runqslower -P      # also show previous task comm and TID
 """
 parser = argparse.ArgumentParser(
     description="Trace high run queue latency",
@@ -59,6 +60,8 @@ thread_group.add_argument("-p", "--pid", metavar="PID", dest="pid",
     help="trace this PID only", type=int)
 thread_group.add_argument("-t", "--tid", metavar="TID", dest="tid",
     help="trace this TID only", type=int)
+thread_group.add_argument("-P", "--previous", action="store_true",
+    help="also show previous task name and TID")
 args = parser.parse_args()
 
 min_us = int(args.min_us)
@@ -73,11 +76,11 @@ bpf_text = """
 
 BPF_HASH(start, u32);
 
-struct rq;
-
 struct data_t {
     u32 pid;
+    u32 prev_pid;
     char task[TASK_COMM_LEN];
+    char prev_task[TASK_COMM_LEN];
     u64 delta_us;
 };
 
@@ -112,7 +115,7 @@ int trace_run(struct pt_regs *ctx, struct task_struct *prev)
     u32 pid, tgid;
 
     // ivcsw: treat like an enqueue event and store timestamp
-    if (prev->state == TASK_RUNNING) {
+    if (prev->STATE_FIELD == TASK_RUNNING) {
         tgid = prev->tgid;
         pid = prev->pid;
         u64 ts = bpf_ktime_get_ns();
@@ -139,8 +142,10 @@ int trace_run(struct pt_regs *ctx, struct task_struct *prev)
 
     struct data_t data = {};
     data.pid = pid;
+    data.prev_pid = prev->pid;
     data.delta_us = delta_us;
     bpf_get_current_comm(&data.task, sizeof(data.task));
+    bpf_probe_read_kernel_str(&data.prev_task, sizeof(data.prev_task), prev->comm);
 
     // output
     events.perf_submit(ctx, &data, sizeof(data));
@@ -178,10 +183,10 @@ RAW_TRACEPOINT_PROBE(sched_switch)
     long state;
 
     // ivcsw: treat like an enqueue event and store timestamp
-    bpf_probe_read_kernel(&state, sizeof(long), (const void *)&prev->state);
+    bpf_probe_read_kernel(&state, sizeof(long), (const void *)&prev->STATE_FIELD);
+    bpf_probe_read_kernel(&pid, sizeof(prev->pid), &prev->pid);
     if (state == TASK_RUNNING) {
         bpf_probe_read_kernel(&tgid, sizeof(prev->tgid), &prev->tgid);
-        bpf_probe_read_kernel(&pid, sizeof(prev->pid), &prev->pid);
         u64 ts = bpf_ktime_get_ns();
         if (pid != 0) {
             if (!(FILTER_PID) && !(FILTER_TGID)) {
@@ -191,9 +196,11 @@ RAW_TRACEPOINT_PROBE(sched_switch)
 
     }
 
-    bpf_probe_read_kernel(&pid, sizeof(next->pid), &next->pid);
-
+    u32 prev_pid;
     u64 *tsp, delta_us;
+
+    prev_pid = pid;
+    bpf_probe_read_kernel(&pid, sizeof(next->pid), &next->pid);
 
     // fetch timestamp and calculate delta
     tsp = start.lookup(&pid);
@@ -207,8 +214,10 @@ RAW_TRACEPOINT_PROBE(sched_switch)
 
     struct data_t data = {};
     data.pid = pid;
+    data.prev_pid = prev_pid;
     data.delta_us = delta_us;
     bpf_probe_read_kernel_str(&data.task, sizeof(data.task), next->comm);
+    bpf_probe_read_kernel_str(&data.prev_task, sizeof(data.prev_task), prev->comm);
 
     // output
     events.perf_submit(ctx, &data, sizeof(data));
@@ -225,6 +234,10 @@ else:
     bpf_text += bpf_text_kprobe
 
 # code substitutions
+if BPF.kernel_struct_has_field(b'task_struct', b'__state') == 1:
+    bpf_text = bpf_text.replace('STATE_FIELD', '__state')
+else:
+    bpf_text = bpf_text.replace('STATE_FIELD', 'state')
 if min_us == 0:
     bpf_text = bpf_text.replace('FILTER_US', '0')
 else:
@@ -248,17 +261,24 @@ if debug or args.ebpf:
 # process event
 def print_event(cpu, data, size):
     event = b["events"].event(data)
-    print("%-8s %-16s %-6s %14s" % (strftime("%H:%M:%S"), event.task, event.pid, event.delta_us))
+    if args.previous:
+        print("%-8s %-16s %-6s %14s %-16s %-6s" % (strftime("%H:%M:%S"), event.task, event.pid, event.delta_us, event.prev_task, event.prev_pid))
+    else:
+        print("%-8s %-16s %-6s %14s" % (strftime("%H:%M:%S"), event.task, event.pid, event.delta_us))
 
 # load BPF program
 b = BPF(text=bpf_text)
 if not is_support_raw_tp:
     b.attach_kprobe(event="ttwu_do_wakeup", fn_name="trace_ttwu_do_wakeup")
     b.attach_kprobe(event="wake_up_new_task", fn_name="trace_wake_up_new_task")
-    b.attach_kprobe(event="finish_task_switch", fn_name="trace_run")
+    b.attach_kprobe(event_re="^finish_task_switch$|^finish_task_switch\.isra\.\d$",
+                    fn_name="trace_run")
 
 print("Tracing run queue latency higher than %d us" % min_us)
-print("%-8s %-16s %-6s %14s" % ("TIME", "COMM", "TID", "LAT(us)"))
+if args.previous:
+    print("%-8s %-16s %-6s %14s %-16s %-6s" % ("TIME", "COMM", "TID", "LAT(us)", "PREV COMM", "PREV TID"))
+else:
+    print("%-8s %-16s %-6s %14s" % ("TIME", "COMM", "TID", "LAT(us)"))
 
 # read events
 b["events"].open_perf_buffer(print_event, page_cnt=64)

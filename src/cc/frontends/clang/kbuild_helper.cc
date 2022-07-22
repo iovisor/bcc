@@ -66,6 +66,8 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
     arch = "powerpc";
   } else if (!arch.compare(0, 4, "mips")) {
     arch = "mips";
+  } else if (!arch.compare(0, 5, "riscv")) {
+    arch = "riscv";
   } else if (!arch.compare(0, 2, "sh")) {
     arch = "sh";
   }
@@ -115,12 +117,14 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
     cflags->push_back("-Iinclude/generated/uapi");
   }
 
+  if (arch == "mips") {
+    cflags->push_back("-Iarch/mips/include/asm/mach-loongson64");
+    cflags->push_back("-Iarch/mips/include/asm/mach-generic");
+  }
+
   cflags->push_back("-include");
   cflags->push_back("./include/linux/kconfig.h");
   cflags->push_back("-D__KERNEL__");
-  cflags->push_back("-D__HAVE_BUILTIN_BSWAP16__");
-  cflags->push_back("-D__HAVE_BUILTIN_BSWAP32__");
-  cflags->push_back("-D__HAVE_BUILTIN_BSWAP64__");
   cflags->push_back("-DKBUILD_MODNAME=\"bcc\"");
 
   // If ARCH env variable is set, pass this along.

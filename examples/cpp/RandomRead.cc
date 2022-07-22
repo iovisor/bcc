@@ -106,14 +106,14 @@ int main(int argc, char** argv) {
 
   bpf = new ebpf::BPF(0, nullptr, true, "", allow_rlimit);
   auto init_res = bpf->init(BPF_PROGRAM, cflags, {});
-  if (init_res.code() != 0) {
+  if (!init_res.ok()) {
     std::cerr << init_res.msg() << std::endl;
     return 1;
   }
   if (argc == 3) {
     auto cgroup_array = bpf->get_cgroup_array("cgroup");
     auto update_res = cgroup_array.update_value(0, argv[2]);
-    if (update_res.code() != 0) {
+    if (!update_res.ok()) {
       std::cerr << update_res.msg() << std::endl;
       return 1;
     }
@@ -121,13 +121,13 @@ int main(int argc, char** argv) {
 
   auto attach_res =
       bpf->attach_raw_tracepoint("urandom_read", "on_urandom_read");
-  if (attach_res.code() != 0) {
+  if (!attach_res.ok()) {
     std::cerr << attach_res.msg() << std::endl;
     return 1;
   }
 
   auto open_res = bpf->open_perf_buffer("events", &handle_output);
-  if (open_res.code() != 0) {
+  if (!open_res.ok()) {
     std::cerr << open_res.msg() << std::endl;
     return 1;
   }

@@ -2,7 +2,7 @@
 .SH NAME
 funccount \- Count function, tracepoint, and USDT probe calls matching a pattern. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B funccount [\-h] [\-p PID] [\-i INTERVAL] [\-d DURATION] [\-T] [\-r] [\-D] pattern
+.B funccount [\-h] [\-p PID] [\-i INTERVAL] [\-d DURATION] [\-T] [\-r] [\-c CPU] [\-D] pattern
 .SH DESCRIPTION
 This tool is a quick way to determine which functions are being called,
 and at what rate. It uses in-kernel eBPF maps to count function calls.

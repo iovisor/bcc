@@ -58,6 +58,14 @@ These symbols cannot be inlined in the binary.
 Comma-separated list of unlock symbols to trace. Default is
 pthread_mutex_unlock. These symbols cannot be inlined in the binary.
 .TP
+\-t THREADS, --threads THREADS
+Specifies the maximum number of threads to trace. default 65536.
+Note. 40 bytes per thread.
+.TP
+\-e EDGES, --edges EDGES
+Specifies the maximum number of edge cases that can be
+recorded. default 65536. Note. 88 bytes per edge case.
+.TP
 pid
 Pid to trace
 .SH EXAMPLES

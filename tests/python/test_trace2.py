@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
@@ -31,7 +31,8 @@ class TestTracingEvent(TestCase):
     def setUp(self):
         b = BPF(text=text, debug=0)
         self.stats = b.get_table("stats")
-        b.attach_kprobe(event="finish_task_switch", fn_name="count_sched")
+        b.attach_kprobe(event_re="^finish_task_switch$|^finish_task_switch\.isra\.\d$",
+                        fn_name="count_sched")
 
     def test_sched1(self):
         for i in range(0, 100):

@@ -74,7 +74,7 @@ int probe_end(struct pt_regs *ctx) {
     u64 delta = bpf_ktime_get_ns() - *timestampp;
     FILTER
     delta /= SCALE;
-    latency.increment(bpf_log2l(delta));
+    latency.atomic_increment(bpf_log2l(delta));
     temp.delete(&pid);
     return 0;
 }

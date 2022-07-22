@@ -73,25 +73,22 @@ BPF_ARRAY(stats, u64, S_MAXSTAT);
  */
 void count_fast(struct pt_regs *ctx) {
     int key = S_REFS;
-    u64 *leaf = stats.lookup(&key);
-    if (leaf) (*leaf)++;
+    stats.atomic_increment(key);
 }
 
 void count_lookup(struct pt_regs *ctx) {
     int key = S_SLOW;
-    u64 *leaf = stats.lookup(&key);
-    if (leaf) (*leaf)++;
+    stats.atomic_increment(key);
     if (PT_REGS_RC(ctx) == 0) {
         key = S_MISS;
-        leaf = stats.lookup(&key);
-        if (leaf) (*leaf)++;
+        stats.atomic_increment(key);
     }
 }
 """
 
 # load BPF program
 b = BPF(text=bpf_text)
-b.attach_kprobe(event="lookup_fast", fn_name="count_fast")
+b.attach_kprobe(event_re="^lookup_fast$|^lookup_fast.constprop.*.\d$", fn_name="count_fast")
 b.attach_kretprobe(event="d_lookup", fn_name="count_lookup")
 
 # stat column labels and indexes
@@ -117,7 +114,6 @@ while (1):
     try:
         sleep(interval)
     except KeyboardInterrupt:
-        pass
         exit()
 
     print("%-8s: " % strftime("%H:%M:%S"), end="")

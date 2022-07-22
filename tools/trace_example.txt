@@ -237,6 +237,32 @@ Remember to use the -I argument include the appropriate header file. We didn't
 need to do that here because `struct timespec` is used internally by the tool,
 so it always includes this header file.
 
+To aggregate amount of trace, you need specify -A with -M EVENTS. A typical
+example:
+1, if we find that the sys CPU utilization is higher by 'top' command
+2, then find that the timer interrupt is more normal by 'irqtop' command
+3, to confirm kernel timer setting frequence by 'funccount -i 1 clockevents_program_event'
+4, to trace timer setting by 'trace clockevents_program_event -K -A -M 1000'
+
+1294576 1294584 CPU 0/KVM       clockevents_program_event
+        clockevents_program_event+0x1 [kernel]
+        hrtimer_start_range_ns+0x209 [kernel]
+        start_sw_timer+0x173 [kvm]
+        restart_apic_timer+0x6c [kvm]
+        kvm_set_msr_common+0x442 [kvm]
+        __kvm_set_msr+0xa2 [kvm]
+        kvm_emulate_wrmsr+0x36 [kvm]
+        vcpu_enter_guest+0x326 [kvm]
+        kvm_arch_vcpu_ioctl_run+0xcc [kvm]
+        kvm_vcpu_ioctl+0x22f [kvm]
+        do_vfs_ioctl+0xa1 [kernel]
+        ksys_ioctl+0x60 [kernel]
+        __x64_sys_ioctl+0x16 [kernel]
+        do_syscall_64+0x59 [kernel]
+        entry_SYSCALL_64_after_hwframe+0x44 [kernel]
+-->COUNT 271
+...
+So we can know that 271 timer setting in recent 1000(~27%).
 
 As a final example, let's trace open syscalls for a specific process. By
 default, tracing is system-wide, but the -p switch overrides this:
@@ -337,8 +363,10 @@ PID     TID     COMM            FUNC             -
 
 USAGE message:
 
-usage: trace [-h] [-b BUFFER_PAGES] [-p PID] [-L TID] [-v] [-Z STRING_SIZE]
-             [-S] [-M MAX_EVENTS] [-t] [-T] [-K] [-U] [-a] [-I header]
+usage: trace [-h] [-b BUFFER_PAGES] [-p PID] [-L TID] [--uid UID] [-v]
+             [-Z STRING_SIZE] [-S] [-M MAX_EVENTS] [-t] [-u] [-T] [-C]
+             [-c CGROUP_PATH] [-n NAME] [-f MSG_FILTER] [-B]
+             [-s SYM_FILE_LIST] [-K] [-U] [-a] [-I header]
              probe [probe ...]
 
 Attach to functions and print trace messages.
@@ -353,28 +381,36 @@ optional arguments:
                         (default: 64)
   -p PID, --pid PID     id of the process to trace (optional)
   -L TID, --tid TID     id of the thread to trace (optional)
+  --uid UID             id of the user to trace (optional)
   -v, --verbose         print resulting BPF program code before executing
   -Z STRING_SIZE, --string-size STRING_SIZE
                         maximum size to read from strings
-  -s SYM_FILE_LIST      when collecting stack trace in build id format,
-                        use the coma separated list for symbol resolution
   -S, --include-self    do not filter trace's own pid from the trace
   -M MAX_EVENTS, --max-events MAX_EVENTS
                         number of events to print before quitting
   -t, --timestamp       print timestamp column (offset from trace start)
+  -u, --unix-timestamp  print UNIX timestamp instead of offset from trace
+                        start, requires -t
   -T, --time            print time column
+  -C, --print_cpu       print CPU id
+  -c CGROUP_PATH, --cgroup-path CGROUP_PATH
+                        cgroup path
   -n NAME, --name NAME  only print process names containing this name
   -f MSG_FILTER, --msg-filter MSG_FILTER
-                        only print message of event containing this string
-  -C, --print_cpu       print CPU id
+                        only print the msg of event containing this string
   -B, --bin_cmp         allow to use STRCMP with binary values
+  -s SYM_FILE_LIST, --sym_file_list SYM_FILE_LIST
+                        comma separated list of symbol files to use for symbol
+                        resolution
   -K, --kernel-stack    output kernel stack trace
   -U, --user-stack      output user stack trace
   -a, --address         print virtual address in stacks
   -I header, --include header
                         additional header files to include in the BPF program
-                        as either full path, or relative to current working directory,
-                        or relative to default kernel header search path
+                        as either full path, or relative to current working
+                        directory, or relative to default kernel header search
+                        path
+  -A, --aggregate       aggregate amount of each trace
 
 EXAMPLES:
 
@@ -383,12 +419,15 @@ trace do_sys_open
 trace kfree_skb+0x12
         Trace the kfree_skb kernel function after the instruction on the 0x12 offset
 trace 'do_sys_open "%s", arg2@user'
-        Trace the open syscall and print the filename being opened. @user is
+        Trace the open syscall and print the filename being opened @user is
         added to arg2 in kprobes to ensure that char * should be copied from
         the userspace stack to the bpf stack. If not specified, previous
         behaviour is expected.
+
 trace 'do_sys_open "%s", arg2@user' -n main
         Trace the open syscall and only print event that process names containing "main"
+trace 'do_sys_open "%s", arg2@user' --uid 1001
+        Trace the open syscall and only print event that processes with user ID 1001
 trace 'do_sys_open "%s", arg2@user' -f config
         Trace the open syscall and print the filename being opened filtered by "config"
 trace 'sys_read (arg3 > 20000) "read %d bytes", arg3'
@@ -409,6 +448,8 @@ trace 't:block:block_rq_complete "sectors=%d", args->nr_sector'
         Trace the block_rq_complete kernel tracepoint and print # of tx sectors
 trace 'u:pthread:pthread_create (arg4 != 0)'
         Trace the USDT probe pthread_create when its 4th argument is non-zero
+trace 'u:pthread:libpthread:pthread_create (arg4 != 0)'
+        Ditto, but the provider name "libpthread" is specified.
 trace 'p::SyS_nanosleep(struct timespec *ts) "sleep for %lld ns", ts->tv_nsec'
         Trace the nanosleep syscall and print the sleep duration in ns
 trace -c /sys/fs/cgroup/system.slice/workload.service '__x64_sys_nanosleep' '__x64_sys_clone'
@@ -424,7 +465,7 @@ trace -I 'kernel/sched/sched.h' \
         in kernel/sched/sched.h which is in kernel source tree and not in kernel-devel
         package.  So this command needs to run at the kernel source tree root directory
         so that the added header file can be found by the compiler.
-trace -I 'net/sock.h' \\
+trace -I 'net/sock.h' \
       'udpv6_sendmsg(struct sock *sk) (sk->sk_dport == 13568)'
         Trace udpv6 sendmsg calls only if socket's destination port is equal
         to 53 (DNS; 13568 in big endian order)
@@ -433,4 +474,3 @@ trace -I 'linux/fs_struct.h' 'mntns_install "users = %d", $task->fs->users'
 trace -s /lib/x86_64-linux-gnu/libc.so.6,/bin/ping 'p:c:inet_pton' -U
         Trace inet_pton system call and use the specified libraries/executables for
         symbol resolution.
-"

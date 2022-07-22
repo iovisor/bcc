@@ -25,7 +25,7 @@
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 2, 0)
 
-TEST_CASE("test sk_storage map", "[sk_storage]") {
+TEST_CASE("test sk_storage map", "[sk_storage][!mayfail]") {
   {
     const std::string BPF_PROGRAM = R"(
 BPF_SK_STORAGE(sk_pkt_cnt, __u64);
@@ -55,10 +55,10 @@ int test(struct __sk_buff *skb) {
     ebpf::BPF bpf;
     ebpf::StatusTuple res(0);
     res = bpf.init(BPF_PROGRAM);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     int prog_fd;
     res = bpf.load_func("test", BPF_PROG_TYPE_CGROUP_SKB, prog_fd);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     // create a udp socket so we can do some map operations.
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -69,24 +69,24 @@ int test(struct __sk_buff *skb) {
 
     // no sk_storage for the table yet.
     res = sk_table.get_value(sockfd, v);
-    REQUIRE(res.code() != 0);
+    REQUIRE(!res.ok());
 
     // nothing to remove yet.
     res = sk_table.remove_value(sockfd);
-    REQUIRE(res.code() != 0);
+    REQUIRE(!res.ok());
 
     // update the table with a certain value.
     res = sk_table.update_value(sockfd, v1);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     // get_value should be successful now.
     res = sk_table.get_value(sockfd, v);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
     REQUIRE(v == 10);
 
     // remove the sk_storage.
     res = sk_table.remove_value(sockfd);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
   }
 }
 

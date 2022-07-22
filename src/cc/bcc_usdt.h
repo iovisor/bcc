@@ -30,9 +30,12 @@ struct bcc_usdt {
     const char *provider;
     const char *name;
     const char *bin_path;
+    // Virtual address semaphore is found at
     uint64_t semaphore;
     int num_locations;
     int num_arguments;
+    // Offset from start of file where semaphore is at
+    uint64_t semaphore_offset;
 };
 
 struct bcc_usdt_location {
@@ -51,7 +54,7 @@ struct bcc_usdt_location {
 struct bcc_usdt_argument {
     int size;
     int valid;
-    int constant;
+    long long constant;
     int deref_offset;
     const char *deref_ident;
     const char *base_register_name;

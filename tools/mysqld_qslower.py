@@ -48,7 +48,7 @@ struct start_t {
 };
 
 struct data_t {
-    u64 pid;
+    u32 pid;
     u64 ts;
     u64 delta;
     char query[QUERY_MAX];
@@ -58,19 +58,21 @@ BPF_HASH(start_tmp, u32, struct start_t);
 BPF_PERF_OUTPUT(events);
 
 int do_start(struct pt_regs *ctx) {
-    u32 pid = bpf_get_current_pid_tgid();
+    u32 tid = bpf_get_current_pid_tgid();
     struct start_t start = {};
     start.ts = bpf_ktime_get_ns();
     bpf_usdt_readarg(1, ctx, &start.query);
-    start_tmp.update(&pid, &start);
+    start_tmp.update(&tid, &start);
     return 0;
 };
 
 int do_done(struct pt_regs *ctx) {
-    u32 pid = bpf_get_current_pid_tgid();
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 pid = pid_tgid >> 32;
+    u32 tid = (u32)pid_tgid;
     struct start_t *sp;
 
-    sp = start_tmp.lookup(&pid);
+    sp = start_tmp.lookup(&tid);
     if (sp == 0) {
         // missed tracing start
         return 0;
@@ -85,7 +87,7 @@ int do_done(struct pt_regs *ctx) {
         events.perf_submit(ctx, &data, sizeof(data));
     }
 
-    start_tmp.delete(&pid);
+    start_tmp.delete(&tid);
 
     return 0;
 };
@@ -106,7 +108,7 @@ b = BPF(text=bpf_text, usdt_contexts=[u])
 # header
 print("Tracing MySQL server queries for PID %d slower than %s ms..." % (pid,
     min_ms_text))
-print("%-14s %-6s %8s %s" % ("TIME(s)", "PID", "MS", "QUERY"))
+print("%-14s %-7s %8s %s" % ("TIME(s)", "PID", "MS", "QUERY"))
 
 # process event
 start = 0
@@ -115,7 +117,7 @@ def print_event(cpu, data, size):
     event = b["events"].event(data)
     if start == 0:
         start = event.ts
-    print("%-14.6f %-6d %8.3f %s" % (float(event.ts - start) / 1000000000,
+    print("%-14.6f %-7d %8.3f %s" % (float(event.ts - start) / 1000000000,
         event.pid, float(event.delta) / 1000000, event.query))
 
 # loop with callback to print_event

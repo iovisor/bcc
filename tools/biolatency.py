@@ -4,26 +4,32 @@
 # biolatency    Summarize block device I/O latency as a histogram.
 #       For Linux, uses BCC, eBPF.
 #
-# USAGE: biolatency [-h] [-T] [-Q] [-m] [-D] [interval] [count]
+# USAGE: biolatency [-h] [-T] [-Q] [-m] [-D] [-F] [-e] [-j] [-d DISK] [interval] [count]
 #
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 20-Sep-2015   Brendan Gregg   Created this.
+# 31-Mar-2022   Rocky Xing      Added disk filter support.
 
 from __future__ import print_function
 from bcc import BPF
 from time import sleep, strftime
 import argparse
+import ctypes as ct
+import os
 
 # arguments
 examples = """examples:
-    ./biolatency            # summarize block I/O latency as a histogram
-    ./biolatency 1 10       # print 1 second summaries, 10 times
-    ./biolatency -mT 1      # 1s summaries, milliseconds, and timestamps
-    ./biolatency -Q         # include OS queued time in I/O time
-    ./biolatency -D         # show each disk device separately
-    ./biolatency -F         # show I/O flags separately
+    ./biolatency                    # summarize block I/O latency as a histogram
+    ./biolatency 1 10               # print 1 second summaries, 10 times
+    ./biolatency -mT 1              # 1s summaries, milliseconds, and timestamps
+    ./biolatency -Q                 # include OS queued time in I/O time
+    ./biolatency -D                 # show each disk device separately
+    ./biolatency -F                 # show I/O flags separately
+    ./biolatency -j                 # print a dictionary
+    ./biolatency -e                 # show extension summary(total, average)
+    ./biolatency -d sdc             # Trace sdc only
 """
 parser = argparse.ArgumentParser(
     description="Summarize block device I/O latency as a histogram",
@@ -39,15 +45,23 @@ parser.add_argument("-D", "--disks", action="store_true",
     help="print a histogram per disk device")
 parser.add_argument("-F", "--flags", action="store_true",
     help="print a histogram per set of I/O flags")
+parser.add_argument("-e", "--extension", action="store_true",
+    help="summarize average/total value")
 parser.add_argument("interval", nargs="?", default=99999999,
     help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
     help="number of outputs")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
+parser.add_argument("-d", "--disk", type=str,
+    help="Trace this disk only")
+
 args = parser.parse_args()
 countdown = int(args.count)
 debug = 0
+
 if args.flags and args.disks:
     print("ERROR: can only use -D or -F. Exiting.")
     exit()
@@ -55,7 +69,7 @@ if args.flags and args.disks:
 # define BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
-#include <linux/blkdev.h>
+#include <linux/blk-mq.h>
 
 typedef struct disk_key {
     char disk[DISK_NAME_LEN];
@@ -67,12 +81,19 @@ typedef struct flag_key {
     u64 slot;
 } flag_key_t;
 
+typedef struct ext_val {
+    u64 total;
+    u64 count;
+} ext_val_t;
+
 BPF_HASH(start, struct request *);
 STORAGE
 
 // time block I/O
 int trace_req_start(struct pt_regs *ctx, struct request *req)
 {
+    DISK_FILTER
+
     u64 ts = bpf_ktime_get_ns();
     start.update(&req, &ts);
     return 0;
@@ -89,6 +110,9 @@ int trace_req_done(struct pt_regs *ctx, struct request *req)
         return 0;   // missed issue
     }
     delta = bpf_ktime_get_ns() - *tsp;
+
+    EXTENSION
+
     FACTOR
 
     // store as histogram
@@ -106,25 +130,74 @@ if args.milliseconds:
 else:
     bpf_text = bpf_text.replace('FACTOR', 'delta /= 1000;')
     label = "usecs"
+
+storage_str = ""
+store_str = ""
 if args.disks:
-    bpf_text = bpf_text.replace('STORAGE',
-        'BPF_HISTOGRAM(dist, disk_key_t);')
-    bpf_text = bpf_text.replace('STORE',
-        'disk_key_t key = {.slot = bpf_log2l(delta)}; ' +
-        'void *__tmp = (void *)req->rq_disk->disk_name; ' +
-        'bpf_probe_read_kernel(&key.disk, sizeof(key.disk), __tmp); ' +
-        'dist.increment(key);')
+    storage_str += "BPF_HISTOGRAM(dist, disk_key_t);"
+    disks_str = """
+    disk_key_t key = {.slot = bpf_log2l(delta)};
+    void *__tmp = (void *)req->__RQ_DISK__->disk_name;
+    bpf_probe_read(&key.disk, sizeof(key.disk), __tmp);
+    dist.atomic_increment(key);
+    """
+    if BPF.kernel_struct_has_field(b'request', b'rq_disk') == 1:
+        store_str += disks_str.replace('__RQ_DISK__', 'rq_disk')
+    else:
+        store_str += disks_str.replace('__RQ_DISK__', 'q->disk')
 elif args.flags:
-    bpf_text = bpf_text.replace('STORAGE',
-        'BPF_HISTOGRAM(dist, flag_key_t);')
-    bpf_text = bpf_text.replace('STORE',
-        'flag_key_t key = {.slot = bpf_log2l(delta)}; ' +
-        'key.flags = req->cmd_flags; ' +
-        'dist.increment(key);')
+    storage_str += "BPF_HISTOGRAM(dist, flag_key_t);"
+    store_str += """
+    flag_key_t key = {.slot = bpf_log2l(delta)};
+    key.flags = req->cmd_flags;
+    dist.atomic_increment(key);
+    """
 else:
-    bpf_text = bpf_text.replace('STORAGE', 'BPF_HISTOGRAM(dist);')
-    bpf_text = bpf_text.replace('STORE',
-        'dist.increment(bpf_log2l(delta));')
+    storage_str += "BPF_HISTOGRAM(dist);"
+    store_str += "dist.atomic_increment(bpf_log2l(delta));"
+
+if args.disk is not None:
+    disk_path = os.path.join('/dev', args.disk)
+    if not os.path.exists(disk_path):
+        print("no such disk '%s'" % args.disk)
+        exit(1)
+
+    stat_info = os.stat(disk_path)
+    major = os.major(stat_info.st_rdev)
+    minor = os.minor(stat_info.st_rdev)
+
+    disk_field_str = ""
+    if BPF.kernel_struct_has_field(b'request', b'rq_disk') == 1:
+        disk_field_str = 'req->rq_disk'
+    else:
+        disk_field_str = 'req->q->disk'
+
+    disk_filter_str = """
+    struct gendisk *disk = %s;
+    if (!(disk->major == %d && disk->first_minor == %d)) {
+        return 0;
+    }
+    """ % (disk_field_str, major, minor)
+
+    bpf_text = bpf_text.replace('DISK_FILTER', disk_filter_str)
+else:
+    bpf_text = bpf_text.replace('DISK_FILTER', '')
+
+if args.extension:
+    storage_str += "BPF_ARRAY(extension, ext_val_t, 1);"
+    bpf_text = bpf_text.replace('EXTENSION', """
+    u32 index = 0;
+    ext_val_t *ext_val = extension.lookup(&index);
+    if (ext_val) {
+        lock_xadd(&ext_val->total, delta);
+        lock_xadd(&ext_val->count, 1);
+    }
+    """)
+else:
+    bpf_text = bpf_text.replace('EXTENSION', '')
+bpf_text = bpf_text.replace("STORAGE", storage_str)
+bpf_text = bpf_text.replace("STORE", store_str)
+
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
@@ -133,15 +206,27 @@ if debug or args.ebpf:
 # load BPF program
 b = BPF(text=bpf_text)
 if args.queued:
-    b.attach_kprobe(event="blk_account_io_start", fn_name="trace_req_start")
+    if BPF.get_kprobe_functions(b'__blk_account_io_start'):
+        b.attach_kprobe(event="__blk_account_io_start", fn_name="trace_req_start")
+    else:
+        b.attach_kprobe(event="blk_account_io_start", fn_name="trace_req_start")
 else:
     if BPF.get_kprobe_functions(b'blk_start_request'):
         b.attach_kprobe(event="blk_start_request", fn_name="trace_req_start")
     b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_req_start")
-b.attach_kprobe(event="blk_account_io_done",
-    fn_name="trace_req_done")
+if BPF.get_kprobe_functions(b'__blk_account_io_done'):
+    b.attach_kprobe(event="__blk_account_io_done", fn_name="trace_req_done")
+else:
+    b.attach_kprobe(event="blk_account_io_done", fn_name="trace_req_done")
 
-print("Tracing block device I/O... Hit Ctrl-C to end.")
+if not args.json:
+    print("Tracing block device I/O... Hit Ctrl-C to end.")
+
+def disk_print(s):
+    disk = s.decode('utf-8', 'replace')
+    if not disk:
+        disk = "<unknown>"
+    return disk
 
 # see blk_fill_rwbs():
 req_opf = {
@@ -196,6 +281,8 @@ def flags_print(flags):
 # output
 exiting = 0 if args.interval else 1
 dist = b.get_table("dist")
+if args.extension:
+    extension = b.get_table("extension")
 while (1):
     try:
         sleep(int(args.interval))
@@ -203,13 +290,36 @@ while (1):
         exiting = 1
 
     print()
-    if args.timestamp:
-        print("%-8s\n" % strftime("%H:%M:%S"), end="")
+    if args.json:
+        if args.timestamp:
+            print("%-8s\n" % strftime("%H:%M:%S"), end="")
 
-    if args.flags:
-        dist.print_log2_hist(label, "flags", flags_print)
+        if args.flags:
+            dist.print_json_hist(label, "flags", flags_print)
+        else:
+            dist.print_json_hist(label, "disk", disk_print)
+
     else:
-        dist.print_log2_hist(label, "disk")
+        if args.timestamp:
+            print("%-8s\n" % strftime("%H:%M:%S"), end="")
+
+        if args.flags:
+            dist.print_log2_hist(label, "flags", flags_print)
+        else:
+            dist.print_log2_hist(label, "disk", disk_print)
+        if args.extension:
+            total = extension[0].total
+            counts = extension[0].count
+            if counts > 0:
+                if label == 'msecs':
+                    total /= 1000000
+                elif label == 'usecs':
+                    total /= 1000
+                avg = total / counts
+                print("\navg = %ld %s, total: %ld %s, count: %ld\n" %
+                      (total / counts, label, total, label, counts))
+            extension.clear()
+
     dist.clear()
 
     countdown -= 1

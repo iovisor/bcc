@@ -5,7 +5,7 @@
 # tcpstates   Trace the TCP session state changes with durations.
 #             For Linux, uses BCC, BPF. Embedded C.
 #
-# USAGE: tcpstates [-h] [-C] [-S] [interval [count]]
+# USAGE: tcpstates [-h] [-C] [-S] [interval [count]] [-4 | -6]
 #
 # This uses the sock:inet_sock_set_state tracepoint, added to Linux 4.16.
 # Linux 4.16 also adds more state transitions so that they can be traced.
@@ -34,6 +34,8 @@ examples = """examples:
     ./tcpstates -L 80     # only trace local port 80
     ./tcpstates -L 80,81  # only trace local ports 80 and 81
     ./tcpstates -D 80     # only trace remote port 80
+    ./tcpstates -4        # trace IPv4 family only
+    ./tcpstates -6        # trace IPv6 family only
 """
 parser = argparse.ArgumentParser(
     description="Trace TCP session state changes and durations",
@@ -55,6 +57,11 @@ parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 parser.add_argument("-Y", "--journal", action="store_true",
     help="log session state changes to the systemd journal")
+group = parser.add_mutually_exclusive_group()
+group.add_argument("-4", "--ipv4", action="store_true",
+    help="trace IPv4 family only")
+group.add_argument("-6", "--ipv6", action="store_true",
+    help="trace IPv6 family only")
 args = parser.parse_args()
 debug = 0
 
@@ -95,12 +102,8 @@ struct ipv6_data_t {
     char task[TASK_COMM_LEN];
 };
 BPF_PERF_OUTPUT(ipv6_events);
-
-struct id_t {
-    u32 pid;
-    char task[TASK_COMM_LEN];
-};
 """
+
 bpf_text_tracepoint = """
 TRACEPOINT_PROBE(sock, inet_sock_set_state)
 {
@@ -126,6 +129,8 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
         delta_us = 0;
     else
         delta_us = (bpf_ktime_get_ns() - *tsp) / 1000;
+    u16 family = args->family;
+    FILTER_FAMILY
 
     if (args->family == AF_INET) {
         struct ipv4_data_t data4 = {
@@ -159,8 +164,12 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
         ipv6_events.perf_submit(args, &data6, sizeof(data6));
     }
 
-    u64 ts = bpf_ktime_get_ns();
-    last.update(&sk, &ts);
+    if (args->newstate == TCP_CLOSE) {
+        last.delete(&sk);
+    } else {
+        u64 ts = bpf_ktime_get_ns();
+        last.update(&sk, &ts);
+    }
 
     return 0;
 }
@@ -169,42 +178,6 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
 bpf_text_kprobe = """
 int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
 {
-    // check this is TCP
-    u8 protocol = 0;
-
-    // Following comments add by Joe Yin:
-    // Unfortunately,it can not work since Linux 4.10,
-    // because the sk_wmem_queued is not following the bitfield of sk_protocol.
-    // And the following member is sk_gso_max_segs.
-    // So, we can use this:
-    // bpf_probe_read_kernel(&protocol, 1, (void *)((u64)&newsk->sk_gso_max_segs) - 3);
-    // In order to  diff the pre-4.10 and 4.10+ ,introduce the variables gso_max_segs_offset,sk_lingertime,
-    // sk_lingertime is closed to the gso_max_segs_offset,and
-    // the offset between the two members is 4
-
-    int gso_max_segs_offset = offsetof(struct sock, sk_gso_max_segs);
-    int sk_lingertime_offset = offsetof(struct sock, sk_lingertime);
-
-    if (sk_lingertime_offset - gso_max_segs_offset == 4)
-        // 4.10+ with little endian
-#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-        bpf_probe_read_kernel(&protocol, 1, (void *)((u64)&sk->sk_gso_max_segs) - 3);
-else
-        // pre-4.10 with little endian
-        bpf_probe_read_kernel(&protocol, 1, (void *)((u64)&sk->sk_wmem_queued) - 3);
-#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-        // 4.10+ with big endian
-        bpf_probe_read_kernel(&protocol, 1, (void *)((u64)&sk->sk_gso_max_segs) - 1);
-else
-        // pre-4.10 with big endian
-        bpf_probe_read_kernel(&protocol, 1, (void *)((u64)&sk->sk_wmem_queued) - 1);
-#else
-# error "Fix your compiler's __BYTE_ORDER__?!"
-#endif
-
-    if (protocol != IPPROTO_TCP)
-        return 0;
-
     u32 pid = bpf_get_current_pid_tgid() >> 32;
     // sk is used as a UUID
 
@@ -214,6 +187,7 @@ else
 
     // dport is either used in a filter here, or later
     u16 dport = sk->__sk_common.skc_dport;
+    dport = ntohs(dport);
     FILTER_DPORT
 
     // calculate delta
@@ -225,6 +199,7 @@ else
         delta_us = (bpf_ktime_get_ns() - *tsp) / 1000;
 
     u16 family = sk->__sk_common.skc_family;
+    FILTER_FAMILY
 
     if (family == AF_INET) {
         struct ipv4_data_t data4 = {
@@ -260,8 +235,12 @@ else
         ipv6_events.perf_submit(ctx, &data6, sizeof(data6));
     }
 
-    u64 ts = bpf_ktime_get_ns();
-    last.update(&sk, &ts);
+    if (state == TCP_CLOSE) {
+        last.delete(&sk);
+    } else {
+        u64 ts = bpf_ktime_get_ns();
+        last.update(&sk, &ts);
+    }
 
     return 0;
 
@@ -269,7 +248,7 @@ else
 """
 
 bpf_text = bpf_header
-if (BPF.tracepoint_exists("sock", "inet_sock_set_state")):
+if BPF.tracepoint_exists("sock", "inet_sock_set_state"):
     bpf_text += bpf_text_tracepoint
 else:
     bpf_text += bpf_text_kprobe
@@ -285,6 +264,13 @@ if args.localport:
     lports_if = ' && '.join(['lport != %d' % lport for lport in lports])
     bpf_text = bpf_text.replace('FILTER_LPORT',
         'if (%s) { last.delete(&sk); return 0; }' % lports_if)
+if args.ipv4:
+    bpf_text = bpf_text.replace('FILTER_FAMILY',
+        'if (family != AF_INET) { return 0; }')
+elif args.ipv6:
+    bpf_text = bpf_text.replace('FILTER_FAMILY',
+        'if (family != AF_INET6) { return 0; }')
+bpf_text = bpf_text.replace('FILTER_FAMILY', '')
 bpf_text = bpf_text.replace('FILTER_DPORT', '')
 bpf_text = bpf_text.replace('FILTER_LPORT', '')
 

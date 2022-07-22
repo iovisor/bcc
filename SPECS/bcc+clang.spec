@@ -1,5 +1,6 @@
 %define debug_package %{nil}
-%define llvmver 3.7.1
+%define _unpackaged_files_terminate_build 0
+%define llvmver 7.0.1
 
 Name:           bcc
 Version:        @REVISION@

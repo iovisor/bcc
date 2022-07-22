@@ -47,6 +47,7 @@ static const char * const prog_type_strings[] = {
   [BPF_PROG_TYPE_EXT] = "ext",
   [BPF_PROG_TYPE_LSM] = "lsm",
   [BPF_PROG_TYPE_SK_LOOKUP] = "sk_lookup",
+  [BPF_PROG_TYPE_SYSCALL] = "syscall",
 };
 
 static const char * const map_type_strings[] = {
@@ -77,6 +78,9 @@ static const char * const map_type_strings[] = {
   [BPF_MAP_TYPE_DEVMAP_HASH] = "devmap_hash",
   [BPF_MAP_TYPE_STRUCT_OPS] = "struct_ops",
   [BPF_MAP_TYPE_RINGBUF] = "ringbuf",
+  [BPF_MAP_TYPE_INODE_STORAGE] = "inode_storage",
+  [BPF_MAP_TYPE_TASK_STORAGE] = "task_storage",
+  [BPF_MAP_TYPE_BLOOM_FILTER] = "bloom_filter",
 };
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))

@@ -1,16 +1,17 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-from bcc import BPF
+from bcc import BPF, BPFAttachType, BPFProgType
+from bcc.libbcc import lib
 import ctypes as ct
 from unittest import main, skipUnless, TestCase
+from utils import kernel_version_ge
 import os
 import sys
 import socket
 import struct
 from contextlib import contextmanager
-import distutils.version
 
 @contextmanager
 def redirect_stderr(to):
@@ -23,17 +24,6 @@ def redirect_stderr(to):
         finally:
             sys.stderr.flush()
             os.dup2(copied.fileno(), stderr_fd)
-
-def kernel_version_ge(major, minor):
-    # True if running kernel is >= X.Y
-    version = distutils.version.LooseVersion(os.uname()[2]).version
-    if version[0] > major:
-        return True
-    if version[0] < major:
-        return False
-    if minor and version[1] < minor:
-        return False
-    return True
 
 class TestClang(TestCase):
     def test_complex(self):
@@ -64,6 +54,16 @@ int count_sched(struct pt_regs *ctx, struct task_struct *prev) {
 """
         b = BPF(text=text, debug=0)
         fn = b.load_func("count_sched", BPF.KPROBE)
+
+    def test_load_cgroup_sockopt_prog(self):
+        text = """
+int sockopt(struct bpf_sockopt* ctx){
+
+    return 0;
+}
+"""
+        b = BPF(text=text, debug=0)
+        fn =  b.load_func("sockopt", BPFProgType.CGROUP_SOCKOPT, device = None, attach_type = BPFAttachType.CGROUP_SETSOCKOPT)
 
     def test_probe_read2(self):
         text = """
@@ -154,6 +154,7 @@ int do_completion(struct pt_regs *ctx, struct request *req) {
         b = BPF(text=text, debug=0)
         fns = b.load_funcs(BPF.KPROBE)
 
+    @skipUnless(lib.bpf_module_rw_engine_enabled(), "requires enabled rwengine")
     def test_sscanf(self):
         text = """
 BPF_HASH(stats, int, struct { u64 a; u64 b; u64 c:36; u64 d:28; struct { u32 a; u32 b; } s; }, 10);
@@ -175,6 +176,7 @@ int foo(void *ctx) {
         self.assertEqual(l.s.a, 5)
         self.assertEqual(l.s.b, 6)
 
+    @skipUnless(lib.bpf_module_rw_engine_enabled(), "requires enabled rwengine")
     def test_sscanf_array(self):
         text = """
 BPF_HASH(stats, int, struct { u32 a[3]; u32 b; }, 10);
@@ -191,6 +193,7 @@ BPF_HASH(stats, int, struct { u32 a[3]; u32 b; }, 10);
         self.assertEqual(l.a[2], 3)
         self.assertEqual(l.b, 4)
 
+    @skipUnless(lib.bpf_module_rw_engine_enabled(), "requires enabled rwengine")
     def test_sscanf_string(self):
         text = """
 struct Symbol {
@@ -852,7 +855,11 @@ int trace_read_entry(struct pt_regs *ctx, struct file *file) {
 }
         """
         b = BPF(text=text)
-        b.attach_kprobe(event="__vfs_read", fn_name="trace_read_entry")
+        try:
+            b.attach_kprobe(event="__vfs_read", fn_name="trace_read_entry")
+        except Exception:
+            print('Current kernel does not have __vfs_read, try vfs_read instead')
+            b.attach_kprobe(event="vfs_read", fn_name="trace_read_entry")
 
     def test_printk_f(self):
         text = """
@@ -1250,7 +1257,8 @@ int test(struct pt_regs *ctx, struct mm_struct *mm) {
 struct bpf_map;
 BPF_HASH(map);
 int map_delete(struct pt_regs *ctx, struct bpf_map *bpfmap, u64 *k) {
-    map.increment(42, 10);
+    map.increment(42, 5);
+    map.atomic_increment(42, 5);
     return 0;
 }
 """)

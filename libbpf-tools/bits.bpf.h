@@ -2,6 +2,9 @@
 #ifndef __BITS_BPF_H
 #define __BITS_BPF_H
 
+#define READ_ONCE(x) (*(volatile typeof(x) *)&(x))
+#define WRITE_ONCE(x, val) ((*(volatile typeof(x) *)&(x)) = val)
+
 static __always_inline u64 log2(u32 v)
 {
 	u32 shift, r;

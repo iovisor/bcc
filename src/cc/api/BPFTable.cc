@@ -47,7 +47,7 @@ StatusTuple BPFTable::get_value(const std::string& key_str,
   StatusTuple r(0);
 
   r = string_to_key(key_str, key);
-  if (r.code() != 0)
+  if (!r.ok())
     return r;
 
   if (!lookup(key, value))
@@ -65,7 +65,7 @@ StatusTuple BPFTable::get_value(const std::string& key_str,
   StatusTuple r(0);
 
   r = string_to_key(key_str, key);
-  if (r.code() != 0)
+  if (!r.ok())
     return r;
 
   if (!lookup(key, value))
@@ -75,7 +75,7 @@ StatusTuple BPFTable::get_value(const std::string& key_str,
 
   for (size_t i = 0; i < ncpus; i++) {
     r = leaf_to_string(value + i * desc.leaf_size, value_str.at(i));
-    if (r.code() != 0)
+    if (!r.ok())
       return r;
   }
   return StatusTuple::OK();
@@ -89,11 +89,11 @@ StatusTuple BPFTable::update_value(const std::string& key_str,
   StatusTuple r(0);
 
   r = string_to_key(key_str, key);
-  if (r.code() != 0)
+  if (!r.ok())
     return r;
 
   r = string_to_leaf(value_str, value);
-  if (r.code() != 0)
+  if (!r.ok())
     return r;
 
   if (!update(key, value))
@@ -111,7 +111,7 @@ StatusTuple BPFTable::update_value(const std::string& key_str,
   StatusTuple r(0);
 
   r = string_to_key(key_str, key);
-  if (r.code() != 0)
+  if (!r.ok())
     return r;
 
   if (value_str.size() != ncpus)
@@ -119,7 +119,7 @@ StatusTuple BPFTable::update_value(const std::string& key_str,
 
   for (size_t i = 0; i < ncpus; i++) {
     r = string_to_leaf(value_str.at(i), value + i * desc.leaf_size);
-    if (r.code() != 0)
+    if (!r.ok())
       return r;
   }
 
@@ -135,7 +135,7 @@ StatusTuple BPFTable::remove_value(const std::string& key_str) {
   StatusTuple r(0);
 
   r = string_to_key(key_str, key);
-  if (r.code() != 0)
+  if (!r.ok())
     return r;
 
   if (!remove(key))
@@ -213,11 +213,11 @@ StatusTuple BPFTable::get_table_offline(
       }
 
       r = key_to_string(&i, key_str);
-      if (r.code() != 0)
+      if (!r.ok())
         return r;
 
       r = leaf_to_string(value.get(), value_str);
-      if (r.code() != 0)
+      if (!r.ok())
         return r;
       res.emplace_back(key_str, value_str);
     }
@@ -231,11 +231,11 @@ StatusTuple BPFTable::get_table_offline(
       if (!this->lookup(key.get(), value.get()))
         break;
       r = key_to_string(key.get(), key_str);
-      if (r.code() != 0)
+      if (!r.ok())
         return r;
 
       r = leaf_to_string(value.get(), value_str);
-      if (r.code() != 0)
+      if (!r.ok())
         return r;
       res.emplace_back(key_str, value_str);
       if (!this->next(key.get(), key.get()))
@@ -272,6 +272,14 @@ BPFStackTable::BPFStackTable(BPFStackTable&& that)
 BPFStackTable::~BPFStackTable() {
   for (auto it : pid_sym_)
     bcc_free_symcache(it.second, it.first);
+}
+
+void BPFStackTable::free_symcache(int pid) {
+  auto iter = pid_sym_.find(pid);
+  if (iter != pid_sym_.end()) {
+    bcc_free_symcache(iter->second, iter->first);
+    pid_sym_.erase(iter);
+  }
 }
 
 void BPFStackTable::clear_table_non_atomic() {
@@ -389,21 +397,21 @@ BPFPerfBuffer::BPFPerfBuffer(const TableDesc& desc)
                                 "' is not a perf buffer");
 }
 
-StatusTuple BPFPerfBuffer::open_on_cpu(perf_reader_raw_cb cb,
-                                       perf_reader_lost_cb lost_cb, int cpu,
-                                       void* cb_cookie, int page_cnt) {
-  if (cpu_readers_.find(cpu) != cpu_readers_.end())
-    return StatusTuple(-1, "Perf buffer already open on CPU %d", cpu);
+StatusTuple BPFPerfBuffer::open_on_cpu(perf_reader_raw_cb cb, perf_reader_lost_cb lost_cb,
+                                       void* cb_cookie, int page_cnt,
+                                       struct bcc_perf_buffer_opts& opts) {
+  if (cpu_readers_.find(opts.cpu) != cpu_readers_.end())
+    return StatusTuple(-1, "Perf buffer already open on CPU %d", opts.cpu);
 
   auto reader = static_cast<perf_reader*>(
-      bpf_open_perf_buffer(cb, lost_cb, cb_cookie, -1, cpu, page_cnt));
+      bpf_open_perf_buffer_opts(cb, lost_cb, cb_cookie, page_cnt, &opts));
   if (reader == nullptr)
     return StatusTuple(-1, "Unable to construct perf reader");
 
   int reader_fd = perf_reader_fd(reader);
-  if (!update(&cpu, &reader_fd)) {
+  if (!update(&opts.cpu, &reader_fd)) {
     perf_reader_free(static_cast<void*>(reader));
-    return StatusTuple(-1, "Unable to open perf buffer on CPU %d: %s", cpu,
+    return StatusTuple(-1, "Unable to open perf buffer on CPU %d: %s", opts.cpu,
                        std::strerror(errno));
   }
 
@@ -416,13 +424,21 @@ StatusTuple BPFPerfBuffer::open_on_cpu(perf_reader_raw_cb cb,
                        std::strerror(errno));
   }
 
-  cpu_readers_[cpu] = reader;
+  cpu_readers_[opts.cpu] = reader;
   return StatusTuple::OK();
 }
 
 StatusTuple BPFPerfBuffer::open_all_cpu(perf_reader_raw_cb cb,
                                         perf_reader_lost_cb lost_cb,
                                         void* cb_cookie, int page_cnt) {
+  return open_all_cpu(cb, lost_cb, cb_cookie, page_cnt, 1);
+}
+
+StatusTuple BPFPerfBuffer::open_all_cpu(perf_reader_raw_cb cb,
+                                        perf_reader_lost_cb lost_cb,
+                                        void* cb_cookie, int page_cnt,
+                                        int wakeup_events)
+{
   if (cpu_readers_.size() != 0 || epfd_ != -1)
     return StatusTuple(-1, "Previously opened perf buffer not cleaned");
 
@@ -431,8 +447,13 @@ StatusTuple BPFPerfBuffer::open_all_cpu(perf_reader_raw_cb cb,
   epfd_ = epoll_create1(EPOLL_CLOEXEC);
 
   for (int i : cpus) {
-    auto res = open_on_cpu(cb, lost_cb, i, cb_cookie, page_cnt);
-    if (res.code() != 0) {
+    struct bcc_perf_buffer_opts opts = {
+      .pid = -1,
+      .cpu = i,
+      .wakeup_events = wakeup_events,
+    };
+    auto res = open_on_cpu(cb, lost_cb, cb_cookie, page_cnt, opts);
+    if (!res.ok()) {
       TRY2(close_all_cpu());
       return res;
     }
@@ -470,7 +491,7 @@ StatusTuple BPFPerfBuffer::close_all_cpu() {
     opened_cpus.push_back(it.first);
   for (int i : opened_cpus) {
     auto res = close_on_cpu(i);
-    if (res.code() != 0) {
+    if (!res.ok()) {
       errors += "Failed to close CPU" + std::to_string(i) + " perf buffer: ";
       errors += res.msg() + "\n";
       has_error = true;
@@ -492,9 +513,17 @@ int BPFPerfBuffer::poll(int timeout_ms) {
   return cnt;
 }
 
+int BPFPerfBuffer::consume() {
+  if (epfd_ < 0)
+    return -1;
+  for (auto it : cpu_readers_)
+    perf_reader_event_read(it.second);
+  return 0;
+}
+
 BPFPerfBuffer::~BPFPerfBuffer() {
   auto res = close_all_cpu();
-  if (res.code() != 0)
+  if (!res.ok())
     std::cerr << "Failed to close all perf buffer on destruction: " << res.msg()
               << std::endl;
 }
@@ -514,7 +543,7 @@ StatusTuple BPFPerfEventArray::open_all_cpu(uint32_t type, uint64_t config) {
 
   for (int i : cpus) {
     auto res = open_on_cpu(i, type, config);
-    if (res.code() != 0) {
+    if (!res.ok()) {
       TRY2(close_all_cpu());
       return res;
     }
@@ -531,7 +560,7 @@ StatusTuple BPFPerfEventArray::close_all_cpu() {
     opened_cpus.push_back(it.first);
   for (int i : opened_cpus) {
     auto res = close_on_cpu(i);
-    if (res.code() != 0) {
+    if (!res.ok()) {
       errors += "Failed to close CPU" + std::to_string(i) + " perf event: ";
       errors += res.msg() + "\n";
       has_error = true;
@@ -573,7 +602,7 @@ StatusTuple BPFPerfEventArray::close_on_cpu(int cpu) {
 
 BPFPerfEventArray::~BPFPerfEventArray() {
   auto res = close_all_cpu();
-  if (res.code() != 0) {
+  if (!res.ok()) {
     std::cerr << "Failed to close all perf buffer on destruction: " << res.msg()
               << std::endl;
   }
@@ -676,27 +705,6 @@ StatusTuple BPFXskmapTable::get_value(const int& index,
 }
 
 StatusTuple BPFXskmapTable::remove_value(const int& index) {
-    if (!this->remove(const_cast<int*>(&index)))
-      return StatusTuple(-1, "Error removing value: %s", std::strerror(errno));
-    return StatusTuple::OK();
-}
-
-BPFMapInMapTable::BPFMapInMapTable(const TableDesc& desc)
-    : BPFTableBase<int, int>(desc) {
-    if(desc.type != BPF_MAP_TYPE_ARRAY_OF_MAPS &&
-       desc.type != BPF_MAP_TYPE_HASH_OF_MAPS)
-      throw std::invalid_argument("Table '" + desc.name +
-                                  "' is not a map-in-map table");
-}
-
-StatusTuple BPFMapInMapTable::update_value(const int& index,
-                                           const int& inner_map_fd) {
-    if (!this->update(const_cast<int*>(&index), const_cast<int*>(&inner_map_fd)))
-      return StatusTuple(-1, "Error updating value: %s", std::strerror(errno));
-    return StatusTuple::OK();
-}
-
-StatusTuple BPFMapInMapTable::remove_value(const int& index) {
     if (!this->remove(const_cast<int*>(&index)))
       return StatusTuple(-1, "Error removing value: %s", std::strerror(errno));
     return StatusTuple::OK();

@@ -4,7 +4,7 @@
 # tcpaccept Trace TCP accept()s.
 #           For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: tcpaccept [-h] [-T] [-t] [-p PID] [-P PORTS]
+# USAGE: tcpaccept [-h] [-T] [-t] [-p PID] [-P PORTS] [-4 | -6]
 #
 # This uses dynamic tracing of the kernel inet_csk_accept() socket function
 # (from tcp_prot.accept), and will need to be modified to match kernel changes.
@@ -32,6 +32,8 @@ examples = """examples:
     ./tcpaccept -p 181    # only trace PID 181
     ./tcpaccept --cgroupmap mappath  # only trace cgroups in this BPF map
     ./tcpaccept --mntnsmap mappath   # only trace mount namespaces in the map
+    ./tcpaccept -4        # trace IPv4 family
+    ./tcpaccept -6        # trace IPv6 family
 """
 parser = argparse.ArgumentParser(
     description="Trace TCP accepts",
@@ -45,6 +47,11 @@ parser.add_argument("-p", "--pid",
     help="trace this PID only")
 parser.add_argument("-P", "--port",
     help="comma-separated list of local ports to trace")
+group = parser.add_mutually_exclusive_group()
+group.add_argument("-4", "--ipv4", action="store_true",
+    help="trace IPv4 family only")
+group.add_argument("-6", "--ipv6", action="store_true",
+    help="trace IPv6 family only")
 parser.add_argument("--cgroupmap",
     help="trace cgroups in this BPF map only")
 parser.add_argument("--mntnsmap",
@@ -109,7 +116,7 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
         return 0;
 
     // check this is TCP
-    u8 protocol = 0;
+    u16 protocol = 0;
     // workaround for reading the sk_protocol bitfield:
 
     // Following comments add by Joe Yin:
@@ -125,7 +132,12 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
     int gso_max_segs_offset = offsetof(struct sock, sk_gso_max_segs);
     int sk_lingertime_offset = offsetof(struct sock, sk_lingertime);
 
-    if (sk_lingertime_offset - gso_max_segs_offset == 4)
+
+    // Since kernel v5.6 sk_protocol is its own u16 field and gso_max_segs
+    // precedes sk_lingertime.
+    if (sk_lingertime_offset - gso_max_segs_offset == 2)
+        protocol = newsk->sk_protocol;
+    else if (sk_lingertime_offset - gso_max_segs_offset == 4)
         // 4.10+ with little endian
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
         protocol = *(u8 *)((u64)&newsk->sk_gso_max_segs - 3);
@@ -151,6 +163,8 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
     lport = newsk->__sk_common.skc_num;
     dport = newsk->__sk_common.skc_dport;
     dport = ntohs(dport);
+
+    ##FILTER_FAMILY##
 
     ##FILTER_PORT##
 
@@ -195,6 +209,13 @@ if args.port:
     lports_if = ' && '.join(['lport != %d' % lport for lport in lports])
     bpf_text = bpf_text.replace('##FILTER_PORT##',
         'if (%s) { return 0; }' % lports_if)
+if args.ipv4:
+    bpf_text = bpf_text.replace('##FILTER_FAMILY##',
+        'if (family != AF_INET) { return 0; }')
+elif args.ipv6:
+    bpf_text = bpf_text.replace('##FILTER_FAMILY##',
+        'if (family != AF_INET6) { return 0; }')
+
 bpf_text = filter_by_containers(args) + bpf_text
 if debug or args.ebpf:
     print(bpf_text)
@@ -202,6 +223,7 @@ if debug or args.ebpf:
         exit()
 
 bpf_text = bpf_text.replace('##FILTER_PORT##', '')
+bpf_text = bpf_text.replace('##FILTER_FAMILY##', '')
 
 # process event
 def print_ipv4_event(cpu, data, size):

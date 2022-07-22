@@ -13,20 +13,21 @@
 # limitations under the License.
 
 from __future__ import print_function
-from collections import MutableMapping
+try:
+    from collections.abc import MutableMapping
+except ImportError:
+    from collections import MutableMapping
+from time import strftime
 import ctypes as ct
 from functools import reduce
-import multiprocessing
 import os
 import errno
 import re
 import sys
 
-from .libbcc import lib, _RAW_CB_TYPE, _LOST_CB_TYPE, _RINGBUF_CB_TYPE
-from .perf import Perf
+from .libbcc import lib, _RAW_CB_TYPE, _LOST_CB_TYPE, _RINGBUF_CB_TYPE, bcc_perf_buffer_opts
 from .utils import get_online_cpus
 from .utils import get_possible_cpus
-from subprocess import check_output
 
 BPF_MAP_TYPE_HASH = 1
 BPF_MAP_TYPE_ARRAY = 2
@@ -55,34 +56,40 @@ BPF_MAP_TYPE_SK_STORAGE = 24
 BPF_MAP_TYPE_DEVMAP_HASH = 25
 BPF_MAP_TYPE_STRUCT_OPS = 26
 BPF_MAP_TYPE_RINGBUF = 27
+BPF_MAP_TYPE_INODE_STORAGE = 28
+BPF_MAP_TYPE_TASK_STORAGE = 29
 
-map_type_name = {BPF_MAP_TYPE_HASH: "HASH",
-                 BPF_MAP_TYPE_ARRAY: "ARRAY",
-                 BPF_MAP_TYPE_PROG_ARRAY: "PROG_ARRAY",
-                 BPF_MAP_TYPE_PERF_EVENT_ARRAY: "PERF_EVENT_ARRAY",
-                 BPF_MAP_TYPE_PERCPU_HASH: "PERCPU_HASH",
-                 BPF_MAP_TYPE_PERCPU_ARRAY: "PERCPU_ARRAY",
-                 BPF_MAP_TYPE_STACK_TRACE: "STACK_TRACE",
-                 BPF_MAP_TYPE_CGROUP_ARRAY: "CGROUP_ARRAY",
-                 BPF_MAP_TYPE_LRU_HASH: "LRU_HASH",
-                 BPF_MAP_TYPE_LRU_PERCPU_HASH: "LRU_PERCPU_HASH",
-                 BPF_MAP_TYPE_LPM_TRIE: "LPM_TRIE",
-                 BPF_MAP_TYPE_ARRAY_OF_MAPS: "ARRAY_OF_MAPS",
-                 BPF_MAP_TYPE_HASH_OF_MAPS: "HASH_OF_MAPS",
-                 BPF_MAP_TYPE_DEVMAP: "DEVMAP",
-                 BPF_MAP_TYPE_SOCKMAP: "SOCKMAP",
-                 BPF_MAP_TYPE_CPUMAP: "CPUMAP",
-                 BPF_MAP_TYPE_XSKMAP: "XSKMAP",
-                 BPF_MAP_TYPE_SOCKHASH: "SOCKHASH",
-                 BPF_MAP_TYPE_CGROUP_STORAGE: "CGROUP_STORAGE",
-                 BPF_MAP_TYPE_REUSEPORT_SOCKARRAY: "REUSEPORT_SOCKARRAY",
-                 BPF_MAP_TYPE_PERCPU_CGROUP_STORAGE: "PERCPU_CGROUP_STORAGE",
-                 BPF_MAP_TYPE_QUEUE: "QUEUE",
-                 BPF_MAP_TYPE_STACK: "STACK",
-                 BPF_MAP_TYPE_SK_STORAGE: "SK_STORAGE",
-                 BPF_MAP_TYPE_DEVMAP_HASH: "DEVMAP_HASH",
-                 BPF_MAP_TYPE_STRUCT_OPS: "STRUCT_OPS",
-                 BPF_MAP_TYPE_RINGBUF: "RINGBUF",}
+map_type_name = {
+    BPF_MAP_TYPE_HASH: "HASH",
+    BPF_MAP_TYPE_ARRAY: "ARRAY",
+    BPF_MAP_TYPE_PROG_ARRAY: "PROG_ARRAY",
+    BPF_MAP_TYPE_PERF_EVENT_ARRAY: "PERF_EVENT_ARRAY",
+    BPF_MAP_TYPE_PERCPU_HASH: "PERCPU_HASH",
+    BPF_MAP_TYPE_PERCPU_ARRAY: "PERCPU_ARRAY",
+    BPF_MAP_TYPE_STACK_TRACE: "STACK_TRACE",
+    BPF_MAP_TYPE_CGROUP_ARRAY: "CGROUP_ARRAY",
+    BPF_MAP_TYPE_LRU_HASH: "LRU_HASH",
+    BPF_MAP_TYPE_LRU_PERCPU_HASH: "LRU_PERCPU_HASH",
+    BPF_MAP_TYPE_LPM_TRIE: "LPM_TRIE",
+    BPF_MAP_TYPE_ARRAY_OF_MAPS: "ARRAY_OF_MAPS",
+    BPF_MAP_TYPE_HASH_OF_MAPS: "HASH_OF_MAPS",
+    BPF_MAP_TYPE_DEVMAP: "DEVMAP",
+    BPF_MAP_TYPE_SOCKMAP: "SOCKMAP",
+    BPF_MAP_TYPE_CPUMAP: "CPUMAP",
+    BPF_MAP_TYPE_XSKMAP: "XSKMAP",
+    BPF_MAP_TYPE_SOCKHASH: "SOCKHASH",
+    BPF_MAP_TYPE_CGROUP_STORAGE: "CGROUP_STORAGE",
+    BPF_MAP_TYPE_REUSEPORT_SOCKARRAY: "REUSEPORT_SOCKARRAY",
+    BPF_MAP_TYPE_PERCPU_CGROUP_STORAGE: "PERCPU_CGROUP_STORAGE",
+    BPF_MAP_TYPE_QUEUE: "QUEUE",
+    BPF_MAP_TYPE_STACK: "STACK",
+    BPF_MAP_TYPE_SK_STORAGE: "SK_STORAGE",
+    BPF_MAP_TYPE_DEVMAP_HASH: "DEVMAP_HASH",
+    BPF_MAP_TYPE_STRUCT_OPS: "STRUCT_OPS",
+    BPF_MAP_TYPE_RINGBUF: "RINGBUF",
+    BPF_MAP_TYPE_INODE_STORAGE: "INODE_STORAGE",
+    BPF_MAP_TYPE_TASK_STORAGE: "TASK_STORAGE",
+}
 
 stars_max = 40
 log2_index_max = 65
@@ -101,6 +108,30 @@ def _stars(val, val_max, width):
         text = text[:-1] + "+"
     return text
 
+def _print_json_hist(vals, val_type, section_bucket=None):
+    hist_list = []
+    max_nonzero_idx = 0
+    for i in range(len(vals)):
+        if vals[i] != 0:
+            max_nonzero_idx = i
+    index = 1
+    prev = 0
+    for i in range(len(vals)):
+        if i != 0 and i <= max_nonzero_idx:
+            index = index * 2
+
+            list_obj = {}
+            list_obj['interval-start'] = prev
+            list_obj['interval-end'] = int(index) - 1
+            list_obj['count'] = int(vals[i])
+
+            hist_list.append(list_obj)
+
+            prev = index
+    histogram = {"ts": strftime("%Y-%m-%d %H:%M:%S"), "val_type": val_type, "data": hist_list}
+    if section_bucket:
+        histogram[section_bucket[0]] = section_bucket[1]
+    print(histogram)
 
 def _print_log2_hist(vals, val_type, strip_leading_zero):
     global stars_max
@@ -140,7 +171,7 @@ def _print_log2_hist(vals, val_type, strip_leading_zero):
             print(body % (low, high, val, stars,
                           _stars(val, val_max, stars)))
 
-def _print_linear_hist(vals, val_type):
+def _print_linear_hist(vals, val_type, strip_leading_zero):
     global stars_max
     log2_dist_max = 64
     idx_max = -1
@@ -155,11 +186,18 @@ def _print_linear_hist(vals, val_type):
     stars = stars_max
 
     if idx_max >= 0:
-        print(header % val_type);
+        print(header % val_type)
     for i in range(0, idx_max + 1):
         val = vals[i]
-        print(body % (i, val, stars,
-                      _stars(val, val_max, stars)))
+
+        if strip_leading_zero:
+            if val:
+                print(body % (i, val, stars,
+                              _stars(val, val_max, stars)))
+                strip_leading_zero = False
+        else:
+                print(body % (i, val, stars,
+                              _stars(val, val_max, stars)))
 
 
 def get_table_type_name(ttype):
@@ -170,33 +208,35 @@ def get_table_type_name(ttype):
 
 
 def _get_event_class(event_map):
-    ct_mapping = { 'char'              : ct.c_char,
-                   's8'                : ct.c_char,
-                   'unsigned char'     : ct.c_ubyte,
-                   'u8'                : ct.c_ubyte,
-                   'u8 *'              : ct.c_char_p,
-                   'char *'            : ct.c_char_p,
-                   'short'             : ct.c_short,
-                   's16'               : ct.c_short,
-                   'unsigned short'    : ct.c_ushort,
-                   'u16'               : ct.c_ushort,
-                   'int'               : ct.c_int,
-                   's32'               : ct.c_int,
-                   'enum'              : ct.c_int,
-                   'unsigned int'      : ct.c_uint,
-                   'u32'               : ct.c_uint,
-                   'long'              : ct.c_long,
-                   'unsigned long'     : ct.c_ulong,
-                   'long long'         : ct.c_longlong,
-                   's64'               : ct.c_longlong,
-                   'unsigned long long': ct.c_ulonglong,
-                   'u64'               : ct.c_ulonglong,
-                   '__int128'          : (ct.c_longlong * 2),
-                   'unsigned __int128' : (ct.c_ulonglong * 2),
-                   'void *'            : ct.c_void_p }
+    ct_mapping = {
+        'char'              : ct.c_char,
+        's8'                : ct.c_char,
+        'unsigned char'     : ct.c_ubyte,
+        'u8'                : ct.c_ubyte,
+        'u8 *'              : ct.c_char_p,
+        'char *'            : ct.c_char_p,
+        'short'             : ct.c_short,
+        's16'               : ct.c_short,
+        'unsigned short'    : ct.c_ushort,
+        'u16'               : ct.c_ushort,
+        'int'               : ct.c_int,
+        's32'               : ct.c_int,
+        'enum'              : ct.c_int,
+        'unsigned int'      : ct.c_uint,
+        'u32'               : ct.c_uint,
+        'long'              : ct.c_long,
+        'unsigned long'     : ct.c_ulong,
+        'long long'         : ct.c_longlong,
+        's64'               : ct.c_longlong,
+        'unsigned long long': ct.c_ulonglong,
+        'u64'               : ct.c_ulonglong,
+        '__int128'          : (ct.c_longlong * 2),
+        'unsigned __int128' : (ct.c_ulonglong * 2),
+        'void *'            : ct.c_void_p,
+    }
 
-    # handle array types e.g. "int [16] foo"
-    array_type = re.compile(r"(.+) \[([0-9]+)\]$")
+    # handle array types e.g. "int [16]" or "char[16]"
+    array_type = re.compile(r"([^ ]+) ?\[([0-9]+)\]$")
 
     fields = []
     num_fields = lib.bpf_perf_event_fields(event_map.bpf.module, event_map._name)
@@ -286,6 +326,8 @@ class TableBase(MutableMapping):
         self.flags = lib.bpf_table_flags_id(self.bpf.module, self.map_id)
         self._cbs = {}
         self._name = name
+        self.max_entries = int(lib.bpf_table_max_entries_id(self.bpf.module,
+                self.map_id))
 
     def get_fd(self):
         return self.map_fd
@@ -369,6 +411,206 @@ class TableBase(MutableMapping):
         for k in self.keys():
             self.__delitem__(k)
 
+    def _alloc_keys_values(self, alloc_k=False, alloc_v=False, count=None):
+        """Allocate keys and/or values arrays. Useful for in items_*_batch.
+
+        Args:
+            alloc_k (bool): True to allocate keys array, False otherwise.
+            Default is False.
+            alloc_v (bool): True to allocate values array, False otherwise.
+            Default is False.
+            count (int): number of elements in the array(s) to allocate. If
+            count is None then it allocates the maximum number of elements i.e
+            self.max_entries.
+
+        Returns:
+            tuple: (count, keys, values). Where count is ct.c_uint32,
+            and keys and values an instance of ct.Array
+        Raises:
+            ValueError: If count is less than 1 or greater than
+            self.max_entries.
+        """
+        keys = values = None
+        if not alloc_k and not alloc_v:
+            return (ct.c_uint32(0), None, None)
+
+        if not count:  # means alloc maximum size
+            count = self.max_entries
+        elif count < 1 or count > self.max_entries:
+            raise ValueError("Wrong count")
+
+        if alloc_k:
+            keys = (self.Key * count)()
+        if alloc_v:
+            values = (self.Leaf * count)()
+
+        return (ct.c_uint32(count), keys, values)
+
+    def _sanity_check_keys_values(self, keys=None, values=None):
+        """Check if the given keys or values have the right type and size.
+
+        Args:
+            keys (ct.Array): keys array to check
+            values (ct.Array): values array to check
+        Returns:
+            ct.c_uint32 : the size of the array(s)
+        Raises:
+            ValueError: If length of arrays is less than 1 or greater than
+            self.max_entries, or when both arrays length are different.
+            TypeError: If the keys and values are not an instance of ct.Array
+        """
+        arr_len = 0
+        for elem in [keys, values]:
+            if elem:
+                if not isinstance(elem, ct.Array):
+                    raise TypeError
+
+                arr_len = len(elem)
+                if arr_len < 1 or arr_len > self.max_entries:
+                    raise ValueError("Array's length is wrong")
+
+        if keys and values:
+            # check both length are equal
+            if len(keys) != len(values):
+                raise ValueError("keys array length != values array length")
+
+        return ct.c_uint32(arr_len)
+
+    def items_lookup_batch(self):
+        """Look up all the key-value pairs in the map.
+
+        Args:
+            None
+        Yields:
+            tuple: The tuple of (key,value) for every entries that have
+            been looked up.
+        Notes: lookup batch on a keys subset is not supported by the kernel.
+        """
+        for k, v in self._items_lookup_and_optionally_delete_batch(delete=False):
+            yield(k, v)
+        return
+
+    def items_delete_batch(self, ct_keys=None):
+        """Delete the key-value pairs related to the keys given as parameters.
+        Note that if no key are given, it is faster to call
+        lib.bpf_lookup_and_delete_batch than create keys array and then call
+        lib.bpf_delete_batch on these keys.
+
+        Args:
+            ct_keys (ct.Array): keys array to delete. If an array of keys is
+            given then it deletes all the related keys-values.
+            If keys is None (default) then it deletes all entries.
+        Yields:
+            tuple: The tuple of (key,value) for every entries that have
+            been deleted.
+        Raises:
+            Exception: If bpf syscall return value indicates an error.
+        """
+        if ct_keys is not None:
+            ct_cnt = self._sanity_check_keys_values(keys=ct_keys)
+            res = lib.bpf_delete_batch(self.map_fd,
+                                       ct.byref(ct_keys),
+                                       ct.byref(ct_cnt)
+                                       )
+            if (res != 0):
+                raise Exception("BPF_MAP_DELETE_BATCH has failed: %s"
+                                % os.strerror(ct.get_errno()))
+
+        else:
+            for _ in self.items_lookup_and_delete_batch():
+                return
+
+    def items_update_batch(self, ct_keys, ct_values):
+        """Update all the key-value pairs in the map provided.
+        The arrays must be the same length, between 1 and the maximum number
+        of entries.
+
+        Args:
+            ct_keys (ct.Array): keys array to update
+            ct_values (ct.Array): values array to update
+        Raises:
+            Exception: If bpf syscall return value indicates an error.
+        """
+        ct_cnt = self._sanity_check_keys_values(keys=ct_keys, values=ct_values)
+        res = lib.bpf_update_batch(self.map_fd,
+                                   ct.byref(ct_keys),
+                                   ct.byref(ct_values),
+                                   ct.byref(ct_cnt)
+                                   )
+        if (res != 0):
+            raise Exception("BPF_MAP_UPDATE_BATCH has failed: %s"
+                            % os.strerror(ct.get_errno()))
+
+    def items_lookup_and_delete_batch(self):
+        """Look up and delete all the key-value pairs in the map.
+
+        Args:
+            None
+        Yields:
+            tuple: The tuple of (key,value) for every entries that have
+            been looked up and deleted.
+        Notes: lookup and delete batch on a keys subset is not supported by
+        the kernel.
+        """
+        for k, v in self._items_lookup_and_optionally_delete_batch(delete=True):
+            yield(k, v)
+        return
+
+    def _items_lookup_and_optionally_delete_batch(self, delete=True):
+        """Look up and optionally delete all the key-value pairs in the map.
+
+        Args:
+            delete (bool) : look up and delete the key-value pairs when True,
+            else just look up.
+        Yields:
+            tuple: The tuple of (key,value) for every entries that have
+            been looked up and deleted.
+        Raises:
+            Exception: If bpf syscall return value indicates an error.
+        Notes: lookup and delete batch on a keys subset is not supported by
+        the kernel.
+        """
+        if delete is True:
+            bpf_batch = lib.bpf_lookup_and_delete_batch
+            bpf_cmd = "BPF_MAP_LOOKUP_AND_DELETE_BATCH"
+        else:
+            bpf_batch = lib.bpf_lookup_batch
+            bpf_cmd = "BPF_MAP_LOOKUP_BATCH"
+
+        # alloc keys and values to the max size
+        ct_buf_size, ct_keys, ct_values = self._alloc_keys_values(alloc_k=True,
+                                                                  alloc_v=True)
+        ct_out_batch = ct_cnt = ct.c_uint32(0)
+        total = 0
+        while True:
+            ct_cnt.value = ct_buf_size.value - total
+            res = bpf_batch(self.map_fd,
+                            ct.byref(ct_out_batch) if total else None,
+                            ct.byref(ct_out_batch),
+                            ct.byref(ct_keys, ct.sizeof(self.Key) * total),
+                            ct.byref(ct_values, ct.sizeof(self.Leaf) * total),
+                            ct.byref(ct_cnt)
+                            )
+            errcode = ct.get_errno()
+            total += ct_cnt.value
+            if (res != 0 and errcode != errno.ENOENT):
+                raise Exception("%s has failed: %s" % (bpf_cmd,
+                                                       os.strerror(errcode)))
+
+            if res != 0:
+                break  # success
+
+            if total == ct_buf_size.value:  # buffer full, we can't progress
+                break
+
+            if ct_cnt.value == 0:
+                # no progress, probably because concurrent update
+                # puts too many elements in one bucket.
+                break
+
+        for i in range(0, total):
+            yield (ct_keys[i], ct_values[i])
+
     def zero(self):
         # Even though this is not very efficient, we grab the entire list of
         # keys before enumerating it. This helps avoid a potential race where
@@ -409,6 +651,65 @@ class TableBase(MutableMapping):
             raise StopIteration()
         return next_key
 
+    def decode_c_struct(self, tmp, buckets, bucket_fn, bucket_sort_fn):
+        f1 = self.Key._fields_[0][0]
+        f2 = self.Key._fields_[1][0]
+        # The above code assumes that self.Key._fields_[1][0] holds the
+        # slot. But a padding member may have been inserted here, which
+        # breaks the assumption and leads to chaos.
+        # TODO: this is a quick fix. Fixing/working around in the BCC
+        # internal library is the right thing to do.
+        if f2 == '__pad_1' and len(self.Key._fields_) == 3:
+            f2 = self.Key._fields_[2][0]
+        for k, v in self.items():
+            bucket = getattr(k, f1)
+            if bucket_fn:
+                bucket = bucket_fn(bucket)
+            vals = tmp[bucket] = tmp.get(bucket, [0] * log2_index_max)
+            slot = getattr(k, f2)
+            vals[slot] = v.value
+        buckets_lst = list(tmp.keys())
+        if bucket_sort_fn:
+            buckets_lst = bucket_sort_fn(buckets_lst)
+        for bucket in buckets_lst:
+            buckets.append(bucket)
+
+    def print_json_hist(self, val_type="value", section_header="Bucket ptr",
+                        section_print_fn=None, bucket_fn=None, bucket_sort_fn=None):
+        """print_json_hist(val_type="value", section_header="Bucket ptr",
+                                   section_print_fn=None, bucket_fn=None,
+                                   bucket_sort_fn=None):
+
+                Prints a table as a json histogram. The table must be stored as
+                log2. The val_type argument is optional, and is a column header.
+                If the histogram has a secondary key, the dictionary will be split by secondary key
+                If section_print_fn is not None, it will be passed the bucket value
+                to format into a string as it sees fit. If bucket_fn is not None,
+                it will be used to produce a bucket value for the histogram keys.
+                If bucket_sort_fn is not None, it will be used to sort the buckets
+                before iterating them, and it is useful when there are multiple fields
+                in the secondary key.
+                The maximum index allowed is log2_index_max (65), which will
+                accommodate any 64-bit integer in the histogram.
+                """
+        if isinstance(self.Key(), ct.Structure):
+            tmp = {}
+            buckets = []
+            self.decode_c_struct(tmp, buckets, bucket_fn, bucket_sort_fn)
+            for bucket in buckets:
+                vals = tmp[bucket]
+                if section_print_fn:
+                    section_bucket = (section_header, section_print_fn(bucket))
+                else:
+                    section_bucket = (section_header, bucket)
+                _print_json_hist(vals, val_type, section_bucket)
+
+        else:
+            vals = [0] * log2_index_max
+            for k, v in self.items():
+                vals[k.value] = v.value
+            _print_json_hist(vals, val_type)
+
     def print_log2_hist(self, val_type="value", section_header="Bucket ptr",
             section_print_fn=None, bucket_fn=None, strip_leading_zero=None,
             bucket_sort_fn=None):
@@ -433,29 +734,8 @@ class TableBase(MutableMapping):
         """
         if isinstance(self.Key(), ct.Structure):
             tmp = {}
-            f1 = self.Key._fields_[0][0]
-            f2 = self.Key._fields_[1][0]
-
-            # The above code assumes that self.Key._fields_[1][0] holds the
-            # slot. But a padding member may have been inserted here, which
-            # breaks the assumption and leads to chaos.
-            # TODO: this is a quick fix. Fixing/working around in the BCC
-            # internal library is the right thing to do.
-            if f2 == '__pad_1' and len(self.Key._fields_) == 3:
-                f2 = self.Key._fields_[2][0]
-
-            for k, v in self.items():
-                bucket = getattr(k, f1)
-                if bucket_fn:
-                    bucket = bucket_fn(bucket)
-                vals = tmp[bucket] = tmp.get(bucket, [0] * log2_index_max)
-                slot = getattr(k, f2)
-                vals[slot] = v.value
-
-            buckets = list(tmp.keys())
-            if bucket_sort_fn:
-                buckets = bucket_sort_fn(buckets)
-
+            buckets = []
+            self.decode_c_struct(tmp, buckets, bucket_fn, bucket_sort_fn)
             for bucket in buckets:
                 vals = tmp[bucket]
                 if section_print_fn:
@@ -471,10 +751,11 @@ class TableBase(MutableMapping):
             _print_log2_hist(vals, val_type, strip_leading_zero)
 
     def print_linear_hist(self, val_type="value", section_header="Bucket ptr",
-            section_print_fn=None, bucket_fn=None, bucket_sort_fn=None):
+            section_print_fn=None, bucket_fn=None, strip_leading_zero=None,
+            bucket_sort_fn=None):
         """print_linear_hist(val_type="value", section_header="Bucket ptr",
                            section_print_fn=None, bucket_fn=None,
-                           bucket_sort_fn=None)
+                           strip_leading_zero=None, bucket_sort_fn=None)
 
         Prints a table as a linear histogram. This is intended to span integer
         ranges, eg, from 0 to 100. The val_type argument is optional, and is a
@@ -483,6 +764,8 @@ class TableBase(MutableMapping):
         each.  If section_print_fn is not None, it will be passed the bucket
         value to format into a string as it sees fit. If bucket_fn is not None,
         it will be used to produce a bucket value for the histogram keys.
+        If the value of strip_leading_zero is not False, prints a histogram
+        that is omitted leading zeros from the beginning.
         If bucket_sort_fn is not None, it will be used to sort the buckets
         before iterating them, and it is useful when there are multiple fields
         in the secondary key.
@@ -491,19 +774,8 @@ class TableBase(MutableMapping):
         """
         if isinstance(self.Key(), ct.Structure):
             tmp = {}
-            f1 = self.Key._fields_[0][0]
-            f2 = self.Key._fields_[1][0]
-            for k, v in self.items():
-                bucket = getattr(k, f1)
-                if bucket_fn:
-                    bucket = bucket_fn(bucket)
-                vals = tmp[bucket] = tmp.get(bucket, [0] * linear_index_max)
-                slot = getattr(k, f2)
-                vals[slot] = v.value
-
-            buckets = tmp.keys()
-            if bucket_sort_fn:
-                buckets = bucket_sort_fn(buckets)
+            buckets = []
+            self.decode_c_struct(tmp, buckets, bucket_fn, bucket_sort_fn)
 
             for bucket in buckets:
                 vals = tmp[bucket]
@@ -512,7 +784,7 @@ class TableBase(MutableMapping):
                         section_print_fn(bucket)))
                 else:
                     print("\n%s = %r" % (section_header, bucket))
-                _print_linear_hist(vals, val_type)
+                _print_linear_hist(vals, val_type, strip_leading_zero)
         else:
             vals = [0] * linear_index_max
             for k, v in self.items():
@@ -523,7 +795,7 @@ class TableBase(MutableMapping):
                     # function be rewritten to avoid having one.
                     raise IndexError(("Index in print_linear_hist() of %d " +
                         "exceeds max of %d.") % (k.value, linear_index_max))
-            _print_linear_hist(vals, val_type)
+            _print_linear_hist(vals, val_type, strip_leading_zero)
 
 
 class HashTable(TableBase):
@@ -542,8 +814,6 @@ class LruHash(HashTable):
 class ArrayBase(TableBase):
     def __init__(self, *args, **kwargs):
         super(ArrayBase, self).__init__(*args, **kwargs)
-        self.max_entries = int(lib.bpf_table_max_entries_id(self.bpf.module,
-                self.map_id))
 
     def _normalize_key(self, key):
         if isinstance(key, int):
@@ -690,7 +960,7 @@ class PerfEventArray(ArrayBase):
             self._event_class = _get_event_class(self)
         return ct.cast(data, ct.POINTER(self._event_class)).contents
 
-    def open_perf_buffer(self, callback, page_cnt=8, lost_cb=None):
+    def open_perf_buffer(self, callback, page_cnt=8, lost_cb=None, wakeup_events=1):
         """open_perf_buffers(callback)
 
         Opens a set of per-cpu ring buffer to receive custom perf event
@@ -704,9 +974,9 @@ class PerfEventArray(ArrayBase):
             raise Exception("Perf buffer page_cnt must be a power of two")
 
         for i in get_online_cpus():
-            self._open_perf_buffer(i, callback, page_cnt, lost_cb)
+            self._open_perf_buffer(i, callback, page_cnt, lost_cb, wakeup_events)
 
-    def _open_perf_buffer(self, cpu, callback, page_cnt, lost_cb):
+    def _open_perf_buffer(self, cpu, callback, page_cnt, lost_cb, wakeup_events):
         def raw_cb_(_, data, size):
             try:
                 callback(cpu, data, size)
@@ -725,7 +995,11 @@ class PerfEventArray(ArrayBase):
                     raise e
         fn = _RAW_CB_TYPE(raw_cb_)
         lost_fn = _LOST_CB_TYPE(lost_cb_) if lost_cb else ct.cast(None, _LOST_CB_TYPE)
-        reader = lib.bpf_open_perf_buffer(fn, lost_fn, None, -1, cpu, page_cnt)
+        opts = bcc_perf_buffer_opts()
+        opts.pid = -1
+        opts.cpu = cpu
+        opts.wakeup_events = wakeup_events
+        reader = lib.bpf_open_perf_buffer_opts(fn, lost_fn, None, page_cnt, ct.byref(opts))
         if not reader:
             raise Exception("Could not open perf buffer")
         fd = lib.perf_reader_fd(reader)
@@ -1014,6 +1288,8 @@ class QueueStack:
         self.Leaf = leaftype
         self.ttype = lib.bpf_table_type_id(self.bpf.module, self.map_id)
         self.flags = lib.bpf_table_flags_id(self.bpf.module, self.map_id)
+        self.max_entries = int(lib.bpf_table_max_entries_id(self.bpf.module,
+                self.map_id))
 
     def leaf_sprintf(self, leaf):
         buf = ct.create_string_buffer(ct.sizeof(self.Leaf) * 8)
@@ -1050,3 +1326,16 @@ class QueueStack:
         if res < 0:
             raise KeyError("Could not peek table")
         return leaf
+
+    def itervalues(self):
+        # to avoid infinite loop, set maximum pops to max_entries
+        cnt = self.max_entries
+        while cnt:
+            try:
+                yield(self.pop())
+                cnt -= 1
+            except KeyError:
+                return
+
+    def values(self):
+        return [value for value in self.itervalues()]

@@ -5,6 +5,7 @@
 #
 # USAGE: argdist [-h] [-p PID] [-z STRING_SIZE] [-i INTERVAL] [-n COUNT] [-v]
 #                [-c] [-T TOP] [-C specifier] [-H specifier] [-I header]
+#                [-t TID]
 #
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
@@ -55,6 +56,7 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
         u32 __pid      = __pid_tgid;        // lower 32 bits
         u32 __tgid     = __pid_tgid >> 32;  // upper 32 bits
         PID_FILTER
+        TID_FILTER
         COLLECT
         return 0;
 }
@@ -63,6 +65,7 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
                 text = text.replace("SIGNATURE",
                      "" if len(self.signature) == 0 else ", " + self.signature)
                 text = text.replace("PID_FILTER", self._generate_pid_filter())
+                text = text.replace("TID_FILTER", self._generate_tid_filter())
                 collect = ""
                 for pname in self.args_to_probe:
                         param_hash = self.hashname_prefix + pname
@@ -184,6 +187,7 @@ u64 __time = bpf_ktime_get_ns();
                 self.usdt_ctx = None
                 self.streq_functions = ""
                 self.pid = tool.args.pid
+                self.tid = tool.args.tid
                 self.cumulative = tool.args.cumulative or False
                 self.raw_spec = specifier
                 self.probe_user_list = set()
@@ -334,16 +338,23 @@ u64 __time = bpf_ktime_get_ns();
 
         def _generate_hash_update(self):
                 if self.type == "hist":
-                        return "%s.increment(bpf_log2l(__key));" % \
+                        return "%s.atomic_increment(bpf_log2l(__key));" % \
                                 self.probe_hash_name
                 else:
-                        return "%s.increment(__key);" % self.probe_hash_name
+                        return "%s.atomic_increment(__key);" % \
+                                self.probe_hash_name
 
         def _generate_pid_filter(self):
                 # Kernel probes need to explicitly filter pid, because the
                 # attach interface doesn't support pid filtering
                 if self.pid is not None and not self.is_user:
                         return "if (__tgid != %d) { return 0; }" % self.pid
+                else:
+                        return ""
+
+        def _generate_tid_filter(self):
+                if self.tid is not None and not self.is_user:
+                        return "if (__pid != %d) { return 0; }" % self.tid
                 else:
                         return ""
 
@@ -361,6 +372,7 @@ DATA_DECL
         u32 __pid      = __pid_tgid;        // lower 32 bits
         u32 __tgid     = __pid_tgid >> 32;  // upper 32 bits
         PID_FILTER
+        TID_FILTER
         PREFIX
         KEY_EXPR
         if (!(FILTER)) return 0;
@@ -390,6 +402,8 @@ DATA_DECL
                 program = program.replace("SIGNATURE", signature)
                 program = program.replace("PID_FILTER",
                                           self._generate_pid_filter())
+                program = program.replace("TID_FILTER",
+                                          self._generate_tid_filter())
 
                 decl = self._generate_hash_decl()
                 key_expr = self._generate_key_assignment()
@@ -510,7 +524,7 @@ DATA_DECL
 class Tool(object):
         examples = """
 Probe specifier syntax:
-        {p,r,t,u}:{[library],category}:function(signature)[:type[,type...]:expr[,expr...][:filter]][#label]
+        {p,r,t,u}:{[library],category}:function(signature):type[,type...]:expr[,expr...][:filter]][#label]
 Where:
         p,r,t,u    -- probe at function entry, function exit, kernel
                       tracepoint, or USDT probe
@@ -601,6 +615,8 @@ argdist -I 'kernel/sched/sched.h' \\
                   epilog=Tool.examples)
                 parser.add_argument("-p", "--pid", type=int,
                   help="id of the process to trace (optional)")
+                parser.add_argument("-t", "--tid", type=int,
+                  help="id of the thread to trace (optional)")
                 parser.add_argument("-z", "--string-size", default=80,
                   type=int,
                   help="maximum string size to read from char* arguments")

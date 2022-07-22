@@ -1,0 +1,69 @@
+Demonstrations of swapin, the Linux BCC/eBPF version.
+
+
+This tool counts swapins by process, to show which process is affected by
+swapping. For example:
+
+# swapin.py 
+Counting swap ins. Ctrl-C to end.
+13:36:58
+COMM             PID    COUNT
+
+13:36:59
+COMM             PID    COUNT
+gnome-shell      2239   12410
+
+13:37:00
+COMM             PID    COUNT
+chrome           4536   14635
+
+13:37:01
+COMM             PID    COUNT
+gnome-shell      2239   14
+cron             1180   23
+
+13:37:02
+COMM             PID    COUNT
+gnome-shell      2239   2496
+[...]
+
+While tracing, this showed that PID 2239 (gnome-shell) and PID 4536 (chrome)
+suffered over ten thousand swapins.
+
+#swapin.py -T
+Counting swap ins. Ctrl-C to end.
+COMM             PID    COUNT
+b'firefox'       60965  4
+
+COMM             PID    COUNT
+b'IndexedDB #1'  60965  1
+b'firefox'       60965  2
+
+COMM             PID    COUNT
+b'StreamTrans #9' 60965  1
+b'firefox'       60965  3
+
+COMM             PID    COUNT
+
+COMM             PID    COUNT
+b'sssd_kcm'      3605   384
+[--]
+
+While tracing along with -T flag, it does not show timestamp.
+
+
+
+USAGE:
+
+# swapin.py -h
+usage: swapin.py [-h] [-T] [interval] [count]
+
+Count swapin events by process.
+
+positional arguments:
+  interval      output interval, in seconds
+  count         number of outputs
+
+optional arguments:
+  -h, --help    show this help message and exit
+  -T, --notime  do not show the timestamp (HH:MM:SS)

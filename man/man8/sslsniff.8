@@ -2,7 +2,9 @@
 .SH NAME
 sslsniff \- Print data passed to OpenSSL, GnuTLS or NSS. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B sslsniff [-h] [-p PID] [-c COMM] [-o] [-g] [-n] [-d] [--hexdump]
+.B sslsniff [-h] [-p PID] [-u UID] [-x] [-c COMM] [-o] [-g] [-n] [-d]
+.B [--hexdump] [--max-buffer-size SIZE] [-l] [--handshake]
+.B [--extra-lib EXTRA_LIB]
 .SH DESCRIPTION
 sslsniff prints data sent to write/send and read/recv functions of
 OpenSSL, GnuTLS and NSS, allowing us to read plain text content before
@@ -13,11 +15,65 @@ This works reading the second parameter of both functions (*buf).
 Since this uses BPF, only the root user can use this tool.
 .SH REQUIREMENTS
 CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-p PID
+Trace only functions in this process PID.
+.TP
+\-u UID
+Trace only calls made by this UID.
+.TP
+\-x
+Show extra fields: UID and TID.
+.TP
+\-c COMM
+Show only processes that match this COMM exactly.
+.TP
+\-o, \-\-no-openssl
+Do not trace OpenSSL functions.
+.TP
+\-g, \-\-no-gnutls
+Do not trace GnuTLS functions.
+.TP
+\-n, \-\-no-nss
+Do not trace GnuTLS functions.
+.TP
+\-\-hexdump
+Show data as hexdump instead of trying to decode it as UTF-8
+.TP
+\-\-max-buffer-size SIZE
+Sets maximum buffer size of intercepted data. Longer values would be truncated.
+Default value is 8 Kib, maximum possible value is a bit less than 32 Kib.
+.TP
+\-l, \-\-latency
+Show function latency in ms.
+.TP
+\--handshake
+Show handshake latency, enabled only if latency option is on.
+.TP
+\--extra-lib EXTRA_LIB
+Consist type of the library and library path separated by colon. Supported
+library types are: openssl, gnutls, nss. Can be specified multiple times.
 .SH EXAMPLES
 .TP
 Print all calls to SSL write/send and read/recv system-wide:
 #
 .B sslsniff
+.TP
+Print only OpenSSL calls issued by user with UID 1000
+#
+.B sslsniff -u 1000 --no-nss --no-gnutls
+.TP
+Print SSL handshake event and latency for all traced functions:
+#
+.B sslsniff -l --handshake
+.TP
+Print only calls to OpenSSL from /some/path/libssl.so
+.B sslsniff --no-openssl --no-gnutls --no-nss --extra-lib
+.B openssl:/some/path/libssl.so
 .SH FIELDS
 .TP
 FUNC
@@ -34,6 +90,15 @@ Process ID calling SSL.
 .TP
 LEN
 Bytes written or read by SSL functions.
+.TP
+UID
+UID of the process, displayed only if launched with -x.
+.TP
+TID
+Thread ID, displayed only if launched with -x.
+.TP
+LAT(ms)
+Function latency in ms.
 .SH SOURCE
 This is from bcc.
 .IP

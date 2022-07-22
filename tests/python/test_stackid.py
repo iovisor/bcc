@@ -1,24 +1,12 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
 import bcc
-import distutils.version
 import os
 import unittest
-from utils import mayFail
+from utils import mayFail, kernel_version_ge
 import subprocess
-
-def kernel_version_ge(major, minor):
-    # True if running kernel is >= X.Y
-    version = distutils.version.LooseVersion(os.uname()[2]).version
-    if version[0] > major:
-        return True
-    if version[0] < major:
-        return False
-    if minor and version[1] < minor:
-        return False
-    return True
 
 
 @unittest.skipUnless(kernel_version_ge(4,6), "requires kernel >= 4.6")

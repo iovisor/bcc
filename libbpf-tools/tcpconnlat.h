@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause) */
 #ifndef __TCPCONNLAT_H
 #define __TCPCONNLAT_H
 
@@ -17,6 +18,7 @@ struct event {
 	__u64 ts_us;
 	__u32 tgid;
 	int af;
+	__u16 lport;
 	__u16 dport;
 };
 

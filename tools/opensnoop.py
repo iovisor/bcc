@@ -215,8 +215,11 @@ KRETFUNC_PROBE(FNNAME, struct pt_regs *regs, int ret)
 {
     int dfd = PT_REGS_PARM1(regs);
     const char __user *filename = (char *)PT_REGS_PARM2(regs);
-    struct open_how __user *how = (struct open_how *)PT_REGS_PARM3(regs);
-    int flags = how->flags;
+    struct open_how __user how;
+    int flags;
+
+    bpf_probe_read_user(&how, sizeof(struct open_how), (struct open_how*)PT_REGS_PARM3(regs));
+    flags = how.flags;
 #else
 KRETFUNC_PROBE(FNNAME, int dfd, const char __user *filename, struct open_how __user *how, int ret)
 {

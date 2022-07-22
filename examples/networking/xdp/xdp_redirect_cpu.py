@@ -61,10 +61,6 @@ int xdp_redirect_cpu(struct xdp_md *ctx) {
 
     return cpumap.redirect_map(*cpu, 0);
 }
-
-int xdp_dummy(struct xdp_md *ctx) {
-    return XDP_PASS;
-}
 """, cflags=["-w", "-D__MAX_CPU__=%u" % max_cpu], debug=0)
 
 dest = b.get_table("dest")

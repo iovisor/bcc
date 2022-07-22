@@ -73,11 +73,14 @@ BPF_HISTOGRAM(dist, dist_key_t);
 // time operation
 int trace_entry(struct pt_regs *ctx)
 {
-    u32 pid = bpf_get_current_pid_tgid();
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 pid = pid_tgid >> 32;
+    u32 tid = (u32)pid_tgid;
+
     if (FILTER_PID)
         return 0;
     u64 ts = bpf_ktime_get_ns();
-    start.update(&pid, &ts);
+    start.update(&tid, &ts);
     return 0;
 }
 
@@ -86,15 +89,17 @@ EXT4_TRACE_READ_CODE
 static int trace_return(struct pt_regs *ctx, const char *op)
 {
     u64 *tsp;
-    u32 pid = bpf_get_current_pid_tgid();
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 pid = pid_tgid >> 32;
+    u32 tid = (u32)pid_tgid;
 
     // fetch timestamp and calculate delta
-    tsp = start.lookup(&pid);
+    tsp = start.lookup(&tid);
     if (tsp == 0) {
         return 0;   // missed start or filtered
     }
     u64 delta = bpf_ktime_get_ns() - *tsp;
-    start.delete(&pid);
+    start.delete(&tid);
 
     // Skip entries with backwards time: temp workaround for #728
     if ((s64) delta < 0)
@@ -105,7 +110,7 @@ static int trace_return(struct pt_regs *ctx, const char *op)
     // store as histogram
     dist_key_t key = {.slot = bpf_log2l(delta)};
     __builtin_memcpy(&key.op, op, sizeof(key.op));
-    dist.increment(key);
+    dist.atomic_increment(key);
 
     return 0;
 }
@@ -164,7 +169,10 @@ else:
     ext4_trace_read_code = """
 int trace_read_entry(struct pt_regs *ctx, struct kiocb *iocb)
 {
-    u32 pid = bpf_get_current_pid_tgid();
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 pid = pid_tgid >> 32;
+    u32 tid = (u32)pid_tgid;
+
     if (FILTER_PID)
         return 0;
 
@@ -174,7 +182,7 @@ int trace_read_entry(struct pt_regs *ctx, struct kiocb *iocb)
         return 0;
 
     u64 ts = bpf_ktime_get_ns();
-    start.update(&pid, &ts);
+    start.update(&tid, &ts);
     return 0;
 }""" % ext4_file_ops_addr
 

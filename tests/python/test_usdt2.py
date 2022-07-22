@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # USAGE: test_usdt2.py
 #
@@ -81,7 +81,7 @@ int do_trace3(struct pt_regs *ctx) {
         self.ftemp = NamedTemporaryFile(delete=False)
         self.ftemp.close()
         comp = Popen(["gcc", "-I", "%s/include" % os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))),
-                      "-x", "c", "-o", self.ftemp.name, "-"],
+                      "-x", "c++", "-o", self.ftemp.name, "-"],
                      stdin=PIPE)
         comp.stdin.write(app_text)
         comp.stdin.close()
@@ -149,7 +149,7 @@ int do_trace3(struct pt_regs *ctx) {
         b["event6"].open_perf_buffer(print_event6)
 
         # three iterations to make sure we get some probes and have time to process them
-        for i in range(3):
+        for i in range(5):
             b.perf_buffer_poll()
 
         # note that event1 and event4 do not really fire, so their state should be 0

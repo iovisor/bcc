@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) 2016 PLUMgrid
 # Licensed under the Apache License, Version 2.0 (the "License")
 
@@ -33,8 +33,10 @@ int do_ret_sys_getuid(void *ctx) {
         return 0;
 
     u64 *prevp = prev.lookup(&cpu);
-    if (prevp)
+    if (prevp) {
         dist.increment(bpf_log2l(val - *prevp));
+        dist.atomic_increment(bpf_log2l(val - *prevp));
+    }
     return 0;
 }
 """

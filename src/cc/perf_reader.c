@@ -93,7 +93,7 @@ int perf_reader_mmap(struct perf_reader *reader) {
     return -1;
   }
 
-  reader->base = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE , MAP_SHARED, reader->fd, 0);
+  reader->base = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED, reader->fd, 0);
   if (reader->base == MAP_FAILED) {
     perror("mmap");
     return -1;
@@ -233,6 +233,14 @@ int perf_reader_poll(int num_readers, struct perf_reader **readers, int timeout)
       if (pfds[i].revents & POLLIN)
         perf_reader_event_read(readers[i]);
     }
+  }
+  return 0;
+}
+
+int perf_reader_consume(int num_readers, struct perf_reader **readers) {
+  int i;
+  for (i = 0; i < num_readers; ++i) {
+    perf_reader_event_read(readers[i]);
   }
   return 0;
 }

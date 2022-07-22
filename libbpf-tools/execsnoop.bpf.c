@@ -1,13 +1,22 @@
-#include "vmlinux.h"
+// SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
+#include <vmlinux.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_core_read.h>
 #include "execsnoop.h"
 
+const volatile bool filter_cg = false;
 const volatile bool ignore_failed = true;
 const volatile uid_t targ_uid = INVALID_UID;
 const volatile int max_args = DEFAULT_MAXARGS;
 
 static const struct event empty_event = {};
+
+struct {
+	__uint(type, BPF_MAP_TYPE_CGROUP_ARRAY);
+	__type(key, u32);
+	__type(value, u32);
+	__uint(max_entries, 1);
+} cgroup_map SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
@@ -36,7 +45,12 @@ int tracepoint__syscalls__sys_enter_execve(struct trace_event_raw_sys_enter* ctx
 	struct task_struct *task;
 	const char **args = (const char **)(ctx->args[1]);
 	const char *argp;
+
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
+
 	uid_t uid = (u32)bpf_get_current_uid_gid();
+	int i;
 
 	if (valid_uid(targ_uid) && targ_uid != uid)
 		return 0;
@@ -51,15 +65,14 @@ int tracepoint__syscalls__sys_enter_execve(struct trace_event_raw_sys_enter* ctx
 	if (!event)
 		return 0;
 
-	event->pid = pid;
-	event->tgid = tgid;
+	event->pid = tgid;
 	event->uid = uid;
 	task = (struct task_struct*)bpf_get_current_task();
 	event->ppid = (pid_t)BPF_CORE_READ(task, real_parent, tgid);
 	event->args_count = 0;
 	event->args_size = 0;
 
-	ret = bpf_probe_read_str(event->args, ARGSIZE, (const char*)ctx->args[0]);
+	ret = bpf_probe_read_user_str(event->args, ARGSIZE, (const char*)ctx->args[0]);
 	if (ret <= ARGSIZE) {
 		event->args_size += ret;
 	} else {
@@ -70,15 +83,15 @@ int tracepoint__syscalls__sys_enter_execve(struct trace_event_raw_sys_enter* ctx
 
 	event->args_count++;
 	#pragma unroll
-	for (int i = 1; i < TOTAL_MAX_ARGS && i < max_args; i++) {
-		bpf_probe_read(&argp, sizeof(argp), &args[i]);
+	for (i = 1; i < TOTAL_MAX_ARGS && i < max_args; i++) {
+		bpf_probe_read_user(&argp, sizeof(argp), &args[i]);
 		if (!argp)
 			return 0;
 
 		if (event->args_size > LAST_ARG)
 			return 0;
 
-		ret = bpf_probe_read_str(&event->args[event->args_size], ARGSIZE, argp);
+		ret = bpf_probe_read_user_str(&event->args[event->args_size], ARGSIZE, argp);
 		if (ret > ARGSIZE)
 			return 0;
 
@@ -86,7 +99,7 @@ int tracepoint__syscalls__sys_enter_execve(struct trace_event_raw_sys_enter* ctx
 		event->args_size += ret;
 	}
 	/* try to read one more argument to check if there is one */
-	bpf_probe_read(&argp, sizeof(argp), &args[max_args]);
+	bpf_probe_read_user(&argp, sizeof(argp), &args[max_args]);
 	if (!argp)
 		return 0;
 
@@ -102,6 +115,10 @@ int tracepoint__syscalls__sys_exit_execve(struct trace_event_raw_sys_exit* ctx)
 	pid_t pid;
 	int ret;
 	struct event *event;
+
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
+
 	u32 uid = (u32)bpf_get_current_uid_gid();
 
 	if (valid_uid(targ_uid) && targ_uid != uid)

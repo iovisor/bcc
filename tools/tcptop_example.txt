@@ -105,7 +105,7 @@ USAGE:
 # tcptop -h
 usage: tcptop.py [-h] [-C] [-S] [-p PID] [--cgroupmap CGROUPMAP]
                  [--mntnsmap MNTNSMAP]
-                 [interval] [count]
+                 [interval] [count] [-4 | -6]
 
 Summarize TCP send/recv throughput by host
 
@@ -120,6 +120,8 @@ optional arguments:
   -p PID, --pid PID     trace this PID only
   --cgroupmap CGROUPMAP
                         trace cgroups in this BPF map only
+  -4, --ipv4            trace IPv4 family only
+  -6, --ipv6            trace IPv6 family only
 
 examples:
     ./tcptop           # trace TCP send/recv by host
@@ -127,3 +129,5 @@ examples:
     ./tcptop -p 181    # only trace PID 181
     ./tcptop --cgroupmap ./mappath  # only trace cgroups in this BPF map
     ./tcptop --mntnsmap mappath   # only trace mount namespaces in the map
+    ./tcptop -4        # trace IPv4 family only
+    ./tcptop -6        # trace IPv6 family only

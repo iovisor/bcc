@@ -77,7 +77,7 @@ class ArgString(object):
         return self.s.encode(FILESYSTEMENCODING)
 
     def __str__(self):
-        return self.__bytes__()
+        return self.s
 
 def warn_with_traceback(message, category, filename, lineno, file=None, line=None):
     log = file if hasattr(file, "write") else sys.stderr
@@ -140,8 +140,8 @@ static inline bool %s(char const *ignored, uintptr_t str) {
             probeid += 1
             expr = expr.replace("STRCMP", fname, 1)
         rdict = {
-            "expr" : expr,
-            "streq_functions" : streq_functions,
-            "probeid" : probeid
+            "expr": expr,
+            "streq_functions": streq_functions,
+            "probeid": probeid
         }
         return rdict

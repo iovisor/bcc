@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
@@ -10,6 +10,7 @@ from socket import socket, AF_INET, SOCK_DGRAM
 import sys
 from time import sleep
 from unittest import main, TestCase
+from utils import mayFail
 
 arg1 = sys.argv.pop(1)
 
@@ -36,6 +37,7 @@ class TestBPFSocket(TestCase):
         self.jump[c_int(S_EOP)] = c_int(eop_fn.fd)
         self.stats = b.get_table("stats", c_int, c_ulonglong)
 
+    @mayFail("This may fail on github actions environment due to udp packet loss")
     def test_jumps(self):
         udp = socket(AF_INET, SOCK_DGRAM)
         udp.sendto(b"a" * 10, ("172.16.1.1", 5000))

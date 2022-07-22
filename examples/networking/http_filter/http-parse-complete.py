@@ -29,18 +29,6 @@ MAX_URL_STRING_LEN = 8192  # max url string len (usually 8K)
 MAX_AGE_SECONDS = 30       # max age entry in bpf_sessions map
 
 
-# convert a bin string into a string of hex char
-# helper function to print raw packet in hex
-def toHex(s):
-    lst = ""
-    for ch in s:
-        hv = hex(ord(ch)).replace('0x', '')
-        if len(hv) == 1:
-            hv = '0' + hv
-        lst = lst + hv
-    return lst
-
-
 # print str until CR+LF
 def printUntilCRLF(s):
     print(s.split(b'\r\n')[0].decode())
@@ -151,7 +139,7 @@ while 1:
     packet_count += 1
 
     # DEBUG - print raw packet in hex format
-    # packet_hex = toHex(packet_str)
+    # packet_hex = binascii.hexlify(packet_str)
     # print ("%s" % packet_hex)
 
     # convert packet into bytearray
@@ -188,8 +176,8 @@ while 1:
     ip_src_str = packet_str[ETH_HLEN + 12: ETH_HLEN + 16]  # ip source offset 12..15
     ip_dst_str = packet_str[ETH_HLEN + 16:ETH_HLEN + 20]   # ip dest   offset 16..19
 
-    ip_src = int(toHex(ip_src_str), 16)
-    ip_dst = int(toHex(ip_dst_str), 16)
+    ip_src = int(binascii.hexlify(ip_src_str), 16)
+    ip_dst = int(binascii.hexlify(ip_dst_str), 16)
 
     # TCP HEADER
     # https://www.rfc-editor.org/rfc/rfc793.txt
@@ -215,8 +203,8 @@ while 1:
     port_src_str = packet_str[ETH_HLEN + ip_header_length:ETH_HLEN + ip_header_length + 2]
     port_dst_str = packet_str[ETH_HLEN + ip_header_length + 2:ETH_HLEN + ip_header_length + 4]
 
-    port_src = int(toHex(port_src_str), 16)
-    port_dst = int(toHex(port_dst_str), 16)
+    port_src = int(binascii.hexlify(port_src_str), 16)
+    port_dst = int(binascii.hexlify(port_dst_str), 16)
 
     # calculate payload offset
     payload_offset = ETH_HLEN + ip_header_length + tcp_header_length

@@ -13,9 +13,11 @@ namespace {
       if (::getenv("bar") != (char *)-1)
         return;
 
+#ifdef EXPORT_USDT
       (void)bcc_usdt_new_frompid(-1, nullptr);
       (void)bcc_usdt_new_frompath(nullptr);
       (void)bcc_usdt_close(nullptr);
+#endif
     }
   } LinkAll;  // declare one instance to invoke the constructor
 }

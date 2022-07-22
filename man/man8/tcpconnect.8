@@ -2,7 +2,7 @@
 .SH NAME
 tcpconnect \- Trace TCP active connections (connect()). Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B tcpconnect [\-h] [\-c] [\-t] [\-p PID] [-P PORT] [-u UID] [-U] [\-\-cgroupmap MAPPATH] [\-\-mntnsmap MAPPATH]
+.B tcpconnect [\-h] [\-c] [\-t] [\-p PID] [-P PORT] [\-4 | \-6] [\-L] [-u UID] [-U] [\-\-cgroupmap MAPPATH] [\-\-mntnsmap MAPPATH] [\-d]
 .SH DESCRIPTION
 This tool traces active TCP connections (eg, via a connect() syscall;
 accept() are passive connections). This can be useful for general
@@ -14,9 +14,18 @@ This works by tracing the kernel tcp_v4_connect() and tcp_v6_connect() functions
 using dynamic tracing, and will need updating to match any changes to these
 functions.
 
+When provided with the \-d or \-\-dns option, this tool will also correlate
+connect calls with the most recent DNS query that matches the IP connected.
+This feature works by tracing the kernel udp_recvmsg() function to collect DNS
+responses.
+
 Since this uses BPF, only the root user can use this tool.
 .SH REQUIREMENTS
 CONFIG_BPF and bcc.
+
+If using the \-d or \-\-dns option, you must have the
+dnslib and cachetools python packages installed.  You can install them with pip3 or with
+apt on Ubuntu 18.04+ using the python3\-dnslib and python3\-cachetools packages.
 .SH OPTIONS
 .TP
 \-h
@@ -34,6 +43,15 @@ Trace this process ID only (filtered in-kernel).
 \-P PORT
 Comma-separated list of destination ports to trace (filtered in-kernel).
 .TP
+\-4
+Trace IPv4 family only.
+.TP
+\-6
+Trace IPv6 family only.
+.TP
+\-L
+Include a LPORT column.
+.TP
 \-U
 Include a UID column.
 .TP
@@ -45,6 +63,26 @@ Trace cgroups in this BPF map only (filtered in-kernel).
 .TP
 \--mntnsmap  MAPPATH
 Trace mount namespaces in this BPF map only (filtered in-kernel).
+.TP
+\-d
+Shows the most recent DNS query for the IP address in the connect call.
+This is likely related to the TCP connection details in the other columns, but is not guaranteed.
+This
+feature works by tracing the udp_recvmsg kernel function and tracking DNS
+responses received by the server.  It only supports UDP DNS packets up to 512 bytes
+in length.  The python code keeps a cache of 10k DNS responses in memory
+for up 24 hours.
+
+If the time difference in milliseconds
+between when the system received a DNS response and when a
+connect syscall was traced using an IP in that DNS response is greater than 100ms,
+this tool will report this delta after the query.
+These deltas should be relatively short for most applications.  A
+long delay between the response and connect could be either anomalous activity
+or indicate a misattribution between the DNS name requested and the IP that
+the connect syscall is using.
+
+The \-d option may not be used with the count feature (option \-c)
 .SH EXAMPLES
 .TP
 Trace all active TCP connections:
@@ -55,6 +93,10 @@ Trace all TCP connects, and include timestamps:
 #
 .B tcpconnect \-t
 .TP
+Trace all TCP connects, and include most recent matching DNS query for each connected IP
+#
+.B tcpconnect \-d
+.TP
 Trace PID 181 only:
 #
 .B tcpconnect \-p 181
@@ -62,6 +104,18 @@ Trace PID 181 only:
 Trace ports 80 and 81 only:
 #
 .B tcpconnect \-P 80,81
+.TP
+Trace IPv4 family only:
+#
+.B tcpconnect -4
+.TP
+Trace IPv6 family only:
+#
+.B tcpconnect -6
+.TP
+Trace all TCP connects, and include LPORT:
+#
+.B tcpconnect \-L
 .TP
 Trace all TCP connects, and include UID:
 #
@@ -102,6 +156,9 @@ IP address family (4 or 6)
 SADDR
 Source IP address.
 .TP
+LPORT
+Source port
+.TP
 DADDR
 Destination IP address.
 .TP
@@ -110,12 +167,27 @@ Destination port
 .TP
 CONNECTS
 Accumulated active connections since start.
+.TP
+QUERY
+Shows the most recent DNS query for the IP address in the connect call.
+This is likely related to the TCP connection details in the other columns, but is not guaranteed.
 .SH OVERHEAD
 This traces the kernel tcp_v[46]_connect functions and prints output for each
 event. As the rate of this is generally expected to be low (< 1000/s), the
 overhead is also expected to be negligible. If you have an application that
 is calling a high rate of connect()s, such as a proxy server, then test and
 understand this overhead before use.
+
+If you are using the \-d option to track DNS requests, this tool will trace the
+udp_recvmsg function and generate an event for any packets from UDP port 53.
+This event contains up to 512 bytes of the UDP packet payload.
+Typical applications do not extensively use UDP, so the performance overhead of
+tracing udp_recvmsg is
+expected to be negligible,   However, if you have an application that receives
+many UDP packets, then you should test and understand the overhead of tracing
+every received UDP message.  Furthermore, performance overhead of running
+this tool on a DNS server is expected to be higher than average because all
+DNS response packets will be copied to userspace.
 .SH SOURCE
 This is from bcc.
 .IP

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
@@ -56,13 +56,15 @@ int count(struct pt_regs *ctx) {
     return 0;
 }"""
         b = bcc.BPF(text=text)
-        b.attach_uprobe(name="/usr/bin/python", sym="main", fn_name="count")
-        b.attach_uretprobe(name="/usr/bin/python", sym="main", fn_name="count")
-        with os.popen("/usr/bin/python -V") as f:
+        pythonpath = "/usr/bin/python3"
+        symname = "_start"
+        b.attach_uprobe(name=pythonpath, sym=symname, fn_name="count")
+        b.attach_uretprobe(name=pythonpath, sym=symname, fn_name="count")
+        with os.popen(pythonpath + " -V") as f:
             pass
         self.assertGreater(b["stats"][ctypes.c_int(0)].value, 0)
-        b.detach_uretprobe(name="/usr/bin/python", sym="main")
-        b.detach_uprobe(name="/usr/bin/python", sym="main")
+        b.detach_uretprobe(name=pythonpath, sym=symname)
+        b.detach_uprobe(name=pythonpath, sym=symname)
 
     def test_mount_namespace(self):
         text = """
@@ -119,7 +121,7 @@ int count(struct pt_regs *ctx) {
             shutil.copy(libz_path, b"/tmp")
 
             libz = ctypes.CDLL("/tmp/libz.so.1")
-            time.sleep(1)
+            time.sleep(3)
             libz.zlibVersion()
             time.sleep(5)
             os._exit(0)
@@ -130,7 +132,7 @@ int count(struct pt_regs *ctx) {
         b = bcc.BPF(text=text)
         b.attach_uprobe(name=libname, sym=symname, fn_name="count", pid=child_pid)
         b.attach_uretprobe(name=libname, sym=symname, fn_name="count", pid=child_pid)
-        time.sleep(1)
+        time.sleep(5)
         self.assertEqual(b["stats"][ctypes.c_int(0)].value, 2)
         b.detach_uretprobe(name=libname, sym=symname, pid=child_pid)
         b.detach_uprobe(name=libname, sym=symname, pid=child_pid)

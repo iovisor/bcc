@@ -32,6 +32,7 @@ void perf_reader_free(void *ptr);
 int perf_reader_mmap(struct perf_reader *reader);
 void perf_reader_event_read(struct perf_reader *reader);
 int perf_reader_poll(int num_readers, struct perf_reader **readers, int timeout);
+int perf_reader_consume(int num_readers, struct perf_reader **readers);
 int perf_reader_fd(struct perf_reader *reader);
 void perf_reader_set_fd(struct perf_reader *reader, int fd);
 

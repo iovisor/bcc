@@ -78,7 +78,7 @@ private:
   int ret_;
 
   bool use_enum_code_ = false;
-  Code code_;
+  Code code_ = Code::UNKNOWN;
 
   std::string msg_;
 };
@@ -86,7 +86,7 @@ private:
 #define TRY2(CMD)                    \
   do {                               \
     ebpf::StatusTuple __stp = (CMD); \
-    if (__stp.code() != 0) {         \
+    if (!__stp.ok()) {               \
       return __stp;                  \
     }                                \
   } while (0)

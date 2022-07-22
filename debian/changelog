@@ -1,3 +1,109 @@
+bcc (0.24.0-1) unstable; urgency=low
+
+  * Support for kernel up to 5.16
+  * bcc tools: update for trace.py, sslsniff.py, tcptop.py, hardirqs.py, etc.
+  * new libbpf tools: bashreadline
+  * allow specify wakeup_events for perf buffer
+  * support BPF_MAP_TYPE_{INODE, TASK}_STORAGE maps
+  * remove all deprecated libbpf function usage
+  * remove P4/B language support
+  * major test infra change, using github actions now
+  * doc update, bug fixes and other tools improvement
+
+ -- Yonghong Song <ys114321@gmail.com>  Wed, 14 Jan 2022 17:00:00 +0000
+
+bcc (0.23.0-1) unstable; urgency=low
+
+  * Support for kernel up to 5.15
+  * bcc tools: update for kvmexit.py, tcpv4connect.py, cachetop.py, cachestat.py, etc.
+  * libbpf tools: update for update for mountsnoop, ksnoop, gethostlatency, etc.
+  * fix renaming of task_struct->state
+  * get pid namespace properly for a number of tools
+  * initial work for more libbpf utilization (less section names)
+  * doc update, bug fixes and other tools improvement
+
+ -- Yonghong Song <ys114321@gmail.com>  Wed, 15 Nov 2021 17:00:00 +0000
+
+bcc (0.22.0-1) unstable; urgency=low
+
+  * Support for kernel up to 5.14
+  * add ipv4/ipv6 filter support for tcp trace tools
+  * add python interface to attach raw perf events
+  * fix tcpstates for incorrect display of dport
+  * new options for bcc tools runqslower, argdist
+  * new libbpf-tools: filetop, exitsnoop, tcprtt
+  * doc update, bug fixes and other tools improvement
+
+ -- Yonghong Song <ys114321@gmail.com>  Wed, 15 Sep 2021 17:00:00 +0000
+
+bcc (0.21.0-1) unstable; urgency=low
+
+  * Support for kernel up to 5.13
+  * support for debug information from libdebuginfod
+  * finished support for map elements items_*_batch() APIs
+  * add atomic_increment() API
+  * support attach_func() and detach_func() in python
+  * fix displaying PID instead of TID for many tools
+  * new tools: kvmexit.py
+  * new libbpf-tools: gethostlatency, statsnoop, fsdist and solisten
+  * fix tools ttysnoop/readahead for newer kernels
+  * doc update and bug fixes
+
+ -- Yonghong Song <ys114321@gmail.com>  Mon, 16 Jul 2021 17:00:00 +0000
+
+bcc (0.20.0-1) unstable; urgency=low
+
+  * Support for kernel up to 5.12
+  * Some basic support for MIPS
+  * added bpf_map_lookup_batch and bpf_map_delete_batch support
+  * tools/funclatency.py support nested or recursive functions
+  * tools/biolatency.py can optionally print out average/total value
+  * fix possible marco HAVE_BUILTIN_BSWAP redefine warning for kernel >= 5.10.
+  * new tools: virtiostat
+  * new libbpf-tools: ext4dist
+  * doc update and bug fixes
+
+ -- Yonghong Song <ys114321@gmail.com>  Mon, 5 May 2021 17:00:00 +0000
+
+bcc (0.19.0-1) unstable; urgency=low
+
+  * Support for kernel up to 5.11
+  * allow BCC as a cmake subproject
+  * add LPORT support in tcpconnlat and tcpconnect
+  * added bpf_map_lookup_and_delete_batch support
+  * new tools: virtiostat
+  * new libbpf-tools: cpufreq, funclatency, cachestat
+  * add install target to libbpf-tools
+  * a few lua fixes
+  * doc update and bug fixes
+
+ -- Yonghong Song <ys114321@gmail.com>  Mon, 19 Mar 2021 17:00:00 +0000
+
+bcc (0.18.0-1) unstable; urgency=low
+
+  * Support for kernel up to 5.10
+  * add bpf kfunc/kretfunc C++ example
+  * add PT_REGS_PARMx_SYSCALL helper macro
+  * biolatency: allow json output
+  * biolatpcts: support measuring overall latencies between two events
+  * fix build when ENABLE_CLANG_JIT is disabled
+  * doc update and bug fixes
+
+ -- Yonghong Song <ys114321@gmail.com>  Mon, 4 Jan 2021 17:00:00 +0000
+
+bcc (0.17.0-1) unstable; urgency=low
+
+  * Support for kernel up to 5.9
+  * usdt: add uprobe refcnt support
+  * use newer llvm/clang versions in debian packaging if possible
+  * add bpf iterator C++ support
+  * new bcc tools: tcprtt, netqtop, swapin, tcpsynbl, threadsnoop
+  * tcpconnect: add DNS correlation to connect tracking
+  * new libbpf-tools: llcstat, numamove, runqlen, runqlat, softirgs, hardirqs
+  * doc update, bug fixes and some additional arguments for tools
+
+ -- Yonghong Song <ys114321@gmail.com>  Thu, 29 Oct 2020 17:00:00 +0000
+
 bcc (0.16.0-1) unstable; urgency=low
 
   * Support for kernel up to 5.8

@@ -44,15 +44,17 @@ usage: runqslower.py [-h] [-p PID | -t TID] [min_us]
 Trace high run queue latency
 
 positional arguments:
-  min_us             minimum run queue latecy to trace, in us (default 10000)
+  min_us             minimum run queue latency to trace, in us (default 10000)
 
 optional arguments:
   -h, --help         show this help message and exit
-  -p PID, --pid PID  trace this PID
+  -p PID, --pid PID  trace this PID only
   -t TID, --tid TID  trace this TID only
+  -P, --previous     also show previous task name and TID
 
 examples:
     ./runqslower         # trace run queue latency higher than 10000 us (default)
     ./runqslower 1000    # trace run queue latency higher than 1000 us
     ./runqslower -p 123  # trace pid 123
-    ./runqslower -t 123  # trace tid (thread) 123
+    ./runqslower -t 123  # trace tid 123 (use for threads only)
+    ./runqslower -P      # also show previous task comm and TID

@@ -2,7 +2,7 @@
 // Copyright (c) 2020 Anton Protopopov
 //
 // Based on tcpconnect(8) from BCC by Brendan Gregg
-#include "vmlinux.h"
+#include <vmlinux.h>
 
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_core_read.h>
@@ -11,7 +11,7 @@
 #include "maps.bpf.h"
 #include "tcpconnect.h"
 
-SEC(".rodata") int filter_ports[MAX_PORTS];
+const volatile int filter_ports[MAX_PORTS];
 const volatile int filter_ports_len = 0;
 const volatile uid_t filter_uid = -1;
 const volatile pid_t filter_pid = 0;
@@ -26,7 +26,6 @@ struct {
 	__uint(max_entries, MAX_ENTRIES);
 	__type(key, u32);
 	__type(value, struct sock *);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } sockets SEC(".maps");
 
 struct {
@@ -34,7 +33,6 @@ struct {
 	__uint(max_entries, MAX_ENTRIES);
 	__type(key, struct ipv4_flow_key);
 	__type(value, u64);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } ipv4_count SEC(".maps");
 
 struct {
@@ -42,7 +40,6 @@ struct {
 	__uint(max_entries, MAX_ENTRIES);
 	__type(key, struct ipv6_flow_key);
 	__type(value, u64);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } ipv6_count SEC(".maps");
 
 struct {
@@ -53,10 +50,12 @@ struct {
 
 static __always_inline bool filter_port(__u16 port)
 {
+	int i;
+
 	if (filter_ports_len == 0)
 		return false;
 
-	for (int i = 0; i < filter_ports_len; i++) {
+	for (i = 0; i < filter_ports_len && i < MAX_PORTS; i++) {
 		if (port == filter_ports[i])
 			return false;
 	}
@@ -192,25 +191,25 @@ end:
 }
 
 SEC("kprobe/tcp_v4_connect")
-int BPF_KPROBE(kprobe__tcp_v4_connect, struct sock *sk)
+int BPF_KPROBE(tcp_v4_connect, struct sock *sk)
 {
 	return enter_tcp_connect(ctx, sk);
 }
 
 SEC("kretprobe/tcp_v4_connect")
-int BPF_KRETPROBE(kretprobe__tcp_v4_connect, int ret)
+int BPF_KRETPROBE(tcp_v4_connect_ret, int ret)
 {
 	return exit_tcp_connect(ctx, ret, 4);
 }
 
 SEC("kprobe/tcp_v6_connect")
-int BPF_KPROBE(kprobe__tcp_v6_connect, struct sock *sk)
+int BPF_KPROBE(tcp_v6_connect, struct sock *sk)
 {
 	return enter_tcp_connect(ctx, sk);
 }
 
 SEC("kretprobe/tcp_v6_connect")
-int BPF_KRETPROBE(kretprobe__tcp_v6_connect, int ret)
+int BPF_KRETPROBE(tcp_v6_connect_ret, int ret)
 {
 	return exit_tcp_connect(ctx, ret, 6);
 }

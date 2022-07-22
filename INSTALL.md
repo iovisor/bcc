@@ -2,23 +2,28 @@
 
 * [Kernel Configuration](#kernel-configuration)
 * [Packages](#packages)
+  - [Debian](#debian---binary)
   - [Ubuntu](#ubuntu---binary)
   - [Fedora](#fedora---binary)
-  - [Arch](#arch---aur)
+  - [Arch](#arch---binary)
   - [Gentoo](#gentoo---portage)
   - [openSUSE](#opensuse---binary)
   - [RHEL](#rhel---binary)
-  - [Amazon Linux 1](#Amazon-Linux-1---Binary)
-  - [Amazon Linux 2](#Amazon-Linux-2---Binary)
+  - [Amazon Linux 1](#amazon-linux-1---binary)
+  - [Amazon Linux 2](#amazon-linux-2---binary)
   - [Alpine](#alpine---binary)
+  - [WSL](#wslwindows-subsystem-for-linux---binary)
 * [Source](#source)
+  - [libbpf Submodule](#libbpf-submodule)
   - [Debian](#debian---source)
   - [Ubuntu](#ubuntu---source)
   - [Fedora](#fedora---source)
   - [openSUSE](#opensuse---source)
   - [Centos](#centos---source)
-  - [Amazon Linux](#amazon-linux---source)
+  - [Amazon Linux 1](#amazon-linux-1---source)
+  - [Amazon Linux 2](#amazon-linux-2---source)
   - [Alpine](#alpine---source)
+  - [Arch](#arch---source)
 * [Older Instructions](#older-instructions)
 
 ## Kernel Configuration
@@ -41,6 +46,8 @@ CONFIG_HAVE_BPF_JIT=y
 CONFIG_HAVE_EBPF_JIT=y
 # [optional, for kprobes]
 CONFIG_BPF_EVENTS=y
+# Need kernel headers through /sys/kernel/kheaders.tar.xz
+CONFIG_IKHEADERS=y
 ```
 
 There are a few optional kernel flags needed for running bcc networking examples on vanilla kernel:
@@ -57,6 +64,10 @@ Kernel compile flags can usually be checked by looking at `/proc/config.gz` or
 `/boot/config-<kernel-version>`.
 
 # Packages
+
+## Debian - Binary
+
+`bcc` and its tools are available in the standard Debian main repository, from the source package [bpfcc](https://packages.debian.org/source/sid/bpfcc) under the names `bpfcc-tools`, `python-bpfcc`, `libbpfcc` and `libbpfcc-dev`.
 
 ## Ubuntu - Binary
 
@@ -160,15 +171,12 @@ echo -e '[iovisor]\nbaseurl=https://repo.iovisor.org/yum/main/f27/$basearch\nena
 sudo dnf install bcc-tools kernel-devel-$(uname -r) kernel-headers-$(uname -r)
 ```
 
-## Arch - AUR
+## Arch - Binary
 
-Upgrade the kernel to minimum 4.3.1-1 first; the ```CONFIG_BPF_SYSCALL=y``` configuration was not added until [this kernel release](https://bugs.archlinux.org/task/47008).
-
-Install these packages using any AUR helper such as [pacaur](https://aur.archlinux.org/packages/pacaur), [yaourt](https://aur.archlinux.org/packages/yaourt), [cower](https://aur.archlinux.org/packages/cower), etc.:
+bcc is available in the standard Arch repos, so it can be installed with the `pacman` command:
 ```
-bcc bcc-tools python-bcc
+# pacman -S bcc bcc-tools python-bcc
 ```
-All build and install dependencies are listed [in the PKGBUILD](https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=bcc) and should install automatically.
 
 ## Gentoo - Portage
 
@@ -228,11 +236,9 @@ sudo yum install bcc
 
 ## Amazon Linux 2 - Binary
 Use case 1. Install BCC for your AMI's default kernel (no reboot required):
-   Tested on Amazon Linux AMI release 2020.03 (kernel 4.14.154-128.181.amzn2.x86_64)
+   Tested on Amazon Linux AMI release 2021.11 (kernel 5.10.75-79.358.amzn2.x86_64)
 ```
-sudo amazon-linux-extras enable BCC
-sudo yum install kernel-devel-$(uname -r)
-sudo yum install bcc
+sudo amazon-linux-extras install BCC
 ```
 
 ## Alpine - Binary
@@ -265,6 +271,29 @@ sudo docker run --rm -it --privileged \
   alpine:3.12
 ```
 
+## WSL(Windows Subsystem for Linux) - Binary
+
+### Install dependencies
+The compiling depends on the headers and lib of linux kernel module which was not found in wsl distribution packages repo. We have to compile the kernel moudle manually.
+```bash
+apt-get install flex bison libssl-dev libelf-dev dwarves
+```
+### Install packages
+```
+cp Microsoft/config-wsl .config
+make oldconfig && make prepare
+make scripts
+make modules && make modules_install
+# if your kernel version is 4.19.y
+mv /lib/modules/x.y.z-microsoft-standard+ /lib/modules/x.y.z-microsoft-standard 
+````
+Then you can install bcc tools package according your distribution.
+
+If you met some problems, try to 
+```
+sudo mount -t debugfs debugfs /sys/kernel/debug
+```
+
 # Source
 
 ## libbpf Submodule
@@ -278,87 +307,36 @@ To alleviate this problem, starting at release v0.11.0, source code with corresp
 libbpf submodule codes will be released as well. See https://github.com/iovisor/bcc/releases.
 
 ## Debian - Source
-### Jessie
+### sid
 #### Repositories
-
-The automated tests that run as part of the build process require `netperf`.  Since netperf's license is not "certified"
-as an open-source license, it is in Debian's `non-free` repository.
 
 `/etc/apt/sources.list` should include the `non-free` repository and look something like this:
 
 ```
-deb http://httpredir.debian.org/debian/ jessie main non-free
-deb-src http://httpredir.debian.org/debian/ jessie main non-free
-
-deb http://security.debian.org/ jessie/updates main non-free
-deb-src http://security.debian.org/ jessie/updates main non-free
-
-# wheezy-updates, previously known as 'volatile'
-deb http://ftp.us.debian.org/debian/ jessie-updates main non-free
-deb-src http://ftp.us.debian.org/debian/ jessie-updates main non-free
-```
-
-BCC also requires kernel version 4.1 or above.  Those kernels are available in the `jessie-backports` repository.  To
-add the `jessie-backports` repository to your system create the file `/etc/apt/sources.list.d/jessie-backports.list`
-with the following contents:
-
-```
-deb http://httpredir.debian.org/debian jessie-backports main
-deb-src http://httpredir.debian.org/debian jessie-backports main
+deb http://deb.debian.org/debian sid main contrib non-free
+deb-src http://deb.debian.org/debian sid main contrib non-free
 ```
 
 #### Install Build Dependencies
-
-Note, check for the latest `linux-image-4.x` version in `jessie-backports` before proceeding.  Also, have a look at the
-`Build-Depends:` section in `debian/control` file.
-
 ```
 # Before you begin
 apt-get update
-
-# Update kernel and linux-base package
-apt-get -t jessie-backports install linux-base linux-image-4.9.0-0.bpo.2-amd64 linux-headers-4.9.0-0.bpo.2-amd64
-
+# According to https://packages.debian.org/source/sid/bpfcc,
 # BCC build dependencies:
-apt-get install debhelper cmake libllvm3.8 llvm-3.8-dev libclang-3.8-dev \
-  libelf-dev bison flex libedit-dev clang-format-3.8 python python-netaddr \
-  python-pyroute2 luajit libluajit-5.1-dev arping iperf netperf ethtool \
-  devscripts zlib1g-dev libfl-dev
+sudo apt-get install arping bison clang-format cmake dh-python \
+  dpkg-dev pkg-kde-tools ethtool flex inetutils-ping iperf \
+  libbpf-dev libclang-dev libclang-cpp-dev libedit-dev libelf-dev \
+  libfl-dev libzip-dev linux-libc-dev llvm-dev libluajit-5.1-dev \
+  luajit python3-netaddr python3-pyroute2 python3-distutils python3
 ```
 
-#### Sudo
-
-Adding eBPF probes to the kernel and removing probes from it requires root privileges.  For the build to complete
-successfully, you must build from an account with `sudo` access.  (You may also build as root, but it is bad style.)
-
-`/etc/sudoers` or `/etc/sudoers.d/build-user` should contain
-
+#### Install and compile BCC
 ```
-build-user ALL = (ALL) NOPASSWD: ALL
-```
-
-or
-
-```
-build-user ALL = (ALL) ALL
-```
-
-If using the latter sudoers configuration, please keep an eye out for sudo's password prompt while the build is running.
-
-#### Build
-
-```
-cd <preferred development directory>
 git clone https://github.com/iovisor/bcc.git
-cd bcc
-debuild -b -uc -us
-```
-
-#### Install
-
-```
-cd ..
-sudo dpkg -i *bcc*.deb
+mkdir bcc/build; cd bcc/build
+cmake ..
+make
+sudo make install
 ```
 
 ## Ubuntu - Source
@@ -381,15 +359,23 @@ sudo apt-get update
 
 # For Bionic (18.04 LTS)
 sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
-  libllvm6.0 llvm-6.0-dev libclang-6.0-dev python zlib1g-dev libelf-dev
+  libllvm6.0 llvm-6.0-dev libclang-6.0-dev python zlib1g-dev libelf-dev libfl-dev python3-distutils
 
-# For Eoan (19.10)
+# For Focal (20.04.1 LTS)
 sudo apt install -y bison build-essential cmake flex git libedit-dev \
-  libllvm7 llvm-7-dev libclang-7-dev python zlib1g-dev libelf-dev
+  libllvm12 llvm-12-dev libclang-12-dev python zlib1g-dev libelf-dev libfl-dev python3-distutils
+
+# For Hirsute (21.04) or Impish (21.10)
+sudo apt install -y bison build-essential cmake flex git libedit-dev \
+libllvm11 llvm-11-dev libclang-11-dev python3 zlib1g-dev libelf-dev libfl-dev python3-distutils
+
+# For Jammy (22.04)
+sudo apt install -y bison build-essential cmake flex git libedit-dev \
+libllvm14 llvm-14-dev libclang-14-dev python3 zlib1g-dev libelf-dev libfl-dev python3-distutils
 
 # For other versions
 sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
-  libllvm3.7 llvm-3.7-dev libclang-3.7-dev python zlib1g-dev libelf-dev
+  libllvm3.7 llvm-3.7-dev libclang-3.7-dev python zlib1g-dev libelf-dev python3-distutils
 
 # For Lua support
 sudo apt-get -y install luajit luajit-5.1-dev
@@ -410,6 +396,56 @@ sudo make install
 popd
 ```
 
+## CentOS-8.5 - Source
+suppose you're running with root or add sudo first
+
+### Install build dependencies
+```
+dnf install -y bison cmake ethtool flex git iperf3 libstdc++-devel python3-netaddr python3-pip gcc gcc-c++ make zlib-devel elfutils-libelf-devel
+# dnf install -y luajit luajit-devel ## if use luajit, will report some lua function(which in lua5.3) undefined problem 
+dnf install -y clang clang-devel llvm llvm-devel llvm-static ncurses-devel
+dnf -y install netperf
+pip3 install pyroute2
+ln -s /usr/bin/python3 /usr/bin/python
+```
+### Install and Compile bcc
+```
+git clone https://github.com/iovisor/bcc.git
+
+mkdir bcc-build
+cd bcc-build/
+
+## here llvm should always link shared library
+cmake ../bcc -DCMAKE_INSTALL_PREFIX=/usr -DENABLE_LLVM_SHARED=1
+make -j10
+make install 
+
+```
+after install, you may add bcc directory to your $PATH, which you can add to ~/.bashrc
+```
+bcctools=/usr/share/bcc/tools
+bccexamples=/usr/share/bcc/examples
+export PATH=$bcctools:$bccexamples:$PATH
+```
+### let path take effect
+```
+source ~/.bashrc 
+```
+then run 
+```
+hello_world.py
+```
+Or 
+```
+cd /usr/share/bcc/examples
+./hello_world.py
+./tracing/bitehist.py
+
+cd /usr/share/bcc/tools
+./bitesize 
+
+```
+
 ## Fedora - Source
 
 ### Install build dependencies
@@ -417,7 +453,7 @@ popd
 ```
 sudo dnf install -y bison cmake ethtool flex git iperf libstdc++-static \
   python-netaddr python-pip gcc gcc-c++ make zlib-devel \
-  elfutils-libelf-devel
+  elfutils-libelf-devel python-cachetools
 sudo dnf install -y luajit luajit-devel  # for Lua support
 sudo dnf install -y \
   http://repo.iovisor.org/yum/extra/mageia/cauldron/x86_64/netperf-2.7.0-1.mga6.x86_64.rpm
@@ -494,23 +530,23 @@ sudo yum install -y luajit luajit-devel  # for Lua support
 You could compile LLVM from source code
 
 ```
-curl  -LO  http://releases.llvm.org/7.0.1/llvm-7.0.1.src.tar.xz
-curl  -LO  http://releases.llvm.org/7.0.1/cfe-7.0.1.src.tar.xz
-tar -xf cfe-7.0.1.src.tar.xz
-tar -xf llvm-7.0.1.src.tar.xz
+curl -LO http://releases.llvm.org/10.0.0/llvm-10.0.0.src.tar.xz
+curl -LO http://releases.llvm.org/10.0.0/cfe-10.0.0.src.tar.xz
+tar -xf cfe-10.0.0.src.tar.xz
+tar -xf llvm-10.0.0.src.tar.xz
 
 mkdir clang-build
 mkdir llvm-build
 
 cd llvm-build
 cmake3 -G "Unix Makefiles" -DLLVM_TARGETS_TO_BUILD="BPF;X86" \
-  -DCMAKE_BUILD_TYPE=Release ../llvm-7.0.1.src
+  -DCMAKE_BUILD_TYPE=Release ../llvm-10.0.0.src
 make
 sudo make install
 
 cd ../clang-build
 cmake3 -G "Unix Makefiles" -DLLVM_TARGETS_TO_BUILD="BPF;X86" \
-  -DCMAKE_BUILD_TYPE=Release ../cfe-7.0.1.src
+  -DCMAKE_BUILD_TYPE=Release ../cfe-10.0.0.src
 make
 sudo make install
 cd ..
@@ -521,8 +557,8 @@ or install from centos-release-scl
 ```
 yum install -y centos-release-scl
 yum-config-manager --enable rhel-server-rhscl-7-rpms
-yum install -y devtoolset-7 llvm-toolset-7 llvm-toolset-7-llvm-devel llvm-toolset-7-llvm-static llvm-toolset-7-clang-devel
-source scl_source enable devtoolset-7 llvm-toolset-7
+yum install -y devtoolset-7 llvm-toolset-10 llvm-toolset-10-llvm-devel llvm-toolset-10-llvm-static llvm-toolset-10-clang-devel
+source scl_source enable devtoolset-7 llvm-toolset-10
 ```
 
 For permanently enable scl environment, please check https://access.redhat.com/solutions/527703.
@@ -537,7 +573,7 @@ make
 sudo make install
 ```
 
-## Amazon Linux - Source
+## Amazon Linux 1 - Source
 
 Tested on Amazon Linux AMI release 2018.03 (kernel 4.14.47-56.37.amzn1.x86_64)
 
@@ -546,7 +582,7 @@ Tested on Amazon Linux AMI release 2018.03 (kernel 4.14.47-56.37.amzn1.x86_64)
 # enable epel to get iperf, luajit, luajit-devel, cmake3 (cmake3 is required to support c++11)
 sudo yum-config-manager --enable epel
 
-sudo yum install -y bison cmake3 ethtool flex git iperf libstdc++-static python-netaddr gcc gcc-c++ make zlib-devel elfutils-libelf-devel
+sudo yum install -y bison cmake3 ethtool flex git iperf libstdc++-static python-netaddr python-cachetools gcc gcc-c++ make zlib-devel elfutils-libelf-devel
 sudo yum install -y luajit luajit-devel
 sudo yum install -y http://repo.iovisor.org/yum/extra/mageia/cauldron/x86_64/netperf-2.7.0-1.mga6.x86_64.rpm
 sudo pip install pyroute2
@@ -558,6 +594,46 @@ sudo yum install -y ncurses-devel
 wget http://releases.llvm.org/3.7.1/clang+llvm-3.7.1-x86_64-fedora22.tar.xz
 tar xf clang*
 (cd clang* && sudo cp -R * /usr/local/)
+```
+
+### Build bcc
+```
+git clone https://github.com/iovisor/bcc.git
+pushd .
+mkdir bcc/build; cd bcc/build
+cmake3 ..
+time make
+sudo make install
+popd
+```
+
+### Setup required to run the tools
+```
+sudo yum -y install kernel-devel-$(uname -r)
+sudo mount -t debugfs debugfs /sys/kernel/debug
+```
+
+### Test
+```
+sudo /usr/share/bcc/tools/execsnoop
+```
+
+## Amazon Linux 2 - Source
+
+```
+# enable epel to get iperf, luajit, luajit-devel, cmake3 (cmake3 is required to support c++11)
+sudo yum-config-manager --enable epel
+
+sudo yum install -y bison cmake3 ethtool flex git iperf libstdc++-static python-netaddr python-cachetools gcc gcc-c++ make zlib-devel elfutils-libelf-devel
+sudo yum install -y luajit luajit-devel
+sudo yum install -y http://repo.iovisor.org/yum/extra/mageia/cauldron/x86_64/netperf-2.7.0-1.mga6.x86_64.rpm
+sudo pip install pyroute2
+sudo yum install -y ncurses-devel
+```
+
+### Install clang
+```
+yum install -y clang llvm llvm-devel llvm-static clang-devel clang-libs
 ```
 
 ### Build bcc
@@ -609,6 +685,30 @@ ln -s $(which python3) /usr/bin/python
 
 ```
 sudo /usr/share/bcc/tools/execsnoop
+```
+
+## Arch - Source
+
+### Install dependencies
+
+```
+pacman -S cmake clang llvm flex bison python
+```
+
+### Build bcc
+
+```
+git clone https://github.com/iovisor/bcc.git
+pushd .
+mkdir bcc/build
+cd bcc/build
+cmake .. -DPYTHON_CMD=python3 # for python3 support
+make -j$(nproc)
+sudo make install
+cd src/python
+make -j$(nproc)
+sudo make install
+popd
 ```
 
 # Older Instructions

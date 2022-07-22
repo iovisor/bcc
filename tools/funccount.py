@@ -20,7 +20,6 @@ from __future__ import print_function
 from bcc import ArgString, BPF, USDT
 from time import sleep, strftime
 import argparse
-import os
 import re
 import signal
 import sys
@@ -29,7 +28,7 @@ import traceback
 debug = False
 
 def verify_limit(num):
-    probe_limit = 1000
+    probe_limit = BPF.get_probe_limit()
     if num > probe_limit:
         raise Exception("maximum of %d probes allowed, attempted %d" %
                         (probe_limit, num))
@@ -74,7 +73,7 @@ class Probe(object):
             libpath = BPF.find_library(self.library)
             if libpath is None:
                 # This might be an executable (e.g. 'bash')
-                libpath = BPF.find_exe(self.library)
+                libpath = BPF.find_exe(str(self.library))
             if libpath is None or len(libpath) == 0:
                 raise Exception("unable to find library %s" % self.library)
             self.library = libpath
@@ -147,7 +146,7 @@ class Probe(object):
             for tracepoint in tracepoints:
                 text += self._add_function(template, tracepoint)
         elif self.type == b"u":
-            self.usdt = USDT(path=self.library, pid=self.pid)
+            self.usdt = USDT(path=str(self.library), pid=self.pid)
             matches = []
             for probe in self.usdt.enumerate_probes():
                 if not self.pid and (probe.bin_path != self.library):
@@ -169,11 +168,7 @@ int PROBE_FUNCTION(void *ctx) {
     FILTERPID
     FILTERCPU
     int loc = LOCATION;
-    u64 *val = counts.lookup(&loc);
-    if (!val) {
-        return 0;   // Should never happen, # of locations is known
-    }
-    (*val)++;
+    counts.atomic_increment(loc);
     return 0;
 }
         """
@@ -300,7 +295,7 @@ class Tool(object):
                 if v.value == 0:
                     continue
                 print("%-36s %8d" %
-                      (self.probe.trace_functions[k.value], v.value))
+                      (self.probe.trace_functions[k.value].decode('utf-8', 'replace'), v.value))
 
             if exiting:
                 print("Detaching...")

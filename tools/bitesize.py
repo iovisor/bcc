@@ -31,7 +31,7 @@ TRACEPOINT_PROBE(block, block_rq_issue)
 {
     struct proc_key_t key = {.slot = bpf_log2l(args->bytes / 1024)};
     bpf_probe_read_kernel(&key.name, sizeof(key.name), args->comm);
-    dist.increment(key);
+    dist.atomic_increment(key);
     return 0;
 }
 """

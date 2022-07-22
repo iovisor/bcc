@@ -1,29 +1,18 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-from bcc import BPF
 import os
-import distutils.version
 import ctypes as ct
-import random
-import time
-import subprocess
+
+from bcc import BPF
+
 from unittest import main, TestCase, skipUnless
+from utils import kernel_version_ge
 
-def kernel_version_ge(major, minor):
-    # True if running kernel is >= X.Y
-    version = distutils.version.LooseVersion(os.uname()[2]).version
-    if version[0] > major:
-        return True
-    if version[0] < major:
-        return False
-    if minor and version[1] < minor:
-        return False
-    return True
-
+@skipUnless(kernel_version_ge(4,20), "requires kernel >= 4.20")
 class TestQueueStack(TestCase):
-    @skipUnless(kernel_version_ge(4,20), "requires kernel >= 4.20")
+
     def test_stack(self):
         text = """
         BPF_STACK(stack, u64, 10);
@@ -48,9 +37,15 @@ class TestQueueStack(TestCase):
         with self.assertRaises(KeyError):
             stack.pop()
 
+        for i in reversed(range(10)):
+            stack.push(ct.c_uint64(i))
+
+        # testing itervalues()
+        for i,v in enumerate(stack.values()):
+            assert v.value == i
+
         b.cleanup()
 
-    @skipUnless(kernel_version_ge(4,20), "requires kernel >= 4.20")
     def test_queue(self):
         text = """
         BPF_QUEUE(queue, u64, 10);
@@ -75,7 +70,15 @@ class TestQueueStack(TestCase):
         with self.assertRaises(KeyError):
             queue.pop()
 
+        for i in range(10):
+            queue.push(ct.c_uint64(i))
+
+        # testing itervalues()
+        for i,v in enumerate(queue.values()):
+            assert v.value == i
+
         b.cleanup()
+
 
 if __name__ == "__main__":
     main()

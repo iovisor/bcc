@@ -59,8 +59,8 @@ void init_syscall_names(void)
 		goto close;
 	}
 
-	/* skip the header */
-	fgets(buf, sizeof(buf), f);
+	/* skip the header, ignore the result of fgets, outwit the comiler */
+	(void) !!fgets(buf, sizeof(buf), f);
 
 	while (fgets(buf, sizeof(buf), f)) {
 		if (buf[strlen(buf) - 1] == '\n')
@@ -116,7 +116,9 @@ close:
 
 void free_syscall_names(void)
 {
-	for (size_t i = 0; i < syscall_names_size; i++)
+	size_t i;
+
+	for (i = 0; i < syscall_names_size; i++)
 		free((void *) syscall_names[i]);
 	free(syscall_names);
 }
@@ -507,7 +509,7 @@ void syscall_name(unsigned n, char *buf, size_t size)
 int list_syscalls(void)
 {
 	const char **list = syscall_names;
-	size_t size = syscall_names_size;
+	size_t i, size = syscall_names_size;
 
 #ifdef __x86_64__
 	if (!size) {
@@ -516,7 +518,7 @@ int list_syscalls(void)
 	}
 #endif
 
-	for (size_t i = 0; i < size; i++) {
+	for (i = 0; i < size; i++) {
 		if (list[i])
 			printf("%3zd: %s\n", i, list[i]);
 	}

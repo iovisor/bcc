@@ -2,7 +2,7 @@
 .SH NAME
 tcpretrans \- Trace or count TCP retransmits and TLPs. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B tcpretrans [\-h] [\-l] [\-c]
+.B tcpretrans [\-h] [\-s] [\-l] [\-c] [\-4 | \-6]
 .SH DESCRIPTION
 This traces TCP retransmits, showing address, port, and TCP state information,
 and sometimes the PID (although usually not, since retransmits are usually
@@ -10,7 +10,7 @@ sent by the kernel on timeouts). To keep overhead very low, only
 the TCP retransmit functions are traced. This does not trace every packet
 (like tcpdump(8) or a packet sniffer). Optionally, it can count retransmits
 over a user signalled interval to spot potentially dropping network paths the
-flows are traversing. 
+flows are traversing.
 
 This uses dynamic tracing of the kernel tcp_retransmit_skb() and
 tcp_send_loss_probe() functions, and will need to be updated to
@@ -24,12 +24,21 @@ CONFIG_BPF and bcc.
 \-h
 Print usage message.
 .TP
+\-s
+Display TCP sequence numbers.
+.TP
 \-l
 Include tail loss probe attempts (in some cases the kernel may not
 complete the TLP send).
 .TP
 \-c
-Count occurring retransmits per flow. 
+Count occurring retransmits per flow.
+.TP
+\-4
+Trace IPv4 family only.
+.TP
+\-6
+Trace IPv6 family only.
 .SH EXAMPLES
 .TP
 Trace TCP retransmits:
@@ -39,6 +48,14 @@ Trace TCP retransmits:
 Trace TCP retransmits and TLP attempts:
 #
 .B tcpretrans \-l
+.TP
+Trace IPv4 family only:
+#
+.B tcpretrans \-4
+.TP
+Trace IPv6 family only:
+#
+.B tcpretrans \-6
 .SH FIELDS
 .TP
 TIME
@@ -68,6 +85,9 @@ Remote port.
 .TP
 STATE
 TCP session state.
+.TP
+SEQ
+TCP sequence.
 .TP
 RETRANSMITS
 Accumulated occurred retransmits since start.

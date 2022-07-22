@@ -16,16 +16,18 @@ import ctypes as ct
 
 lib = ct.CDLL("libbcc.so.0", use_errno=True)
 
+# needed for perf_event_attr() ctype
+from .perf import Perf
+
 # keep in sync with bcc_common.h
-lib.bpf_module_create_b.restype = ct.c_void_p
-lib.bpf_module_create_b.argtypes = [ct.c_char_p, ct.c_char_p, ct.c_uint,
-        ct.c_char_p]
 lib.bpf_module_create_c.restype = ct.c_void_p
 lib.bpf_module_create_c.argtypes = [ct.c_char_p, ct.c_uint,
         ct.POINTER(ct.c_char_p), ct.c_int, ct.c_bool, ct.c_char_p]
 lib.bpf_module_create_c_from_string.restype = ct.c_void_p
 lib.bpf_module_create_c_from_string.argtypes = [ct.c_char_p, ct.c_uint,
         ct.POINTER(ct.c_char_p), ct.c_int, ct.c_bool, ct.c_char_p]
+lib.bpf_module_rw_engine_enabled.restype = ct.c_bool
+lib.bpf_module_rw_engine_enabled.argtypes = None
 lib.bpf_module_destroy.restype = None
 lib.bpf_module_destroy.argtypes = [ct.c_void_p]
 lib.bpf_module_license.restype = ct.c_char_p
@@ -83,13 +85,24 @@ lib.bpf_update_elem.argtypes = [ct.c_int, ct.c_void_p, ct.c_void_p,
         ct.c_ulonglong]
 lib.bpf_delete_elem.restype = ct.c_int
 lib.bpf_delete_elem.argtypes = [ct.c_int, ct.c_void_p]
+lib.bpf_delete_batch.restype = ct.c_int
+lib.bpf_delete_batch.argtypes = [ct.c_int, ct.c_void_p, ct.c_void_p]
+lib.bpf_update_batch.restype = ct.c_int
+lib.bpf_update_batch.argtypes = [ct.c_int, ct.c_void_p, ct.c_void_p,
+        ct.POINTER(ct.c_uint32)]
+lib.bpf_lookup_batch.restype = ct.c_int
+lib.bpf_lookup_batch.argtypes = [ct.c_int, ct.POINTER(ct.c_uint32),
+        ct.POINTER(ct.c_uint32), ct.c_void_p, ct.c_void_p, ct.c_void_p]
+lib.bpf_lookup_and_delete_batch.restype = ct.c_int
+lib.bpf_lookup_and_delete_batch.argtypes = [ct.c_int, ct.POINTER(ct.c_uint32),
+        ct.POINTER(ct.c_uint32), ct.c_void_p, ct.c_void_p, ct.c_void_p]
 lib.bpf_open_raw_sock.restype = ct.c_int
 lib.bpf_open_raw_sock.argtypes = [ct.c_char_p]
 lib.bpf_attach_socket.restype = ct.c_int
 lib.bpf_attach_socket.argtypes = [ct.c_int, ct.c_int]
 lib.bcc_func_load.restype = ct.c_int
 lib.bcc_func_load.argtypes = [ct.c_void_p, ct.c_int, ct.c_char_p, ct.c_void_p,
-        ct.c_size_t, ct.c_char_p, ct.c_uint, ct.c_int, ct.c_char_p, ct.c_uint, ct.c_char_p]
+        ct.c_size_t, ct.c_char_p, ct.c_uint, ct.c_int, ct.c_char_p, ct.c_uint, ct.c_char_p, ct.c_uint]
 _RAW_CB_TYPE = ct.CFUNCTYPE(None, ct.py_object, ct.c_void_p, ct.c_int)
 _LOST_CB_TYPE = ct.CFUNCTYPE(None, ct.py_object, ct.c_ulonglong)
 lib.bpf_attach_kprobe.restype = ct.c_int
@@ -112,14 +125,32 @@ lib.bpf_attach_kfunc.restype = ct.c_int
 lib.bpf_attach_kfunc.argtypes = [ct.c_int]
 lib.bpf_attach_lsm.restype = ct.c_int
 lib.bpf_attach_lsm.argtypes = [ct.c_int]
+lib.bpf_prog_attach.restype = ct.c_int
+lib.bpf_prog_attach.argtype = [ct.c_int, ct.c_int, ct.c_int, ct.c_uint]
+lib.bpf_prog_detach2.restype = ct.c_int
+lib.bpf_prog_detach2.argtype = [ct.c_int, ct.c_int, ct.c_int]
 lib.bpf_has_kernel_btf.restype = ct.c_bool
 lib.bpf_has_kernel_btf.argtypes = None
+lib.kernel_struct_has_field.restype = ct.c_int
+lib.kernel_struct_has_field.argtypes = [ct.c_char_p, ct.c_char_p]
 lib.bpf_open_perf_buffer.restype = ct.c_void_p
 lib.bpf_open_perf_buffer.argtypes = [_RAW_CB_TYPE, _LOST_CB_TYPE, ct.py_object, ct.c_int, ct.c_int, ct.c_int]
+
+class bcc_perf_buffer_opts(ct.Structure):
+    _fields_ = [
+        ('pid', ct.c_int),
+        ('cpu', ct.c_int),
+        ('wakeup_events', ct.c_int),
+    ]
+
+lib.bpf_open_perf_buffer_opts.restype = ct.c_void_p
+lib.bpf_open_perf_buffer_opts.argtypes = [_RAW_CB_TYPE, _LOST_CB_TYPE, ct.py_object, ct.c_int, ct.POINTER(bcc_perf_buffer_opts)]
 lib.bpf_open_perf_event.restype = ct.c_int
 lib.bpf_open_perf_event.argtypes = [ct.c_uint, ct.c_ulonglong, ct.c_int, ct.c_int]
 lib.perf_reader_poll.restype = ct.c_int
 lib.perf_reader_poll.argtypes = [ct.c_int, ct.POINTER(ct.c_void_p), ct.c_int]
+lib.perf_reader_consume.restype = ct.c_int
+lib.perf_reader_consume.argtypes = [ct.c_int, ct.POINTER(ct.c_void_p)]
 lib.perf_reader_free.restype = None
 lib.perf_reader_free.argtypes = [ct.c_void_p]
 lib.perf_reader_fd.restype = int
@@ -131,6 +162,9 @@ lib.bpf_attach_xdp.argtypes = [ct.c_char_p, ct.c_int, ct.c_uint]
 lib.bpf_attach_perf_event.restype = ct.c_int
 lib.bpf_attach_perf_event.argtype = [ct.c_int, ct.c_uint, ct.c_uint, ct.c_ulonglong, ct.c_ulonglong,
         ct.c_int, ct.c_int, ct.c_int]
+
+lib.bpf_attach_perf_event_raw.restype = ct.c_int
+lib.bpf_attach_perf_event_raw.argtype = [Perf.perf_event_attr(), ct.c_uint, ct.c_uint, ct.c_uint, ct.c_uint]
 
 lib.bpf_close_perf_event_fd.restype = ct.c_int
 lib.bpf_close_perf_event_fd.argtype = [ct.c_int]
@@ -282,7 +316,7 @@ class bcc_usdt_argument(ct.Structure):
     _fields_ = [
             ('size', ct.c_int),
             ('valid', ct.c_int),
-            ('constant', ct.c_int),
+            ('constant', ct.c_longlong),
             ('deref_offset', ct.c_int),
             ('deref_ident', ct.c_char_p),
             ('base_register_name', ct.c_char_p),

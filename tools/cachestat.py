@@ -81,7 +81,7 @@ int do_count(struct pt_regs *ctx) {
     u64 ip;
 
     key.ip = PT_REGS_IP(ctx);
-    counts.increment(key); // update counter
+    counts.atomic_increment(key); // update counter
     return 0;
 }
 
@@ -96,7 +96,15 @@ if debug or args.ebpf:
 b = BPF(text=bpf_text)
 b.attach_kprobe(event="add_to_page_cache_lru", fn_name="do_count")
 b.attach_kprobe(event="mark_page_accessed", fn_name="do_count")
-b.attach_kprobe(event="account_page_dirtied", fn_name="do_count")
+
+# Function account_page_dirtied() is changed to folio_account_dirtied() in 5.15.
+# FIXME: Both folio_account_dirtied() and account_page_dirtied() are
+# static functions and they may be gone during compilation and this may
+# introduce some inaccuracy.
+if BPF.get_kprobe_functions(b'folio_account_dirtied'):
+    b.attach_kprobe(event="folio_account_dirtied", fn_name="do_count")
+elif BPF.get_kprobe_functions(b'account_page_dirtied'):
+    b.attach_kprobe(event="account_page_dirtied", fn_name="do_count")
 b.attach_kprobe(event="mark_buffer_dirty", fn_name="do_count")
 
 # header

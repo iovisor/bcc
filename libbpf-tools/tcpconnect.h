@@ -34,7 +34,7 @@ struct event {
 	};
 	char task[TASK_COMM_LEN];
 	__u64 ts_us;
-	int af; // AF_INET or AF_INET6
+	__u32 af; // AF_INET or AF_INET6
 	__u32 pid;
 	__u32 uid;
 	__u16 dport;

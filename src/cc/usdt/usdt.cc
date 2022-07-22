@@ -54,12 +54,13 @@ Location::Location(uint64_t addr, const std::string &bin_path, const char *arg_f
 }
 
 Probe::Probe(const char *bin_path, const char *provider, const char *name,
-             uint64_t semaphore, const optional<int> &pid,
-             uint8_t mod_match_inode_only)
+             uint64_t semaphore, uint64_t semaphore_offset,
+             const optional<int> &pid, uint8_t mod_match_inode_only)
     : bin_path_(bin_path),
       provider_(provider),
       name_(name),
       semaphore_(semaphore),
+      semaphore_offset_(semaphore_offset),
       pid_(pid),
       mod_match_inode_only_(mod_match_inode_only)
       {}
@@ -148,7 +149,7 @@ bool Probe::disable() {
   return true;
 }
 
-std::string Probe::largest_arg_type(size_t arg_n) {
+const char *Probe::largest_arg_type(size_t arg_n) {
   Argument *largest = nullptr;
   for (Location &location : locations_) {
     Argument *candidate = &location.arguments_[arg_n];
@@ -158,7 +159,7 @@ std::string Probe::largest_arg_type(size_t arg_n) {
   }
 
   assert(largest);
-  return largest->ctype();
+  return largest->ctype_name();
 }
 
 bool Probe::usdt_getarg(std::ostream &stream) {
@@ -173,6 +174,11 @@ bool Probe::usdt_getarg(std::ostream &stream, const std::string& probe_func) {
 
   if (arg_count == 0)
     return true;
+
+  uint64_t page_size = sysconf(_SC_PAGESIZE);
+  std::unordered_set<int> page_offsets;
+  for (Location &location : locations_)
+    page_offsets.insert(location.address_ % page_size);
 
   for (size_t arg_n = 0; arg_n < arg_count; ++arg_n) {
     std::string ctype = largest_arg_type(arg_n);
@@ -192,15 +198,22 @@ bool Probe::usdt_getarg(std::ostream &stream, const std::string& probe_func) {
         return false;
       stream << "\n  return 0;\n}\n";
     } else {
-      stream << "  switch(PT_REGS_IP(ctx)) {\n";
+      if (page_offsets.size() == locations_.size())
+        tfm::format(stream, "  switch (PT_REGS_IP(ctx) %% 0x%xULL) {\n", page_size);
+      else
+        stream << "  switch (PT_REGS_IP(ctx)) {\n";
       for (Location &location : locations_) {
-        uint64_t global_address;
+        if (page_offsets.size() == locations_.size()) {
+          tfm::format(stream, "  case 0x%xULL: ", location.address_ % page_size);
+        } else {
+          uint64_t global_address;
 
-        if (!resolve_global_address(&global_address, location.bin_path_,
-                                    location.address_))
-          return false;
+          if (!resolve_global_address(&global_address, location.bin_path_,
+                                      location.address_))
+            return false;
 
-        tfm::format(stream, "  case 0x%xULL: ", global_address);
+          tfm::format(stream, "  case 0x%xULL: ", global_address);
+        }
         if (!location.arguments_[arg_n].assign_to_local(stream, cptr, location.bin_path_,
                                                         pid_))
           return false;
@@ -219,9 +232,13 @@ void Probe::add_location(uint64_t addr, const std::string &bin_path, const char 
 }
 
 void Probe::finalize_locations() {
+  // The following comparator needs to establish a strict weak ordering relation. Such
+  // that when x < y == true, y < x == false. Otherwise it leads to undefined behavior.
+  // To guarantee this, it uses std::tie which allows the lambda to have a lexicographical
+  // comparison and hence, guarantee the strict weak ordering.
   std::sort(locations_.begin(), locations_.end(),
             [](const Location &a, const Location &b) {
-              return a.bin_path_ < b.bin_path_ || a.address_ < b.address_;
+              return std::tie(a.bin_path_, a.address_) < std::tie(b.bin_path_, b.address_);
             });
   auto last = std::unique(locations_.begin(), locations_.end(),
                           [](const Location &a, const Location &b) {
@@ -262,8 +279,8 @@ void Context::add_probe(const char *binpath, const struct bcc_elf_usdt *probe) {
   }
 
   probes_.emplace_back(
-    new Probe(binpath, probe->provider, probe->name, probe->semaphore, pid_,
-              mod_match_inode_only_)
+    new Probe(binpath, probe->provider, probe->name, probe->semaphore,
+              probe->semaphore_offset, pid_, mod_match_inode_only_)
   );
   probes_.back()->add_location(probe->pc, binpath, probe->arg_fmt);
 }
@@ -347,6 +364,7 @@ void Context::each(each_cb callback) {
     info.bin_path = probe->bin_path().c_str();
     info.name = probe->name().c_str();
     info.semaphore = probe->semaphore();
+    info.semaphore_offset = probe->semaphore_offset();
     info.num_locations = probe->num_locations();
     info.num_arguments = probe->num_arguments();
     callback(&info);
@@ -538,7 +556,7 @@ const char *bcc_usdt_get_probe_argctype(
 ) {
   USDT::Probe *p = static_cast<USDT::Context *>(ctx)->get(probe_name);
   if (p)
-    return p->get_arg_ctype(arg_index).c_str();
+    return p->get_arg_ctype_name(arg_index);
   return "";
 }
 
@@ -547,7 +565,7 @@ const char *bcc_usdt_get_fully_specified_probe_argctype(
 ) {
   USDT::Probe *p = static_cast<USDT::Context *>(ctx)->get(provider_name, probe_name);
   if (p)
-    return p->get_arg_ctype(arg_index).c_str();
+    return p->get_arg_ctype_name(arg_index);
   return "";
 }
 

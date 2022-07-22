@@ -1,0 +1,60 @@
+.TH threadsnoop 8  "2019-07-02" "USER COMMANDS"
+.SH NAME
+threadsnoop \- Trace thread creation via pthread_create(). Uses BCC/eBPF.
+.SH SYNOPSIS
+.B threadsnoop
+.SH DESCRIPTION
+threadsnoop traces calls to pthread_create(), showing this path of thread
+creation. This can be used for workload characterization and discovery, and is
+a companion to execsnoop(8) which traces execve(2).
+
+This works by tracing the pthread_create() from libpthread.so.0. The path
+to this library may need adjusting in the tool source to match your system.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and BCC.
+.SH EXAMPLES
+.TP
+Trace calls pthread_create():
+#
+.B threadsnoop
+.SH FIELDS
+.TP
+TIME(ms)
+Elapsed time since the tool began tracing (in milliseconds).
+.TP
+PID
+The process ID.
+.TP
+COMM
+The process (thread) name.
+.TP
+FUNC
+The name of the start routine, if the symbol is available, else a hex address
+for the start routine address.
+.SH OVERHEAD
+Thread creation is expected to be low (<< 1000/s), so the overhead of this
+tool is expected to be negligible.
+.SH SOURCE
+This originated as a bpftrace tool from the book "BPF Performance Tools",
+published by Addison Wesley (2019):
+.IP
+http://www.brendangregg.com/bpf-performance-tools-book.html
+.PP
+See the book for more documentation on this tool.
+.PP
+This version is in the BCC repository:
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file
+containing example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Brendan Gregg
+.SH SEE ALSO
+execsnoop(8)
