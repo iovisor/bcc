@@ -1040,14 +1040,19 @@ int bcc_elf_get_buildid(const char *path, char *buildid)
 {
   Elf *e;
   int fd;
+  int rc = -1;
 
   if (openelf(path, &e, &fd) < 0)
     return -1;
 
   if (!find_buildid(e, buildid))
-    return -1;
+    goto exit;
 
-  return 0;
+  rc = 0;
+exit:
+  elf_end(e);
+  close(fd);
+  return rc;
 }
 
 int bcc_elf_symbol_str(const char *path, size_t section_idx,
