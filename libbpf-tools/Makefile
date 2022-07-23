@@ -81,6 +81,7 @@ APPS = \
 	tcprtt \
 	tcpsynbl \
 	vfsstat \
+	wakeuptime \
 	$(BZ_APPS) \
 	#
 
