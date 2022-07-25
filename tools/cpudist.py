@@ -3,7 +3,7 @@
 #
 # cpudist   Summarize on- and off-CPU time per task as a histogram.
 #
-# USAGE: cpudist [-h] [-O] [-T] [-m] [-P] [-L] [-p PID] [-I] [interval] [count]
+# USAGE: cpudist [-h] [-O] [-T] [-m] [-P] [-L] [-p PID] [-I] [-e] [interval] [count]
 #
 # This measures the time a task spends on or off the CPU, and shows this time
 # as a histogram, optionally per-process.
@@ -14,6 +14,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 27-Mar-2022   Rocky Xing      Changed to exclude CPU idle time by default.
+# 25-Jul-2022   Rocky Xing      Added extension summary support.
 
 from __future__ import print_function
 from bcc import BPF
@@ -28,6 +29,7 @@ examples = """examples:
     cpudist -P           # show each PID separately
     cpudist -p 185       # trace PID 185 only
     cpudist -I           # include CPU idle time
+    cpudist -e           # show extension summary (average/total/count)
 """
 parser = argparse.ArgumentParser(
     description="Summarize on-CPU time per task as a histogram.",
@@ -47,6 +49,8 @@ parser.add_argument("-p", "--pid",
     help="trace this PID only")
 parser.add_argument("-I", "--include-idle", action="store_true",
     help="include CPU idle time")
+parser.add_argument("-e", "--extension", action="store_true",
+    help="show extension summary (average/total/count)")
 parser.add_argument("interval", nargs="?", default=99999999,
     help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
@@ -57,7 +61,8 @@ args = parser.parse_args()
 countdown = int(args.count)
 debug = 0
 
-bpf_text = """#include <uapi/linux/ptrace.h>
+bpf_text = """
+#include <uapi/linux/ptrace.h>
 #include <linux/sched.h>
 """
 
@@ -75,6 +80,10 @@ typedef struct pid_key {
     u64 slot;
 } pid_key_t;
 
+typedef struct ext_val {
+    u64 total;
+    u64 count;
+} ext_val_t;
 
 BPF_HASH(start, entry_key_t, u64, MAX_PID);
 STORAGE
@@ -157,22 +166,40 @@ if args.milliseconds:
 else:
     bpf_text = bpf_text.replace('FACTOR', 'delta /= 1000;')
     label = "usecs"
+
+storage_str = ""
+store_str = ""
+
 if args.pids or args.tids:
     section = "pid"
     pid = "tgid"
     if args.tids:
         pid = "pid"
         section = "tid"
-    bpf_text = bpf_text.replace('STORAGE',
-        'BPF_HISTOGRAM(dist, pid_key_t, MAX_PID);')
-    bpf_text = bpf_text.replace('STORE',
-        'pid_key_t key = {.id = ' + pid + ', .slot = bpf_log2l(delta)}; ' +
-        'dist.increment(key);')
+    storage_str += "BPF_HISTOGRAM(dist, pid_key_t, MAX_PID);"
+    store_str += """
+    pid_key_t key = {.id = ' + pid + ', .slot = bpf_log2l(delta)};
+    dist.increment(key);
+    """
 else:
     section = ""
-    bpf_text = bpf_text.replace('STORAGE', 'BPF_HISTOGRAM(dist);')
-    bpf_text = bpf_text.replace('STORE',
-        'dist.atomic_increment(bpf_log2l(delta));')
+    storage_str += "BPF_HISTOGRAM(dist);"
+    store_str += "dist.atomic_increment(bpf_log2l(delta));"
+
+if args.extension:
+    storage_str += "BPF_ARRAY(extension, ext_val_t, 1);"
+    store_str += """
+    u32 index = 0;
+    ext_val_t *ext_val = extension.lookup(&index);
+    if (ext_val) {
+        lock_xadd(&ext_val->total, delta);
+        lock_xadd(&ext_val->count, 1);
+    }
+    """
+
+bpf_text = bpf_text.replace("STORAGE", storage_str)
+bpf_text = bpf_text.replace("STORE", store_str)
+
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
@@ -189,6 +216,8 @@ print("Tracing %s-CPU time... Hit Ctrl-C to end." %
 
 exiting = 0 if args.interval else 1
 dist = b.get_table("dist")
+if args.extension:
+    extension = b.get_table("extension")
 while (1):
     try:
         sleep(int(args.interval))
@@ -207,6 +236,15 @@ while (1):
             return str(pid)
 
     dist.print_log2_hist(label, section, section_print_fn=pid_to_comm)
+
+    if args.extension:
+        total = extension[0].total
+        count = extension[0].count
+        if count > 0:
+            print("\navg = %ld %s, total: %ld %s, count: %ld\n" %
+                (total / count, label, total, label, count))
+        extension.clear()
+
     dist.clear()
 
     countdown -= 1
