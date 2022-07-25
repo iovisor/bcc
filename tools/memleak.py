@@ -538,7 +538,7 @@ def print_outstanding_combined():
                                                       show_module=True,
                                                       show_offset=True)
                                 trace.append(sym)
-                        trace = "\n\t\t".join(trace)
+                        trace = "\n\t\t".join(trace.decode())
                 except KeyError:
                         trace = "stack information lost"
 
