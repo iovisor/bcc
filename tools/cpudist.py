@@ -32,7 +32,7 @@ examples = """examples:
     cpudist -e           # show extension summary (average/total/count)
 """
 parser = argparse.ArgumentParser(
-    description="Summarize on-CPU time per task as a histogram.",
+    description="Summarize on- and off-CPU time per task as a histogram.",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
 parser.add_argument("-O", "--offcpu", action="store_true",

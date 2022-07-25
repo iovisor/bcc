@@ -285,7 +285,7 @@ USAGE message:
 usage: cpudist.py [-h] [-O] [-T] [-m] [-P] [-L] [-p PID] [-I] [-e]
                   [interval] [count]
 
-Summarize on-CPU time per task as a histogram.
+Summarize on- and off-CPU time per task as a histogram.
 
 positional arguments:
   interval            output interval, in seconds
