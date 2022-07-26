@@ -3,13 +3,14 @@
 # syscount   Summarize syscall counts and latencies.
 #
 # USAGE: syscount [-h] [-p PID] [-t TID] [-i INTERVAL] [-d DURATION] [-T TOP]
-#                 [-x] [-e ERRNO] [-L] [-m] [-P] [-l]
+#                 [-x] [-e ERRNO] [-L] [-m] [-P] [-l] [--syscall SYSCALL]
 #
 # Copyright 2017, Sasha Goldshtein.
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 15-Feb-2017   Sasha Goldshtein    Created this.
 # 16-May-2022   Rocky Xing          Added TID filter support.
+# 26-Jul-2022   Rocky Xing          Added syscall filter support.
 
 from time import sleep, strftime
 import argparse
@@ -66,6 +67,8 @@ parser.add_argument("-P", "--process", action="store_true",
     help="count by process and not by syscall")
 parser.add_argument("-l", "--list", action="store_true",
     help="print list of recognized syscalls and exit")
+parser.add_argument("--syscall", type=str,
+    help="trace this syscall only (use option -l to get all recognized syscalls)")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
@@ -73,6 +76,17 @@ if args.duration and not args.interval:
     args.interval = args.duration
 if not args.interval:
     args.interval = 99999999
+
+syscall_nr = -1
+if args.syscall is not None:
+    syscall = bytes(args.syscall, 'utf-8')
+    for key, value in syscalls.items():
+        if syscall == value:
+            syscall_nr = key
+            break
+    if syscall_nr == -1:
+        print("Error: syscall '%s' not found. Exiting." % args.syscall)
+        sys.exit(1)
 
 if args.list:
     for grp in izip_longest(*(iter(sorted(syscalls.values())),) * 4):
@@ -98,6 +112,11 @@ TRACEPOINT_PROBE(raw_syscalls, sys_enter) {
     u32 pid = pid_tgid >> 32;
     u32 tid = (u32)pid_tgid;
 
+#ifdef FILTER_SYSCALL_NR
+    if (args->id != FILTER_SYSCALL_NR)
+        return 0;
+#endif
+
 #ifdef FILTER_PID
     if (pid != FILTER_PID)
         return 0;
@@ -118,6 +137,11 @@ TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
     u64 pid_tgid = bpf_get_current_pid_tgid();
     u32 pid = pid_tgid >> 32;
     u32 tid = (u32)pid_tgid;
+
+#ifdef FILTER_SYSCALL_NR
+    if (args->id != FILTER_SYSCALL_NR)
+        return 0;
+#endif
 
 #ifdef FILTER_PID
     if (pid != FILTER_PID)
@@ -179,6 +203,8 @@ if args.latency:
     text = "#define LATENCY\n" + text
 if args.process:
     text = "#define BY_PROCESS\n" + text
+if args.syscall is not None:
+    text = ("#define FILTER_SYSCALL_NR %d\n" % syscall_nr) + text
 if args.ebpf:
     print(text)
     exit()
@@ -231,8 +257,12 @@ def print_latency_stats():
     print("")
     data.clear()
 
-print("Tracing %ssyscalls, printing top %d... Ctrl+C to quit." %
-      ("failed " if args.failures else "", args.top))
+if args.syscall is not None:
+    print("Tracing %ssyscall '%s'... Ctrl+C to quit." %
+        ("failed " if args.failures else "", args.syscall))
+else:
+    print("Tracing %ssyscalls, printing top %d... Ctrl+C to quit." %
+        ("failed " if args.failures else "", args.top))
 exiting = 0 if args.interval else 1
 seconds = 0
 while True:
