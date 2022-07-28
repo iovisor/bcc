@@ -14,12 +14,14 @@
 struct ipv4_flow_key {
 	__u32 saddr;
 	__u32 daddr;
+	__u16 sport;
 	__u16 dport;
 };
 
 struct ipv6_flow_key {
 	__u8 saddr[16];
 	__u8 daddr[16];
+	__u16 sport;
 	__u16 dport;
 };
 
@@ -37,6 +39,7 @@ struct event {
 	__u32 af; // AF_INET or AF_INET6
 	__u32 pid;
 	__u32 uid;
+	__u16 sport;
 	__u16 dport;
 };
 
