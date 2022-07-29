@@ -282,9 +282,10 @@ USAGE message:
 
 # ./cpudist.py -h
 
-usage: cpudist.py [-h] [-O] [-T] [-m] [-P] [-L] [-p PID] [-I] [interval] [count]
+usage: cpudist.py [-h] [-O] [-T] [-m] [-P] [-L] [-p PID] [-I] [-e]
+                  [interval] [count]
 
-Summarize on-CPU time per task as a histogram.
+Summarize on- and off-CPU time per task as a histogram.
 
 positional arguments:
   interval            output interval, in seconds
@@ -299,6 +300,7 @@ optional arguments:
   -L, --tids          print a histogram per thread ID
   -p PID, --pid PID   trace this PID only
   -I, --include-idle  include CPU idle time
+  -e, --extension     show extension summary (average/total/count)
 
 examples:
     cpudist              # summarize on-CPU time as a histogram
@@ -308,4 +310,5 @@ examples:
     cpudist -P           # show each PID separately
     cpudist -p 185       # trace PID 185 only
     cpudist -I           # include CPU idle time
+    cpudist -e           # show extension summary (average/total/count)
 
