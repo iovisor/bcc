@@ -19,7 +19,7 @@ from time import strftime
 bpf_text="""
 #include <uapi/linux/ptrace.h>
 #include <linux/sched.h>
-#include <linux/genhd.h>
+#include <linux/blkdev.h>
 #include <linux/bio.h>
 
 struct data_t {
