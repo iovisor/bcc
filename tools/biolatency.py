@@ -111,8 +111,6 @@ int trace_req_done(struct pt_regs *ctx, struct request *req)
     }
     delta = bpf_ktime_get_ns() - *tsp;
 
-    EXTENSION
-
     FACTOR
 
     // store as histogram
@@ -185,16 +183,15 @@ else:
 
 if args.extension:
     storage_str += "BPF_ARRAY(extension, ext_val_t, 1);"
-    bpf_text = bpf_text.replace('EXTENSION', """
+    store_str += """
     u32 index = 0;
     ext_val_t *ext_val = extension.lookup(&index);
     if (ext_val) {
         lock_xadd(&ext_val->total, delta);
         lock_xadd(&ext_val->count, 1);
     }
-    """)
-else:
-    bpf_text = bpf_text.replace('EXTENSION', '')
+    """
+
 bpf_text = bpf_text.replace("STORAGE", storage_str)
 bpf_text = bpf_text.replace("STORE", store_str)
 
@@ -309,15 +306,10 @@ while (1):
             dist.print_log2_hist(label, "disk", disk_print)
         if args.extension:
             total = extension[0].total
-            counts = extension[0].count
-            if counts > 0:
-                if label == 'msecs':
-                    total /= 1000000
-                elif label == 'usecs':
-                    total /= 1000
-                avg = total / counts
+            count = extension[0].count
+            if count > 0:
                 print("\navg = %ld %s, total: %ld %s, count: %ld\n" %
-                      (total / counts, label, total, label, counts))
+                      (total / count, label, total, label, count))
             extension.clear()
 
     dist.clear()
