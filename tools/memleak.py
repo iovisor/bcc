@@ -131,6 +131,11 @@ if command is not None:
 bpf_source = """
 #include <uapi/linux/ptrace.h>
 
+struct alloc_key_t {
+    u64 pid;
+    u64 address;
+};
+
 struct alloc_info_t {
         u64 size;
         u64 timestamp_ns;
@@ -143,7 +148,7 @@ struct combined_alloc_info_t {
 };
 
 BPF_HASH(sizes, u64);
-BPF_HASH(allocs, u64, struct alloc_info_t, 1000000);
+BPF_HASH(allocs, struct alloc_key_t, struct alloc_info_t, 1000000);
 BPF_HASH(memptrs, u64, u64);
 BPF_STACK_TRACE(stack_traces, 10240);
 BPF_HASH(combined_allocs, u64, struct combined_alloc_info_t, 10240);
@@ -201,6 +206,7 @@ static inline int gen_alloc_enter(struct pt_regs *ctx, size_t size) {
 static inline int gen_alloc_exit2(struct pt_regs *ctx, u64 address) {
         u64 pid = bpf_get_current_pid_tgid();
         u64* size64 = sizes.lookup(&pid);
+        struct alloc_key_t key = {0};
         struct alloc_info_t info = {0};
 
         if (size64 == 0)
@@ -210,9 +216,11 @@ static inline int gen_alloc_exit2(struct pt_regs *ctx, u64 address) {
         sizes.delete(&pid);
 
         if (address != 0) {
+                key.pid = pid;
+                key.address = address;
                 info.timestamp_ns = bpf_ktime_get_ns();
                 info.stack_id = stack_traces.get_stackid(ctx, STACK_FLAGS);
-                allocs.update(&address, &info);
+                allocs.update(&key, &info);
                 update_statistics_add(info.stack_id, info.size);
         }
 
@@ -228,12 +236,15 @@ static inline int gen_alloc_exit(struct pt_regs *ctx) {
 }
 
 static inline int gen_free_enter(struct pt_regs *ctx, void *address) {
-        u64 addr = (u64)address;
-        struct alloc_info_t *info = allocs.lookup(&addr);
+        struct alloc_key_t key = {0};
+        key.pid = bpf_get_current_pid_tgid();
+        key.address = (u64)address;
+
+        struct alloc_info_t *info = allocs.lookup(&key);
         if (info == 0)
                 return 0;
 
-        allocs.delete(&addr);
+        allocs.delete(&key);
         update_statistics_del(info->stack_id, info->size);
 
         if (SHOULD_PRINT) {
