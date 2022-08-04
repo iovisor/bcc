@@ -78,11 +78,11 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
 
 	if (n)
-		printf("%s Triggered by PID %d (\"%s\"), OOM kill of PID %d (\"%s\"), %lld pages, loadavg: %s\n",
+		printf("%s Triggered by PID %d (\"%s\"), OOM kill of PID %d (\"%s\"), %lld pages, loadavg: %s",
 			ts, e->fpid, e->fcomm, e->tpid, e->tcomm, e->pages, buf);
 	else
 		printf("%s Triggered by PID %d (\"%s\"), OOM kill of PID %d (\"%s\"), %lld pages\n",
-                        ts, e->fpid, e->fcomm, e->tpid, e->tcomm, e->pages);
+			ts, e->fpid, e->fcomm, e->tpid, e->tcomm, e->pages);
 }
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
