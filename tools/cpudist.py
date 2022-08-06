@@ -178,7 +178,7 @@ if args.pids or args.tids:
         section = "tid"
     storage_str += "BPF_HISTOGRAM(dist, pid_key_t, MAX_PID);"
     store_str += """
-    pid_key_t key = {.id = ' + pid + ', .slot = bpf_log2l(delta)};
+    pid_key_t key = {.id = """ + pid + """, .slot = bpf_log2l(delta)};
     dist.increment(key);
     """
 else:
