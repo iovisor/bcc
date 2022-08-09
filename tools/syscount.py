@@ -177,14 +177,14 @@ TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
 
     val = data.lookup_or_try_init(&key, &zero);
     if (val) {
-        val->count++;
-        val->total_ns += bpf_ktime_get_ns() - *start_ns;
+        lock_xadd(&val->count, 1);
+        lock_xadd(&val->total_ns, bpf_ktime_get_ns() - *start_ns);
     }
 #else
     u64 *val, zero = 0;
     val = data.lookup_or_try_init(&key, &zero);
     if (val) {
-        ++(*val);
+        lock_xadd(val, 1);
     }
 #endif
     return 0;
