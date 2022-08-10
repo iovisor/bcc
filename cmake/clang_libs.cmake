@@ -50,7 +50,13 @@ list(APPEND clang_libs
   ${libclangRewrite}
   ${libclangEdit}
   ${libclangAST}
-  ${libclangLex}
+  ${libclangLex})
+
+# if (${LLVM_PACKAGE_VERSION} VERSION_EQUAL 15 OR ${LLVM_PACKAGE_VERSION} VERSION_GREATER 15)
+  list(APPEND clang_libs ${libclangSupport})
+# endif()
+
+list(APPEND clang_libs
   ${libclangBasic})
 endif()
 
