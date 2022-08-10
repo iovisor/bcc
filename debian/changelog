@@ -1,3 +1,22 @@
+bcc (0.25.0-1) unstable; urgency=low
+
+  * Support for kernel up to 5.19
+  * bcc tool updates for oomkill.py, biolatpcts.py, sslsniff.py, tcpaccept.py, etc.
+  * libbpf tool updates for klockstat, opensnoop, tcpconnect, etc.
+  * new bcc tools: tcpcong
+  * new libbpf tools: tcpsynbl, mdflush, oomkill, sigsnoop
+  * usdt: support xmm registers as args for x64
+  * bpftool as a submodule now
+  * remove uses of libbpf deprecated APIs
+  * use new llvm pass manager
+  * support cgroup filtering libbpf tools
+  * fix shared lib module offset <-> global addr conversion
+  * riscv support
+  * LoongArch support
+  * doc update, bug fixes and other tools improvement
+
+ -- Yonghong Song <ys114321@gmail.com>  Wed, 10 Aug 2022 17:00:00 +0000
+
 bcc (0.24.0-1) unstable; urgency=low
 
   * Support for kernel up to 5.16
