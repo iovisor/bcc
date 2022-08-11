@@ -20,6 +20,7 @@ RUN dnf -y install \
 	llvm \
 	llvm-devel \
 	clang-devel \
+	liblsan \
 	elfutils-debuginfod-client-devel \
 #	elfutils-libelf-devel-static \
 	elfutils-libelf-devel \
