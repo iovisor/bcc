@@ -59,6 +59,9 @@ Trace cgroups in this BPF map only (filtered in-kernel).
 \-\-mntnsmap  MAPPATH
 Trace mount namespaces in this BPF map only (filtered in-kernel).
 .TP
+\-P PPID
+Trace this parent PID only.
+.TP
 .SH EXAMPLES
 .TP
 Trace all exec() syscalls:
@@ -144,6 +147,6 @@ Linux
 .SH STABILITY
 Unstable - in development.
 .SH AUTHOR
-Brendan Gregg
+Brendan Gregg, Rocky Xing
 .SH SEE ALSO
 opensnoop(1)
