@@ -646,7 +646,8 @@ static struct sym *dso__find_sym(struct dso *dso, uint64_t offset)
 			end = mid - 1;
 	}
 
-	if (start == end && dso->syms[start].start <= offset) {
+	if (start == end && dso->syms[start].start <= offset &&
+	    offset < dso->syms[start].start + dso->syms[start].size) {
 		(dso->syms[start]).offset = offset - dso->syms[start].start;
 		return &dso->syms[start];
 	}
