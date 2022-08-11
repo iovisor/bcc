@@ -376,7 +376,7 @@ TEST_CASE("test probing running Ruby process in namespaces",
 
   SECTION("in separate mount namespace and separate PID namespace") {
     static char _unshare[] = "unshare";
-    const char *const argv[8] = {_unshare,  "--fork", "--kill-child",
+    const char *const argv[8] = {_unshare,  "--fork",
                                  "--mount", "--pid",  "--mount-proc",
                                  "ruby",    NULL};
 
@@ -404,6 +404,7 @@ TEST_CASE("test probing running Ruby process in namespaces",
     std::string module = pid_root + "usr/local/bin/ruby";
     REQUIRE(bcc_resolve_symname(module.c_str(), "rb_gc_mark", 0x0, ruby_pid, nullptr, &sym) == 0);
     REQUIRE(std::string(sym.module).find(pid_root, 1) == std::string::npos);
+    kill(ruby_pid, SIGKILL);
     bcc_procutils_free(sym.module);
   }
 }
