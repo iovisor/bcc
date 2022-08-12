@@ -97,6 +97,10 @@ CMAKE_DEPENDENT_OPTION(ENABLE_CPP_API "Enable C++ API" ON "ENABLE_USDT" OFF)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
+if(ENABLE_TESTS)
+  find_package(KernelHeaders)
+endif()
+
 if (CMAKE_USE_LIBBPF_PACKAGE)
   find_package(LibBpf)
 endif()
