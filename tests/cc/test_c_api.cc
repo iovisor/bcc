@@ -34,6 +34,7 @@
 
 #include "catch.hpp"
 
+
 using namespace std;
 
 static pid_t spawn_child(void *, bool, bool, int (*)(void *));
@@ -495,7 +496,8 @@ struct mod_search {
 };
 
 TEST_CASE("searching for modules in /proc/[pid]/maps", "[c_api][!mayfail]") {
-  FILE *dummy_maps = fopen("dummy_proc_map.txt", "r");
+  std::string dummy_maps_path = CMAKE_CURRENT_BINARY_DIR + std::string("/dummy_proc_map.txt");
+  FILE *dummy_maps = fopen(dummy_maps_path.c_str(), "r");
   REQUIRE(dummy_maps != NULL);
 
   SECTION("name match") {
