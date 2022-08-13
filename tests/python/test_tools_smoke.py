@@ -265,6 +265,7 @@ class SmokeTests(TestCase):
         self.run_with_duration("offcputime.py 1")
 
     @skipUnless(kernel_version_ge(4,6), "requires kernel >= 4.6")
+    @mayFail("This fails on ubuntu 18.04 github actions environment")
     def test_offwaketime(self):
         self.run_with_duration("offwaketime.py 1")
 
