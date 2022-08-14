@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # stackcount    Count events and their stack traces.
 #               For Linux, uses BCC, eBPF.

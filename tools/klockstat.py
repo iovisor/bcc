@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # klockstat traces lock events and display locks statistics.
 #

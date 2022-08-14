@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # tplist    Display kernel tracepoints or USDT probes and their formats.
 #
