@@ -957,7 +957,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           string arg0 = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
           string args_other = rewriter_.getRewrittenText(expansionRange(SourceRange(GET_BEGINLOC(Call->getArg(1)),
                                                            GET_ENDLOC(Call->getArg(2)))));
-          txt = "bpf_perf_event_output(" + arg0 + ", bpf_pseudo_fd(1, " + fd + ")";
+          txt = "bpf_perf_event_output(" + arg0 + ", (void *)bpf_pseudo_fd(1, " + fd + ")";
           txt += ", CUR_CPU_IDENTIFIER, " + args_other + ")";
 
           // e.g.
@@ -986,7 +986,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           string meta_len = rewriter_.getRewrittenText(expansionRange(Call->getArg(3)->getSourceRange()));
           txt = "bpf_perf_event_output(" +
             skb + ", " +
-            "bpf_pseudo_fd(1, " + fd + "), " +
+            "(void *)bpf_pseudo_fd(1, " + fd + "), " +
             "((__u64)" + skb_len + " << 32) | BPF_F_CURRENT_CPU, " +
             meta + ", " +
             meta_len + ");";
@@ -1006,12 +1006,12 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           string keyp = rewriter_.getRewrittenText(expansionRange(Call->getArg(1)->getSourceRange()));
           string flag = rewriter_.getRewrittenText(expansionRange(Call->getArg(2)->getSourceRange()));
           txt = "bpf_" + string(memb_name) + "(" + ctx + ", " +
-            "bpf_pseudo_fd(1, " + fd + "), " + keyp + ", " + flag + ");";
+            "(void *)bpf_pseudo_fd(1, " + fd + "), " + keyp + ", " + flag + ");";
         } else if (memb_name == "ringbuf_output") {
           string name = string(Ref->getDecl()->getName());
           string args = rewriter_.getRewrittenText(expansionRange(SourceRange(GET_BEGINLOC(Call->getArg(0)),
                                                            GET_ENDLOC(Call->getArg(2)))));
-          txt = "bpf_ringbuf_output(bpf_pseudo_fd(1, " + fd + ")";
+          txt = "bpf_ringbuf_output((void *)bpf_pseudo_fd(1, " + fd + ")";
           txt += ", " + args + ")";
 
           // e.g.
@@ -1033,7 +1033,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
         } else if (memb_name == "ringbuf_reserve") {
           string name = string(Ref->getDecl()->getName());
           string arg0 = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
-          txt = "bpf_ringbuf_reserve(bpf_pseudo_fd(1, " + fd + ")";
+          txt = "bpf_ringbuf_reserve((void *)bpf_pseudo_fd(1, " + fd + ")";
           txt += ", " + arg0 + ", 0)"; // Flags in reserve are meaningless
         } else if (memb_name == "ringbuf_discard") {
           string name = string(Ref->getDecl()->getName());
