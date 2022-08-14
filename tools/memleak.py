@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # memleak   Trace and display outstanding allocations to detect
 #           memory leaks in user-mode processes and the kernel.

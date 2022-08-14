@@ -72,3 +72,4 @@ RUN wget -O ruby-install-0.7.0.tar.gz \
 
 RUN ruby-install --system ruby 2.6.0 -- --enable-dtrace
 RUN if [ ! -f "/usr/bin/python" ]; then ln -s /bin/python3 /usr/bin/python; fi
+RUN if [ ! -f "/usr/local/bin/python" ]; then ln -s /usr/bin/python3 /usr/local/bin/python; fi

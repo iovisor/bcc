@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # offwaketime   Summarize blocked time by kernel off-CPU stack + waker stack
 #               For Linux, uses BCC, eBPF.
