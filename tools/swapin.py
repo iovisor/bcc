@@ -157,10 +157,10 @@ print("Counting swap activities. Ctrl-C to end.")
 # output
 exiting = 0
 
-header_line = "%-16s %-7s | %13s " % ("COMM", "PID", "SWAPIN_COUNT")
+header_line = "%-20s %-7s | %7s " % ("COMM", "PID", "SI_CNT")
 if args.sum:
     header_line += "%10s " % ("TIME(ms)")
-header_line += "| %13s " % ("SWAPOUT_COUNT")
+header_line += "| %7s " % ("SO_CNT")
 if args.sum:
     header_line += "%10s " % ("TIME(ms)")
 
@@ -176,10 +176,10 @@ while 1:
     print(header_line)
     counts = b.get_table("counts")
     for k, v in sorted(counts.items(), key=lambda counts: counts[1].count_in+counts[1].count_out):
-        line = "%-16s %-7d | %13d " % (k.comm, k.pid, v.count_in)
+        line = "%-20s %-7d | %7d " % (k.comm, k.pid, v.count_in)
         if args.sum:
             line += "%10.2f " % (float(v.time_in) / 1000000)
-        line += "| %13d " % v.count_out
+        line += "| %7d " % v.count_out
         if args.sum:
             line += "%10.2f " % (float(v.time_out) / 1000000)
         print(line)
