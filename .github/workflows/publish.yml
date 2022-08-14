@@ -7,66 +7,6 @@ on:
   pull_request:
 
 jobs:
-  publish_images:
-    # Optionally publish container images, guarded by the GitHub secret
-    # QUAY_PUBLISH.
-    # To set this up, sign up for quay.io (you can connect it to your github)
-    # then create a robot user with write access user called "bcc_buildbot",
-    # and add the secret token for it to GitHub secrets as:
-    #   - QUAY_TOKEN = <token from quay.io>
-    name: Publish to quay.io
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        env:
-        - NAME: bionic-release
-          OS_RELEASE: 18.04
-        - NAME: focal-release
-          OS_RELEASE: 20.04
-    steps:
-
-    - uses: actions/checkout@v1
-
-    - name: Initialize workflow variables
-      id: vars
-      shell: bash
-      run: |
-          if [ -n "${QUAY_TOKEN}" ];then
-            echo "Quay token is set, will push an image"
-            echo ::set-output name=QUAY_PUBLISH::true
-          else
-            echo "Quay token not set, skipping"
-          fi
-
-      env:
-        QUAY_TOKEN: ${{ secrets.QUAY_TOKEN }}
-
-    - name: Authenticate with quay.io docker registry
-      if: >
-        steps.vars.outputs.QUAY_PUBLISH
-      env:
-        QUAY_TOKEN: ${{ secrets.QUAY_TOKEN }}
-      run: ./scripts/docker/auth.sh ${{ github.repository }}
-
-    - name: Package docker image and push to quay.io
-      if: >
-        steps.vars.outputs.QUAY_PUBLISH
-      run: >
-        ./scripts/docker/push.sh
-        ${{ github.repository }}
-        ${{ github.ref }}
-        ${{ github.sha }}
-        ${{ matrix.env['NAME'] }}
-        ${{ matrix.env['OS_RELEASE'] }}
-
-    # Uploads the packages built in docker to the github build as an artifact for convenience
-    - uses: actions/upload-artifact@v1
-      if: >
-        steps.vars.outputs.QUAY_PUBLISH
-      with:
-        name: ${{ matrix.env['NAME'] }}
-        path: output
-
   # Optionally publish container images to custom docker repository,
   # guarded by presence of all required github secrets.
   # GitHub secrets can be configured as follows:
