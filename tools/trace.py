@@ -612,11 +612,15 @@ BPF_PERF_OUTPUT(%s);
                                        if t == 'K']
                 user_placeholders = [i for i, t in enumerate(self.types)
                                      if t == 'U']
+                string_placeholders = [i for i, t in enumerate(self.types)
+                                       if t == 's']
                 for kp in kernel_placeholders:
-                        values[kp] = bpf.ksym(values[kp], show_offset=True)
+                    values[kp] = bpf.ksym(values[kp], show_offset=True)
                 for up in user_placeholders:
-                        values[up] = bpf.sym(values[up], tgid,
-                                           show_module=True, show_offset=True)
+                    values[up] = bpf.sym(values[up], tgid,
+                                         show_module=True, show_offset=True)
+                for sp in string_placeholders:
+                    values[sp] = values[sp].decode('utf-8', 'replace')
                 return self.python_format % tuple(values)
 
         def print_aggregate_events(self):
