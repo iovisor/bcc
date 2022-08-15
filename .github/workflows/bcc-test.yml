@@ -33,7 +33,7 @@ jobs:
         docker build \
         --build-arg UBUNTU_VERSION=${{ matrix.os.version }} \
         --build-arg UBUNTU_SHORTNAME=${{ matrix.os.nick }} \
-        -t bcc-docker -f docker/Dockerfile.tests .
+        -t bcc-docker -f docker/build/Dockerfile.ubuntu .
     - name: Run bcc build
       env: ${{ matrix.env }}
       run: |
@@ -117,7 +117,7 @@ jobs:
     - name: Build docker container with all deps
       run: |
         docker build \
-        -t bcc-docker -f docker/Dockerfile.fedora .
+        -t bcc-docker -f docker/build/Dockerfile.fedora .
     - name: Run bcc build
       env: ${{ matrix.env }}
       run: |
