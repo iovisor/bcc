@@ -53,7 +53,8 @@ RUN apt-get update && apt-get install -y \
       iputils-ping \
       bridge-utils \
       libtinfo5 \
-      libtinfo-dev
+      libtinfo-dev && \
+      apt-get -y clean
 
 RUN pip3 install pyroute2==0.5.18 netaddr==0.8.0 dnslib==0.9.14 cachetools==3.1.1
 
@@ -68,8 +69,10 @@ RUN wget -O ruby-install-0.7.0.tar.gz \
          https://github.com/postmodern/ruby-install/archive/v0.7.0.tar.gz && \
     tar -xzvf ruby-install-0.7.0.tar.gz && \
     cd ruby-install-0.7.0/ && \
-    make install
+    make install && \
+    cd .. && \
+    rm -rf ruby-install-0.7.0*
 
-RUN ruby-install --system ruby 2.6.0 -- --enable-dtrace
+RUN ruby-install --system ruby 2.6.0 -c -- --enable-dtrace
 RUN if [ ! -f "/usr/bin/python" ]; then ln -s /bin/python3 /usr/bin/python; fi
 RUN if [ ! -f "/usr/local/bin/python" ]; then ln -s /usr/bin/python3 /usr/local/bin/python; fi
