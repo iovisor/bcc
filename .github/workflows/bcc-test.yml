@@ -6,12 +6,18 @@ on:
       - master
   pull_request:
 
+env:
+  # Use docker.io for Docker Hub if empty
+  REGISTRY: ghcr.io
+  # github.repository as <account>/<repo>
+  IMAGE_NAME: ${{ github.repository }}
+
 jobs:
   test_bcc:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        os: [{version: "18.04", nick: bionic}, {version: "20.04", nick: focal}]
+        os: [{distro: "ubuntu", version: "18.04", nick: bionic}, {distro: "ubuntu", version: "20.04", nick: focal}]
         env:
         - TYPE: Debug
           PYTHON_TEST_LOGFILE: critical.log
@@ -28,12 +34,16 @@ jobs:
       run: |
         uname -a
         ip addr
-    - name: Build docker container with all deps
+    - name: Log into registry ${{ env.REGISTRY }}
+      uses: docker/login-action@v2
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Pull and tag docker container
       run: |
-        docker build \
-        --build-arg VERSION=${{ matrix.os.version }} \
-        --build-arg SHORTNAME=${{ matrix.os.nick }} \
-        -t bcc-docker -f docker/build/Dockerfile.ubuntu .
+        docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.os.distro }}-${{ matrix.os.version }}
+        docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.os.distro }}-${{ matrix.os.version }} bcc-docker
     - name: Run bcc build
       env: ${{ matrix.env }}
       run: |
@@ -103,7 +113,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        os: [{version: "34", nick: "f34"}]
+        os: [{distro: "fedora", version: "34", nick: "f34"}]
         env:
         - TYPE: Debug
           PYTHON_TEST_LOGFILE: critical.log
@@ -115,11 +125,16 @@ jobs:
       run: |
         uname -a
         ip addr
-    - name: Build docker container with all deps
+    - name: Log into registry ${{ env.REGISTRY }}
+      uses: docker/login-action@v2
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Pull and tag docker container
       run: |
-        docker build \
-        --build-arg VERSION=${{ matrix.os.version }} \
-        -t bcc-docker -f docker/build/Dockerfile.fedora .
+        docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.os.distro }}-${{ matrix.os.version }}
+        docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.os.distro }}-${{ matrix.os.version }} bcc-docker
     - name: Run bcc build
       env: ${{ matrix.env }}
       run: |
