@@ -13,7 +13,7 @@ endif()
 
 if(CMAKE_SANITIZE_TYPE)
     add_compile_options(-fsanitize=${CMAKE_SANITIZE_TYPE})
-    add_link_options(-fsanitize=${CMAKE_SANITIZE_TYPE})
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsanitize=${CMAKE_SANITIZE_TYPE}")
 endif()
 
 
