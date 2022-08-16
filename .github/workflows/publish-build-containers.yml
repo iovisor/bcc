@@ -23,7 +23,8 @@ jobs:
         os: [
           {distro: "ubuntu", version: "18.04", nick: bionic},
           {distro: "ubuntu", version: "20.04", nick: focal},
-          {distro: "fedora", version: "34", nick: "f34"}
+          {distro: "fedora", version: "34", nick: "f34"},
+          {distro: "fedora", version: "36", nick: "f36"}
         ]
 
     steps:

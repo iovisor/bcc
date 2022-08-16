@@ -103,6 +103,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
+        os: [{version: "34", nick: "f34"}]
         env:
         - TYPE: Debug
           PYTHON_TEST_LOGFILE: critical.log
@@ -117,6 +118,7 @@ jobs:
     - name: Build docker container with all deps
       run: |
         docker build \
+        --build-arg VERSION=${{ matrix.os.version }} \
         -t bcc-docker -f docker/build/Dockerfile.fedora .
     - name: Run bcc build
       env: ${{ matrix.env }}
