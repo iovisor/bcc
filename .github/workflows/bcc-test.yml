@@ -31,8 +31,8 @@ jobs:
     - name: Build docker container with all deps
       run: |
         docker build \
-        --build-arg UBUNTU_VERSION=${{ matrix.os.version }} \
-        --build-arg UBUNTU_SHORTNAME=${{ matrix.os.nick }} \
+        --build-arg VERSION=${{ matrix.os.version }} \
+        --build-arg SHORTNAME=${{ matrix.os.nick }} \
         -t bcc-docker -f docker/build/Dockerfile.ubuntu .
     - name: Run bcc build
       env: ${{ matrix.env }}

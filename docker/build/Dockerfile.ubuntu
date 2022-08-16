@@ -1,17 +1,17 @@
-ARG UBUNTU_VERSION="18.04"
-FROM ubuntu:${UBUNTU_VERSION}
+ARG VERSION="18.04"
+FROM ubuntu:${VERSION}
 
 ARG LLVM_VERSION="11"
 ENV LLVM_VERSION=$LLVM_VERSION
 
-ARG UBUNTU_SHORTNAME="bionic"
+ARG SHORTNAME="bionic"
 
 RUN apt-get update && apt-get install -y curl gnupg &&\
     llvmRepository="\n\
-deb http://apt.llvm.org/${UBUNTU_SHORTNAME}/ llvm-toolchain-${UBUNTU_SHORTNAME} main\n\
-deb-src http://apt.llvm.org/${UBUNTU_SHORTNAME}/ llvm-toolchain-${UBUNTU_SHORTNAME} main\n\
-deb http://apt.llvm.org/${UBUNTU_SHORTNAME}/ llvm-toolchain-${UBUNTU_SHORTNAME}-${LLVM_VERSION} main\n\
-deb-src http://apt.llvm.org/${UBUNTU_SHORTNAME}/ llvm-toolchain-${UBUNTU_SHORTNAME}-${LLVM_VERSION} main\n" &&\
+deb http://apt.llvm.org/${SHORTNAME}/ llvm-toolchain-${SHORTNAME} main\n\
+deb-src http://apt.llvm.org/${SHORTNAME}/ llvm-toolchain-${SHORTNAME} main\n\
+deb http://apt.llvm.org/${SHORTNAME}/ llvm-toolchain-${SHORTNAME}-${LLVM_VERSION} main\n\
+deb-src http://apt.llvm.org/${SHORTNAME}/ llvm-toolchain-${SHORTNAME}-${LLVM_VERSION} main\n" &&\
     echo $llvmRepository >> /etc/apt/sources.list && \
     curl -L https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
 

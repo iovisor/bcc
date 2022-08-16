@@ -45,8 +45,8 @@ jobs:
       with:
         push: true
         build-args: |
-          UBUNTU_VERSION=${{ matrix.os.version }}
-          UBUNTU_SHORTNAME=${{ matrix.os.nick }}
+          VERSION=${{ matrix.os.version }}
+          SHORTNAME=${{ matrix.os.nick }}
         file: docker/build/Dockerfile.${{ matrix.os.distro }}
         tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.os.distro }}-${{ matrix.os.version }}
 
