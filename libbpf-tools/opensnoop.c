@@ -18,6 +18,9 @@
 #include "opensnoop.skel.h"
 #include "btf_helpers.h"
 #include "trace_helpers.h"
+#ifdef USE_BLAZESYM
+#include "blazesym.h"
+#endif
 
 /* Tune the buffer size and wakeup rate. These settings cope with roughly
  * 50k opens/sec.
@@ -32,6 +35,10 @@
 
 static volatile sig_atomic_t exiting = 0;
 
+#ifdef USE_BLAZESYM
+static blazesym *symbolizer;
+#endif
+
 static struct env {
 	pid_t pid;
 	pid_t tid;
@@ -43,6 +50,9 @@ static struct env {
 	bool extended;
 	bool failed;
 	char *name;
+#ifdef USE_BLAZESYM
+	bool callers;
+#endif
 } env = {
 	.uid = INVALID_UID
 };
@@ -54,7 +64,11 @@ const char argp_program_doc[] =
 "Trace open family syscalls\n"
 "\n"
 "USAGE: opensnoop [-h] [-T] [-U] [-x] [-p PID] [-t TID] [-u UID] [-d DURATION]\n"
+#ifdef USE_BLAZESYM
+"                 [-n NAME] [-e] [-c]\n"
+#else
 "                 [-n NAME] [-e]\n"
+#endif
 "\n"
 "EXAMPLES:\n"
 "    ./opensnoop           # trace all open() syscalls\n"
@@ -66,7 +80,11 @@ const char argp_program_doc[] =
 "    ./opensnoop -u 1000   # only trace UID 1000\n"
 "    ./opensnoop -d 10     # trace for 10 seconds only\n"
 "    ./opensnoop -n main   # only print process names containing \"main\"\n"
-"    ./opensnoop -e        # show extended fields\n";
+"    ./opensnoop -e        # show extended fields\n"
+#ifdef USE_BLAZESYM
+"    ./opensnoop -c        # show calling functions\n"
+#endif
+"";
 
 static const struct argp_option opts[] = {
 	{ "duration", 'd', "DURATION", 0, "Duration to trace"},
@@ -80,6 +98,9 @@ static const struct argp_option opts[] = {
 	{ "print-uid", 'U', NULL, 0, "Print UID"},
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{ "failed", 'x', NULL, 0, "Failed opens only"},
+#ifdef USE_BLAZESYM
+	{ "callers", 'c', NULL, 0, "Show calling functions"},
+#endif
 	{},
 };
 
@@ -147,6 +168,11 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		}
 		env.uid = uid;
 		break;
+#ifdef USE_BLAZESYM
+	case 'c':
+		env.callers = true;
+		break;
+#endif
 	case ARGP_KEY_ARG:
 		if (pos_args++) {
 			fprintf(stderr,
@@ -177,6 +203,15 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	const struct event *e = data;
 	struct tm *tm;
+#ifdef USE_BLAZESYM
+	sym_src_cfg cfgs[] = {
+		{ .src_type = SRC_T_PROCESS, .params = { .process = { .pid = e->pid }}},
+	};
+	const blazesym_result *result = NULL;
+	const blazesym_csym *sym;
+	int i, j;
+#endif
+	int sps_cnt;
 	char ts[32];
 	time_t t;
 	int fd, err;
@@ -197,15 +232,45 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		err = - e->ret;
 	}
 
+#ifdef USE_BLAZESYM
+	if (env.callers)
+		result = blazesym_symbolize(symbolizer, cfgs, 1, (const uint64_t *)&e->callers, 2);
+#endif
+
 	/* print output */
-	if (env.timestamp)
+	sps_cnt = 0;
+	if (env.timestamp) {
 		printf("%-8s ", ts);
-	if (env.print_uid)
-		printf("%-6d ", e->uid);
+		sps_cnt += 9;
+	}
+	if (env.print_uid) {
+		printf("%-7d ", e->uid);
+		sps_cnt += 8;
+	}
 	printf("%-6d %-16s %3d %3d ", e->pid, e->comm, fd, err);
-	if (env.extended)
+	sps_cnt += 7 + 17 + 4 + 4;
+	if (env.extended) {
 		printf("%08o ", e->flags);
+		sps_cnt += 9;
+	}
 	printf("%s\n", e->fname);
+
+#ifdef USE_BLAZESYM
+	for (i = 0; result && i < result->size; i++) {
+		if (result->entries[i].size == 0)
+			continue;
+		sym = &result->entries[i].syms[0];
+
+		for (j = 0; j < sps_cnt; j++)
+			printf(" ");
+		if (sym->line_no)
+			printf("%s:%ld\n", sym->symbol, sym->line_no);
+		else
+			printf("%s\n", sym->symbol);
+	}
+
+	blazesym_result_free(result);
+#endif
 }
 
 void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
@@ -273,15 +338,25 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
+#ifdef USE_BLAZESYM
+	if (env.callers)
+		symbolizer = blazesym_new();
+#endif
+
 	/* print headers */
 	if (env.timestamp)
 		printf("%-8s ", "TIME");
 	if (env.print_uid)
-		printf("%-6s ", "UID");
+		printf("%-7s ", "UID");
 	printf("%-6s %-16s %3s %3s ", "PID", "COMM", "FD", "ERR");
 	if (env.extended)
 		printf("%-8s ", "FLAGS");
-	printf("%s\n", "PATH");
+	printf("%s", "PATH");
+#ifdef USE_BLAZESYM
+	if (env.callers)
+		printf("/CALLER");
+#endif
+	printf("\n");
 
 	/* setup event callbacks */
 	pb = perf_buffer__new(bpf_map__fd(obj->maps.events), PERF_BUFFER_PAGES,
@@ -319,6 +394,9 @@ cleanup:
 	perf_buffer__free(pb);
 	opensnoop_bpf__destroy(obj);
 	cleanup_core_btf(&open_opts);
+#ifdef USE_BLAZESYM
+	blazesym_free(symbolizer);
+#endif
 
 	return err != 0;
 }

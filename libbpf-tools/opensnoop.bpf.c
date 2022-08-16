@@ -87,6 +87,7 @@ int trace_exit(struct trace_event_raw_sys_exit* ctx)
 {
 	struct event event = {};
 	struct args_t *ap;
+	uintptr_t stack[3];
 	int ret;
 	u32 pid = bpf_get_current_pid_tgid();
 
@@ -104,6 +105,12 @@ int trace_exit(struct trace_event_raw_sys_exit* ctx)
 	bpf_probe_read_user_str(&event.fname, sizeof(event.fname), ap->fname);
 	event.flags = ap->flags;
 	event.ret = ret;
+
+	bpf_get_stack(ctx, &stack, sizeof(stack),
+		      BPF_F_USER_STACK);
+	/* Skip the first address that is usually the syscall it-self */
+	event.callers[0] = stack[1];
+	event.callers[1] = stack[2];
 
 	/* emit event */
 	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU,

@@ -18,6 +18,7 @@ struct event {
 	uid_t uid;
 	int ret;
 	int flags;
+	__u64 callers[2];
 	char comm[TASK_COMM_LEN];
 	char fname[NAME_MAX];
 };

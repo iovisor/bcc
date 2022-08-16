@@ -7,6 +7,7 @@ BPFTOOL_OUTPUT ?= $(abspath $(OUTPUT)/bpftool)
 BPFTOOL ?= $(BPFTOOL_OUTPUT)/bootstrap/bpftool
 LIBBPF_SRC := $(abspath ../src/cc/libbpf/src)
 LIBBPF_OBJ := $(abspath $(OUTPUT)/libbpf.a)
+LIBBLAZESYM_SRC := $(abspath blazesym/target/release/libblazesym.a)
 INCLUDES := -I$(OUTPUT) -I../src/cc/libbpf/include/uapi
 CFLAGS := -g -O2 -Wall
 BPFCFLAGS := -g -O2 -Wall
@@ -16,10 +17,17 @@ ARCH := $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/' \
 			 | sed 's/ppc64le/powerpc/' | sed 's/mips.*/mips/' \
 			 | sed 's/riscv64/riscv/' | sed 's/loongarch.*/loongarch/')
 BTFHUB_ARCHIVE ?= $(abspath btfhub-archive)
+ifeq ($(ARCH),x86)
+USE_BLAZESYM ?= 1
+endif
 
 ifeq ($(wildcard $(ARCH)/),)
 $(error Architecture $(ARCH) is not supported yet. Please open an issue)
 endif
+
+BZ_APPS = \
+	opensnoop \
+	#
 
 APPS = \
 	bashreadline \
@@ -51,7 +59,6 @@ APPS = \
 	numamove \
 	offcputime \
 	oomkill \
-	opensnoop \
 	readahead \
 	runqlat \
 	runqlen \
@@ -69,6 +76,7 @@ APPS = \
 	tcprtt \
 	tcpsynbl \
 	vfsstat \
+	$(BZ_APPS) \
 	#
 
 # export variables that are used in Makefile.btfgen as well.
@@ -88,6 +96,13 @@ COMMON_OBJ = \
 	$(OUTPUT)/btf_helpers.o \
 	$(if $(ENABLE_MIN_CORE_BTFS),$(OUTPUT)/min_core_btf_tar.o) \
 	#
+
+ifeq ($(USE_BLAZESYM),1)
+COMMON_OBJ += \
+	$(OUTPUT)/libblazesym.a \
+	$(OUTPUT)/blazesym.h \
+	#
+endif
 
 define allow-override
   $(if $(or $(findstring environment,$(origin $(1))),\
@@ -116,11 +131,29 @@ endif
 ifneq ($(EXTRA_LDFLAGS),)
 LDFLAGS += $(EXTRA_LDFLAGS)
 endif
+ifeq ($(USE_BLAZESYM),1)
+CFLAGS += -DUSE_BLAZESYM=1
+endif
+
+ifeq ($(USE_BLAZESYM),1)
+LDFLAGS += $(OUTPUT)/libblazesym.a -lrt -lpthread -ldl
+endif
 
 .PHONY: clean
 clean:
 	$(call msg,CLEAN)
 	$(Q)rm -rf $(OUTPUT) $(APPS) $(APP_ALIASES)
+
+$(LIBBLAZESYM_SRC)::
+	$(Q)cd blazesym && cargo build --release --features=cheader
+
+$(OUTPUT)/libblazesym.a: $(LIBBLAZESYM_SRC) | $(OUTPUT)
+	$(call msg,LIB,$@)
+	$(Q)cp $(LIBBLAZESYM_SRC) $@
+
+$(OUTPUT)/blazesym.h: $(LIBBLAZESYM_SRC) | $(OUTPUT)
+	$(call msg,INC,$@)
+	$(Q)cp blazesym/target/release/blazesym.h $@
 
 $(OUTPUT) $(OUTPUT)/libbpf $(BPFTOOL_OUTPUT):
 	$(call msg,MKDIR,$@)
@@ -133,6 +166,10 @@ $(BPFTOOL): | $(BPFTOOL_OUTPUT)
 $(APPS): %: $(OUTPUT)/%.o $(LIBBPF_OBJ) $(COMMON_OBJ) | $(OUTPUT)
 	$(call msg,BINARY,$@)
 	$(Q)$(CC) $(CFLAGS) $^ $(LDFLAGS) -lelf -lz -o $@
+
+ifeq ($(USE_BLAZESYM),1)
+$(patsubst %,$(OUTPUT)/%.o,$(BZ_APPS)): $(OUTPUT)/blazesym.h
+endif
 
 $(patsubst %,$(OUTPUT)/%.o,$(APPS)): %.o: %.skel.h
 

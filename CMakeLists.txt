@@ -23,14 +23,32 @@ endif()
 
 enable_testing()
 
+execute_process(COMMAND git config --global --add safe.directory ${CMAKE_CURRENT_SOURCE_DIR}
+                WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                RESULT_VARIABLE CONFIG_RESULT)
+if(CONFIG_RESULT AND NOT CONFIG_RESULT EQUAL 0)
+  message(WARNING "Failed to add root source directory to safe.directory")
+endif()
+
+# populate submodule blazesym
+if(NOT NO_BLAZESYM)
+    execute_process(COMMAND git config --global --add safe.directory ${CMAKE_CURRENT_SOURCE_DIR}/libbpf-tools/blazesym
+                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                    RESULT_VARIABLE CONFIG_RESULT)
+    if(CONFIG_RESULT AND NOT CONFIG_RESULT EQUAL 0)
+      message(WARNING "Failed to add blazesym source directory to safe.directory")
+    endif()
+
+    execute_process(COMMAND git submodule update --init --recursive -- libbpf-tools/blazesym
+                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                    RESULT_VARIABLE UPDATE_RESULT)
+    if(UPDATE_RESULT AND NOT UPDATE_RESULT EQUAL 0)
+      message(WARNING "Failed to update submodule blazesym")
+    endif()
+endif()
+
 # populate submodules (libbpf)
 if(NOT CMAKE_USE_LIBBPF_PACKAGE)
-   execute_process(COMMAND git config --global --add safe.directory ${CMAKE_CURRENT_SOURCE_DIR}
-                   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-                   RESULT_VARIABLE CONFIG_RESULT)
-   if(CONFIG_RESULT AND NOT CONFIG_RESULT EQUAL 0)
-     message(WARNING "Failed to add root source directory to safe.directory")
-   endif()
    execute_process(COMMAND git config --global --add safe.directory ${CMAKE_CURRENT_SOURCE_DIR}/src/cc/libbpf
                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
                    RESULT_VARIABLE CONFIG_RESULT)

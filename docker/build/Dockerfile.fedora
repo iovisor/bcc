@@ -41,6 +41,10 @@ RUN dnf -y install \
 	python3 \
 	python3-pip
 
+RUN dnf -y install \
+       rust \
+       cargo
+
 RUN if [[ ! -e /usr/bin/python && -e /usr/bin/python3 ]]; then \
         ln -s $(readlink /usr/bin/python3) /usr/bin/python; \
     fi
