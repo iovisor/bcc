@@ -1,0 +1,53 @@
+name: Publish Build Containers
+
+on:
+  # We want to update this image regularly and when updating master
+  schedule:
+    - cron: '00 18 * * *'
+  push:
+    branches:
+      - master
+
+env:
+  # Use docker.io for Docker Hub if empty
+  REGISTRY: ghcr.io
+  # github.repository as <account>/<repo>
+  IMAGE_NAME: ${{ github.repository }}
+jobs:
+
+  publish_ghcr:
+    name: Publish To GitHub Container Registry
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [
+          {distro: "ubuntu", version: "18.04", nick: bionic},
+          {distro: "ubuntu", version: "20.04", nick: focal},
+          {distro: "fedora", version: "34", nick: "f34"},
+          {distro: "fedora", version: "36", nick: "f36"}
+        ]
+
+    steps:
+
+    - uses: actions/checkout@v2
+
+    # Login against registry except on PR
+    # https://github.com/docker/login-action
+    - name: Log into registry ${{ env.REGISTRY }}
+      if: github.event_name != 'pull_request'
+      uses: docker/login-action@v2
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push
+      uses: docker/build-push-action@v3
+      with:
+        push: true
+        build-args: |
+          VERSION=${{ matrix.os.version }}
+          SHORTNAME=${{ matrix.os.nick }}
+        file: docker/build/Dockerfile.${{ matrix.os.distro }}
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.os.distro }}-${{ matrix.os.version }}
+

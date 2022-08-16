@@ -1,17 +1,23 @@
-ARG UBUNTU_VERSION="18.04"
-FROM ubuntu:${UBUNTU_VERSION}
+ARG VERSION="18.04"
+FROM ubuntu:${VERSION}
 
 ARG LLVM_VERSION="11"
 ENV LLVM_VERSION=$LLVM_VERSION
 
-ARG UBUNTU_SHORTNAME="bionic"
+ARG SHORTNAME="bionic"
+
+ARG RUBY_INSTALL_VERSION="0.8.4"
+ENV RUBY_INSTALL_VERSION=$RUBY_INSTALL_VERSION
+
+ARG RUBY_VERSION="3.1.2"
+ENV RUBY_VERSION=$RUBY_VERSION
 
 RUN apt-get update && apt-get install -y curl gnupg &&\
     llvmRepository="\n\
-deb http://apt.llvm.org/${UBUNTU_SHORTNAME}/ llvm-toolchain-${UBUNTU_SHORTNAME} main\n\
-deb-src http://apt.llvm.org/${UBUNTU_SHORTNAME}/ llvm-toolchain-${UBUNTU_SHORTNAME} main\n\
-deb http://apt.llvm.org/${UBUNTU_SHORTNAME}/ llvm-toolchain-${UBUNTU_SHORTNAME}-${LLVM_VERSION} main\n\
-deb-src http://apt.llvm.org/${UBUNTU_SHORTNAME}/ llvm-toolchain-${UBUNTU_SHORTNAME}-${LLVM_VERSION} main\n" &&\
+deb http://apt.llvm.org/${SHORTNAME}/ llvm-toolchain-${SHORTNAME} main\n\
+deb-src http://apt.llvm.org/${SHORTNAME}/ llvm-toolchain-${SHORTNAME} main\n\
+deb http://apt.llvm.org/${SHORTNAME}/ llvm-toolchain-${SHORTNAME}-${LLVM_VERSION} main\n\
+deb-src http://apt.llvm.org/${SHORTNAME}/ llvm-toolchain-${SHORTNAME}-${LLVM_VERSION} main\n" &&\
     echo $llvmRepository >> /etc/apt/sources.list && \
     curl -L https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
 
@@ -53,7 +59,8 @@ RUN apt-get update && apt-get install -y \
       iputils-ping \
       bridge-utils \
       libtinfo5 \
-      libtinfo-dev
+      libtinfo-dev && \
+      apt-get -y clean
 
 RUN pip3 install pyroute2==0.5.18 netaddr==0.8.0 dnslib==0.9.14 cachetools==3.1.1
 
@@ -64,12 +71,14 @@ RUN pip3 install pyroute2==0.5.18 netaddr==0.8.0 dnslib==0.9.14 cachetools==3.1.
 #    apt-add-repository ppa:brightbox/ruby-ng && \
 #    apt-get update -qq && apt-get install -y ruby2.6 ruby2.6-dev
 
-RUN wget -O ruby-install-0.7.0.tar.gz \
-         https://github.com/postmodern/ruby-install/archive/v0.7.0.tar.gz && \
-    tar -xzvf ruby-install-0.7.0.tar.gz && \
-    cd ruby-install-0.7.0/ && \
-    make install
+RUN wget -O ruby-install-${RUBY_INSTALL_VERSION}.tar.gz \
+         https://github.com/postmodern/ruby-install/archive/v${RUBY_INSTALL_VERSION}.tar.gz && \
+    tar -xzvf ruby-install-${RUBY_INSTALL_VERSION}.tar.gz && \
+    cd ruby-install-${RUBY_INSTALL_VERSION}/ && \
+    make install && \
+    cd .. && \
+    rm -rf ruby-install-${RUBY_INSTALL_VERSION}*
 
-RUN ruby-install --system ruby 2.6.0 -- --enable-dtrace
+RUN ruby-install --system ruby ${RUBY_VERSION} -c -- --enable-dtrace
 RUN if [ ! -f "/usr/bin/python" ]; then ln -s /bin/python3 /usr/bin/python; fi
 RUN if [ ! -f "/usr/local/bin/python" ]; then ln -s /usr/bin/python3 /usr/local/bin/python; fi
