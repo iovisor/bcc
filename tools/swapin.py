@@ -24,6 +24,8 @@ parser.add_argument("-T", "--notime", action="store_true",
     help="do not show the timestamp (HH:MM:SS)")
 parser.add_argument("-s", "--sum", action="store_true",
     help="print time spent swap in / swap out per PID")
+parser.add_argument("-o", "--swapout", action="store_true",
+    help="print time spent swap out per PID")
 parser.add_argument("interval", nargs="?", default=1,
     help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
@@ -36,9 +38,16 @@ countdown = int(args.count)
 debug = 0
 
 bpf_text = ""
+
+# enable time measurement
 if args.sum:
     bpf_text += """
 #define TIMING 1
+"""
+# enable swap out
+if args.swapout:
+    bpf_text += """
+#define SWAPOUT 1
 """
 
 # load BPF program
@@ -52,11 +61,13 @@ struct key_t {
 
 struct value_t {
     u32 count_in;
-    u32 count_out;
     u64 startTime_in;
-    u64 startTime_out;
     u64 time_in; // cumulated time spent in swap_readpage()
+#ifdef SWAPOUT
+    u32 count_out;
+    u64 startTime_out;
     u64 time_out; // cumulated time spent in swap_writepage()
+#endif
 };
 
 // counts is a map aka key/value storage
@@ -83,6 +94,7 @@ int kprobe__swap_readpage(struct pt_regs *ctx)
     return 0;
 }
 
+#ifdef SWAPOUT
 int kprobe__swap_writepage(struct pt_regs *ctx)
 {
     u64 stime = bpf_ktime_get_ns();
@@ -104,7 +116,7 @@ int kprobe__swap_writepage(struct pt_regs *ctx)
 
     return 0;
 }
-
+#endif // SWAPOUT
 #ifdef TIMING
 int kretprobe__swap_readpage(struct pt_regs *ctx)
 {
@@ -124,7 +136,7 @@ int kretprobe__swap_readpage(struct pt_regs *ctx)
 
     return 0;
 }
-
+#ifdef SWAPOUT
 int kretprobe__swap_writepage(struct pt_regs *ctx)
 {
     u64 endTime = bpf_ktime_get_ns();
@@ -143,9 +155,18 @@ int kretprobe__swap_writepage(struct pt_regs *ctx)
 
     return 0;
 }
-#endif
+#endif // SWAPOUT
+#endif // TIMING
 """
 b = BPF(text=bpf_text)
+
+
+def _sort_by_count(count):
+    cnt = count[1].count_in
+    if args.swapout:
+        cnt += count[1].count_out
+
+    return cnt
 
 if debug or args.ebpf:
     print(bpf_text)
@@ -160,9 +181,10 @@ exiting = 0
 header_line = "%-20s %-7s | %7s " % ("COMM", "PID", "SI_CNT")
 if args.sum:
     header_line += "%10s " % ("TIME(ms)")
-header_line += "| %7s " % ("SO_CNT")
-if args.sum:
-    header_line += "%10s " % ("TIME(ms)")
+if args.swapout:
+    header_line += "| %7s " % ("SO_CNT")
+    if args.sum:
+        header_line += "%10s " % ("TIME(ms)")
 
 while 1:
     try:
@@ -175,13 +197,14 @@ while 1:
 
     print(header_line)
     counts = b.get_table("counts")
-    for k, v in sorted(counts.items(), key=lambda counts: counts[1].count_in+counts[1].count_out):
+    for k, v in sorted(counts.items(), key=_sort_by_count):
         line = "%-20s %-7d | %7d " % (k.comm, k.pid, v.count_in)
         if args.sum:
             line += "%10.2f " % (float(v.time_in) / 1000000)
-        line += "| %7d " % v.count_out
-        if args.sum:
-            line += "%10.2f " % (float(v.time_out) / 1000000)
+        if args.swapout:
+            line += "| %7d " % v.count_out
+            if args.sum:
+                line += "%10.2f " % (float(v.time_out) / 1000000)
         print(line)
     counts.clear()
     print()
