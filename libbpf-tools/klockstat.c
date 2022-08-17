@@ -114,6 +114,20 @@ static const struct argp_option opts[] = {
 	{},
 };
 
+static void *get_lock_addr(struct ksyms *ksyms, const char *lock_name)
+{
+	const struct ksym *ksym = ksyms__get_symbol(ksyms, lock_name);
+
+	return ksym ? (void*)ksym->addr : NULL;
+}
+
+const char *get_lock_name(struct ksyms *ksyms, unsigned long addr)
+{
+	const struct ksym *ksym = ksyms__map_addr(ksyms, addr);
+
+	return (ksym && ksym->addr == addr) ? ksym->name : "no-ksym";
+}
+
 static bool parse_one_sort(struct prog_env *env, const char *sort)
 {
 	const char *field = sort + 4;
@@ -400,9 +414,11 @@ static void print_acq_stat(struct ksyms *ksyms, struct stack_stat *ss,
 		printf("%37s\n", symname(ksyms, ss->bt[i], buf, sizeof(buf)));
 	}
 	if (nr_stack_entries > 1 && !env.per_thread)
-		printf("                              Max PID %llu, COMM %s\n",
+		printf("                              Max PID %llu, COMM %s, Lock %s (0x%llx)\n",
 		       ss->ls.acq_max_id >> 32,
-		       ss->ls.acq_max_comm);
+		       ss->ls.acq_max_comm,
+			   get_lock_name(ksyms, ss->ls.acq_max_lock_ptr),
+			   ss->ls.acq_max_lock_ptr);
 }
 
 static void print_acq_task(struct stack_stat *ss)
@@ -451,9 +467,11 @@ static void print_hld_stat(struct ksyms *ksyms, struct stack_stat *ss,
 		printf("%37s\n", symname(ksyms, ss->bt[i], buf, sizeof(buf)));
 	}
 	if (nr_stack_entries > 1 && !env.per_thread)
-		printf("                              Max PID %llu, COMM %s\n",
+		printf("                              Max PID %llu, COMM %s, Lock %s (0x%llx)\n",
 		       ss->ls.hld_max_id >> 32,
-		       ss->ls.hld_max_comm);
+		       ss->ls.hld_max_comm,
+			   get_lock_name(ksyms, ss->ls.hld_max_lock_ptr),
+			   ss->ls.hld_max_lock_ptr);
 }
 
 static void print_hld_task(struct stack_stat *ss)
@@ -555,13 +573,6 @@ static int print_stats(struct ksyms *ksyms, int stack_map, int stat_map)
 	free(stats);
 
 	return 0;
-}
-
-static void *get_lock_addr(struct ksyms *ksyms, const char *lock_name)
-{
-	const struct ksym *ksym = ksyms__get_symbol(ksyms, lock_name);
-
-	return ksym ? (void*)ksym->addr : NULL;
 }
 
 static volatile bool exiting;
