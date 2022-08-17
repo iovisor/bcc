@@ -175,6 +175,10 @@ static void account(struct lockholder_info *li)
 			bpf_get_current_comm(ls->acq_max_comm, TASK_COMM_LEN);
 	}
 
+	if (!li->try_at) {
+		return;
+	}
+
 	delta = li->acq_at - li->try_at;
 	__sync_fetch_and_add(&ls->acq_count, 1);
 	__sync_fetch_and_add(&ls->acq_total_time, delta);
