@@ -40,7 +40,7 @@ foreach(PY_CMD ${PYTHON_CMD})
   install(
     CODE "
       execute_process(
-        COMMAND ${PY_CMD} setup.py install -f ${PYTHON_FLAGS} --prefix=${CMAKE_INSTALL_PREFIX}
+        COMMAND ${PY_CMD} setup.py install -f ${PYTHON_FLAGS} --prefix=${CMAKE_INSTALL_PREFIX} --record ${CMAKE_BINARY_DIR}/install_manifest_python_bcc.txt
         WORKING_DIRECTORY ${PY_DIRECTORY})"
     COMPONENT python)
 endforeach()
