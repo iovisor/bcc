@@ -83,7 +83,7 @@ static const char program_doc[] =
 "  klockstat -t 181              # trace thread 181 only\n"
 "  klockstat -c pipe_            # print only for lock callers with 'pipe_'\n"
 "                                # prefix\n"
-"  klockstat -L cgroup_mutex     # trace the cgroup_mutex lock only\n"
+"  klockstat -L cgroup_mutex     # trace the cgroup_mutex lock only (accepts addr too)\n"
 "  klockstat -S acq_count        # sort lock acquired results by acquire count\n"
 "  klockstat -S hld_total        # sort lock held results by total held time\n"
 "  klockstat -S acq_count,hld_total  # combination of above\n"
@@ -114,11 +114,17 @@ static const struct argp_option opts[] = {
 	{},
 };
 
+static void *parse_lock_addr(const char *lock_name) {
+	unsigned long lock_addr;
+
+	return sscanf(lock_name, "0x%lx", &lock_addr) ? (void*)lock_addr : NULL;
+}
+
 static void *get_lock_addr(struct ksyms *ksyms, const char *lock_name)
 {
 	const struct ksym *ksym = ksyms__get_symbol(ksyms, lock_name);
 
-	return ksym ? (void*)ksym->addr : NULL;
+	return ksym ? (void*)ksym->addr : parse_lock_addr(lock_name);
 }
 
 const char *get_lock_name(struct ksyms *ksyms, unsigned long addr)
