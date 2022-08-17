@@ -38,6 +38,7 @@ struct lockholder_info {
 	u64 try_at;
 	u64 acq_at;
 	u64 rel_at;
+	u64 lock_ptr;
 };
 
 struct {
@@ -86,6 +87,7 @@ static void lock_contended(void *ctx, void *lock)
 		return;
 
 	li->task_id = task_id;
+	li->lock_ptr = (u64)lock;
 	/*
 	 * Skip 4 frames, e.g.:
 	 *       __this_module+0x34ef
@@ -181,6 +183,7 @@ static void account(struct lockholder_info *li)
 	if (delta > READ_ONCE(ls->acq_max_time)) {
 		WRITE_ONCE(ls->acq_max_time, delta);
 		WRITE_ONCE(ls->acq_max_id, li->task_id);
+		WRITE_ONCE(ls->acq_max_lock_ptr, li->lock_ptr);
 		/*
 		 * Potentially racy, if multiple threads think they are the max,
 		 * so you may get a clobbered write.
@@ -195,6 +198,7 @@ static void account(struct lockholder_info *li)
 	if (delta > READ_ONCE(ls->hld_max_time)) {
 		WRITE_ONCE(ls->hld_max_time, delta);
 		WRITE_ONCE(ls->hld_max_id, li->task_id);
+		WRITE_ONCE(ls->hld_max_lock_ptr, li->lock_ptr);
 		if (!per_thread)
 			bpf_get_current_comm(ls->hld_max_comm, TASK_COMM_LEN);
 	}
