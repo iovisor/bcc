@@ -194,7 +194,7 @@ REQ_WRITE = 1		# from include/linux/blk_types.h
 # load BPF program
 b = BPF(text="""
 #include <uapi/linux/ptrace.h>
-#include <linux/blkdev.h>
+#include <linux/blk-mq.h>
 
 BPF_HASH(start, struct request *);
 
@@ -217,10 +217,13 @@ void trace_completion(struct pt_regs *ctx, struct request *req) {
 	}
 }
 """)
-
-b.attach_kprobe(event="blk_start_request", fn_name="trace_start")
+if BPF.get_kprobe_functions(b'blk_start_request'):
+        b.attach_kprobe(event="blk_start_request", fn_name="trace_start")
 b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_start")
-b.attach_kprobe(event="blk_account_io_done", fn_name="trace_completion")
+if BPF.get_kprobe_functions(b'__blk_account_io_done'):
+    b.attach_kprobe(event="__blk_account_io_done", fn_name="trace_completion")
+else:
+    b.attach_kprobe(event="blk_account_io_done", fn_name="trace_completion")
 [...]
 ```
 
