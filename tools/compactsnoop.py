@@ -124,7 +124,7 @@ static inline int zone_idx_(struct zone *zone)
 {
     struct pglist_data *zone_pgdat = NULL;
     bpf_probe_read_kernel(&zone_pgdat, sizeof(zone_pgdat), &zone->zone_pgdat);
-    return zone - zone_pgdat->node_zones;
+    return ((u64)zone - (u64)zone_pgdat->node_zones)/sizeof(struct zone);
 }
 
 #ifdef EXTNEDED_FIELDS
