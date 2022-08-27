@@ -2,7 +2,7 @@
 .SH NAME
 tcpsubnet \- Summarize and aggregate IPv4 TCP traffic by subnet.
 .SH SYNOPSIS
-.B tcpsubnet [\-h] [\-v] [\--ebpf] [\-J] [\-f FORMAT] [\-i INTERVAL] [subnets]
+.B tcpsubnet [\-h] [\-v] [\-J] [\-f FORMAT] [\-i INTERVAL] [subnets]
 .SH DESCRIPTION
 This tool summarizes and aggregates IPv4 TCP sent to the subnets
 passed in argument and prints to stdout on a fixed interval.
@@ -34,9 +34,6 @@ Interval between updates, seconds (default 1).
 \-f
 Format output units. Supported values are bkmBKM. When using
 kmKM the output will be rounded to floor.
-.TP
-\--ebpf
-Prints the BPF program.
 .TP
 subnets
 Comma separated list of subnets. Traffic will be categorized
