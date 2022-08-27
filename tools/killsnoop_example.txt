@@ -27,6 +27,8 @@ optional arguments:
   -h, --help         show this help message and exit
   -x, --failed       only show failed kill syscalls
   -p PID, --pid PID  trace this PID only
+  -s SIGNAL, --signal SIGNAL
+                        trace this signal only
 
 examples:
     ./killsnoop           # trace all kill() signals
