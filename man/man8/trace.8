@@ -2,9 +2,11 @@
 .SH NAME
 trace \- Trace a function and print its arguments or return value, optionally evaluating a filter. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B trace [-h] [-b BUFFER_PAGES] [-p PID] [-L TID] [--uid UID] [-v] [-Z STRING_SIZE] [-S] [-s SYM_FILE_LIST]
-         [-M MAX_EVENTS] [-t] [-u] [-T] [-C] [-K] [-U] [-a] [-I header] [-A]
+.B trace [-h] [-b BUFFER_PAGES] [-p PID] [-L TID] [--uid UID] [-v] [-Z STRING_SIZE] [-S] [-M MAX_EVENTS] [-t]
+         [-u] [-T] [-C] [-c CGROUP_PATH] [-n NAME] [-f MSG_FILTER] [-B] [-s SYM_FILE_LIST] [-K] [-U] [-a]
+         [-I header] [-A]
          probe [probe ...]
+
 .SH DESCRIPTION
 trace probes functions you specify and displays trace messages if a particular
 condition is met. You can control the message format to display function

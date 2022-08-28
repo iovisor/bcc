@@ -55,19 +55,19 @@ Number of interval summaries.
 .TP
 Summarize block device I/O by directory, 1 second screen refresh:
 #
-.B dirtop.py
+.B dirtop -d '/hdfs/uuid/*/yarn'
 .TP
 Don't clear the screen, and top 8 rows only:
 #
-.B dirtop.py -Cr 8
+.B dirtop -d '/hdfs/uuid/*/yarn' -Cr 8
 .TP
 5 second summaries, 10 times only:
 #
-.B dirtop.py 5 10
+.B dirtop  -d '/hdfs/uuid/*/yarn' 5 10
 .TP
 Report read & write IOs generated in mutliple yarn and data directories:
 #
-.B dirtop.py -d '/hdfs/uuid/*/yarn,/hdfs/uuid/*/data'
+.B dirtop -d '/hdfs/uuid/*/yarn,/hdfs/uuid/*/data'
 .SH FIELDS
 .TP
 loadavg:
