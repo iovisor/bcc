@@ -137,7 +137,7 @@ class TestDisassembler(TestCase):
                    .replace("%jmp", "%d" % (instr.offset + 1)))
     
     def test_func(self):
-        b = BPF(text="""
+        b = BPF(text=b"""
             struct key_t {int a; short b; struct {int c:4; int d:8;} e;} __attribute__((__packed__));
             BPF_HASH(test_map, struct key_t);
             int test_func(void)
@@ -146,10 +146,10 @@ class TestDisassembler(TestCase):
             }""")
 
         self.assertEqual(
-            """Disassemble of BPF program test_func:
+            """Disassemble of BPF program b'test_func':
    0: (b7) r0 = 1
    1: (95) exit""",
-            b.disassemble_func("test_func"))
+            b.disassemble_func(b"test_func"))
         
         def _assert_equal_ignore_fd_id(s1, s2):
             # In first line of string like
@@ -170,7 +170,7 @@ class TestDisassembler(TestCase):
             self.assertEqual(s1_rest, s2_rest)
 
         _assert_equal_ignore_fd_id(
-            """Layout of BPF map test_map (type HASH, FD 3, ID 0):
+            """Layout of BPF map b'test_map' (type HASH, FD 3, ID 0):
   struct {
     int a;
     short b;
@@ -180,7 +180,7 @@ class TestDisassembler(TestCase):
     } e;
   } key;
   unsigned long long value;""",
-            b.decode_table("test_map"))
+            b.decode_table(b"test_map"))
     
     def test_bpf_isa(self):
         for op, instr_fmt in self.opcodes:

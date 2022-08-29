@@ -206,7 +206,7 @@ To check which probes are present in the process, use the tplist tool.
         for (binpath, fn_name, addr, pid) in probes:
             if attach_usdt_ignore_pid:
                 pid = -1
-            bpf.attach_uprobe(name=binpath.decode(), fn_name=fn_name.decode(),
+            bpf.attach_uprobe(name=binpath, fn_name=fn_name,
                               addr=addr, pid=pid)
 
     def enumerate_active_probes(self):
