@@ -16,7 +16,7 @@ import os, resource
                                           ",map mem has been counted against memcg, not rlimit")
 class TestRlimitMemlock(TestCase):
     def testRlimitMemlock(self):
-        text = """
+        text = b"""
 BPF_HASH(unused, u64, u64, 65536);
 int test() { return 0; }
 """
