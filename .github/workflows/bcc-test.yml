@@ -113,7 +113,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        os: [{distro: "fedora", version: "34", nick: "f34"}]
+        os: [{distro: "fedora", version: "34", nick: "f34"}, {distro: "fedora", version: "36", nick: "f36"}]
         env:
         - TYPE: Debug
           PYTHON_TEST_LOGFILE: critical.log
