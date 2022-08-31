@@ -7,6 +7,8 @@ import unittest
 from bcc import BPF
 import multiprocessing
 
+MONITORED_SYSCALL="execve"
+
 class TestPercpu(unittest.TestCase):
 
     def setUp(self):
@@ -38,7 +40,7 @@ class TestPercpu(unittest.TestCase):
         """
         bpf_code = BPF(text=test_prog1)
         stats_map = bpf_code.get_table("stats")
-        event_name = bpf_code.get_syscall_fnname("clone")
+        event_name = bpf_code.get_syscall_fnname(MONITORED_SYSCALL)
         bpf_code.attach_kprobe(event=event_name, fn_name="hello_world")
         ini = stats_map.Leaf()
         for i in range(0, multiprocessing.cpu_count()):
@@ -70,7 +72,7 @@ class TestPercpu(unittest.TestCase):
         """
         bpf_code = BPF(text=test_prog1)
         stats_map = bpf_code.get_table("stats")
-        event_name = bpf_code.get_syscall_fnname("clone")
+        event_name = bpf_code.get_syscall_fnname(MONITORED_SYSCALL)
         bpf_code.attach_kprobe(event=event_name, fn_name="hello_world")
         ini = stats_map.Leaf()
         for i in range(0, multiprocessing.cpu_count()):
@@ -108,7 +110,7 @@ class TestPercpu(unittest.TestCase):
         bpf_code = BPF(text=test_prog2)
         stats_map = bpf_code.get_table("stats",
                 reducer=lambda x,y: stats_map.sLeaf(x.c1+y.c1))
-        event_name = bpf_code.get_syscall_fnname("clone")
+        event_name = bpf_code.get_syscall_fnname(MONITORED_SYSCALL)
         bpf_code.attach_kprobe(event=event_name, fn_name="hello_world")
         ini = stats_map.Leaf()
         for i in ini:
