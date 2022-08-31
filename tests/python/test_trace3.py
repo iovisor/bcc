@@ -16,11 +16,13 @@ if len(sys.argv) > 1:
 
 
 class TestBlkRequest(TestCase):
-    @mayFail("This fails on github actions environment, and needs to be fixed")
     def setUp(self):
         b = BPF(arg1, arg2, debug=0)
         self.latency = b.get_table("latency", c_uint, c_ulong)
-        b.attach_kprobe(event="blk_start_request",
+        if BPF.get_kprobe_functions(b"blk_start_request"):
+            b.attach_kprobe(event="blk_start_request",
+                    fn_name="probe_blk_start_request")
+        b.attach_kprobe(event="blk_mq_start_request",
                 fn_name="probe_blk_start_request")
         b.attach_kprobe(event="blk_update_request",
                 fn_name="probe_blk_update_request")
