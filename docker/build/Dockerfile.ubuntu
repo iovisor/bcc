@@ -59,7 +59,8 @@ RUN apt-get update && apt-get install -y \
       iputils-ping \
       bridge-utils \
       libtinfo5 \
-      libtinfo-dev && \
+      libtinfo-dev \
+      iperf netperf && \
       apt-get -y clean
 
 RUN pip3 install pyroute2==0.5.18 netaddr==0.8.0 dnslib==0.9.14 cachetools==3.1.1
