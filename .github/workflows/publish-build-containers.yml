@@ -7,6 +7,10 @@ on:
   push:
     branches:
       - master
+  pull_request:
+    paths:
+      - 'docker/build/**'
+
 
 env:
   # Use docker.io for Docker Hub if empty
@@ -44,7 +48,7 @@ jobs:
     - name: Build and push
       uses: docker/build-push-action@v3
       with:
-        push: true
+        push: ${{ github.event_name != 'pull_request' }}
         build-args: |
           VERSION=${{ matrix.os.version }}
           SHORTNAME=${{ matrix.os.nick }}
