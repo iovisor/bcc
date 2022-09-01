@@ -2,6 +2,7 @@ from pyroute2 import NSPopen
 from distutils.spawn import find_executable
 import traceback
 import distutils.version
+import shutil
 
 import logging, os, sys
 
@@ -48,6 +49,23 @@ def mayFail(message):
                     raise err
                 else:
                     return res
+        return wrapper
+    return decorator
+
+# This is a decorator that will skip tests if any binary in the list is not in PATH.
+def skipUnlessHasBinaries(binaries, message):
+    def decorator(func):
+        def wrapper(self, *args, **kwargs):
+            missing = []
+            for binary in binaries:
+                if shutil.which(binary) is None:
+                    missing.append(binary)
+
+            if len(missing):
+                missing_binaries = ", ".join(missing)
+                self.skipTest(f"Missing binaries: {missing_binaries}. {message}")
+            else:
+                func(self, *args, **kwargs)
         return wrapper
     return decorator
 
