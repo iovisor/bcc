@@ -1037,9 +1037,21 @@ static int bpf_try_perf_event_open_with_probe(const char *name, uint64_t offs,
                  PERF_FLAG_FD_CLOEXEC);
 }
 
+#define DEBUGFS_TRACEFS "/sys/kernel/debug/tracing"
+#define TRACEFS "/sys/kernel/tracing"
+
+static const char *get_tracefs_path()
+{
+  if (access(DEBUGFS_TRACEFS, F_OK) == 0) {
+    return DEBUGFS_TRACEFS;
+  }
+  return TRACEFS;
+}
+
+
 // When a valid Perf Event FD provided through pfd, it will be used to enable
 // and attach BPF program to the event, and event_path will be ignored.
-// Otherwise, event_path is expected to contain the path to the event in debugfs
+// Otherwise, event_path is expected to contain the path to the event in tracefs
 // and it will be used to open the Perf Event FD.
 // In either case, if the attach partially failed (such as issue with the
 // ioctl operations), the **caller** need to clean up the Perf Event FD, either
@@ -1051,7 +1063,7 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path, int pid,
   ssize_t bytes;
   char buf[PATH_MAX];
   struct perf_event_attr attr = {};
-  // Caller did not provided a valid Perf Event FD. Create one with the debugfs
+  // Caller did not provide a valid Perf Event FD. Create one with the tracefs
   // event path provided.
   if (*pfd < 0) {
     snprintf(buf, sizeof(buf), "%s/id", event_path);
@@ -1100,7 +1112,7 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path, int pid,
   return 0;
 }
 
-/* Creates an [uk]probe using debugfs.
+/* Creates an [uk]probe using tracefs.
  * On success, the path to the probe is placed in buf (which is assumed to be of size PATH_MAX).
  */
 static int create_probe_event(char *buf, const char *ev_name,
@@ -1112,7 +1124,7 @@ static int create_probe_event(char *buf, const char *ev_name,
   char ev_alias[256];
   bool is_kprobe = strncmp("kprobe", event_type, 6) == 0;
 
-  snprintf(buf, PATH_MAX, "/sys/kernel/debug/tracing/%s_events", event_type);
+  snprintf(buf, PATH_MAX, "%s/%s_events", get_tracefs_path(), event_type);
   kfd = open(buf, O_WRONLY | O_APPEND, 0);
   if (kfd < 0) {
     fprintf(stderr, "%s: open(%s): %s\n", __func__, buf,
@@ -1157,7 +1169,7 @@ static int create_probe_event(char *buf, const char *ev_name,
     goto error;
   }
   close(kfd);
-  snprintf(buf, PATH_MAX, "/sys/kernel/debug/tracing/events/%ss/%s",
+  snprintf(buf, PATH_MAX, "%s/events/%ss/%s", get_tracefs_path(),
            event_type, ev_alias);
   return 0;
 error:
@@ -1172,7 +1184,7 @@ static int bpf_attach_probe(int progfd, enum bpf_probe_attach_type attach_type,
                             uint32_t ref_ctr_offset)
 {
   int kfd, pfd = -1;
-  char buf[PATH_MAX], fname[256];
+  char buf[PATH_MAX], fname[256], kprobe_events[PATH_MAX];
   bool is_kprobe = strncmp("kprobe", event_type, 6) == 0;
 
   if (maxactive <= 0)
@@ -1183,14 +1195,14 @@ static int bpf_attach_probe(int progfd, enum bpf_probe_attach_type attach_type,
 
   // If failed, most likely Kernel doesn't support the perf_kprobe PMU
   // (e12f03d "perf/core: Implement the 'perf_kprobe' PMU") yet.
-  // Try create the event using debugfs.
+  // Try create the event using tracefs.
   if (pfd < 0) {
     if (create_probe_event(buf, ev_name, attach_type, config1, offset,
                            event_type, pid, maxactive) < 0)
       goto error;
 
     // If we're using maxactive, we need to check that the event was created
-    // under the expected name.  If debugfs doesn't support maxactive yet
+    // under the expected name.  If tracefs doesn't support maxactive yet
     // (kernel < 4.12), the event is created under a different name; we need to
     // delete that event and start again without maxactive.
     if (is_kprobe && maxactive > 0 && attach_type == BPF_PROBE_RETURN) {
@@ -1199,12 +1211,11 @@ static int bpf_attach_probe(int progfd, enum bpf_probe_attach_type attach_type,
         goto error;
       }
       if (access(fname, F_OK) == -1) {
+        snprintf(kprobe_events, PATH_MAX, "%s/kprobe_events", get_tracefs_path());
         // Deleting kprobe event with incorrect name.
-        kfd = open("/sys/kernel/debug/tracing/kprobe_events",
-                   O_WRONLY | O_APPEND, 0);
+        kfd = open(kprobe_events, O_WRONLY | O_APPEND, 0);
         if (kfd < 0) {
-          fprintf(stderr, "open(/sys/kernel/debug/tracing/kprobe_events): %s\n",
-                  strerror(errno));
+          fprintf(stderr, "open(%s): %s\n", kprobe_events, strerror(errno));
           return -1;
         }
         snprintf(fname, sizeof(fname), "-:kprobes/%s_0", ev_name);
@@ -1271,7 +1282,7 @@ static int bpf_detach_probe(const char *ev_name, const char *event_type)
    * the %s_bcc_%d line in [k,u]probe_events. If the event is not found,
    * it is safe to skip the cleaning up process (write -:... to the file).
    */
-  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/%s_events", event_type);
+  snprintf(buf, sizeof(buf), "%s/%s_events", get_tracefs_path(), event_type);
   fp = fopen(buf, "r");
   if (!fp) {
     fprintf(stderr, "open(%s): %s\n", buf, strerror(errno));
@@ -1296,7 +1307,7 @@ static int bpf_detach_probe(const char *ev_name, const char *event_type)
   if (!found_event)
     return 0;
 
-  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/%s_events", event_type);
+  snprintf(buf, sizeof(buf), "%s/%s_events", get_tracefs_path(), event_type);
   kfd = open(buf, O_WRONLY | O_APPEND, 0);
   if (kfd < 0) {
     fprintf(stderr, "open(%s): %s\n", buf, strerror(errno));
@@ -1340,8 +1351,7 @@ int bpf_attach_tracepoint(int progfd, const char *tp_category,
   char buf[256];
   int pfd = -1;
 
-  snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/events/%s/%s",
-           tp_category, tp_name);
+  snprintf(buf, sizeof(buf), "%s/events/%s/%s", get_tracefs_path(), tp_category, tp_name);
   if (bpf_attach_tracing_event(progfd, buf, -1 /* PID */, &pfd) == 0)
     return pfd;
 

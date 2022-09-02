@@ -211,6 +211,19 @@ static inline field_kind_t _get_field_kind(std::string const& line,
   return field_kind_t::regular;
 }
 
+#define DEBUGFS_TRACEFS "/sys/kernel/debug/tracing"
+#define TRACEFS "/sys/kernel/tracing"
+
+std::string tracefs_path() {
+  static bool use_debugfs = access(DEBUGFS_TRACEFS, F_OK) == 0;
+  return use_debugfs ? DEBUGFS_TRACEFS : TRACEFS;
+}
+
+std::string tracepoint_format_file(std::string const& category,
+                                   std::string const& event) {
+  return tracefs_path() + "/events/" + category + "/" + event + "/format";
+}
+
 std::string parse_tracepoint(std::istream &input, std::string const& category,
                              std::string const& event) {
   std::string tp_struct = "struct tracepoint__" + category + "__" + event + " {\n";
