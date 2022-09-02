@@ -151,6 +151,14 @@ static inline int proc_kheaders_exists(void)
   return file_exists(PROC_KHEADERS_PATH);
 }
 
+static inline const char *get_tmp_dir() {
+  const char *tmpdir = getenv("TMPDIR");
+  if (tmpdir) {
+    return tmpdir;
+  }
+  return "/tmp";
+}
+
 static inline int extract_kheaders(const std::string &dirpath,
                                    const struct utsname &uname_data)
 {
@@ -169,7 +177,8 @@ static inline int extract_kheaders(const std::string &dirpath,
     }
   }
 
-  snprintf(dirpath_tmp, sizeof(dirpath_tmp), "/tmp/kheaders-%s-XXXXXX", uname_data.release);
+  snprintf(dirpath_tmp, sizeof(dirpath_tmp), "%s/kheaders-%s-XXXXXX",
+           get_tmp_dir(), uname_data.release);
   if (mkdtemp(dirpath_tmp) == NULL) {
     ret = -1;
     goto cleanup;
@@ -211,7 +220,8 @@ int get_proc_kheaders(std::string &dirpath)
   if (uname(&uname_data))
     return -errno;
 
-  snprintf(dirpath_tmp, 256, "/tmp/kheaders-%s", uname_data.release);
+  snprintf(dirpath_tmp, 256, "%s/kheaders-%s", get_tmp_dir(),
+           uname_data.release);
   dirpath = std::string(dirpath_tmp);
 
   if (file_exists(dirpath_tmp))
