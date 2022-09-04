@@ -52,6 +52,7 @@ APPS = \
 	offcputime \
 	oomkill \
 	opensnoop \
+	pagefaultsnoop \
 	readahead \
 	runqlat \
 	runqlen \
