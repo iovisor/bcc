@@ -44,7 +44,10 @@ def _get_num_open_probes():
     global _num_open_probes
     return _num_open_probes
 
-TRACEFS = "/sys/kernel/debug/tracing"
+DEBUGFS = "/sys/kernel/debug"
+TRACEFS = os.path.join(DEBUGFS, "tracing")
+if not os.path.exists(TRACEFS):
+    TRACEFS = "/sys/kernel/tracing"
 
 # Debug flags
 
@@ -686,7 +689,7 @@ class BPF(object):
 
     @staticmethod
     def get_kprobe_functions(event_re):
-        blacklist_file = "%s/../kprobes/blacklist" % TRACEFS
+        blacklist_file = "%s/kprobes/blacklist" % DEBUGFS
         try:
             with open(blacklist_file, "rb") as blacklist_f:
                 blacklist = set([line.rstrip().split()[1] for line in blacklist_f])
