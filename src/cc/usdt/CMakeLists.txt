@@ -1,1 +1,4 @@
-add_library(usdt-static STATIC usdt_args.cc usdt.cc)
+set(bcc_usdt_sources
+  "${CMAKE_CURRENT_SOURCE_DIR}/usdt_args.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/usdt.cc"
+  PARENT_SCOPE)

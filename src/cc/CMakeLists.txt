@@ -71,13 +71,13 @@ endif()
 
 set(bcc_common_sources bcc_common.cc bpf_module.cc bcc_btf.cc exported_files.cc)
 if (${LLVM_PACKAGE_VERSION} VERSION_EQUAL 6 OR ${LLVM_PACKAGE_VERSION} VERSION_GREATER 6)
-  set(bcc_common_sources ${bcc_common_sources} bcc_debug.cc)
+  list(APPEND bcc_common_sources bcc_debug.cc)
 endif()
 
 if(ENABLE_LLVM_NATIVECODEGEN)
-set(bcc_common_sources ${bcc_common_sources} bpf_module_rw_engine.cc)
+list(APPEND bcc_common_sources bpf_module_rw_engine.cc)
 else()
-set(bcc_common_sources ${bcc_common_sources} bpf_module_rw_engine_disabled.cc)
+list(APPEND bcc_common_sources bpf_module_rw_engine_disabled.cc)
 endif()
 
 set(bcc_table_sources table_storage.cc shared_table.cc bpffs_table.cc json_map_decl_visitor.cc)
@@ -87,29 +87,36 @@ set(bcc_common_headers libbpf.h perf_reader.h "${CMAKE_CURRENT_BINARY_DIR}/bcc_v
 set(bcc_table_headers file_desc.h table_desc.h table_storage.h)
 set(bcc_api_headers bcc_common.h bpf_module.h bcc_exception.h bcc_syms.h bcc_proc.h bcc_elf.h)
 if(LIBBPF_FOUND)
-  set(bcc_common_sources ${bcc_common_sources} libbpf.c perf_reader.c)
+  list(APPEND bcc_common_sources libbpf.c perf_reader.c)
 endif()
 
 if(ENABLE_CLANG_JIT)
+
+add_subdirectory(frontends)
+list(APPEND bcc_common_sources "${bcc_frontend_sources}")
+
+if(ENABLE_CPP_API)
+  add_subdirectory(api)
+  list(APPEND bcc_common_sources "${bcc_api_sources}")
+endif()
+
+if(ENABLE_USDT)
+  add_definitions(-DEXPORT_USDT)
+  list(APPEND bcc_api_headers bcc_usdt.h)
+  add_subdirectory(usdt)
+endif()
+
 add_library(bcc-shared SHARED
   link_all.cc ${bcc_common_sources} ${bcc_table_sources} ${bcc_sym_sources}
   ${bcc_util_sources})
 set_target_properties(bcc-shared PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0)
 set_target_properties(bcc-shared PROPERTIES OUTPUT_NAME bcc)
 
-if(ENABLE_USDT)
-  add_definitions(-DEXPORT_USDT)
-  set(bcc_usdt_sources usdt/usdt.cc usdt/usdt_args.cc)
-  # else undefined
-endif()
-
-add_library(bcc-loader-static STATIC ${bcc_sym_sources} ${bcc_util_sources})
-target_link_libraries(bcc-loader-static elf z)
 add_library(bcc-static STATIC
-  ${bcc_common_sources} ${bcc_table_sources} ${bcc_util_sources} ${bcc_usdt_sources} ${bcc_sym_sources} ${bcc_util_sources})
+  ${bcc_common_sources} ${bcc_table_sources} ${bcc_usdt_sources} ${bcc_sym_sources} ${bcc_util_sources})
 set_target_properties(bcc-static PROPERTIES OUTPUT_NAME bcc)
 set(bcc-lua-static
-  ${bcc_common_sources} ${bcc_table_sources} ${bcc_sym_sources} ${bcc_util_sources})
+  ${bcc_common_sources} ${bcc_table_sources} ${bcc_usdt_sources} ${bcc_sym_sources} ${bcc_util_sources})
 
 set(bpf_sources libbpf.c perf_reader.c ${libbpf_sources} ${bcc_sym_sources} ${bcc_util_sources} ${bcc_usdt_sources})
 add_library(bpf-static STATIC ${bpf_sources})
@@ -135,7 +142,7 @@ set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${llvm_lib_exclude_f
 
 # bcc_common_libs_for_a for archive libraries
 # bcc_common_libs_for_s for shared libraries
-set(bcc_common_libs clang_frontend
+set(bcc_common_libs
   -Wl,--whole-archive ${clang_libs} ${llvm_libs} -Wl,--no-whole-archive
   ${LIBELF_LIBRARIES})
 if (LIBLZMA_FOUND)
@@ -146,8 +153,7 @@ if (LIBDEBUGINFOD_FOUND)
 endif (LIBDEBUGINFOD_FOUND)
 set(bcc_common_libs_for_a ${bcc_common_libs})
 set(bcc_common_libs_for_s ${bcc_common_libs})
-set(bcc_common_libs_for_lua clang_frontend
-  ${clang_libs} ${llvm_libs} ${LIBELF_LIBRARIES})
+set(bcc_common_libs_for_lua ${clang_libs} ${llvm_libs} ${LIBELF_LIBRARIES})
 if(LIBBPF_FOUND)
   list(APPEND bcc_common_libs_for_a ${LIBBPF_LIBRARIES})
   list(APPEND bcc_common_libs_for_s ${LIBBPF_LIBRARIES})
@@ -158,29 +164,12 @@ else()
   list(APPEND bcc_common_libs_for_lua bpf-static)
 endif()
 
-if(ENABLE_CPP_API)
-  add_subdirectory(api)
-  list(APPEND bcc_common_libs_for_a api-static)
-  # Keep all API functions
-  list(APPEND bcc_common_libs_for_s -Wl,--whole-archive api-static -Wl,--no-whole-archive)
-endif()
-
-if(ENABLE_USDT)
-  list(APPEND bcc_api_headers bcc_usdt.h)
-  add_subdirectory(usdt)
-  list(APPEND bcc_common_libs_for_a usdt-static)
-  list(APPEND bcc_common_libs_for_s usdt-static)
-  list(APPEND bcc_common_libs_for_lua usdt-static)
-endif()
-
-add_subdirectory(frontends)
-
 # Link against LLVM libraries
 target_link_libraries(bcc-shared ${bcc_common_libs_for_s})
-target_link_libraries(bcc-static ${bcc_common_libs_for_a} bcc-loader-static)
+target_link_libraries(bcc-static ${bcc_common_libs_for_a})
 set(bcc-lua-static ${bcc-lua-static} ${bcc_common_libs_for_lua})
 
-install(TARGETS bcc-shared bcc-static bcc-loader-static bpf-static LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(TARGETS bcc-shared bcc-static bpf-static LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(FILES ${bcc_table_headers} DESTINATION include/bcc)
 install(FILES ${bcc_api_headers} DESTINATION include/bcc)
 install(DIRECTORY ${libbpf_uapi} DESTINATION include/bcc/compat/linux FILES_MATCHING PATTERN "*.h")

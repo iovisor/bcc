@@ -1,12 +1,17 @@
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DKERNEL_MODULES_DIR='\"${BCC_KERNEL_MODULES_DIR}\"'")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DKERNEL_MODULES_DIR='\"${BCC_KERNEL_MODULES_DIR}\"'" PARENT_SCOPE)
 if(DEFINED BCC_CUR_CPU_IDENTIFIER)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCUR_CPU_IDENTIFIER='\"${BCC_CUR_CPU_IDENTIFIER}\"'")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCUR_CPU_IDENTIFIER='\"${BCC_CUR_CPU_IDENTIFIER}\"'" PARENT_SCOPE)
 endif()
 if(DEFINED BCC_BACKUP_COMPILE)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBCC_BACKUP_COMPILE='${BCC_BACKUP_COMPILE}'")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBCC_BACKUP_COMPILE='${BCC_BACKUP_COMPILE}'" PARENT_SCOPE)
 endif()
 
-add_library(clang_frontend STATIC loader.cc b_frontend_action.cc tp_frontend_action.cc kbuild_helper.cc ../../common.cc)
+set(bcc_clang_frontend_sources
+  "${CMAKE_CURRENT_SOURCE_DIR}/loader.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/b_frontend_action.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/tp_frontend_action.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/kbuild_helper.cc"
+  PARENT_SCOPE)
