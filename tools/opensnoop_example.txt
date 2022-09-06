@@ -196,6 +196,7 @@ USAGE message:
 usage: opensnoop.py [-h] [-T] [-U] [-x] [-p PID] [-t TID]
                     [--cgroupmap CGROUPMAP] [--mntnsmap MNTNSMAP] [-u UID]
                     [-d DURATION] [-n NAME] [-e] [-f FLAG_FILTER] [-F]
+                    [-b BUFFER_PAGES]
 
 Trace open() syscalls
 
@@ -218,6 +219,9 @@ optional arguments:
   -f FLAG_FILTER, --flag_filter FLAG_FILTER
                         filter on flags argument (e.g., O_WRONLY)
   -F, --full-path       show full path for an open file with relative path
+  -b BUFFER_PAGES, --buffer-pages BUFFER_PAGES
+                        size of the perf ring buffer (must be a power of two
+                        number of pages and defaults to 64)
 
 examples:
     ./opensnoop                        # trace all open() syscalls
