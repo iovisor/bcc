@@ -94,4 +94,6 @@ bool kprobe_exists(const char *name);
 bool vmlinux_btf_exists(void);
 bool module_btf_exists(const char *mod);
 
+bool probe_tp_btf(const char *name);
+
 #endif /* __TRACE_HELPERS_H */

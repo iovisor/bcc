@@ -1126,3 +1126,19 @@ bool module_btf_exists(const char *mod)
 	}
 	return false;
 }
+
+bool probe_tp_btf(const char *name)
+{
+	LIBBPF_OPTS(bpf_prog_load_opts, opts, .expected_attach_type = BPF_TRACE_RAW_TP);
+	struct bpf_insn insns[] = {
+		{ .code = BPF_ALU64 | BPF_MOV | BPF_K, .dst_reg = BPF_REG_0, .imm = 0 },
+		{ .code = BPF_JMP | BPF_EXIT },
+	};
+	int fd, insn_cnt = sizeof(insns) / sizeof(struct bpf_insn);
+
+	opts.attach_btf_id = libbpf_find_vmlinux_btf_id(name, BPF_TRACE_RAW_TP);
+	fd = bpf_prog_load(BPF_PROG_TYPE_TRACING, NULL, "GPL", insns, insn_cnt, &opts);
+	if (fd >= 0)
+		close(fd);
+	return fd >= 0;
+}
