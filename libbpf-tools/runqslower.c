@@ -167,6 +167,16 @@ int main(int argc, char **argv)
 	obj->rodata->targ_pid = env.tid;
 	obj->rodata->min_us = env.min_us;
 
+	if (probe_tp_btf("sched_wakeup")) {
+		bpf_program__set_autoload(obj->progs.handle_sched_wakeup, false);
+		bpf_program__set_autoload(obj->progs.handle_sched_wakeup_new, false);
+		bpf_program__set_autoload(obj->progs.handle_sched_switch, false);
+	} else {
+		bpf_program__set_autoload(obj->progs.sched_wakeup, false);
+		bpf_program__set_autoload(obj->progs.sched_wakeup_new, false);
+		bpf_program__set_autoload(obj->progs.sched_switch, false);
+	}
+
 	err = runqslower_bpf__load(obj);
 	if (err) {
 		fprintf(stderr, "failed to load BPF object: %d\n", err);
