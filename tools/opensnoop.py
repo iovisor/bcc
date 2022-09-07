@@ -7,6 +7,7 @@
 # USAGE: opensnoop [-h] [-T] [-U] [-x] [-p PID] [-t TID]
 #                  [--cgroupmap CGROUPMAP] [--mntnsmap MNTNSMAP] [-u UID]
 #                  [-d DURATION] [-n NAME] [-F] [-e] [-f FLAG_FILTER]
+#                  [-b BUFFER_PAGES]
 #
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -17,6 +18,7 @@
 # 28-Dec-2018   Tim Douglas     Print flags argument, enable filtering
 # 06-Jan-2019   Takuma Kume     Support filtering by UID
 # 21-Aug-2022   Rocky Xing      Support showing full path for an open file.
+# 06-Sep-2022   Rocky Xing      Support setting size of the perf ring buffer.
 
 from __future__ import print_function
 from bcc import ArgString, BPF
@@ -77,6 +79,9 @@ parser.add_argument("-f", "--flag_filter", action="append",
     help="filter on flags argument (e.g., O_WRONLY)")
 parser.add_argument("-F", "--full-path", action="store_true",
     help="show full path for an open file with relative path")
+parser.add_argument("-b", "--buffer-pages", type=int, default=64,
+    help="size of the perf ring buffer "
+        "(must be a power of two number of pages and defaults to 64)")
 args = parser.parse_args()
 debug = 0
 if args.duration:
@@ -466,7 +471,7 @@ def print_event(cpu, data, size):
         entries[event.id].append(event.name)
 
 # loop with callback to print_event
-b["events"].open_perf_buffer(print_event, page_cnt=64)
+b["events"].open_perf_buffer(print_event, page_cnt=args.buffer_pages)
 start_time = datetime.now()
 while not args.duration or datetime.now() - start_time < args.duration:
     try:
