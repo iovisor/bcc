@@ -5,7 +5,7 @@ FROM fedora:rawhide
 
 MAINTAINER Brenden Blanco <bblanco@plumgrid.com>
 
-RUN dnf -y install bison cmake flex gcc gcc-c++ git libxml2-devel make python2-devel rpm-build wget zlib-devel
+RUN dnf -y install bison cmake flex gcc gcc-c++ git libxml2-devel make python2-devel rpm-build wget zlib-devel cargo
 
 WORKDIR /root
 

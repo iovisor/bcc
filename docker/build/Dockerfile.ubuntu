@@ -28,6 +28,7 @@ RUN apt-get update && apt-get install -y \
       util-linux \
       bison \
       binutils-dev \
+      cargo \
       cmake \
       flex \
       g++ \

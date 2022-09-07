@@ -358,23 +358,23 @@ wget -O - http://llvm.org/apt/llvm-snapshot.gpg.key | sudo apt-key add -
 sudo apt-get update
 
 # For Bionic (18.04 LTS)
-sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
+sudo apt-get -y install bison build-essential cargo cmake flex git libedit-dev \
   libllvm6.0 llvm-6.0-dev libclang-6.0-dev python zlib1g-dev libelf-dev libfl-dev python3-distutils
 
 # For Focal (20.04.1 LTS)
-sudo apt install -y bison build-essential cmake flex git libedit-dev \
+sudo apt install -y bison build-essential cargo cmake flex git libedit-dev \
   libllvm12 llvm-12-dev libclang-12-dev python zlib1g-dev libelf-dev libfl-dev python3-distutils
 
 # For Hirsute (21.04) or Impish (21.10)
-sudo apt install -y bison build-essential cmake flex git libedit-dev \
+sudo apt install -y bison build-essential cargo cmake flex git libedit-dev \
 libllvm11 llvm-11-dev libclang-11-dev python3 zlib1g-dev libelf-dev libfl-dev python3-distutils
 
 # For Jammy (22.04)
-sudo apt install -y bison build-essential cmake flex git libedit-dev \
+sudo apt install -y bison build-essential cargo cmake flex git libedit-dev \
 libllvm14 llvm-14-dev libclang-14-dev python3 zlib1g-dev libelf-dev libfl-dev python3-distutils
 
 # For other versions
-sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
+sudo apt-get -y install bison build-essential cargo cmake flex git libedit-dev \
   libllvm3.7 llvm-3.7-dev libclang-3.7-dev python zlib1g-dev libelf-dev python3-distutils
 
 # For Lua support
@@ -401,7 +401,7 @@ suppose you're running with root or add sudo first
 
 ### Install build dependencies
 ```
-dnf install -y bison cmake ethtool flex git iperf3 libstdc++-devel python3-netaddr python3-pip gcc gcc-c++ make zlib-devel elfutils-libelf-devel
+dnf install -y bison cargo cmake ethtool flex git iperf3 libstdc++-devel python3-netaddr python3-pip gcc gcc-c++ make zlib-devel elfutils-libelf-devel
 # dnf install -y luajit luajit-devel ## if use luajit, will report some lua function(which in lua5.3) undefined problem 
 dnf install -y clang clang-devel llvm llvm-devel llvm-static ncurses-devel
 dnf -y install netperf
@@ -451,7 +451,7 @@ cd /usr/share/bcc/tools
 ### Install build dependencies
 
 ```
-sudo dnf install -y bison cmake ethtool flex git iperf libstdc++-static \
+sudo dnf install -y bison cargo cmake ethtool flex git iperf libstdc++-static \
   python-netaddr python-pip gcc gcc-c++ make zlib-devel \
   elfutils-libelf-devel python-cachetools
 sudo dnf install -y luajit luajit-devel  # for Lua support
@@ -489,7 +489,7 @@ sudo make install
 ### Install build dependencies
 
 ```
-sudo zypper in bison cmake flex gcc gcc-c++ git libelf-devel libstdc++-devel \
+sudo zypper in bison cargo cmake flex gcc gcc-c++ git libelf-devel libstdc++-devel \
   llvm-devel clang-devel pkg-config python-devel python-setuptools python3-devel \
   python3-setuptools
 sudo zypper in luajit-devel       # for lua support in openSUSE Leap 42.2 or later
@@ -521,7 +521,7 @@ For Centos 7.6 only
 sudo yum install -y epel-release
 sudo yum update -y
 sudo yum groupinstall -y "Development tools"
-sudo yum install -y elfutils-libelf-devel cmake3 git bison flex ncurses-devel
+sudo yum install -y elfutils-libelf-devel cargo cmake3 git bison flex ncurses-devel
 sudo yum install -y luajit luajit-devel  # for Lua support
 ```
 
@@ -582,7 +582,7 @@ Tested on Amazon Linux AMI release 2018.03 (kernel 4.14.47-56.37.amzn1.x86_64)
 # enable epel to get iperf, luajit, luajit-devel, cmake3 (cmake3 is required to support c++11)
 sudo yum-config-manager --enable epel
 
-sudo yum install -y bison cmake3 ethtool flex git iperf libstdc++-static python-netaddr python-cachetools gcc gcc-c++ make zlib-devel elfutils-libelf-devel
+sudo yum install -y bison cargo cmake3 ethtool flex git iperf libstdc++-static python-netaddr python-cachetools gcc gcc-c++ make zlib-devel elfutils-libelf-devel
 sudo yum install -y luajit luajit-devel
 sudo yum install -y http://repo.iovisor.org/yum/extra/mageia/cauldron/x86_64/netperf-2.7.0-1.mga6.x86_64.rpm
 sudo pip install pyroute2
@@ -624,7 +624,7 @@ sudo /usr/share/bcc/tools/execsnoop
 # enable epel to get iperf, luajit, luajit-devel, cmake3 (cmake3 is required to support c++11)
 sudo yum-config-manager --enable epel
 
-sudo yum install -y bison cmake3 ethtool flex git iperf libstdc++-static python-netaddr python-cachetools gcc gcc-c++ make zlib-devel elfutils-libelf-devel
+sudo yum install -y bison cargo cmake3 ethtool flex git iperf libstdc++-static python-netaddr python-cachetools gcc gcc-c++ make zlib-devel elfutils-libelf-devel
 sudo yum install -y luajit luajit-devel
 sudo yum install -y http://repo.iovisor.org/yum/extra/mageia/cauldron/x86_64/netperf-2.7.0-1.mga6.x86_64.rpm
 sudo pip install pyroute2
@@ -664,7 +664,7 @@ sudo /usr/share/bcc/tools/execsnoop
 
 ```
 sudo apk add tar git build-base iperf linux-headers llvm10-dev llvm10-static \
-  clang-dev clang-static cmake python3 flex-dev bison luajit-dev elfutils-dev \
+  clang-dev clang-static cargo cmake python3 flex-dev bison luajit-dev elfutils-dev \
   zlib-dev
 ```
 
@@ -692,7 +692,7 @@ sudo /usr/share/bcc/tools/execsnoop
 ### Install dependencies
 
 ```
-pacman -S cmake clang llvm flex bison python
+pacman -S cargo cmake clang llvm flex bison python
 ```
 
 ### Build bcc
