@@ -18,7 +18,12 @@ ARCH := $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/' \
 			 | sed 's/riscv64/riscv/' | sed 's/loongarch.*/loongarch/')
 BTFHUB_ARCHIVE ?= $(abspath btfhub-archive)
 ifeq ($(ARCH),x86)
+CARGO ?= $(shell which cargo)
+ifeq ($(strip $(CARGO)),)
+USE_BLAZESYM ?= 0
+else
 USE_BLAZESYM ?= 1
+endif
 endif
 
 ifeq ($(wildcard $(ARCH)/),)
