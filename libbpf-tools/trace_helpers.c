@@ -1008,10 +1008,8 @@ static bool fentry_try_attach(int id)
 
 	prog_fd = bpf_prog_load(BPF_PROG_TYPE_TRACING, "test", "GPL", insns,
 			sizeof(insns) / sizeof(struct bpf_insn), &opts);
-	if (prog_fd < 0) {
-		fprintf(stderr, "failed to try attaching to fentry: %s\n", error);
+	if (prog_fd < 0)
 		return false;
-	}
 
 	attach_fd = bpf_raw_tracepoint_open(NULL, prog_fd);
 	if (attach_fd >= 0)
