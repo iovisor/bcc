@@ -114,7 +114,8 @@ static const struct argp_option opts[] = {
 	{},
 };
 
-static void *parse_lock_addr(const char *lock_name) {
+static void *parse_lock_addr(const char *lock_name)
+{
 	unsigned long lock_addr;
 
 	return sscanf(lock_name, "0x%lx", &lock_addr) ? (void*)lock_addr : NULL;
@@ -127,7 +128,7 @@ static void *get_lock_addr(struct ksyms *ksyms, const char *lock_name)
 	return ksym ? (void*)ksym->addr : parse_lock_addr(lock_name);
 }
 
-const char *get_lock_name(struct ksyms *ksyms, unsigned long addr)
+static const char *get_lock_name(struct ksyms *ksyms, unsigned long addr)
 {
 	const struct ksym *ksym = ksyms__map_addr(ksyms, addr);
 
@@ -267,10 +268,10 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 				env->interval = env->duration;
 			env->iterations = env->duration / env->interval;
 		}
-                if (env->per_thread && env->nr_stack_entries != 1) {
+		if (env->per_thread && env->nr_stack_entries != 1) {
 			warn("--per-thread and --stacks cannot be used together\n");
 			argp_usage(state);
-                }
+		}
 		break;
 	default:
 		return ARGP_ERR_UNKNOWN;
@@ -597,6 +598,100 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 	return vfprintf(stderr, format, args);
 }
 
+static void enable_fentry(struct klockstat_bpf *obj)
+{
+	bool debug_lock;
+
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_trylock, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_trylock_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_interruptible, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_interruptible_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_killable, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_killable_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_unlock, false);
+
+	bpf_program__set_autoload(obj->progs.kprobe_down_read, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_read_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_read_trylock, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_read_trylock_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_read_interruptible, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_read_interruptible_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_read_killable, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_read_killable_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_up_read, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_write, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_write_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_write_trylock, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_write_trylock_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_write_killable, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_write_killable_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_up_write, false);
+
+	/* CONFIG_DEBUG_LOCK_ALLOC is on */
+	debug_lock = fentry_can_attach("mutex_lock_nested", NULL);
+	if (!debug_lock)
+		return;
+
+	bpf_program__set_attach_target(obj->progs.mutex_lock, 0,
+				       "mutex_lock_nested");
+	bpf_program__set_attach_target(obj->progs.mutex_lock_exit, 0,
+				       "mutex_lock_nested");
+	bpf_program__set_attach_target(obj->progs.mutex_lock_interruptible, 0,
+				       "mutex_lock_interruptible_nested");
+	bpf_program__set_attach_target(obj->progs.mutex_lock_interruptible_exit, 0,
+				       "mutex_lock_interruptible_nested");
+	bpf_program__set_attach_target(obj->progs.mutex_lock_killable, 0,
+				       "mutex_lock_killable_nested");
+	bpf_program__set_attach_target(obj->progs.mutex_lock_killable_exit, 0,
+				       "mutex_lock_killable_nested");
+
+	bpf_program__set_attach_target(obj->progs.down_read, 0,
+				       "down_read_nested");
+	bpf_program__set_attach_target(obj->progs.down_read_exit, 0,
+				       "down_read_nested");
+	bpf_program__set_attach_target(obj->progs.down_read_killable, 0,
+				       "down_read_killable_nested");
+	bpf_program__set_attach_target(obj->progs.down_read_killable_exit, 0,
+				       "down_read_killable_nested");
+	bpf_program__set_attach_target(obj->progs.down_write, 0,
+				       "down_write_nested");
+	bpf_program__set_attach_target(obj->progs.down_write_exit, 0,
+				       "down_write_nested");
+	bpf_program__set_attach_target(obj->progs.down_write_killable, 0,
+				       "down_write_killable_nested");
+	bpf_program__set_attach_target(obj->progs.down_write_killable_exit, 0,
+				       "down_write_killable_nested");
+}
+
+static void enable_kprobes(struct klockstat_bpf *obj)
+{
+	bpf_program__set_autoload(obj->progs.mutex_lock, false);
+	bpf_program__set_autoload(obj->progs.mutex_lock_exit, false);
+	bpf_program__set_autoload(obj->progs.mutex_trylock_exit, false);
+	bpf_program__set_autoload(obj->progs.mutex_lock_interruptible, false);
+	bpf_program__set_autoload(obj->progs.mutex_lock_interruptible_exit, false);
+	bpf_program__set_autoload(obj->progs.mutex_lock_killable, false);
+	bpf_program__set_autoload(obj->progs.mutex_lock_killable_exit, false);
+	bpf_program__set_autoload(obj->progs.mutex_unlock, false);
+
+	bpf_program__set_autoload(obj->progs.down_read, false);
+	bpf_program__set_autoload(obj->progs.down_read_exit, false);
+	bpf_program__set_autoload(obj->progs.down_read_trylock_exit, false);
+	bpf_program__set_autoload(obj->progs.down_read_interruptible, false);
+	bpf_program__set_autoload(obj->progs.down_read_interruptible_exit, false);
+	bpf_program__set_autoload(obj->progs.down_read_killable, false);
+	bpf_program__set_autoload(obj->progs.down_read_killable_exit, false);
+	bpf_program__set_autoload(obj->progs.up_read, false);
+	bpf_program__set_autoload(obj->progs.down_write, false);
+	bpf_program__set_autoload(obj->progs.down_write_exit, false);
+	bpf_program__set_autoload(obj->progs.down_write_trylock_exit, false);
+	bpf_program__set_autoload(obj->progs.down_write_killable, false);
+	bpf_program__set_autoload(obj->progs.down_write_killable_exit, false);
+	bpf_program__set_autoload(obj->progs.up_write, false);
+}
+
 int main(int argc, char **argv)
 {
 	static const struct argp argp = {
@@ -649,40 +744,11 @@ int main(int argc, char **argv)
 	obj->rodata->targ_lock = lock_addr;
 	obj->rodata->per_thread = env.per_thread;
 
-	if (fentry_can_attach("mutex_lock_nested", NULL)) {
-		bpf_program__set_attach_target(obj->progs.mutex_lock, 0,
-					       "mutex_lock_nested");
-		bpf_program__set_attach_target(obj->progs.mutex_lock_exit, 0,
-					       "mutex_lock_nested");
-		bpf_program__set_attach_target(obj->progs.mutex_lock_interruptible, 0,
-					       "mutex_lock_interruptible_nested");
-		bpf_program__set_attach_target(obj->progs.mutex_lock_interruptible_exit, 0,
-					       "mutex_lock_interruptible_nested");
-		bpf_program__set_attach_target(obj->progs.mutex_lock_killable, 0,
-					       "mutex_lock_killable_nested");
-		bpf_program__set_attach_target(obj->progs.mutex_lock_killable_exit, 0,
-					       "mutex_lock_killable_nested");
-	}
-
-	if (fentry_can_attach("down_read_nested", NULL)) {
-		bpf_program__set_attach_target(obj->progs.down_read, 0,
-					       "down_read_nested");
-		bpf_program__set_attach_target(obj->progs.down_read_exit, 0,
-					       "down_read_nested");
-		bpf_program__set_attach_target(obj->progs.down_read_killable, 0,
-					       "down_read_killable_nested");
-		bpf_program__set_attach_target(obj->progs.down_read_killable_exit, 0,
-					       "down_read_killable_nested");
-
-		bpf_program__set_attach_target(obj->progs.down_write, 0,
-					       "down_write_nested");
-		bpf_program__set_attach_target(obj->progs.down_write_exit, 0,
-					       "down_write_nested");
-		bpf_program__set_attach_target(obj->progs.down_write_killable, 0,
-					       "down_write_killable_nested");
-		bpf_program__set_attach_target(obj->progs.down_write_killable_exit, 0,
-					       "down_write_killable_nested");
-	}
+	if (fentry_can_attach("mutex_lock", NULL) ||
+	    fentry_can_attach("mutex_lock_nested", NULL))
+		enable_fentry(obj);
+	else
+		enable_kprobes(obj);
 
 	err = klockstat_bpf__load(obj);
 	if (err) {

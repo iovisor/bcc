@@ -17,7 +17,7 @@ struct lock_stat {
 	__u64 hld_max_time;
 	__u64 hld_max_id;
 	__u64 hld_max_lock_ptr;
-	char hld_max_comm[TASK_COMM_LEN];
+		char hld_max_comm[TASK_COMM_LEN];
 };
 
 #endif /*__KLOCKSTAT_H */
