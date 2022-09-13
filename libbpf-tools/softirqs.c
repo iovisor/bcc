@@ -204,6 +204,14 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	if (probe_tp_btf("softirq_entry")) {
+		bpf_program__set_autoload(obj->progs.softirq_entry, false);
+		bpf_program__set_autoload(obj->progs.softirq_exit, false);
+	} else {
+		bpf_program__set_autoload(obj->progs.softirq_entry_btf, false);
+		bpf_program__set_autoload(obj->progs.softirq_exit_btf, false);
+	}
+
 	/* initialize global data (filtering options) */
 	obj->rodata->targ_dist = env.distributed;
 	obj->rodata->targ_ns = env.nanoseconds;
