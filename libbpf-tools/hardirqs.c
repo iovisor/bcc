@@ -205,7 +205,20 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	if (probe_tp_btf("irq_handler_entry")) {
+		bpf_program__set_autoload(obj->progs.irq_handler_entry, false);
+		bpf_program__set_autoload(obj->progs.irq_handler_exit, false);
+		if (env.count)
+			bpf_program__set_autoload(obj->progs.irq_handler_exit_btf, false);
+	} else {
+		bpf_program__set_autoload(obj->progs.irq_handler_entry_btf, false);
+		bpf_program__set_autoload(obj->progs.irq_handler_exit_btf, false);
+		if (env.count)
+			bpf_program__set_autoload(obj->progs.irq_handler_exit, false);
+	}
+
 	obj->rodata->filter_cg = env.cg;
+	obj->rodata->do_count = env.count;
 
 	/* initialize global data (filtering options) */
 	if (!env.count) {
@@ -234,29 +247,10 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (env.count) {
-		obj->links.handle__irq_handler = bpf_program__attach(obj->progs.handle__irq_handler);
-		if (!obj->links.handle__irq_handler) {
-			err = -errno;
-			fprintf(stderr,
-				"failed to attach irq/irq_handler_entry: %s\n",
-				strerror(-err));
-		}
-	} else {
-		obj->links.irq_handler_entry = bpf_program__attach(obj->progs.irq_handler_entry);
-		if (!obj->links.irq_handler_entry) {
-			err = -errno;
-			fprintf(stderr,
-				"failed to attach irq_handler_entry: %s\n",
-				strerror(-err));
-		}
-		obj->links.irq_handler_exit_exit = bpf_program__attach(obj->progs.irq_handler_exit_exit);
-		if (!obj->links.irq_handler_exit_exit) {
-			err = -errno;
-			fprintf(stderr,
-				"failed to attach irq_handler_exit: %s\n",
-				strerror(-err));
-		}
+	err = hardirqs_bpf__attach(obj);
+	if (err) {
+		fprintf(stderr, "failed to attach BPF object: %d\n", err);
+		goto cleanup;
 	}
 
 	signal(SIGINT, sig_handler);
