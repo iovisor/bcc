@@ -209,7 +209,7 @@ class ProbeChecker : public RecursiveASTVisitor<ProbeChecker> {
 
     if (!track_helpers_)
       return false;
-    if (VarDecl *V = dyn_cast<VarDecl>(E->getCalleeDecl()))
+    if (VarDecl *V = dyn_cast_or_null<VarDecl>(E->getCalleeDecl()))
       needs_probe_ = V->getName() == "bpf_get_current_task";
     return false;
   }
@@ -421,8 +421,12 @@ bool ProbeVisitor::TraverseStmt(Stmt *S) {
 }
 
 bool ProbeVisitor::VisitCallExpr(CallExpr *Call) {
+  Decl *decl = Call->getCalleeDecl();
+  if (decl == nullptr)
+      return true;
+
   // Skip bpf_probe_read for the third argument if it is an AddrOf.
-  if (VarDecl *V = dyn_cast<VarDecl>(Call->getCalleeDecl())) {
+  if (VarDecl *V = dyn_cast<VarDecl>(decl)) {
     if (V->getName() == "bpf_probe_read" && Call->getNumArgs() >= 3) {
       const Expr *E = Call->getArg(2)->IgnoreParenCasts();
       whitelist_.insert(E);
@@ -430,7 +434,7 @@ bool ProbeVisitor::VisitCallExpr(CallExpr *Call) {
     }
   }
 
-  if (FunctionDecl *F = dyn_cast<FunctionDecl>(Call->getCalleeDecl())) {
+  if (FunctionDecl *F = dyn_cast<FunctionDecl>(decl)) {
     if (F->hasBody()) {
       unsigned i = 0;
       for (auto arg : Call->arguments()) {
