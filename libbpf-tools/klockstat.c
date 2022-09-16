@@ -496,6 +496,16 @@ static void print_hld_task(struct stack_stat *ss)
 	       print_time(tot, sizeof(tot), ss->ls.hld_total_time));
 }
 
+static inline void *reallocarray_handwrite(void *ptr, size_t nmemb, size_t size)
+{
+        size_t total;
+        if (size == 0 || nmemb > ULONG_MAX / size)
+                return NULL;
+        total = nmemb * size;
+        return realloc(ptr, total);
+}
+
+
 static int print_stats(struct ksyms *ksyms, int stack_map, int stat_map)
 {
 	struct stack_stat **stats, *ss;
@@ -515,7 +525,7 @@ static int print_stats(struct ksyms *ksyms, int stack_map, int stat_map)
 	while (bpf_map_get_next_key(stat_map, &lookup_key, &stack_id) == 0) {
 		if (stat_idx == stats_sz) {
 			stats_sz *= 2;
-			stats = reallocarray(stats, stats_sz, sizeof(void *));
+			stats = reallocarray_handwrite(stats, stats_sz, sizeof(void *));
 			if (!stats) {
 				warn("Out of memory\n");
 				return -1;
