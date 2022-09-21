@@ -274,19 +274,30 @@ sudo docker run --rm -it --privileged \
 ## WSL(Windows Subsystem for Linux) - Binary
 
 ### Install dependencies
-The compiling depends on the headers and lib of linux kernel module which was not found in wsl distribution packages repo. We have to compile the kernel moudle manually.
+The compiling depends on the headers and lib of linux kernel module which was not found in wsl distribution packages repo. We have to compile the kernel module manually.
 ```bash
 apt-get install flex bison libssl-dev libelf-dev dwarves
 ```
 ### Install packages
+
+First, you will need to checkout the WSL2 Linux kernel git repository:
+```
+git clone git@github.com:microsoft/WSL2-Linux-Kernel.git
+cd WSL2-Linux-Kernel
+KERNEL_VERSION=$(uname -r | cut -d '-' -f 1)
+git checkout linux-msft-wsl-$KERNEL_VERSION
+```
+
+Then compile and install:
 ```
 cp Microsoft/config-wsl .config
 make oldconfig && make prepare
 make scripts
-make modules && make modules_install
-# if your kernel version is 4.19.y
-mv /lib/modules/x.y.z-microsoft-standard+ /lib/modules/x.y.z-microsoft-standard 
+make modules
+sudo make modules_install
+sudo mv /lib/modules/$(uname -r)+ /lib/modules/$(uname -r)
 ````
+
 Then you can install bcc tools package according your distribution.
 
 If you met some problems, try to 
