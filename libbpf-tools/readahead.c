@@ -80,7 +80,7 @@ static int readahead__set_attach_target(struct bpf_program *prog)
 {
 	int err;
 
-	err = bpf_program__set_attach_target(prog, 0, "do_page_cache_ra");
+	err = bpf_program__set_attach_target(prog, 0, "page_cache_ra_unbounded");
 	if (!err)
 		return 0;
 
@@ -119,13 +119,16 @@ int main(int argc, char **argv)
 	}
 
 	/*
-	 * Starting from v5.10-rc1 (8238287), __do_page_cache_readahead has
-	 * renamed to do_page_cache_ra. So we specify the function dynamically.
+	 * Starting from kernel commit 56a4d67c264e("mm/readahead: Switch to
+	 * page_cache_ra_order") do_page_cache_ra be replaced to page_cache_ra_order
+	 * and it's became to static.
+	 *
+	 * So we specify the function dynamically.
 	 */
-	err = readahead__set_attach_target(obj->progs.do_page_cache_ra);
+	err = readahead__set_attach_target(obj->progs.page_cache_ra_unbounded);
 	if (err)
 		goto cleanup;
-	err = readahead__set_attach_target(obj->progs.do_page_cache_ra_ret);
+	err = readahead__set_attach_target(obj->progs.page_cache_ra_unbounded_ret);
 	if (err)
 		goto cleanup;
 

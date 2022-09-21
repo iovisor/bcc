@@ -18,14 +18,14 @@ struct {
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, MAX_ENTRIES);
-	__type(key, struct page *);
+	__type(key, struct folio *);
 	__type(value, u64);
 } birth SEC(".maps");
 
 struct hist hist = {};
 
-SEC("fentry/do_page_cache_ra")
-int BPF_PROG(do_page_cache_ra)
+SEC("fentry/page_cache_ra_unbounded")
+int BPF_PROG(page_cache_ra_unbounded)
 {
 	u32 pid = bpf_get_current_pid_tgid();
 	u64 one = 1;
@@ -34,8 +34,8 @@ int BPF_PROG(do_page_cache_ra)
 	return 0;
 }
 
-SEC("fexit/__page_cache_alloc")
-int BPF_PROG(page_cache_alloc_ret, gfp_t gfp, struct page *ret)
+SEC("fexit/filemap_alloc_folio")
+int BPF_PROG(filemap_alloc_folio_ret, gfp_t gfp, struct folio *ret)
 {
 	u32 pid = bpf_get_current_pid_tgid();
 	u64 ts;
@@ -51,8 +51,8 @@ int BPF_PROG(page_cache_alloc_ret, gfp_t gfp, struct page *ret)
 	return 0;
 }
 
-SEC("fexit/do_page_cache_ra")
-int BPF_PROG(do_page_cache_ra_ret)
+SEC("fexit/page_cache_ra_unbounded")
+int BPF_PROG(page_cache_ra_unbounded_ret)
 {
 	u32 pid = bpf_get_current_pid_tgid();
 
@@ -60,13 +60,13 @@ int BPF_PROG(do_page_cache_ra_ret)
 	return 0;
 }
 
-SEC("fentry/mark_page_accessed")
-int BPF_PROG(mark_page_accessed, struct page *page)
+SEC("fentry/folio_mark_accessed")
+int BPF_PROG(folio_mark_accessed, struct folio *folio)
 {
 	u64 *tsp, slot, ts = bpf_ktime_get_ns();
 	s64 delta;
 
-	tsp = bpf_map_lookup_elem(&birth, &page);
+	tsp = bpf_map_lookup_elem(&birth, &folio);
 	if (!tsp)
 		return 0;
 	delta = (s64)(ts - *tsp);
@@ -79,7 +79,7 @@ int BPF_PROG(mark_page_accessed, struct page *page)
 
 update_and_cleanup:
 	__sync_fetch_and_add(&hist.unused, -1);
-	bpf_map_delete_elem(&birth, &page);
+	bpf_map_delete_elem(&birth, &folio);
 
 	return 0;
 }
