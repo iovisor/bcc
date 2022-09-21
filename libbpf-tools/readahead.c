@@ -31,7 +31,7 @@ const char argp_program_doc[] =
 "USAGE: readahead [--help] [-d DURATION]\n"
 "\n"
 "EXAMPLES:\n"
-"    readahead              # summarize on-CPU time as a histogram"
+"    readahead              # summarize on-CPU time as a histogram\n"
 "    readahead -d 10        # trace for 10 seconds only\n";
 
 static const struct argp_option opts[] = {
