@@ -37,6 +37,7 @@ RUN apt-get update && apt-get install -y \
       libelf-dev \
       zlib1g-dev \
       libiberty-dev \
+      liblzma-dev \
       libbfd-dev \
       libedit-dev \
       clang-${LLVM_VERSION} \
@@ -60,7 +61,9 @@ RUN apt-get update && apt-get install -y \
       bridge-utils \
       libtinfo5 \
       libtinfo-dev \
-      iperf netperf && \
+      iperf \
+      netperf \
+      xz-utils && \
       apt-get -y clean
 
 RUN pip3 install pyroute2==0.5.18 netaddr==0.8.0 dnslib==0.9.14 cachetools==3.1.1
