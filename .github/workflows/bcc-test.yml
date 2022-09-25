@@ -12,6 +12,10 @@ env:
   # github.repository as <account>/<repo>
   IMAGE_NAME: ${{ github.repository }}
 
+permissions:
+  contents: read # to fetch code (actions/checkout)
+  pull-requests: read # to read pull requests (dorny/paths-filter)
+
 jobs:
   test_bcc:
     runs-on: ubuntu-20.04
