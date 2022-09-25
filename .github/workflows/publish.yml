@@ -6,6 +6,9 @@ on:
       - master
   pull_request:
 
+permissions:
+  contents: read # to fetch code (actions/checkout)
+
 jobs:
   # Optionally publish container images to custom docker repository,
   # guarded by presence of all required github secrets.
