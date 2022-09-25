@@ -111,6 +111,17 @@ TEST_CASE("resolve symbol name in external library using loaded libraries", "[c_
   bcc_procutils_free(sym.module);
 }
 
+#ifdef HAVE_LIBLZMA
+TEST_CASE("resolve symbol name via mini debug info", "[c_api]") {
+  struct bcc_symbol sym;
+  REQUIRE(bcc_resolve_symname(LIB_WITH_MINI_DEBUG_INFO, "lib_probed_function",
+                              0x0, 0, nullptr, &sym) == 0);
+  REQUIRE(sym.module[0] == '/');
+  REQUIRE(sym.offset != 0);
+  bcc_procutils_free(sym.module);
+}
+#endif
+
 extern "C" int _a_test_function(const char *a_string) {
   int i;
   for (i = 0; a_string[i]; ++i)

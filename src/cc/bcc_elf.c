@@ -24,6 +24,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
+#ifdef HAVE_LIBLZMA
+#include <lzma.h>
+#endif
 #ifdef HAVE_LIBDEBUGINFOD
 #include <elfutils/debuginfod.h>
 #endif
@@ -47,6 +50,19 @@ static int openelf_fd(int fd, Elf **elf_out) {
   return 0;
 }
 
+#ifdef HAVE_LIBLZMA
+static int openelf_mem(void *buf, size_t buf_len, Elf **elf_out) {
+  if (elf_version(EV_CURRENT) == EV_NONE)
+    return -1;
+
+  *elf_out = elf_memory(buf, buf_len);
+  if (*elf_out == NULL)
+    return -1;
+
+  return 0;
+}
+#endif
+
 // Provides access to an Elf structure in an uniform way,
 // independently from its source (file or memory buffer).
 struct bcc_elf_file {
@@ -55,6 +71,10 @@ struct bcc_elf_file {
   // Set only when the elf file is parsed from an opened file descriptor that
   // needs to be closed. Otherwise set to -1.
   int fd;
+
+  // Set only when the elf file is parsed from a memory buffer that needs to be
+  // freed.
+  void *buf;
 };
 
 // Initializes bcc_elf_file as not pointing to any elf file and not
@@ -63,7 +83,23 @@ struct bcc_elf_file {
 static void bcc_elf_file_init(struct bcc_elf_file *elf_file) {
   elf_file->elf = NULL;
   elf_file->fd = -1;
+  elf_file->buf = NULL;
 }
+
+#ifdef HAVE_LIBLZMA
+static int bcc_elf_file_open_buf(void *buf, size_t buf_len,
+                                 struct bcc_elf_file *out) {
+  Elf *elf = NULL;
+
+  if (openelf_mem(buf, buf_len, &elf)) {
+    return -1;
+  }
+
+  out->elf = elf;
+  out->buf = buf;
+  return 0;
+}
+#endif
 
 static int bcc_elf_file_open_fd(int fd, struct bcc_elf_file *out) {
   Elf *elf = NULL;
@@ -99,6 +135,10 @@ static void bcc_elf_file_close(struct bcc_elf_file *elf_file) {
 
   if (elf_file->fd >= 0) {
     close(elf_file->fd);
+  }
+
+  if (elf_file->buf) {
+    free(elf_file->buf);
   }
 
   bcc_elf_file_init(elf_file);
@@ -671,6 +711,71 @@ fail:
   return -1;
 }
 
+#ifdef HAVE_LIBLZMA
+
+#define LZMA_MIN_BUFFER_SIZE 4096
+#define LZMA_MEMLIMIT (128 * 1024 * 1024)
+static int open_mini_debug_info_file(void *gnu_debugdata,
+                                     size_t gnu_debugdata_size,
+                                     struct bcc_elf_file *out) {
+  void *decompressed = NULL;
+  void *new_decompressed = NULL;
+  size_t decompressed_data_size = 0;
+  size_t decompressed_buffer_size = 0;
+  lzma_stream stream = LZMA_STREAM_INIT;
+  lzma_ret ret;
+
+  ret = lzma_stream_decoder(&stream, LZMA_MEMLIMIT, 0);
+  if (ret != LZMA_OK)
+    return -1;
+
+  stream.next_in = gnu_debugdata;
+  stream.avail_in = gnu_debugdata_size;
+  stream.avail_out = 0;
+
+  while (ret == LZMA_OK && stream.avail_in > 0) {
+    if (stream.avail_out < LZMA_MIN_BUFFER_SIZE) {
+      decompressed_buffer_size += LZMA_MIN_BUFFER_SIZE;
+      new_decompressed = realloc(decompressed, decompressed_buffer_size);
+      if (new_decompressed == NULL) {
+        ret = LZMA_MEM_ERROR;
+        break;
+      }
+
+      decompressed = new_decompressed;
+      stream.avail_out += LZMA_MIN_BUFFER_SIZE;
+      stream.next_out = decompressed + decompressed_data_size;
+    }
+    ret = lzma_code(&stream, LZMA_FINISH);
+    decompressed_data_size = decompressed_buffer_size - stream.avail_out;
+  }
+  lzma_end(&stream);
+
+  if (ret != LZMA_STREAM_END ||
+      bcc_elf_file_open_buf(decompressed, decompressed_data_size, out)) {
+    free(decompressed);
+    return -1;
+  }
+
+  return 0;
+}
+
+// Returns 0 on success, otherwise nonzero.
+// If successfull, 'out' param is a valid bcc_elf_file.
+// Caller is responsible for calling bcc_elf_file_close when done using it.
+// See https://sourceware.org/gdb/onlinedocs/gdb/MiniDebugInfo.html
+static int find_debug_via_mini_debug_info(Elf *elf, struct bcc_elf_file *out) {
+  Elf_Data *gnu_debugdata;
+
+  gnu_debugdata = get_section_elf_data(elf, ".gnu_debugdata");
+  if (gnu_debugdata == NULL)
+    return -1;
+
+  return open_mini_debug_info_file(gnu_debugdata->d_buf, gnu_debugdata->d_size,
+                                   out);
+}
+#endif
+
 #ifdef HAVE_LIBDEBUGINFOD
 
 // Returns 0 on success, otherwise nonzero.
@@ -716,6 +821,11 @@ static int find_debug_file(Elf *e, const char *path, int check_crc,
 
   if (find_debug_via_debuglink(e, path, check_crc, out) == 0)
     return 0;
+
+#ifdef HAVE_LIBLZMA
+  if (find_debug_via_mini_debug_info(e, out) == 0)
+    return 0;
+#endif
 
 #ifdef HAVE_LIBDEBUGINFOD
   if (find_debug_via_debuginfod(e, out) == 0)
