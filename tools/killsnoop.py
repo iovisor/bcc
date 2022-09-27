@@ -4,7 +4,7 @@
 # killsnoop Trace signals issued by the kill() syscall.
 #           For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: killsnoop [-h] [-x] [-p PID]
+# USAGE: killsnoop [-h] [-x] [-p PID] [-T PID]
 #
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -23,6 +23,7 @@ examples = """examples:
     ./killsnoop           # trace all kill() signals
     ./killsnoop -x        # only show failed kills
     ./killsnoop -p 181    # only trace PID 181
+    ./killsnoop -T 189    # only trace target PID 189
     ./killsnoop -s 9      # only trace signal 9
 """
 parser = argparse.ArgumentParser(
@@ -32,7 +33,9 @@ parser = argparse.ArgumentParser(
 parser.add_argument("-x", "--failed", action="store_true",
     help="only show failed kill syscalls")
 parser.add_argument("-p", "--pid",
-    help="trace this PID only")
+    help="trace this PID only which is the sender of signal")
+parser.add_argument("-T", "--tpid",
+    help="trace this target PID only which is the receiver of signal")
 parser.add_argument("-s", "--signal",
     help="trace this signal only")
 parser.add_argument("--ebpf", action="store_true",
@@ -69,6 +72,7 @@ int syscall__kill(struct pt_regs *ctx, int tpid, int sig)
     u32 pid = pid_tgid >> 32;
     u32 tid = (u32)pid_tgid;
 
+    TPID_FILTER
     PID_FILTER
     SIGNAL_FILTER
 
@@ -108,16 +112,25 @@ int do_ret_sys_kill(struct pt_regs *ctx)
     return 0;
 }
 """
+
+if args.tpid:
+    bpf_text = bpf_text.replace('TPID_FILTER',
+        'if (tpid != %s) { return 0; }' % args.tpid)
+else:
+    bpf_text = bpf_text.replace('TPID_FILTER', '')
+
 if args.pid:
     bpf_text = bpf_text.replace('PID_FILTER',
         'if (pid != %s) { return 0; }' % args.pid)
 else:
     bpf_text = bpf_text.replace('PID_FILTER', '')
+
 if args.signal:
     bpf_text = bpf_text.replace('SIGNAL_FILTER',
         'if (sig != %s) { return 0; }' % args.signal)
 else:
     bpf_text = bpf_text.replace('SIGNAL_FILTER', '')
+
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
