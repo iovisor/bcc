@@ -657,8 +657,11 @@ static int find_debug_via_buildid(Elf *e, struct bcc_elf_file *out) {
   //    mm/nnnnnn...nnnn.debug
   // Where mm are the first two characters of the buildid, and nnnn are the
   // rest of the build id, followed by .debug.
-  snprintf(fullpath, sizeof(fullpath), "/usr/lib/debug/.build-id/%c%c/%s.debug",
-          buildid[0], buildid[1], buildid + 2);
+  const char *bcc_debuginfo_root = getenv("BCC_DEBUGINFO_ROOT");
+  if (bcc_debuginfo_root == NULL)
+    bcc_debuginfo_root = "/usr/lib/debug";
+  snprintf(fullpath, sizeof(fullpath), "%s/.build-id/%c%c/%s.debug",
+           bcc_debuginfo_root, buildid[0], buildid[1], buildid + 2);
   return bcc_elf_file_open(fullpath, out);
 }
 
