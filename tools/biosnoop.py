@@ -23,7 +23,7 @@ import os
 examples = """examples:
     ./biosnoop           # trace all block I/O
     ./biosnoop -Q        # include OS queued time
-    ./biolatency -d sdc  # trace sdc only
+    ./biosnoop -d sdc    # trace sdc only
 """
 parser = argparse.ArgumentParser(
     description="Trace block I/O",

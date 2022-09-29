@@ -76,4 +76,4 @@ optional arguments:
 examples:
     ./biosnoop           # trace all block I/O
     ./biosnoop -Q        # include OS queued time
-    ./biolatency -d sdc  # trace sdc only
+    ./biosnoop -d sdc    # trace sdc only
