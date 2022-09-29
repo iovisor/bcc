@@ -1,0 +1,120 @@
+.TH ppchcalls 8  "2022-10-19" "USER COMMANDS"
+.SH NAME
+ppchcalls \- Summarize ppc hcall counts and latencies.
+.SH SYNOPSIS
+.B ppchcalls [-h] [-p PID] [-t TID] [-i INTERVAL] [-d DURATION] [-T TOP] [-x] [-e ERRNO] [-L] [-m] [-P] [-l] [--hcall HCALL]
+.SH DESCRIPTION
+This tool traces hcall entry and exit raw tracepoints and summarizes either the
+number of hcalls of each type, or the number of hcalls per process. It can
+also collect min, max and average latency for each hcall or each process.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc. Linux 4.17+ is required to attach a BPF program to the
+raw_hcalls:hcall_{enter,exit} tracepoints, used by this tool.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-p PID
+Trace only this process.
+.TP
+\-t TID
+Trace only this thread.
+.TP
+\-i INTERVAL
+Print the summary at the specified interval (in seconds).
+.TP
+\-d DURATION
+Total duration of trace (in seconds).
+.TP
+\-T TOP
+Print only this many entries. Default: 10.
+.TP
+\-x
+Trace only failed hcalls (i.e., the return value from the hcall was < 0).
+.TP
+\-e ERRNO
+Trace only hcalls that failed with that error (e.g. -e EPERM or -e 1).
+.TP
+\-m
+Display times in milliseconds. Default: microseconds.
+.TP
+\-P
+Summarize by process and not by hcall.
+.TP
+\-l
+List the hcalls recognized by the tool (hard-coded list). Hcalls beyond this
+list will still be displayed, as "[unknown: nnn]" where nnn is the hcall
+number.
+.TP
+\--hcall HCALL
+Trace this hcall only (use option -l to get all recognized hcalls).
+.SH EXAMPLES
+.TP
+Summarize all hcalls by hcall:
+#
+.B ppchcalls
+.TP
+Summarize all hcalls by process:
+#
+.B ppchcalls \-P
+.TP
+Summarize only failed hcalls:
+#
+.B ppchcalls \-x
+.TP
+Summarize only hcalls that failed with EPERM:
+#
+.B ppchcalls \-e EPERM
+.TP
+Trace PID 181 only:
+#
+.B ppchcalls \-p 181
+.TP
+Summarize hcalls counts and latencies:
+#
+.B ppchcalls \-L
+.SH FIELDS
+.TP
+PID
+Process ID
+.TP
+COMM
+Process name
+.TP
+HCALL
+Hcall name, or "[unknown: nnn]" for hcalls that aren't recognized
+.TP
+COUNT
+The number of events
+.TP
+MIN
+The minimum elapsed time (in us or ms)
+.TP
+MAX
+The maximum elapsed time (in us or ms)
+.TP
+AVG
+The average elapsed time (in us or ms)
+.SH OVERHEAD
+For most applications, the overhead should be manageable if they perform 1000's
+or even 10,000's of hcalls per second. For higher rates, the overhead may
+become considerable.
+.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Harsh Prateek Bora
+.SH SEE ALSO
+syscount(8)
