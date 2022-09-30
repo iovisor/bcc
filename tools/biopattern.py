@@ -123,12 +123,13 @@ while True:
             continue
 
         part_name = partitions.get(k.value, "Unknown")
+        random_percent = int(round(v.random * 100 / total))
 
         print("%-9s %-7s %5d %5d %8d %10d" % (
             strftime("%H:%M:%S"),
             part_name,
-            v.random * 100 / total,
-            v.sequential * 100 / total,
+            random_percent,
+            100 - random_percent,
             total,
             v.bytes / 1024))
 
