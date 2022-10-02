@@ -1140,3 +1140,15 @@ bool probe_tp_btf(const char *name)
 		close(fd);
 	return fd >= 0;
 }
+
+bool probe_ringbuf()
+{
+	int map_fd;
+
+	map_fd = bpf_map_create(BPF_MAP_TYPE_RINGBUF, NULL, 0, 0, getpagesize(), NULL);
+	if (map_fd < 0)
+		return false;
+
+	close(map_fd);
+	return true;
+}
