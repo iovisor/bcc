@@ -4,6 +4,8 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_tracing.h>
+
+#include "compat.bpf.h"
 #include "mountsnoop.h"
 
 #define MAX_ENTRIES 10240
@@ -16,19 +18,6 @@ struct {
 	__type(key, __u32);
 	__type(value, struct arg);
 } args SEC(".maps");
-
-struct {
-	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
-	__uint(max_entries, 1);
-	__type(key, int);
-	__type(value, struct event);
-} heap SEC(".maps");
-
-struct {
-	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
-	__uint(key_size, sizeof(__u32));
-	__uint(value_size, sizeof(__u32));
-} events SEC(".maps");
 
 static int probe_entry(const char *src, const char *dest, const char *fs,
 		       __u64 flags, const char *data, enum op op)
@@ -57,18 +46,17 @@ static int probe_exit(void *ctx, int ret)
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 pid = pid_tgid >> 32;
 	__u32 tid = (__u32)pid_tgid;
-	struct arg *argp;
-	struct event *eventp;
 	struct task_struct *task;
-	int zero = 0;
+	struct event *eventp;
+	struct arg *argp;
 
 	argp = bpf_map_lookup_elem(&args, &tid);
 	if (!argp)
 		return 0;
 
-	eventp = bpf_map_lookup_elem(&heap, &zero);
+	eventp = reserve_buf(sizeof(*eventp));
 	if (!eventp)
-		return 0;
+		goto cleanup;
 
 	task = (struct task_struct *)bpf_get_current_task();
 	eventp->delta = bpf_ktime_get_ns() - argp->ts;
@@ -95,8 +83,10 @@ static int probe_exit(void *ctx, int ret)
 		bpf_probe_read_user_str(eventp->data, sizeof(eventp->data), argp->data);
 	else
 		eventp->data[0] = '\0';
-	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, eventp, sizeof(*eventp));
 
+	submit_buf(ctx, eventp, sizeof(*eventp));
+
+cleanup:
 	bpf_map_delete_elem(&args, &tid);
 	return 0;
 }
