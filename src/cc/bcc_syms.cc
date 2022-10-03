@@ -34,18 +34,24 @@
 
 #include "syms.h"
 
-ino_t ProcStat::getinode_() {
+bool ProcStat::getinode_(ino_t &inode) {
   struct stat s;
-  return (!stat(procfs_.c_str(), &s)) ? s.st_ino : -1;
+  if (!stat(procfs_.c_str(), &s)) {
+    inode = s.st_ino;
+    return true;
+  } else {
+    return false;
+  }
 }
 
 bool ProcStat::is_stale() {
-  ino_t cur_inode = getinode_();
-  return (cur_inode > 0) && (cur_inode != inode_);
+  ino_t cur_inode;
+  return getinode_(cur_inode) && (cur_inode != inode_);
 }
 
-ProcStat::ProcStat(int pid)
-    : procfs_(tfm::format("/proc/%d/exe", pid)), inode_(getinode_()) {}
+ProcStat::ProcStat(int pid) : procfs_(tfm::format("/proc/%d/exe", pid)) {
+  getinode_(inode_);
+}
 
 void KSyms::_add_symbol(const char *symname, const char *modname, uint64_t addr, void *p) {
   KSyms *ks = static_cast<KSyms *>(p);

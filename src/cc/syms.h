@@ -30,12 +30,12 @@
 class ProcStat {
   std::string procfs_;
   ino_t inode_;
-  ino_t getinode_();
+  bool getinode_(ino_t &inode);
 
-public:
+ public:
   ProcStat(int pid);
   bool is_stale();
-  void reset() { inode_ = getinode_(); }
+  void reset() { getinode_(inode_); }
 };
 
 class SymbolCache {
