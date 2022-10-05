@@ -526,16 +526,9 @@ static int print_stats(struct ksyms *ksyms, int stack_map, int stat_map)
 			warn("Out of memory\n");
 			return -1;
 		}
-		ss->stack_id = stack_id;
-		if (env.reset) {
-			ret = bpf_map_lookup_and_delete_elem(stat_map,
-							     &stack_id,
-							     &ss->ls);
-			lookup_key = 0;
-		} else {
-			ret = bpf_map_lookup_elem(stat_map, &stack_id, &ss->ls);
-			lookup_key = stack_id;
-		}
+
+		lookup_key = ss->stack_id = stack_id;
+		ret = bpf_map_lookup_elem(stat_map, &stack_id, &ss->ls);
 		if (ret) {
 			free(ss);
 			continue;
@@ -575,8 +568,11 @@ static int print_stats(struct ksyms *ksyms, int stack_map, int stat_map)
 			print_hld_stat(ksyms, stats[i], nr_stack_entries);
 	}
 
-	for (i = 0; i < stat_idx; i++)
+	for (i = 0; i < stat_idx; i++) {
+		if (env.reset)
+			bpf_map_delete_elem(stat_map, &ss->stack_id);
 		free(stats[i]);
+        }
 	free(stats);
 
 	return 0;
