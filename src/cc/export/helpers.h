@@ -1025,6 +1025,10 @@ static long (*bpf_tcp_raw_check_syncookie_ipv4)(struct iphdr *iph, struct tcphdr
 static long (*bpf_tcp_raw_check_syncookie_ipv6)(struct ipv6hdr *iph, struct tcphdr *th) =
   (void *)BPF_FUNC_tcp_raw_check_syncookie_ipv6;
 
+static __u64 (*bpf_ktime_get_tai_ns)(void) = (void *)BPF_FUNC_ktime_get_tai_ns;
+static long (*bpf_user_ringbuf_drain)(void *map, void *callback_fn, void *ctx, __u64 flags) =
+  (void *)BPF_FUNC_user_ringbuf_drain;
+
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
  */

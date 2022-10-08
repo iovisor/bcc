@@ -81,6 +81,7 @@ static const char * const map_type_strings[] = {
   [BPF_MAP_TYPE_INODE_STORAGE] = "inode_storage",
   [BPF_MAP_TYPE_TASK_STORAGE] = "task_storage",
   [BPF_MAP_TYPE_BLOOM_FILTER] = "bloom_filter",
+  [BPF_MAP_TYPE_USER_RINGBUF] = "user_ringbuf",
 };
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
