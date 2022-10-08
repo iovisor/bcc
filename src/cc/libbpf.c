@@ -308,10 +308,12 @@ static struct bpf_helper helpers[] = {
   {"dynptr_read", "5.19"},
   {"dynptr_write", "5.19"},
   {"dynptr_data", "5.19"},
-  {"tcp_raw_gen_syncookie_ipv4", "5.20"},
-  {"tcp_raw_gen_syncookie_ipv6", "5.20"},
-  {"tcp_raw_check_syncookie_ipv4", "5.20"},
-  {"tcp_raw_check_syncookie_ipv6", "5.20"},
+  {"tcp_raw_gen_syncookie_ipv4", "6.0"},
+  {"tcp_raw_gen_syncookie_ipv6", "6.0"},
+  {"tcp_raw_check_syncookie_ipv4", "6.0"},
+  {"tcp_raw_check_syncookie_ipv6", "6.0"},
+  {"ktime_get_tai_ns", "6.1"},
+  {"user_ringbuf_drain", "6.1"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
