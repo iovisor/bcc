@@ -142,9 +142,18 @@ kill_fnname = b.get_syscall_fnname("kill")
 b.attach_kprobe(event=kill_fnname, fn_name="syscall__kill")
 b.attach_kretprobe(event=kill_fnname, fn_name="do_ret_sys_kill")
 
+# detect the length of PID column
+pid_bytes = 6
+try:
+    with open("/proc/sys/kernel/pid_max", 'r') as f:
+        pid_bytes = len(f.read().strip()) + 1
+        f.close()
+except:
+    pass # not fatal error, just use the default value
+
 # header
-print("%-9s %-6s %-16s %-4s %-6s %s" % (
-    "TIME", "PID", "COMM", "SIG", "TPID", "RESULT"))
+print("%-9s %-*s %-16s %-4s %-*s %s" % (
+    "TIME", pid_bytes, "PID", "COMM", "SIG", pid_bytes, "TPID", "RESULT"))
 
 # process event
 def print_event(cpu, data, size):
@@ -153,8 +162,8 @@ def print_event(cpu, data, size):
     if (args.failed and (event.ret >= 0)):
         return
 
-    printb(b"%-9s %-6d %-16s %-4d %-6d %d" % (strftime("%H:%M:%S").encode('ascii'),
-        event.pid, event.comm, event.sig, event.tpid, event.ret))
+    printb(b"%-9s %-*d %-16s %-4d %-*d %d" % (strftime("%H:%M:%S").encode('ascii'),
+        pid_bytes, event.pid, event.comm, event.sig, pid_bytes, event.tpid, event.ret))
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)
