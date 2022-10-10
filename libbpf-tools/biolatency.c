@@ -193,8 +193,7 @@ static void print_cmd_flags(int cmd_flags)
 		printf("Unknown");
 }
 
-static
-int print_log2_hists(struct bpf_map *hists, struct partitions *partitions)
+static int print_log2_hists(struct bpf_map *hists, struct partitions *partitions)
 {
 	struct hist_key lookup_key = { .cmd_flags = -1 }, next_key;
 	const char *units = env.milliseconds ? "msecs" : "usecs";
@@ -286,6 +285,20 @@ int main(int argc, char **argv)
 	obj->rodata->targ_queued = env.queued;
 	obj->rodata->filter_cg = env.cg;
 
+	if (probe_tp_btf("block_rq_insert")) {
+		bpf_program__set_autoload(obj->progs.block_rq_insert, false);
+		bpf_program__set_autoload(obj->progs.block_rq_issue, false);
+		bpf_program__set_autoload(obj->progs.block_rq_complete, false);
+		if (!env.queued)
+			bpf_program__set_autoload(obj->progs.block_rq_insert_btf, false);
+	} else {
+		bpf_program__set_autoload(obj->progs.block_rq_insert_btf, false);
+		bpf_program__set_autoload(obj->progs.block_rq_issue_btf, false);
+		bpf_program__set_autoload(obj->progs.block_rq_complete_btf, false);
+		if (!env.queued)
+			bpf_program__set_autoload(obj->progs.block_rq_insert, false);
+	}
+
 	err = biolatency_bpf__load(obj);
 	if (err) {
 		fprintf(stderr, "failed to load BPF object: %d\n", err);
@@ -307,24 +320,9 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (env.queued) {
-		obj->links.block_rq_insert = bpf_program__attach(obj->progs.block_rq_insert);
-		if (!obj->links.block_rq_insert) {
-			err = -errno;
-			fprintf(stderr, "failed to attach: %s\n", strerror(-err));
-			goto cleanup;
-		}
-	}
-	obj->links.block_rq_issue = bpf_program__attach(obj->progs.block_rq_issue);
-	if (!obj->links.block_rq_issue) {
-		err = -errno;
-		fprintf(stderr, "failed to attach: %s\n", strerror(-err));
-		goto cleanup;
-	}
-	obj->links.block_rq_complete = bpf_program__attach(obj->progs.block_rq_complete);
-	if (!obj->links.block_rq_complete) {
-		err = -errno;
-		fprintf(stderr, "failed to attach: %s\n", strerror(-err));
+	err = biolatency_bpf__attach(obj);
+	if (err) {
+		fprintf(stderr, "failed to attach BPF object: %d\n", err);
 		goto cleanup;
 	}
 
