@@ -29,15 +29,11 @@
 
 class ProcStat {
   std::string procfs_;
-  std::string root_symlink_;
-  std::string root_;
   ino_t inode_;
   bool getinode_(ino_t &inode);
 
  public:
   ProcStat(int pid);
-  bool refresh_root();
-  const std::string &get_root() { return root_; }
   bool is_stale();
   void reset() { getinode_(inode_); }
 };

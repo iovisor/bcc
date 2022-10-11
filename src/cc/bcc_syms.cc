@@ -14,27 +14,25 @@
  * limitations under the License.
  */
 
-#include "bcc_syms.h"
-
 #include <cxxabi.h>
+#include <cstring>
 #include <fcntl.h>
-#include <limits.h>
 #include <linux/elf.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <unistd.h>
-
 #include <cstdio>
-#include <cstring>
 
 #include "bcc_elf.h"
 #include "bcc_perf_map.h"
 #include "bcc_proc.h"
+#include "bcc_syms.h"
 #include "common.h"
-#include "syms.h"
 #include "vendor/tinyformat.hpp"
+
+#include "syms.h"
 
 bool ProcStat::getinode_(ino_t &inode) {
   struct stat s;
@@ -46,31 +44,13 @@ bool ProcStat::getinode_(ino_t &inode) {
   }
 }
 
-bool ProcStat::refresh_root() {
-  char ns_root[PATH_MAX];
-  std::string original_root = root_;
-  int readlink_read = readlink(root_symlink_.c_str(), ns_root, PATH_MAX);
-  if (readlink_read >= 0 && readlink_read < PATH_MAX) {
-    // readlink succeded, save link target to root_
-    ns_root[readlink_read] = 0;
-    root_ = std::string(ns_root);
-    return original_root != root_;
-  }
-  // readlink failed, keep old value of root_
-  return false;
-}
-
 bool ProcStat::is_stale() {
   ino_t cur_inode;
-  return getinode_(cur_inode) && (cur_inode != inode_) && refresh_root();
+  return getinode_(cur_inode) && (cur_inode != inode_);
 }
 
-ProcStat::ProcStat(int pid)
-    : procfs_(tfm::format("/proc/%d/exe", pid)),
-      root_symlink_(tfm::format("/proc/%d/root", pid)),
-      root_(root_symlink_) {
+ProcStat::ProcStat(int pid) : procfs_(tfm::format("/proc/%d/exe", pid)) {
   getinode_(inode_);
-  refresh_root();
 }
 
 void KSyms::_add_symbol(const char *symname, const char *modname, uint64_t addr, void *p) {
@@ -154,9 +134,8 @@ void ProcSyms::refresh() {
 
 int ProcSyms::_add_module(mod_info *mod, int enter_ns, void *payload) {
   ProcSyms *ps = static_cast<ProcSyms *>(payload);
-  std::string ns_modpath = ps->procstat_.get_root() + mod->name;
-  const char *modpath =
-      enter_ns && ps->pid_ != -1 ? ns_modpath.c_str() : mod->name;
+  std::string ns_relative_path = tfm::format("/proc/%d/root%s", ps->pid_, mod->name);
+  const char *modpath = enter_ns && ps->pid_ != -1 ? ns_relative_path.c_str() : mod->name;
   auto it = std::find_if(
       ps->modules_.begin(), ps->modules_.end(),
       [=](const ProcSyms::Module &m) { return m.name_ == mod->name; });
