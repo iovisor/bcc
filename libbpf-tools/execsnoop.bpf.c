@@ -56,9 +56,9 @@ int tracepoint__syscalls__sys_enter_execve(struct trace_event_raw_sys_enter* ctx
 	if (bpf_map_update_elem(&execs, &pid, &empty_event, BPF_NOEXIST))
 		return 0;
 
-	event = reserve_buf(sizeof(*event))
+	event = reserve_buf(sizeof(*event));
 	if (!event)
-		goto cleanup;
+		return 0;
 
 	event->pid = tgid;
 	event->uid = uid;

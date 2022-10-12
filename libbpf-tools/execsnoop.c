@@ -17,8 +17,8 @@
 #include "btf_helpers.h"
 #include "trace_helpers.h"
 
-#define PERF_BUFFER_PAGES   64
-#define PERF_POLL_TIMEOUT_MS	100
+#define BUFFER_PAGES   64
+#define POLL_TIMEOUT_MS	100
 #define MAX_ARGS_KEY 259
 
 static volatile sig_atomic_t exiting = 0;
@@ -307,7 +307,7 @@ int main(int argc, char **argv)
 	obj->rodata->max_args = env.max_args;
 	obj->rodata->filter_cg = env.cg;
 
-	buf = bpf_buffer__new(obj->maps.events);
+	buf = bpf_buffer__new(obj->maps.events, obj->maps.heap);
 	if (!buf) {
 		err = -errno;
 		warn("failed to create ring/perf buffer: %d\n", err);
@@ -356,7 +356,7 @@ int main(int argc, char **argv)
 
 	/* setup event callbacks */
 	err = bpf_buffer__open(buf, handle_event, handle_lost_events, NULL);
-	if (err) {
+	if (err)
 		warn("failed to open ring/perf buffer: %d\n", err);
 
 	if (signal(SIGINT, sig_int) == SIG_ERR) {
