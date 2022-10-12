@@ -71,6 +71,7 @@ bpf_text = """
 #include <linux/sched.h>
 #include <linux/nsproxy.h>
 #include <linux/pid_namespace.h>
+#include <linux/init_task.h>
 
 typedef struct pid_key {
     u64 id;    // work around
@@ -96,6 +97,45 @@ static int trace_enqueue(u32 tgid, u32 pid)
     start.update(&pid, &ts);
     return 0;
 }
+
+static __always_inline unsigned int pid_namespace(struct task_struct *task)
+{
+
+/* pids[] was removed from task_struct since commit 2c4704756cab7cfa031ada4dab361562f0e357c0
+ * Using the macro INIT_PID_LINK as a conditional judgment.
+ */
+#ifdef INIT_PID_LINK
+    struct pid_link pids;
+    unsigned int level;
+    struct upid upid;
+    struct ns_common ns;
+
+    /*  get the pid namespace by following task_active_pid_ns(),
+     *  pid->numbers[pid->level].ns
+     */
+    bpf_probe_read_kernel(&pids, sizeof(pids), &task->pids[PIDTYPE_PID]);
+    bpf_probe_read_kernel(&level, sizeof(level), &pids.pid->level);
+    bpf_probe_read_kernel(&upid, sizeof(upid), &pids.pid->numbers[level]);
+    bpf_probe_read_kernel(&ns, sizeof(ns), &upid.ns->ns);
+
+    return ns.inum;
+#else
+    struct pid *pid;
+    unsigned int level;
+    struct upid upid;
+    struct ns_common ns;
+
+    /*  get the pid namespace by following task_active_pid_ns(),
+     *  pid->numbers[pid->level].ns
+     */
+    bpf_probe_read_kernel(&pid, sizeof(pid), &task->thread_pid);
+    bpf_probe_read_kernel(&level, sizeof(level), &pid->level);
+    bpf_probe_read_kernel(&upid, sizeof(upid), &pid->numbers[level]);
+    bpf_probe_read_kernel(&ns, sizeof(ns), &upid.ns->ns);
+
+    return ns.inum;
+#endif
+}
 """
 
 bpf_text_kprobe = """
@@ -116,7 +156,7 @@ int trace_run(struct pt_regs *ctx, struct task_struct *prev)
     u32 pid, tgid;
 
     // ivcsw: treat like an enqueue event and store timestamp
-    if (prev->state == TASK_RUNNING) {
+    if (prev->STATE_FIELD == TASK_RUNNING) {
         tgid = prev->tgid;
         pid = prev->pid;
         if (!(FILTER || pid == 0)) {
@@ -170,7 +210,7 @@ RAW_TRACEPOINT_PROBE(sched_switch)
     u32 pid, tgid;
 
     // ivcsw: treat like an enqueue event and store timestamp
-    if (prev->state == TASK_RUNNING) {
+    if (prev->STATE_FIELD == TASK_RUNNING) {
         tgid = prev->tgid;
         pid = prev->pid;
         if (!(FILTER || pid == 0)) {
@@ -208,6 +248,10 @@ else:
     bpf_text += bpf_text_kprobe
 
 # code substitutions
+if BPF.kernel_struct_has_field(b'task_struct', b'__state') == 1:
+    bpf_text = bpf_text.replace('STATE_FIELD', '__state')
+else:
+    bpf_text = bpf_text.replace('STATE_FIELD', 'state')
 if args.pid:
     # pid from userspace point of view is thread group from kernel pov
     bpf_text = bpf_text.replace('FILTER', 'tgid != %s' % args.pid)
@@ -235,7 +279,7 @@ elif args.pidnss:
     bpf_text = bpf_text.replace('STORAGE',
         'BPF_HISTOGRAM(dist, pidns_key_t);')
     bpf_text = bpf_text.replace('STORE', 'pidns_key_t key = ' +
-        '{.id = prev->nsproxy->pid_ns_for_children->ns.inum, ' +
+        '{.id = pid_namespace(prev), ' +
         '.slot = bpf_log2l(delta)}; dist.atomic_increment(key);')
 else:
     section = ""

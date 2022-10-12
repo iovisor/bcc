@@ -280,6 +280,11 @@ static struct bpf_helper helpers[] = {
   {"get_func_ip", "5.15"},
   {"get_attach_cookie", "5.15"},
   {"task_pt_regs", "5.15"},
+  {"get_branch_snapshot", "5.16"},
+  {"trace_vprintk", "5.16"},
+  {"skc_to_unix_sock", "5.16"},
+  {"kallsyms_lookup_name", "5.16"},
+  {"find_vma", "5.17"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
@@ -555,8 +560,8 @@ int bpf_prog_compute_tag(const struct bpf_insn *insns, int prog_len,
   }
 
   union {
-	  unsigned char sha[20];
-	  unsigned long long tag;
+    unsigned char sha[20];
+    unsigned long long tag;
   } u = {};
   ret = read(shafd2, u.sha, 20);
   if (ret != 20) {
@@ -1106,8 +1111,8 @@ static int bpf_attach_probe(int progfd, enum bpf_probe_attach_type attach_type,
     // delete that event and start again without maxactive.
     if (is_kprobe && maxactive > 0 && attach_type == BPF_PROBE_RETURN) {
       if (snprintf(fname, sizeof(fname), "%s/id", buf) >= sizeof(fname)) {
-	fprintf(stderr, "filename (%s) is too long for buffer\n", buf);
-	goto error;
+        fprintf(stderr, "filename (%s) is too long for buffer\n", buf);
+        goto error;
       }
       if (access(fname, F_OK) == -1) {
         // Deleting kprobe event with incorrect name.
@@ -1281,6 +1286,39 @@ int bpf_attach_raw_tracepoint(int progfd, const char *tp_name)
 bool bpf_has_kernel_btf(void)
 {
   return libbpf_find_vmlinux_btf_id("bpf_prog_put", 0) > 0;
+}
+
+int kernel_struct_has_field(const char *struct_name, const char *field_name)
+{
+  const struct btf_type *btf_type;
+  const struct btf_member *btf_member;
+  struct btf *btf;
+  int i, ret, btf_id;
+
+  btf = btf__load_vmlinux_btf();
+  ret = libbpf_get_error(btf);
+  if (ret)
+    return -1;
+
+  btf_id = btf__find_by_name_kind(btf, struct_name, BTF_KIND_STRUCT);
+  if (btf_id < 0) {
+    ret = -1;
+    goto cleanup;
+  }
+
+  btf_type = btf__type_by_id(btf, btf_id);
+  btf_member = btf_members(btf_type);
+  for (i = 0; i < btf_vlen(btf_type); i++, btf_member++) {
+    if (!strcmp(btf__name_by_offset(btf, btf_member->name_off), field_name)) {
+      ret = 1;
+      goto cleanup;
+    }
+  }
+  ret = 0;
+
+cleanup:
+  btf__free(btf);
+  return ret;
 }
 
 int bpf_attach_kfunc(int prog_fd)

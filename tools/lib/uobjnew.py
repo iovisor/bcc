@@ -96,9 +96,11 @@ int alloc_entry(struct pt_regs *ctx) {
     struct key_t key = {};
     struct val_t *valp, zero = {};
     u64 classptr = 0, size = 0;
+    u32 length = 0;
     bpf_usdt_readarg(2, ctx, &classptr);
+    bpf_usdt_readarg(3, ctx, &length);
     bpf_usdt_readarg(4, ctx, &size);
-    bpf_probe_read_user(&key.name, sizeof(key.name), (void *)classptr);
+    bpf_probe_read_user(&key.name, min(sizeof(key.name), (size_t)length), (void *)classptr);
     valp = allocs.lookup_or_try_init(&key, &zero);
     if (valp) {
         valp->total_size += size;

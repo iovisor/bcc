@@ -105,13 +105,16 @@ characters.
 
 USAGE message:
 
-usage: sslsniff.py [-h] [-p PID] [-c COMM] [-o] [-g] [-n] [-d] [--hexdump]
+usage: sslsniff.py [-h] [-p PID] [-u UID] [-x] [-c COMM] [-o] [-g] [-n] [-d]
+                   [--hexdump] [--max-buffer-size MAX_BUFFER_SIZE]
 
 Sniff SSL data
 
 optional arguments:
   -h, --help            show this help message and exit
   -p PID, --pid PID     sniff this PID only.
+  -u UID, --uid UID     sniff this UID only.
+  -x, --extra           show extra fields (UID, TID)
   -c COMM, --comm COMM  sniff only commands matching string.
   -o, --no-openssl      do not show OpenSSL calls.
   -g, --no-gnutls       do not show GnuTLS calls.
@@ -119,12 +122,16 @@ optional arguments:
   -d, --debug           debug mode.
   --hexdump             show data as hexdump instead of trying to decode it as
                         UTF-8
+  --max-buffer-size MAX_BUFFER_SIZE
+                        Size of captured buffer
 
 examples:
     ./sslsniff              # sniff OpenSSL and GnuTLS functions
     ./sslsniff -p 181       # sniff PID 181 only
+    ./sslsniff -u 1000      # sniff only UID 1000
     ./sslsniff -c curl      # sniff curl command only
     ./sslsniff --no-openssl # don't show OpenSSL calls
     ./sslsniff --no-gnutls  # don't show GnuTLS calls
     ./sslsniff --no-nss     # don't show NSS calls
     ./sslsniff --hexdump    # show data as hex instead of trying to decode it as UTF-8
+    ./sslsniff -x           # show process UID and TID

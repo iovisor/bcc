@@ -419,11 +419,12 @@ static char *type_id_to_str(struct btf *btf, __s32 type_id, char *str)
 				name = btf__str_by_offset(btf, type->name_off);
 				break;
 			case BTF_KIND_UNION:
-				prefix = "union";
+				prefix = "union ";
 				name = btf__str_by_offset(btf, type->name_off);
 				break;
 			case BTF_KIND_ENUM:
 				prefix = "enum ";
+				name = btf__str_by_offset(btf, type->name_off);
 				break;
 			case BTF_KIND_TYPEDEF:
 				name = btf__str_by_offset(btf, type->name_off);
@@ -445,7 +446,7 @@ static char *value_to_str(struct btf *btf, struct value *val, char *str)
 
 	str = type_id_to_str(btf, val->type_id, str);
 	if (val->flags & KSNOOP_F_PTR)
-		strncat(str, " * ", MAX_STR);
+		strncat(str, "*", MAX_STR);
 	if (strlen(val->name) > 0 &&
 	    strcmp(val->name, KSNOOP_RETURN_NAME) != 0)
 		strncat(str, val->name, MAX_STR);
@@ -668,7 +669,7 @@ static int parse_traces(int argc, char **argv, struct trace **traces)
 
 static int cmd_info(int argc, char **argv)
 {
-	struct trace *traces;
+	struct trace *traces = NULL;
 	char str[MAX_STR];
 	int nr_traces;
 	__u8 i, j;
@@ -680,7 +681,7 @@ static int cmd_info(int argc, char **argv)
 	for (i = 0; i < nr_traces; i++) {
 		struct func *func = &traces[i].func;
 
-		printf("%s %s(",
+		printf("%s%s(",
 		       value_to_str(traces[i].btf, &func->args[KSNOOP_RETURN],
 				    str),
 		       func->name);
@@ -695,6 +696,7 @@ static int cmd_info(int argc, char **argv)
 			       func->nr_args - MAX_ARGS);
 		printf(");\n");
 	}
+	free(traces);
 	return 0;
 }
 
@@ -814,14 +816,14 @@ static int add_traces(struct bpf_map *func_map, struct trace *traces,
 static int attach_traces(struct ksnoop_bpf *skel, struct trace *traces,
 			 int nr_traces)
 {
-	struct bpf_link *link;
 	int i, ret;
 
 	for (i = 0; i < nr_traces; i++) {
-		link = bpf_program__attach_kprobe(skel->progs.kprobe_entry,
-						  false,
-						  traces[i].func.name);
-		ret = libbpf_get_error(link);
+		traces[i].links[0] =
+			bpf_program__attach_kprobe(skel->progs.kprobe_entry,
+						   false,
+						   traces[i].func.name);
+		ret = libbpf_get_error(traces[i].links[0]);
 		if (ret) {
 			p_err("Could not attach kprobe to '%s': %s",
 			      traces[i].func.name, strerror(-ret));
@@ -829,10 +831,11 @@ static int attach_traces(struct ksnoop_bpf *skel, struct trace *traces,
 			}
 		p_debug("Attached kprobe for '%s'", traces[i].func.name);
 
-		link = bpf_program__attach_kprobe(skel->progs.kprobe_return,
-						  true,
-						  traces[i].func.name);
-		ret = libbpf_get_error(link);
+		traces[i].links[1] =
+			bpf_program__attach_kprobe(skel->progs.kprobe_return,
+						   true,
+						   traces[i].func.name);
+		ret = libbpf_get_error(traces[i].links[1]);
 		if (ret) {
 			p_err("Could not attach kretprobe to '%s': %s",
 			      traces[i].func.name, strerror(-ret));
@@ -847,10 +850,10 @@ static int cmd_trace(int argc, char **argv)
 {
 	struct perf_buffer_opts pb_opts = {};
 	struct bpf_map *perf_map, *func_map;
-	struct perf_buffer *pb;
+	struct perf_buffer *pb = NULL;
 	struct ksnoop_bpf *skel;
-	int nr_traces, ret = 0;
-	struct trace *traces;
+	int i, nr_traces, ret = -1;
+	struct trace *traces = NULL;
 
 	nr_traces = parse_traces(argc, argv, &traces);
 	if (nr_traces < 0)
@@ -865,22 +868,22 @@ static int cmd_trace(int argc, char **argv)
 	perf_map = skel->maps.ksnoop_perf_map;
 	if (!perf_map) {
 		p_err("Could not find '%s'", "ksnoop_perf_map");
-		return 1;
+		goto cleanup;
 	}
 	func_map = bpf_object__find_map_by_name(skel->obj, "ksnoop_func_map");
 	if (!func_map) {
 		p_err("Could not find '%s'", "ksnoop_func_map");
-		return 1;
+		goto cleanup;
 	}
 
 	if (add_traces(func_map, traces, nr_traces)) {
 		p_err("Could not add traces to '%s'", "ksnoop_func_map");
-		return 1;
+		goto cleanup;
 	}
 
 	if (attach_traces(skel, traces, nr_traces)) {
 		p_err("Could not attach %d traces", nr_traces);
-		return 1;
+		goto cleanup;
 	}
 
 	pb_opts.sample_cb = trace_handler;
@@ -889,7 +892,7 @@ static int cmd_trace(int argc, char **argv)
 	if (libbpf_get_error(pb)) {
 		p_err("Could not create perf buffer: %s",
 		      libbpf_errstr(pb));
-		return 1;
+		goto cleanup;
 	}
 
 	printf("%16s %4s %8s %s\n", "TIME", "CPU", "PID", "FUNCTION/ARGS");
@@ -911,6 +914,11 @@ static int cmd_trace(int argc, char **argv)
 	}
 
 cleanup:
+	for (i = 0; i < nr_traces; i++) {
+		bpf_link__destroy(traces[i].links[0]);
+		bpf_link__destroy(traces[i].links[1]);
+	}
+	free(traces);
 	perf_buffer__free(pb);
 	ksnoop_bpf__destroy(skel);
 

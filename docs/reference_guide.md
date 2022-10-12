@@ -1808,7 +1808,7 @@ BPF.attach_raw_socket(bpf_func, ifname)
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=attach_raw_socket+path%3Aexamples+language%3Apython&type=Code)
 ### 9. attach_xdp()
-Syntax: ```BPF.attach_xdp(dev="device", fn=b.load_func("fn_name",BPF_XDP), flags)```
+Syntax: ```BPF.attach_xdp(dev="device", fn=b.load_func("fn_name",BPF.XDP), flags)```
 
 Instruments the network driver described by ```dev``` , and then receives the packet, run the BPF function ```fn_name()``` with flags.
 
@@ -1823,7 +1823,7 @@ XDP_FLAGS_HW_MODE = (1 << 3)
 XDP_FLAGS_REPLACE = (1 << 4)
 ```
 
-You can use flags like this ```BPF.attach_xdp(dev="device", fn=b.load_func("fn_name",BPF_XDP), flags=BPF.XDP_FLAGS_UPDATE_IF_NOEXIST)```
+You can use flags like this ```BPF.attach_xdp(dev="device", fn=b.load_func("fn_name",BPF.XDP), flags=BPF.XDP_FLAGS_UPDATE_IF_NOEXIST)```
 
 The default value of flgas is 0. This means if there is no xdp program with `device`, the fn will run with that device. If there is an xdp program running with device, the old program will be replaced with new fn program.
 

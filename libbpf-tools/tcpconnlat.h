@@ -18,6 +18,7 @@ struct event {
 	__u64 ts_us;
 	__u32 tgid;
 	int af;
+	__u16 lport;
 	__u16 dport;
 };
 

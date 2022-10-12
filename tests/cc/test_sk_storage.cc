@@ -25,7 +25,7 @@
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 2, 0)
 
-TEST_CASE("test sk_storage map", "[sk_storage]") {
+TEST_CASE("test sk_storage map", "[sk_storage][!mayfail]") {
   {
     const std::string BPF_PROGRAM = R"(
 BPF_SK_STORAGE(sk_pkt_cnt, __u64);

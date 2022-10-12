@@ -235,11 +235,9 @@ sudo yum install bcc
 
 ## Amazon Linux 2 - Binary
 Use case 1. Install BCC for your AMI's default kernel (no reboot required):
-   Tested on Amazon Linux AMI release 2020.03 (kernel 4.14.154-128.181.amzn2.x86_64)
+   Tested on Amazon Linux AMI release 2021.11 (kernel 5.10.75-79.358.amzn2.x86_64)
 ```
-sudo amazon-linux-extras enable BCC
-sudo yum install kernel-devel-$(uname -r)
-sudo yum install bcc
+sudo amazon-linux-extras install BCC
 ```
 
 ## Alpine - Binary
@@ -342,6 +340,9 @@ sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
 # For Eoan (19.10) or Focal (20.04.1 LTS)
 sudo apt install -y bison build-essential cmake flex git libedit-dev \
   libllvm7 llvm-7-dev libclang-7-dev python zlib1g-dev libelf-dev libfl-dev python3-distutils
+  
+# For Hirsute (21.04)  or Impish (21.10)
+sudo apt install -y bison build-essential cmake flex git libedit-dev   libllvm11 llvm-11-dev libclang-11-dev python zlib1g-dev libelf-dev libfl-dev python3-distutils
 
 # For other versions
 sudo apt-get -y install bison build-essential cmake flex git libedit-dev \

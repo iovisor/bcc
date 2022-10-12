@@ -347,6 +347,7 @@ class SmokeTests(TestCase):
         self.run_with_int("trace.py do_sys_open")
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
+    @mayFail("This fails on github actions environment, and needs to be fixed")
     def test_ttysnoop(self):
         self.run_with_int("ttysnoop.py /dev/console")
 

@@ -220,9 +220,13 @@ void Probe::add_location(uint64_t addr, const std::string &bin_path, const char 
 }
 
 void Probe::finalize_locations() {
+  // The following comparator needs to establish a strict weak ordering relation. Such
+  // that when x < y == true, y < x == false. Otherwise it leads to undefined behavior.
+  // To guarantee this, it uses std::tie which allows the lambda to have a lexicographical
+  // comparison and hence, guarantee the strict weak ordering.
   std::sort(locations_.begin(), locations_.end(),
             [](const Location &a, const Location &b) {
-              return a.bin_path_ < b.bin_path_ || a.address_ < b.address_;
+              return std::tie(a.bin_path_, a.address_) < std::tie(b.bin_path_, b.address_);
             });
   auto last = std::unique(locations_.begin(), locations_.end(),
                           [](const Location &a, const Location &b) {

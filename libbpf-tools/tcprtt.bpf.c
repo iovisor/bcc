@@ -95,7 +95,7 @@ int BPF_KPROBE(tcp_rcv_kprobe, struct sock *sk)
 	if (targ_saddr && targ_saddr != saddr)
 		return 0;
 	bpf_probe_read_kernel(&daddr, sizeof(daddr), &sk->__sk_common.skc_daddr);
-	if (targ_daddr && targ_saddr != saddr)
+	if (targ_daddr && targ_daddr != daddr)
 		return 0;
 
 	if (targ_laddr_hist)

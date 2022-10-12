@@ -1,13 +1,17 @@
 name: BCC Build and tests
 
-on: push
+on:
+  push:
+    branches:
+      - master
+  pull_request:
 
 jobs:
   test_bcc:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-18.04] # 18.04.3 release has 5.0.0 kernel                                        
+        os: [ubuntu-18.04, ubuntu-20.04] # 18.04.3 release has 5.0.0 kernel                                        
         env:
         - TYPE: Debug
           PYTHON_TEST_LOGFILE: critical.log

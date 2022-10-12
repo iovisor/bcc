@@ -1,6 +1,10 @@
 name: Publish Build Artifacts
 
-on: push
+on:
+  push:
+    branches:
+      - master
+  pull_request:
 
 jobs:
   publish_images:
