@@ -13,6 +13,7 @@
 #include <bpf/bpf.h>
 #include "execsnoop.h"
 #include "execsnoop.skel.h"
+#include "compat.h"
 #include "btf_helpers.h"
 #include "trace_helpers.h"
 
@@ -226,7 +227,7 @@ static void print_args(const struct event *e, bool quote)
 	}
 }
 
-static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
+static int handle_event(void *ctx, void *data, size_t len)
 {
 	const struct event *e = data;
 	time_t t;
@@ -235,11 +236,11 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 
 	/* TODO: use pcre lib */
 	if (env.name && strstr(e->comm, env.name) == NULL)
-		return;
+		return 0;
 
 	/* TODO: use pcre lib */
 	if (env.line && strstr(e->comm, env.line) == NULL)
-		return;
+		return 0;
 
 	time(&t);
 	tm = localtime(&t);
@@ -258,6 +259,8 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	printf("%-16s %-6d %-6d %3d ", e->comm, e->pid, e->ppid, e->retval);
 	print_args(e, env.quote);
 	putchar('\n');
+
+	return 0;
 }
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
@@ -273,7 +276,7 @@ int main(int argc, char **argv)
 		.parser = parse_arg,
 		.doc = argp_program_doc,
 	};
-	struct perf_buffer *pb = NULL;
+	struct bpf_buffer *buf = NULL;
 	struct execsnoop_bpf *obj;
 	int err;
 	int idx, cg_map_fd;
@@ -303,6 +306,13 @@ int main(int argc, char **argv)
 	obj->rodata->targ_uid = env.uid;
 	obj->rodata->max_args = env.max_args;
 	obj->rodata->filter_cg = env.cg;
+
+	buf = bpf_buffer__new(obj->maps.events);
+	if (!buf) {
+		err = -errno;
+		warn("failed to create ring/perf buffer: %d\n", err);
+		goto cleanup;
+       }
 
 	err = execsnoop_bpf__load(obj);
 	if (err) {
@@ -345,13 +355,9 @@ int main(int argc, char **argv)
 	printf("%-16s %-6s %-6s %3s %s\n", "PCOMM", "PID", "PPID", "RET", "ARGS");
 
 	/* setup event callbacks */
-	pb = perf_buffer__new(bpf_map__fd(obj->maps.events), PERF_BUFFER_PAGES,
-			      handle_event, handle_lost_events, NULL, NULL);
-	if (!pb) {
-		err = -errno;
-		fprintf(stderr, "failed to open perf buffer: %d\n", err);
-		goto cleanup;
-	}
+	err = bpf_buffer__open(buf, handle_event, handle_lost_events, NULL);
+	if (err) {
+		warn("failed to open ring/perf buffer: %d\n", err);
 
 	if (signal(SIGINT, sig_int) == SIG_ERR) {
 		fprintf(stderr, "can't set signal handler: %s\n", strerror(errno));
@@ -361,9 +367,9 @@ int main(int argc, char **argv)
 
 	/* main: poll */
 	while (!exiting) {
-		err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS);
+		err = bpf_buffer__poll(buf, POLL_TIMEOUT_MS);
 		if (err < 0 && err != -EINTR) {
-			fprintf(stderr, "error polling perf buffer: %s\n", strerror(-err));
+			fprintf(stderr, "error polling ring/perf buffer: %s\n", strerror(-err));
 			goto cleanup;
 		}
 		/* reset err to return 0 if exiting */
@@ -371,7 +377,7 @@ int main(int argc, char **argv)
 	}
 
 cleanup:
-	perf_buffer__free(pb);
+	bpf_buffer__free(buf);
 	execsnoop_bpf__destroy(obj);
 	cleanup_core_btf(&open_opts);
 	if (cgfd > 0)
