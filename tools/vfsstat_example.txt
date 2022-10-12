@@ -33,4 +33,19 @@ TIME         READ/s  WRITE/s CREATE/s   OPEN/s  FSYNC/s
 Full usage:
 
 # ./vfsstat -h
-USAGE: ./vfsstat [interval [count]]
+usage: vfsstat [-h] [-p PID] [interval] [count]
+
+Count some VFS calls.
+
+positional arguments:
+  interval           output interval, in seconds
+  count              number of outputs
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -p PID, --pid PID  trace this PID only
+
+examples:
+    ./vfsstat             # count some VFS calls per second
+    ./vfsstat -p 185      # trace PID 185 only
+    ./vfsstat 2 5         # print 2 second summaries, 5 times
