@@ -52,6 +52,8 @@ parser = argparse.ArgumentParser(
     epilog=examples)
 parser.add_argument("min_us", nargs="?", default='10000',
     help="minimum run queue latency to trace, in us (default 10000)")
+parser.add_argument("-P", "--previous", action="store_true",
+    help="also show previous task name and TID")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 
@@ -60,8 +62,6 @@ thread_group.add_argument("-p", "--pid", metavar="PID", dest="pid",
     help="trace this PID only", type=int)
 thread_group.add_argument("-t", "--tid", metavar="TID", dest="tid",
     help="trace this TID only", type=int)
-thread_group.add_argument("-P", "--previous", action="store_true",
-    help="also show previous task name and TID")
 args = parser.parse_args()
 
 min_us = int(args.min_us)
