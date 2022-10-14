@@ -3,7 +3,11 @@
 
 include_directories(${PROJECT_SOURCE_DIR}/src/cc)
 include_directories(${PROJECT_SOURCE_DIR}/src/cc/api)
+if (CMAKE_USE_LIBBPF_PACKAGE AND LIBBPF_FOUND)
+include_directories(${PROJECT_SOURCE_DIR}/src/cc/compat)
+else()
 include_directories(${PROJECT_SOURCE_DIR}/src/cc/libbpf/include/uapi)
+endif()
 include_directories(${PROJECT_SOURCE_DIR}/tests/python/include)
 
 add_executable(test_static test_static.c)
