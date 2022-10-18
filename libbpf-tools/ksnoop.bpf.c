@@ -357,11 +357,9 @@ static int ksnoop(struct pt_regs *ctx, bool entry)
 			if (currtrace->flags & KSNOOP_F_PTR) {
 				void *dataptr = (void *)data;
 
-				ret = bpf_probe_read(&data, sizeof(data),
-						     dataptr);
+				ret = bpf_probe_read_kernel(&data, sizeof(data), dataptr);
 				if (ret) {
-					currdata->err_type_id =
-						currtrace->type_id;
+					currdata->err_type_id = currtrace->type_id;
 					currdata->err = ret;
 					continue;
 				}
@@ -369,9 +367,7 @@ static int ksnoop(struct pt_regs *ctx, bool entry)
 			} else if (currtrace->size <=
 				   sizeof(currdata->raw_value)) {
 				/* read member value for predicate comparison */
-				bpf_probe_read(&currdata->raw_value,
-					       currtrace->size,
-					       (void*)data);
+				bpf_probe_read_kernel(&currdata->raw_value, currtrace->size, (void*)data);
 			}
 		} else {
 			currdata->raw_value = data;
@@ -424,7 +420,7 @@ static int ksnoop(struct pt_regs *ctx, bool entry)
 		tracesize = currtrace->size;
 		if (tracesize > MAX_TRACE_DATA)
 			tracesize = MAX_TRACE_DATA;
-		ret = bpf_probe_read(buf_offset, tracesize, data_ptr);
+		ret = bpf_probe_read_kernel(buf_offset, tracesize, data_ptr);
 		if (ret < 0) {
 			currdata->err_type_id = currtrace->type_id;
 			currdata->err = ret;
