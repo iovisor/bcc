@@ -58,8 +58,7 @@ static bool allow_record(struct task_struct *t)
 }
 
 SEC("tp_btf/sched_switch")
-int BPF_PROG(sched_switch, bool preempt, struct task_struct *prev,
-	     struct task_struct *next)
+int BPF_PROG(sched_switch, bool preempt, struct task_struct *prev, struct task_struct *next)
 {
 	struct internal_key *i_keyp, i_key;
 	struct val_t *valp, val;
@@ -83,7 +82,7 @@ int BPF_PROG(sched_switch, bool preempt, struct task_struct *prev,
 						BPF_F_USER_STACK);
 		i_key.key.kern_stack_id = bpf_get_stackid(ctx, &stackmap, 0);
 		bpf_map_update_elem(&start, &pid, &i_key, 0);
-		bpf_probe_read_str(&val.comm, sizeof(prev->comm), prev->comm);
+		bpf_probe_read_kernel_str(&val.comm, sizeof(prev->comm), prev->comm);
 		val.delta = 0;
 		bpf_map_update_elem(&info, &i_key.key, &val, BPF_NOEXIST);
 	}
