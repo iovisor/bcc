@@ -156,6 +156,27 @@ int main(int argc, char **argv)
 	obj->rodata->target_pid = target_pid;
 	obj->rodata->trace_failed_only = trace_failed_only;
 
+	if (!tracepoint_exists("syscalls", "statfs")) {
+		bpf_program__set_autoload(obj->progs.handle_statfs_entry, false);
+		bpf_program__set_autoload(obj->progs.handle_statfs_return, false);
+	}
+	if (!tracepoint_exists("syscalls", "statx")) {
+		bpf_program__set_autoload(obj->progs.handle_statx_entry, false);
+		bpf_program__set_autoload(obj->progs.handle_statx_return, false);
+	}
+	if (!tracepoint_exists("syscalls", "newstat")) {
+		bpf_program__set_autoload(obj->progs.handle_newstat_entry, false);
+		bpf_program__set_autoload(obj->progs.handle_newstat_return, false);
+	}
+	if (!tracepoint_exists("syscalls", "newfstatat")) {
+		bpf_program__set_autoload(obj->progs.handle_newfstatat_entry, false);
+		bpf_program__set_autoload(obj->progs.handle_newfstatat_return, false);
+	}
+	if (!tracepoint_exists("syscalls", "newlstat")) {
+		bpf_program__set_autoload(obj->progs.handle_newlstat_entry, false);
+		bpf_program__set_autoload(obj->progs.handle_newlstat_return, false);
+	}
+
 	err = statsnoop_bpf__load(obj);
 	if (err) {
 		warn("failed to load BPF object: %d\n", err);
