@@ -93,6 +93,7 @@ bool fentry_can_attach(const char *name, const char *mod);
  * which is slower.
  */
 bool kprobe_exists(const char *name);
+bool tracepoint_exists(const char *category, const char *event);
 
 bool vmlinux_btf_exists(void);
 bool module_btf_exists(const char *mod);

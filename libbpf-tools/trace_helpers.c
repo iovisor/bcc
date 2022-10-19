@@ -1125,6 +1125,16 @@ slow_path:
 	return false;
 }
 
+bool tracepoint_exists(const char *category, const char *event)
+{
+	char path[PATH_MAX];
+
+	snprintf(path, sizeof(path), "/sys/kernel/debug/tracing/events/%s/%s/format", category, event);
+	if (!access(path, F_OK))
+		return true;
+	return false;
+}
+
 bool vmlinux_btf_exists(void)
 {
 	if (!access("/sys/kernel/btf/vmlinux", R_OK))
