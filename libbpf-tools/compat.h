@@ -7,6 +7,8 @@
 #include <sys/types.h>
 #include <linux/bpf.h>
 
+#define POLL_TIMEOUT_MS 100
+
 struct bpf_buffer;
 struct bpf_map;
 
