@@ -24,7 +24,6 @@
 #include "btf_helpers.h"
 #include "trace_helpers.h"
 
-#define POLL_TIMEOUT_MS		100
 #define warn(...) fprintf(stderr, __VA_ARGS__)
 
 /* https://www.gnu.org/software/gnulib/manual/html_node/strerrorname_005fnp.html */
