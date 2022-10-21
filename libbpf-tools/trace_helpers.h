@@ -24,6 +24,7 @@ struct sym {
 	const char *name;
 	unsigned long start;
 	unsigned long size;
+	unsigned long offset;
 };
 
 struct syms;
@@ -32,6 +33,8 @@ struct syms *syms__load_pid(int tgid);
 struct syms *syms__load_file(const char *fname);
 void syms__free(struct syms *syms);
 const struct sym *syms__map_addr(const struct syms *syms, unsigned long addr);
+const struct sym *syms__map_addr_dso(const struct syms *syms, unsigned long addr,
+				     char **dso_name, unsigned long *dso_offset);
 
 struct syms_cache;
 
