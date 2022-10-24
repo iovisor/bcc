@@ -295,7 +295,7 @@ class BPF(object):
 
     _probe_repl = re.compile(b"[^a-zA-Z0-9_]")
     _sym_caches = {}
-    _bsymcache =  lib.bcc_buildsymcache_new()
+    _bsymcache = lib.bcc_buildsymcache_new()
 
     _auto_includes = {
         "linux/time.h": ["time"],
