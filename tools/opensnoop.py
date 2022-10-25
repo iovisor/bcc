@@ -153,7 +153,7 @@ int trace_return(struct pt_regs *ctx)
     }
 
     bpf_probe_read_kernel(&data.comm, sizeof(data.comm), valp->comm);
-    bpf_probe_read_user(&data.name, sizeof(data.name), (void *)valp->fname);
+    bpf_probe_read_user_str(&data.name, sizeof(data.name), (void *)valp->fname);
     data.id = valp->id;
     data.ts = tsp / 1000;
     data.uid = bpf_get_current_uid_gid();
