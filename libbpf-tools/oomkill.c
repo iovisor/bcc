@@ -139,7 +139,7 @@ int main(int argc, char **argv)
 	buf = bpf_buffer__new(obj->maps.events, obj->maps.heap);
 	if (!buf) {
 		err = -errno;
-		warn("failed to create ring/perf buffer: %d\n", err);
+		fprintf(stderr, "failed to create ring/perf buffer: %d\n", err);
 		goto cleanup;
 	}
 
