@@ -521,9 +521,9 @@ bool ProbeVisitor::VisitUnaryOperator(UnaryOperator *E) {
   string pre, post;
   pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
   if (cannot_fall_back_safely)
-    pre += " bpf_probe_read_kernel(&_val, sizeof(_val), (u64)";
+    pre += " bpf_probe_read_kernel(&_val, sizeof(_val), (void *)";
   else
-    pre += " bpf_probe_read(&_val, sizeof(_val), (u64)";
+    pre += " bpf_probe_read(&_val, sizeof(_val), (void *)";
   post = "); _val; })";
   rewriter_.ReplaceText(expansionLoc(E->getOperatorLoc()), 1, pre);
   rewriter_.InsertTextAfterToken(expansionLoc(GET_ENDLOC(sub)), post);
@@ -585,9 +585,9 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   string pre, post;
   pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
   if (cannot_fall_back_safely)
-    pre += " bpf_probe_read_kernel(&_val, sizeof(_val), (u64)&";
+    pre += " bpf_probe_read_kernel(&_val, sizeof(_val), (void *)&";
   else
-    pre += " bpf_probe_read(&_val, sizeof(_val), (u64)&";
+    pre += " bpf_probe_read(&_val, sizeof(_val), (void *)&";
   post = rhs + "); _val; })";
   rewriter_.InsertText(expansionLoc(GET_BEGINLOC(E)), pre);
   rewriter_.ReplaceText(expansionRange(SourceRange(member, GET_ENDLOC(E))), post);
@@ -639,9 +639,9 @@ bool ProbeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
 
   pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
   if (cannot_fall_back_safely)
-    pre += " bpf_probe_read_kernel(&_val, sizeof(_val), (u64)((";
+    pre += " bpf_probe_read_kernel(&_val, sizeof(_val), (void *)((";
   else
-    pre += " bpf_probe_read(&_val, sizeof(_val), (u64)((";
+    pre += " bpf_probe_read(&_val, sizeof(_val), (void *)((";
   if (isMemberDereference(base)) {
     pre += "&";
     // If the base of the array subscript is a member dereference, we'll rewrite
@@ -751,8 +751,8 @@ void BTypeVisitor::genParamDirectAssign(FunctionDecl *D, string& preamble,
       arg->addAttr(UnavailableAttr::CreateImplicit(C, "ptregs"));
       size_t d = idx - 1;
       const char *reg = calling_conv_regs[d];
-      preamble += " " + text + " = " + fn_args_[0]->getName().str() + "->" +
-                  string(reg) + ";";
+      preamble += " " + text + " = (" + arg->getType().getAsString() + ")" +
+                  fn_args_[0]->getName().str() + "->" + string(reg) + ";";
     }
   }
 }
@@ -766,7 +766,7 @@ void BTypeVisitor::genParamIndirectAssign(FunctionDecl *D, string& preamble,
 
     if (idx == 0) {
       new_ctx = "__" + arg->getName().str();
-      preamble += " struct pt_regs * " + new_ctx + " = " +
+      preamble += " struct pt_regs * " + new_ctx + " = (void *)" +
                   arg->getName().str() + "->" +
                   string(calling_conv_regs[0]) + ";";
     } else {
