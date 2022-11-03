@@ -173,7 +173,6 @@ int main(int argc, char **argv)
 	err = ensure_core_btf(&open_opts);
 	if (err) {
 		warn("failed to fetch necessary BTF for CO-RE: %s\n", strerror(-err));
-		goto cleanup;
 	}
 
 	obj = bashreadline_bpf__open_opts(&open_opts);

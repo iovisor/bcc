@@ -127,7 +127,6 @@ int main(int argc, char **argv)
 	err = ensure_core_btf(&open_opts);
 	if (err) {
 		fprintf(stderr, "failed to fetch necessary BTF for CO-RE: %s\n", strerror(-err));
-		return 1;
 	}
 
 	obj = oomkill_bpf__open_opts(&open_opts);

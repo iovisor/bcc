@@ -47,6 +47,15 @@ struct vector {
 	void **elems;
 };
 
+static inline void *reallocarray_handwrite(void *ptr, size_t nmemb, size_t size)
+{
+        size_t total;
+        if (size == 0 || nmemb > ULONG_MAX / size)
+                return NULL;
+        total = nmemb * size;
+        return realloc(ptr, total);
+}
+
 int grow_vector(struct vector *vector) {
 	if (vector->nr >= vector->capacity) {
 		void **reallocated;
@@ -56,7 +65,7 @@ int grow_vector(struct vector *vector) {
 		else
 			vector->capacity *= 2;
 
-		reallocated = reallocarray(vector->elems, vector->capacity, sizeof(*vector->elems));
+		reallocated = reallocarray_handwrite(vector->elems, vector->capacity, sizeof(*vector->elems));
 		if (!reallocated)
 			return -1;
 
