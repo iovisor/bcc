@@ -16,8 +16,6 @@
 #include "trace_helpers.h"
 #include <unistd.h>
 
-static volatile sig_atomic_t exiting = 0;
-
 struct env {
 	pid_t pid;
 	bool user_threads_only;
@@ -153,7 +151,6 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 
 static void sig_int(int signo)
 {
-	exiting = 1;
 }
 
 static void print_map(struct ksyms *ksyms, struct wakeuptime_bpf *obj)
