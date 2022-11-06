@@ -38,8 +38,6 @@ static struct env {
 	.duration = 99999999,
 };
 
-static volatile bool exiting;
-
 const char *argp_program_version = "offcputime 0.1";
 const char *argp_program_bug_address =
 	"https://github.com/iovisor/bcc/tree/master/libbpf-tools";
