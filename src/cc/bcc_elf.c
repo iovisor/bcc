@@ -1036,7 +1036,9 @@ int bcc_elf_foreach_vdso_sym(bcc_elf_symcb callback, void *payload) {
   if (openelf_fd(vdso_image_fd, &elf) == -1)
     return -1;
 
-  return listsymbols(elf, callback, NULL, payload, &default_option, 0);
+  int rc = listsymbols(elf, callback, NULL, payload, &default_option, 0);
+  elf_end(elf);
+  return rc;
 }
 
 // return value: 0   : success
