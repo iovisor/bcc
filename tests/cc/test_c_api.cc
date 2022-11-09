@@ -13,11 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <fcntl.h>
 #include <dlfcn.h>
-#include <stdint.h>
-#include <string.h>
+#include <fcntl.h>
 #include <link.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
@@ -25,15 +26,15 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <cstdlib>
+
 #include "bcc_elf.h"
 #include "bcc_perf_map.h"
 #include "bcc_proc.h"
 #include "bcc_syms.h"
+#include "catch.hpp"
 #include "common.h"
 #include "vendor/tinyformat.hpp"
-
-#include "catch.hpp"
-
 
 using namespace std;
 
@@ -110,6 +111,88 @@ TEST_CASE("resolve symbol name in external library using loaded libraries", "[c_
   REQUIRE(sym.offset != 0);
   bcc_procutils_free(sym.module);
 }
+
+namespace {
+
+void system(const std::string &command) {
+  if (::system(command.c_str())) {
+    abort();
+  }
+}
+
+class TmpDir {
+ public:
+  TmpDir() : path_("/tmp/bcc-test-XXXXXX") {
+    if (::mkdtemp(&path_[0]) == nullptr) {
+      abort();
+    }
+  }
+
+  ~TmpDir() { system("rm -rf " + path_); }
+
+  const std::string &path() const { return path_; }
+
+ private:
+  std::string path_;
+};
+
+void test_debuginfo_only_symbol(const std::string &lib) {
+  struct bcc_symbol sym;
+  REQUIRE(bcc_resolve_symname(lib.c_str(), "debuginfo_only_symbol", 0x0, 0,
+                              nullptr, &sym) == 0);
+  REQUIRE(sym.module[0] == '/');
+  REQUIRE(sym.offset != 0);
+  bcc_procutils_free(sym.module);
+}
+
+}  // namespace
+
+TEST_CASE("resolve symbol name via symfs", "[c_api]") {
+  TmpDir tmpdir;
+  std::string lib_path = tmpdir.path() + "/lib.so";
+  std::string symfs = tmpdir.path() + "/symfs";
+  std::string symfs_lib_dir = symfs + "/" + tmpdir.path();
+  std::string symfs_lib_path = symfs_lib_dir + "/lib.so";
+
+  system("mkdir -p " + symfs);
+  system("cp " CMAKE_CURRENT_BINARY_DIR "/libdebuginfo_test_lib.so " +
+         lib_path);
+  system("mkdir -p " + symfs_lib_dir);
+  system("cp " CMAKE_CURRENT_BINARY_DIR "/debuginfo.so " + symfs_lib_path);
+
+  ::setenv("BCC_SYMFS", symfs.c_str(), 1);
+  test_debuginfo_only_symbol(lib_path);
+  ::unsetenv("BCC_SYMFS");
+}
+
+TEST_CASE("resolve symbol name via buildid", "[c_api]") {
+  char build_id[128] = {0};
+  REQUIRE(bcc_elf_get_buildid(CMAKE_CURRENT_BINARY_DIR
+                              "/libdebuginfo_test_lib.so",
+                              build_id) == 0);
+
+  TmpDir tmpdir;
+  std::string debugso_dir =
+      tmpdir.path() + "/.build-id/" + build_id[0] + build_id[1];
+  std::string debugso = debugso_dir + "/" + (build_id + 2) + ".debug";
+  system("mkdir -p " + debugso_dir);
+  system("cp " CMAKE_CURRENT_BINARY_DIR "/debuginfo.so " + debugso);
+
+  ::setenv("BCC_DEBUGINFO_ROOT", tmpdir.path().c_str(), 1);
+  test_debuginfo_only_symbol(CMAKE_CURRENT_BINARY_DIR
+                             "/libdebuginfo_test_lib.so");
+  ::unsetenv("BCC_DEBUGINFO_ROOT");
+}
+
+TEST_CASE("resolve symbol name via gnu_debuglink", "[c_api]") {
+  test_debuginfo_only_symbol(CMAKE_CURRENT_BINARY_DIR "/with_gnu_debuglink.so");
+}
+
+#ifdef HAVE_LIBLZMA
+TEST_CASE("resolve symbol name via mini debug info", "[c_api]") {
+  test_debuginfo_only_symbol(CMAKE_CURRENT_BINARY_DIR "/with_gnu_debugdata.so");
+}
+#endif
 
 extern "C" int _a_test_function(const char *a_string) {
   int i;
