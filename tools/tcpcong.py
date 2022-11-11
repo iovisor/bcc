@@ -86,7 +86,7 @@ if start_lport > end_lport:
     end_lport = tmp
 
 # define BPF program
-bpf_text = """
+bpf_head_text = """
 #include <uapi/linux/ptrace.h>
 #include <net/sock.h>
 #include <bcc/proto.h>
@@ -107,6 +107,19 @@ typedef struct ipv6_flow_key {
     u16 dport;
 } ipv6_flow_key_t;
 
+typedef struct data_val {
+    DEF_TEXT
+    u64  last_ts;
+    u16  last_cong_stat;
+} data_val_t;
+
+BPF_HASH(ipv4_stat, ipv4_flow_key_t, data_val_t);
+BPF_HASH(ipv6_stat, ipv6_flow_key_t, data_val_t);
+
+HIST_TABLE
+"""
+
+bpf_extra_head = """
 typedef struct process_key {
     char comm[TASK_COMM_LEN];
     u32  tid;
@@ -126,24 +139,15 @@ BPF_HASH(start_ipv4, process_key_t, ipv4_flow_val_t);
 BPF_HASH(start_ipv6, process_key_t, ipv6_flow_val_t);
 SOCK_STORE_DEF
 
-typedef struct data_val {
-    DEF_TEXT
-    u64  last_ts;
-    u16  last_cong_stat;
-} data_val_t;
-
 typedef struct cong {
     u8  cong_stat:5,
         ca_inited:1,
         ca_setsockopt:1,
         ca_dstlocked:1;
 } cong_status_t;
+"""
 
-BPF_HASH(ipv4_stat, ipv4_flow_key_t, data_val_t);
-BPF_HASH(ipv6_stat, ipv6_flow_key_t, data_val_t);
-
-HIST_TABLE
-
+bpf_no_ca_tp_body_text = """
 static int entry_state_update_func(struct sock *sk)
 {
     u16 dport = 0, lport = 0;
@@ -276,6 +280,75 @@ static int ret_state_update_func(struct sock *sk)
 }
 """
 
+bpf_ca_tp_body_text = """
+TRACEPOINT_PROBE(tcp, tcp_cong_state_set)
+{
+    u64 ts, ts1;
+    u16 family, last_cong_state, dport = 0, lport = 0;
+    u8 cong_state;
+    const struct sock *sk = (const struct sock *)args->skaddr;
+    data_val_t *datap, data = {0};
+
+    family = sk->__sk_common.skc_family;
+    dport = args->dport;
+    lport = args->sport;
+    cong_state = args->cong_state;
+    STATE_KEY
+    if (family == AF_INET) {
+        ipv4_flow_key_t key4 = {0};
+        key4.saddr = sk->__sk_common.skc_rcv_saddr;
+        key4.daddr = sk->__sk_common.skc_daddr;
+        FILTER_LPORT
+        FILTER_DPORT
+        key4.lport = lport;
+        key4.dport = dport;
+        datap = ipv4_stat.lookup(&key4);
+        if (datap == 0) {
+            data.last_ts = bpf_ktime_get_ns();
+            data.last_cong_stat = cong_state + 1;
+            ipv4_stat.update(&key4, &data);
+        } else {
+            last_cong_state = datap->last_cong_stat;
+            if ((cong_state + 1) != last_cong_state) {
+                ts1 = bpf_ktime_get_ns();
+                ts = ts1 - datap->last_ts;
+                datap->last_ts = ts1;
+                datap->last_cong_stat = cong_state + 1;
+                ts /= 1000;
+                STORE
+            }
+        }
+    } else if (family == AF_INET6) {
+        ipv6_flow_key_t key6 = {0};
+        bpf_probe_read_kernel(&key6.saddr, sizeof(key6.saddr),
+            &sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
+        bpf_probe_read_kernel(&key6.daddr, sizeof(key6.daddr),
+            &sk->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
+        FILTER_LPORT
+        FILTER_DPORT
+        key6.lport = lport;
+        key6.dport = dport;
+        datap = ipv6_stat.lookup(&key6);
+        if (datap == 0) {
+            data.last_ts = bpf_ktime_get_ns();
+            data.last_cong_stat = cong_state + 1;
+            ipv6_stat.update(&key6, &data);
+        } else {
+            last_cong_state = datap->last_cong_stat;
+            if ((cong_state + 1) != last_cong_state) {
+                ts1 = bpf_ktime_get_ns();
+                ts = ts1 - datap->last_ts;
+                datap->last_ts = ts1;
+                datap->last_cong_stat = cong_state + 1;
+                ts /= 1000;
+                STORE
+            }
+        }
+    }
+    return 0;
+}
+"""
+
 kprobe_program = """
 int entry_func(struct pt_regs *ctx, struct sock *sk)
 {
@@ -351,20 +424,26 @@ KRETFUNC_PROBE(tcp_process_tlp_ack, struct sock *sk)
 """
 
 # code replace
-is_support_kfunc = BPF.support_kfunc()
-if is_support_kfunc:
-    bpf_text += kfunc_program
-    bpf_text = bpf_text.replace('SOCK_STORE_DEF', '')
-    bpf_text = bpf_text.replace('SOCK_STORE_ADD', '')
-    bpf_text = bpf_text.replace('SOCK_STORE_DEL', '')
+is_support_tp_ca = BPF.tracepoint_exists("tcp", "tcp_cong_state_set")
+if is_support_tp_ca:
+    bpf_text = bpf_head_text + bpf_ca_tp_body_text
 else:
-    bpf_text += kprobe_program
-    bpf_text = bpf_text.replace('SOCK_STORE_DEF',
-                   'BPF_HASH(sock_store, process_key_t, struct sock *);')
-    bpf_text = bpf_text.replace('SOCK_STORE_ADD',
-                   'sock_store.update(&key, &sk);')
-    bpf_text = bpf_text.replace('SOCK_STORE_DEL',
-                   'sock_store.delete(&key);')
+    bpf_text = bpf_head_text + bpf_extra_head
+    bpf_text += bpf_no_ca_tp_body_text
+    is_support_kfunc = BPF.support_kfunc()
+    if is_support_kfunc:
+        bpf_text += kfunc_program
+        bpf_text = bpf_text.replace('SOCK_STORE_DEF', '')
+        bpf_text = bpf_text.replace('SOCK_STORE_ADD', '')
+        bpf_text = bpf_text.replace('SOCK_STORE_DEL', '')
+    else:
+        bpf_text += kprobe_program
+        bpf_text = bpf_text.replace('SOCK_STORE_DEF',
+                       'BPF_HASH(sock_store, process_key_t, struct sock *);')
+        bpf_text = bpf_text.replace('SOCK_STORE_ADD',
+                       'sock_store.update(&key, &sk);')
+        bpf_text = bpf_text.replace('SOCK_STORE_DEL',
+                       'sock_store.delete(&key);')
 
 if args.localport:
     bpf_text = bpf_text.replace('FILTER_LPORT',
@@ -455,7 +534,7 @@ if debug or args.ebpf:
 # load BPF program
 b = BPF(text=bpf_text)
 
-if not is_support_kfunc:
+if not is_support_tp_ca and not is_support_kfunc:
     # all the tcp congestion control status update functions
     # are called by below 5 functions.
     b.attach_kprobe(event="tcp_fastretrans_alert", fn_name="entry_func")
