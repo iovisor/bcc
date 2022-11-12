@@ -241,7 +241,7 @@ print_ustack:
 
 		if (bpf_map_lookup_elem(sfd, &next_key.user_stack_id, ip) != 0) {
 			fprintf(stderr, "    [Missed User Stack]\n");
-			continue;
+			goto skip_ustack;
 		}
 
 		syms = syms_cache__get_syms(syms_cache, next_key.tgid);
