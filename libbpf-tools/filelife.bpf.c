@@ -22,7 +22,7 @@ struct {
 } events SEC(".maps");
 
 static __always_inline int
-probe_create(struct inode *dir, struct dentry *dentry)
+probe_create(struct dentry *dentry)
 {
 	u64 id = bpf_get_current_pid_tgid();
 	u32 tgid = id >> 32;
@@ -39,14 +39,14 @@ probe_create(struct inode *dir, struct dentry *dentry)
 SEC("kprobe/vfs_create")
 int BPF_KPROBE(vfs_create, struct inode *dir, struct dentry *dentry)
 {
-	return probe_create(dir, dentry);
+	return probe_create(dentry);
 }
 
 SEC("kprobe/security_inode_create")
 int BPF_KPROBE(security_inode_create, struct inode *dir,
 	     struct dentry *dentry)
 {
-	return probe_create(dir, dentry);
+	return probe_create(dentry);
 }
 
 SEC("kprobe/vfs_unlink")
