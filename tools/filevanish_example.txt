@@ -1,0 +1,27 @@
+Demonstrations of filevanish, the Linux eBPF/bcc version.
+
+
+filevanish traces why file vanished. either been deleted or renamed
+For example:
+
+# ./filevanish 
+18:30:56 22905   vim               DELETE .fstab.swpx
+18:30:56 22905   vim               DELETE .fstab.swp
+18:31:00 22905   vim               DELETE .viminfo
+18:31:00 22905   vim               RENAME .viminfo.tmp > .viminfo
+18:31:00 22905   vim               DELETE .fstab.swp
+
+USAGE message:
+
+# ./filevanish -h
+usage: filevanish [-h] [-p PID]
+
+Trace why file vanished(been deleted or renamed)
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -p PID, --pid PID  trace this PID only
+
+examples:
+    ./filevanish           # trace all stat() syscalls
+    ./filevanish -p 181    # only trace PID 181
