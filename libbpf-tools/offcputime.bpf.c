@@ -57,8 +57,7 @@ static bool allow_record(struct task_struct *t)
 	return true;
 }
 
-SEC("tp_btf/sched_switch")
-int BPF_PROG(sched_switch, bool preempt, struct task_struct *prev, struct task_struct *next)
+static int handle_switch(u64 *ctx, struct task_struct *prev, struct task_struct *next)
 {
 	struct internal_key *i_keyp, i_key;
 	struct val_t *valp, val;
@@ -66,15 +65,15 @@ int BPF_PROG(sched_switch, bool preempt, struct task_struct *prev, struct task_s
 	u32 pid;
 
 	if (allow_record(prev)) {
-		pid = prev->pid;
+		pid = BPF_CORE_READ(prev, pid);
 		/* To distinguish idle threads of different cores */
 		if (!pid)
 			pid = bpf_get_smp_processor_id();
 		i_key.key.pid = pid;
-		i_key.key.tgid = prev->tgid;
+		i_key.key.tgid = BPF_CORE_READ(prev, tgid);
 		i_key.start_ts = bpf_ktime_get_ns();
 
-		if (prev->flags & PF_KTHREAD)
+		if (BPF_CORE_READ(prev, flags) & PF_KTHREAD)
 			i_key.key.user_stack_id = -1;
 		else
 			i_key.key.user_stack_id =
@@ -82,12 +81,12 @@ int BPF_PROG(sched_switch, bool preempt, struct task_struct *prev, struct task_s
 						BPF_F_USER_STACK);
 		i_key.key.kern_stack_id = bpf_get_stackid(ctx, &stackmap, 0);
 		bpf_map_update_elem(&start, &pid, &i_key, 0);
-		bpf_probe_read_kernel_str(&val.comm, sizeof(prev->comm), prev->comm);
+		bpf_probe_read_kernel_str(&val.comm, bpf_core_field_size(prev->comm), prev->comm);
 		val.delta = 0;
 		bpf_map_update_elem(&info, &i_key.key, &val, BPF_NOEXIST);
 	}
 
-	pid = next->pid;
+	pid = BPF_CORE_READ(next, pid);
 	i_keyp = bpf_map_lookup_elem(&start, &pid);
 	if (!i_keyp)
 		return 0;
@@ -105,6 +104,16 @@ int BPF_PROG(sched_switch, bool preempt, struct task_struct *prev, struct task_s
 cleanup:
 	bpf_map_delete_elem(&start, &pid);
 	return 0;
+}
+
+SEC("tp_btf/sched_switch")
+int BPF_PROG(sched_switch_btf, bool preempt, struct task_struct *prev, struct task_struct *next) {
+	return handle_switch(ctx, prev, next);
+}
+
+SEC("tracepoint/sched/sched_switch")
+int BPF_PROG(sched_switch_tp, bool preempt, struct task_struct *prev, struct task_struct *next) {
+	return handle_switch(ctx, prev, next);
 }
 
 char LICENSE[] SEC("license") = "GPL";
