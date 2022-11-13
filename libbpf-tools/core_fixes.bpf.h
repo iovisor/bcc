@@ -109,4 +109,26 @@ static __always_inline struct gendisk *get_disk(void *request)
 	return BPF_CORE_READ(r, q, disk);
 }
 
+/**
+ * commit 6521f8917082("namei: prepare for idmapped mounts") add `struct
+ * user_namespace *mnt_userns` as vfs_create() and vfs_unlink() first argument.
+ * At the same time, struct renamedata {} add `struct user_namespace
+ * *old_mnt_userns` item. Now, to kprobe vfs_create()/vfs_unlink() in a CO-RE
+ * way, determine whether there is a `old_mnt_userns` field for `struct
+ * renamedata` to decide which input parameter of the vfs_create() to use as
+ * `dentry`.
+ * see:
+ *     https://github.com/torvalds/linux/commit/6521f8917082
+ */
+struct renamedata___x {
+	struct user_namespace *old_mnt_userns;
+} __attribute__((preserve_access_index));
+
+static __always_inline bool renamedata_has_old_mnt_userns_field(void)
+{
+	if (bpf_core_field_exists(struct renamedata___x, old_mnt_userns))
+		return true;
+	return false;
+}
+
 #endif /* __CORE_FIXES_BPF_H */
