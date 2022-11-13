@@ -217,6 +217,11 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	if (probe_tp_btf("sched_switch"))
+		bpf_program__set_autoload(obj->progs.sched_switch_tp, false);
+	else
+		bpf_program__set_autoload(obj->progs.sched_switch_btf, false);
+
 	/* initialize global data (filtering options) */
 	obj->rodata->filter_cg = env.cg;
 	obj->rodata->targ_per_process = env.per_process;

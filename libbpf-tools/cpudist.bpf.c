@@ -71,8 +71,7 @@ static __always_inline void update_hist(struct task_struct *task,
 		histp = bpf_map_lookup_elem(&hists, &id);
 		if (!histp)
 			return;
-		bpf_probe_read_kernel_str(&histp->comm, sizeof(task->comm),
-					  task->comm);
+		BPF_CORE_READ_STR_INTO(&histp->comm, task, comm);
 	}
 	delta = ts - *tsp;
 	if (targ_ms)
@@ -85,12 +84,10 @@ static __always_inline void update_hist(struct task_struct *task,
 	__sync_fetch_and_add(&histp->slots[slot], 1);
 }
 
-SEC("tp_btf/sched_switch")
-int BPF_PROG(sched_switch, bool preempt, struct task_struct *prev,
-	     struct task_struct *next)
+static int handle_switch(struct task_struct *prev, struct task_struct *next)
 {
-	u32 prev_tgid = prev->tgid, prev_pid = prev->pid;
-	u32 tgid = next->tgid, pid = next->pid;
+	u32 prev_tgid = BPF_CORE_READ(prev, tgid), prev_pid = BPF_CORE_READ(prev, pid);
+	u32 tgid = BPF_CORE_READ(next, tgid), pid = BPF_CORE_READ(next, pid);
 	u64 ts = bpf_ktime_get_ns();
 
 	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
@@ -105,6 +102,20 @@ int BPF_PROG(sched_switch, bool preempt, struct task_struct *prev,
 		store_start(tgid, pid, ts);
 	}
 	return 0;
+}
+
+SEC("tp_btf/sched_switch")
+int BPF_PROG(sched_switch_btf, bool preempt, struct task_struct *prev,
+	     struct task_struct *next)
+{
+	return handle_switch(prev, next);
+}
+
+SEC("raw_tp/sched_switch")
+int BPF_PROG(sched_switch_tp, bool preempt, struct task_struct *prev,
+	     struct task_struct *next)
+{
+	return handle_switch(prev, next);
 }
 
 char LICENSE[] SEC("license") = "GPL";
