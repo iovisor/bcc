@@ -132,7 +132,7 @@ static void sig_handler(int sig)
 {
 }
 
-static int init_freqs_hmz(__u32 *freqs_mhz, int nr_cpus)
+static int init_freqs_mhz(__u32 *freqs_mhz, int nr_cpus)
 {
 	char path[64];
 	FILE *f;
@@ -233,7 +233,7 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	err = init_freqs_hmz(obj->bss->freqs_mhz, nr_cpus);
+	err = init_freqs_mhz(obj->bss->freqs_mhz, nr_cpus);
 	if (err) {
 		fprintf(stderr, "failed to init freqs\n");
 		goto cleanup;
