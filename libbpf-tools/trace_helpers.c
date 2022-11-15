@@ -973,6 +973,8 @@ void print_linear_hist(unsigned int *vals, int vals_size, unsigned int base,
 	printf("     %-13s : count     distribution\n", val_type);
 	for (i = idx_min; i <= idx_max; i++) {
 		val = vals[i];
+		if (!val)
+			continue;
 		printf("        %-10d : %-8d |", base + i * step, val);
 		print_stars(val, val_max, stars_max);
 		printf("|\n");
