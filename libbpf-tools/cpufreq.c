@@ -155,6 +155,11 @@ static int init_freqs_hmz(__u32 *freqs_mhz, int nr_cpus)
 			fclose(f);
 			return -1;
 		}
+		/*
+		 * scaling_cur_freq is in kHz. To be handled with
+		 * a small data size, it's converted in mHz.
+		 */
+		freqs_mhz[i] /= 1000;
 		fclose(f);
 	}
 
