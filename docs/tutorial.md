@@ -306,7 +306,7 @@ Use this tool to understand the code paths that are consuming CPU resources.
 
 More [examples](../tools/profile_example.txt).
 
-### 2. Observatility with Generic Tools
+### 2. Observability with Generic Tools
 
 In addition to the above tools for performance tuning, below is a checklist for bcc generic tools, first as a list, and in detail:
 
