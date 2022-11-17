@@ -198,7 +198,7 @@ static int print_one_prog(uint32_t prog_id)
   const uint32_t usual_nr_map_ids = 64;
   uint32_t nr_map_ids = usual_nr_map_ids;
   struct bpf_prog_info prog_info;
-  uint32_t *map_ids =  NULL;
+  uint32_t *map_ids = NULL, *last_map_ids = NULL;
   uint32_t info_len;
   int ret = 0;
   int prog_fd;
@@ -224,11 +224,12 @@ static int print_one_prog(uint32_t prog_id)
               "Cannot allocate memory for %u map_ids for BID:%u\n",
               nr_map_ids, prog_id);
       close(prog_fd);
-      free(map_ids);
+      free(last_map_ids);
       return 1;
     }
 
     map_ids = u64_to_ptr(prog_info.map_ids);
+    last_map_ids = map_ids;
     prog_info.nr_map_ids = nr_map_ids;
     info_len = sizeof(prog_info);
     ret = bpf_obj_get_info(prog_fd, &prog_info, &info_len);
