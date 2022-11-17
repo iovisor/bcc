@@ -57,7 +57,8 @@ static bool allow_record(struct task_struct *t)
 	return true;
 }
 
-static int handle_switch(u64 *ctx, struct task_struct *prev)
+static int handle_switch(u64 *ctx, struct task_struct *prev, 
+	struct task_struct *next)
 {
 	struct internal_key *i_keyp, i_key;
 	struct val_t *valp, val;
@@ -86,7 +87,7 @@ static int handle_switch(u64 *ctx, struct task_struct *prev)
 		bpf_map_update_elem(&info, &i_key.key, &val, BPF_NOEXIST);
 	}
 
-	pid = bpf_get_current_pid_tgid();
+	pid = BPF_CORE_READ(next, pid);
 	i_keyp = bpf_map_lookup_elem(&start, &pid);
 	if (!i_keyp)
 		return 0;
@@ -107,14 +108,17 @@ cleanup:
 }
 
 SEC("tp_btf/sched_switch")
-int BPF_PROG(sched_switch_btf, bool preempt, struct task_struct *prev, struct task_struct *next) {
-	return handle_switch(ctx, prev);
+int BPF_PROG(sched_switch_btf, bool preempt, struct task_struct *prev, 
+	struct task_struct *next) {
+	return handle_switch(ctx, prev, next);
 }
 
-SEC("kprobe/finish_task_switch")
+SEC("raw_tp/sched_switch")
 int BPF_PROG(sched_switch_tp) {
-	struct task_struct *prev = (struct task_struct *)PT_REGS_PARM1_CORE((struct pt_regs *)ctx);
-	return handle_switch(ctx, prev);
+	struct bpf_raw_tracepoint_args *args = (void *)ctx;
+	struct task_struct *prev = (void *)args->args[1];
+	struct task_struct *next = (void *)args->args[2];
+	return handle_switch(ctx, prev, next);
 }
 
 char LICENSE[] SEC("license") = "GPL";
