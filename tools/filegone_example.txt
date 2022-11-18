@@ -1,10 +1,10 @@
-Demonstrations of filevanish, the Linux eBPF/bcc version.
+Demonstrations of filegone, the Linux eBPF/bcc version.
 
 
-filevanish traces why file vanished. either been deleted or renamed
+filegone traces why file gone, either been deleted or renamed
 For example:
 
-# ./filevanish 
+# ./filegone 
 18:30:56 22905   vim               DELETE .fstab.swpx
 18:30:56 22905   vim               DELETE .fstab.swp
 18:31:00 22905   vim               DELETE .viminfo
@@ -13,15 +13,14 @@ For example:
 
 USAGE message:
 
-# ./filevanish -h
-usage: filevanish [-h] [-p PID]
+usage: filegone.py [-h] [-p PID]
 
-Trace why file vanished(been deleted or renamed)
+Trace why file gone (deleted or renamed)
 
 optional arguments:
   -h, --help         show this help message and exit
   -p PID, --pid PID  trace this PID only
 
 examples:
-    ./filevanish           # trace all stat() syscalls
-    ./filevanish -p 181    # only trace PID 181
+    ./filegone           # trace all file gone events
+    ./filegone -p 181    # only trace PID 181

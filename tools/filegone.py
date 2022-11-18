@@ -1,10 +1,10 @@
 #!/usr/bin/python
 # @lint-avoid-python-3-compatibility-imports
 #
-# filevanish    Trace why file vanished
+# filegone    Trace why file gone (deleted or renamed).
 #             For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: filevanish [-h] [-p PID]
+# USAGE: filegone [-h] [-p PID]
 #
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
@@ -17,11 +17,11 @@ from time import strftime
 
 # arguments
 examples = """examples:
-    ./filevanish           # trace all stat() syscalls
-    ./filevanish -p 181    # only trace PID 181
+    ./filegone           # trace all file gone events
+    ./filegone -p 181    # only trace PID 181
 """
 parser = argparse.ArgumentParser(
-    description="Trace stat() syscalls",
+    description="Trace why file gone (deleted or renamed)",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
 parser.add_argument("-p", "--pid",
@@ -128,8 +128,6 @@ if debug or args.ebpf:
 # initialize BPF
 b = BPF(text=bpf_text)
 b.attach_kprobe(event="vfs_unlink", fn_name="trace_unlink")
-
-
 b.attach_kprobe(event="vfs_rmdir", fn_name="trace_unlink")
 b.attach_kprobe(event="vfs_rename", fn_name="trace_rename")
 
