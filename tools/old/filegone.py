@@ -9,7 +9,6 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 08-Nov-2022 Curu. modified from filelife
-# 19-Nov-2022 Rong Tao Check btf struct field instead of KERNEL_VERSION macro.
 
 from __future__ import print_function
 from bcc import BPF
@@ -49,7 +48,11 @@ struct data_t {
 BPF_PERF_OUTPUT(events);
 
 // trace file deletion and output details
-TRACE_VFS_UNLINK_FUNC
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 12, 0)
+int trace_unlink(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
+#else
+int trace_unlink(struct pt_regs *ctx, struct user_namespace *ns, struct inode *dir, struct dentry *dentry)
+#endif
 {
     u32 pid = bpf_get_current_pid_tgid() >> 32;
 
@@ -71,7 +74,16 @@ TRACE_VFS_UNLINK_FUNC
 }
 
 // trace file rename
-TRACE_VFS_RENAME_FUNC
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 12, 0)
+int trace_rename(struct pt_regs *ctx, struct inode *old_dir, struct dentry *old_dentry,
+struct inode *new_dir, struct dentry *new_dentry)
+{
+#else
+int trace_rename(struct pt_regs *ctx, struct renamedata *rd)
+{
+    struct dentry *old_dentry = rd->old_dentry;
+    struct dentry *new_dentry = rd->new_dentry;
+#endif
 
     u32 pid = bpf_get_current_pid_tgid() >> 32;
 
@@ -94,24 +106,6 @@ TRACE_VFS_RENAME_FUNC
 }
 """
 
-bpf_vfs_rename_text_old="""
-int trace_rename(struct pt_regs *ctx, struct inode *old_dir, struct dentry *old_dentry,
-struct inode *new_dir, struct dentry *new_dentry)
-{
-"""
-bpf_vfs_rename_text_new="""
-int trace_rename(struct pt_regs *ctx, struct renamedata *rd)
-{
-    struct dentry *old_dentry = rd->old_dentry;
-    struct dentry *new_dentry = rd->new_dentry;
-"""
-
-bpf_vfs_unlink_text_old="""
-int trace_unlink(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
-"""
-bpf_vfs_unlink_text_new="""
-int trace_unlink(struct pt_regs *ctx, struct user_namespace *ns, struct inode *dir, struct dentry *dentry)
-"""
 
 def action2str(action):
     if chr(action) == 'D':
@@ -130,14 +124,6 @@ if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
         exit()
-
-# check 'struct renamedata' exist or not
-if BPF.kernel_struct_has_field("renamedata", "old_mnt_userns") == 1:
-    bpf_text = bpf_text.replace('TRACE_VFS_RENAME_FUNC', bpf_vfs_rename_text_new)
-    bpf_text = bpf_text.replace('TRACE_VFS_UNLINK_FUNC', bpf_vfs_unlink_text_new)
-else:
-    bpf_text = bpf_text.replace('TRACE_VFS_RENAME_FUNC', bpf_vfs_rename_text_old)
-    bpf_text = bpf_text.replace('TRACE_VFS_UNLINK_FUNC', bpf_vfs_unlink_text_old)
 
 # initialize BPF
 b = BPF(text=bpf_text)
