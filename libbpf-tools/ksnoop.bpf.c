@@ -442,13 +442,13 @@ static int ksnoop(struct pt_regs *ctx, bool entry)
 }
 
 SEC("kprobe/foo")
-int kprobe_entry(struct pt_regs *ctx)
+int BPF_KPROBE(kprobe_entry)
 {
 	return ksnoop(ctx, true);
 }
 
 SEC("kretprobe/foo")
-int kprobe_return(struct pt_regs *ctx)
+int BPF_KRETPROBE(kprobe_return)
 {
 	return ksnoop(ctx, false);
 }
