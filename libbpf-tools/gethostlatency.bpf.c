@@ -61,13 +61,13 @@ static int probe_return(struct pt_regs *ctx)
 }
 
 SEC("kprobe/handle_entry")
-int handle_entry(struct pt_regs *ctx)
+int BPF_KPROBE(handle_entry)
 {
 	return probe_entry(ctx);
 }
 
 SEC("kretprobe/handle_return")
-int handle_return(struct pt_regs *ctx)
+int BPF_KRETPROBE(handle_return)
 {
 	return probe_return(ctx);
 }
