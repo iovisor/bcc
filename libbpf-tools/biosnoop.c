@@ -334,10 +334,10 @@ int main(int argc, char **argv)
 			fprintf(stderr, "error polling perf buffer: %s\n", strerror(-err));
 			goto cleanup;
 		}
-		if (env.duration && get_ktime_ns() > time_end)
-			goto cleanup;
 		/* reset err to return 0 if exiting */
 		err = 0;
+		if (env.duration && get_ktime_ns() > time_end)
+			break;
 	}
 
 cleanup:
