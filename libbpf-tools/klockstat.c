@@ -179,6 +179,7 @@ static bool parse_sorts(struct prog_env *env, char *arg)
 	return parse_one_sort(env, arg);
 }
 
+ __attribute__((no_sanitize("memory")))
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
 	struct prog_env *env = state->input;
@@ -531,7 +532,7 @@ static int print_stats(struct ksyms *ksyms, int stack_map, int stat_map)
 				return -1;
 			}
 		}
-		ss = malloc(sizeof(struct stack_stat));
+		ss = calloc(1, sizeof(struct stack_stat));
 		if (!ss) {
 			warn("Out of memory\n");
 			return -1;
