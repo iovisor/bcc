@@ -295,7 +295,6 @@ make oldconfig && make prepare
 make scripts
 make modules
 sudo make modules_install
-sudo mv /lib/modules/$(uname -r)+ /lib/modules/$(uname -r)
 ````
 
 Then you can install bcc tools package according your distribution.
