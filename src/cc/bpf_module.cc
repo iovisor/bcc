@@ -20,7 +20,11 @@
 #include <llvm-c/Transforms/IPO.h>
 #include <llvm/ExecutionEngine/MCJIT.h>
 #include <llvm/ExecutionEngine/SectionMemoryManager.h>
+#if LLVM_MAJOR_VERSION >= 16
+#include <llvm/IRPrinter/IRPrintingPasses.h>
+#else
 #include <llvm/IR/IRPrintingPasses.h>
+#endif
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 
