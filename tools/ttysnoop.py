@@ -120,7 +120,7 @@ static int do_tty_write(void *ctx, const char __user *buf, size_t count)
  * commit 9bb48c82aced (v5.11-rc4) tty: implement write_iter
  * changed arguments of tty_write function
  */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 11)
 int kprobe__tty_write(struct pt_regs *ctx, struct file *file,
     const char __user *buf, size_t count)
 {
