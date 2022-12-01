@@ -150,7 +150,8 @@ int trace_run(struct pt_regs *ctx, struct task_struct *prev)
     // output
     events.perf_submit(ctx, &data, sizeof(data));
 
-    start.delete(&pid);
+    //array map has no delete method, set ts to 0 instead
+    *tsp = 0;
     return 0;
 }
 """
@@ -222,7 +223,8 @@ RAW_TRACEPOINT_PROBE(sched_switch)
     // output
     events.perf_submit(ctx, &data, sizeof(data));
 
-    start.delete(&pid);
+    //array map has no delete method, set ts to 0 instead
+    *tsp = 0;
     return 0;
 }
 """
