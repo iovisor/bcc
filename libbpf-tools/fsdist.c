@@ -39,44 +39,44 @@ enum fs_type {
 
 static struct fs_config {
 	const char *fs;
-	const char *op_funcs[MAX_OP];
+	const char *op_funcs[F_MAX_OP];
 } fs_configs[] = {
 	[BTRFS] = { "btrfs", {
-		[READ] = "btrfs_file_read_iter",
-		[WRITE] = "btrfs_file_write_iter",
-		[OPEN] = "btrfs_file_open",
-		[FSYNC] = "btrfs_sync_file",
-		[GETATTR] = NULL, /* not supported */
+		[F_READ] = "btrfs_file_read_iter",
+		[F_WRITE] = "btrfs_file_write_iter",
+		[F_OPEN] = "btrfs_file_open",
+		[F_FSYNC] = "btrfs_sync_file",
+		[F_GETATTR] = NULL, /* not supported */
 	}},
 	[EXT4] = { "ext4", {
-		[READ] = "ext4_file_read_iter",
-		[WRITE] = "ext4_file_write_iter",
-		[OPEN] = "ext4_file_open",
-		[FSYNC] = "ext4_sync_file",
-		[GETATTR] = "ext4_file_getattr",
+		[F_READ] = "ext4_file_read_iter",
+		[F_WRITE] = "ext4_file_write_iter",
+		[F_OPEN] = "ext4_file_open",
+		[F_FSYNC] = "ext4_sync_file",
+		[F_GETATTR] = "ext4_file_getattr",
 	}},
 	[NFS] = { "nfs", {
-		[READ] = "nfs_file_read",
-		[WRITE] = "nfs_file_write",
-		[OPEN] = "nfs_file_open",
-		[FSYNC] = "nfs_file_fsync",
-		[GETATTR] = "nfs_getattr",
+		[F_READ] = "nfs_file_read",
+		[F_WRITE] = "nfs_file_write",
+		[F_OPEN] = "nfs_file_open",
+		[F_FSYNC] = "nfs_file_fsync",
+		[F_GETATTR] = "nfs_getattr",
 	}},
 	[XFS] = { "xfs", {
-		[READ] = "xfs_file_read_iter",
-		[WRITE] = "xfs_file_write_iter",
-		[OPEN] = "xfs_file_open",
-		[FSYNC] = "xfs_file_fsync",
-		[GETATTR] = NULL, /* not supported */
+		[F_READ] = "xfs_file_read_iter",
+		[F_WRITE] = "xfs_file_write_iter",
+		[F_OPEN] = "xfs_file_open",
+		[F_FSYNC] = "xfs_file_fsync",
+		[F_GETATTR] = NULL, /* not supported */
 	}},
 };
 
 static char *file_op_names[] = {
-	[READ] = "read",
-	[WRITE] = "write",
-	[OPEN] = "open",
-	[FSYNC] = "fsync",
-	[GETATTR] = "getattr",
+	[F_READ] = "read",
+	[F_WRITE] = "write",
+	[F_OPEN] = "open",
+	[F_FSYNC] = "fsync",
+	[F_GETATTR] = "getattr",
 };
 
 static struct hist zero;
@@ -212,7 +212,7 @@ static int print_hists(struct fsdist_bpf__bss *bss)
 	const char *units = timestamp_in_ms ? "msecs" : "usecs";
 	enum fs_file_op op;
 
-	for (op = READ; op < MAX_OP; op++) {
+	for (op = F_READ; op < F_MAX_OP; op++) {
 		struct hist hist = bss->hists[op];
 
 		bss->hists[op] = zero;
@@ -231,7 +231,7 @@ static bool check_fentry()
 	const char *fn_name, *module;
 	bool support_fentry = true;
 
-	for (i = 0; i < MAX_OP; i++) {
+	for (i = 0; i < F_MAX_OP; i++) {
 		fn_name = fs_configs[fs_type].op_funcs[i];
 		module = fs_configs[fs_type].fs;
 		if (fn_name && !fentry_can_attach(fn_name, module)) {
@@ -247,17 +247,17 @@ static int fentry_set_attach_target(struct fsdist_bpf *obj)
 	struct fs_config *cfg = &fs_configs[fs_type];
 	int err = 0;
 
-	err = err ?: bpf_program__set_attach_target(obj->progs.file_read_fentry, 0, cfg->op_funcs[READ]);
-	err = err ?: bpf_program__set_attach_target(obj->progs.file_read_fexit, 0, cfg->op_funcs[READ]);
-	err = err ?: bpf_program__set_attach_target(obj->progs.file_write_fentry, 0, cfg->op_funcs[WRITE]);
-	err = err ?: bpf_program__set_attach_target(obj->progs.file_write_fexit, 0, cfg->op_funcs[WRITE]);
-	err = err ?: bpf_program__set_attach_target(obj->progs.file_open_fentry, 0, cfg->op_funcs[OPEN]);
-	err = err ?: bpf_program__set_attach_target(obj->progs.file_open_fexit, 0, cfg->op_funcs[OPEN]);
-	err = err ?: bpf_program__set_attach_target(obj->progs.file_sync_fentry, 0, cfg->op_funcs[FSYNC]);
-	err = err ?: bpf_program__set_attach_target(obj->progs.file_sync_fexit, 0, cfg->op_funcs[FSYNC]);
-	if (cfg->op_funcs[GETATTR]) {
-		err = err ?: bpf_program__set_attach_target(obj->progs.getattr_fentry, 0, cfg->op_funcs[GETATTR]);
-		err = err ?: bpf_program__set_attach_target(obj->progs.getattr_fexit, 0, cfg->op_funcs[GETATTR]);
+	err = err ?: bpf_program__set_attach_target(obj->progs.file_read_fentry, 0, cfg->op_funcs[F_READ]);
+	err = err ?: bpf_program__set_attach_target(obj->progs.file_read_fexit, 0, cfg->op_funcs[F_READ]);
+	err = err ?: bpf_program__set_attach_target(obj->progs.file_write_fentry, 0, cfg->op_funcs[F_WRITE]);
+	err = err ?: bpf_program__set_attach_target(obj->progs.file_write_fexit, 0, cfg->op_funcs[F_WRITE]);
+	err = err ?: bpf_program__set_attach_target(obj->progs.file_open_fentry, 0, cfg->op_funcs[F_OPEN]);
+	err = err ?: bpf_program__set_attach_target(obj->progs.file_open_fexit, 0, cfg->op_funcs[F_OPEN]);
+	err = err ?: bpf_program__set_attach_target(obj->progs.file_sync_fentry, 0, cfg->op_funcs[F_FSYNC]);
+	err = err ?: bpf_program__set_attach_target(obj->progs.file_sync_fexit, 0, cfg->op_funcs[F_FSYNC]);
+	if (cfg->op_funcs[F_GETATTR]) {
+		err = err ?: bpf_program__set_attach_target(obj->progs.getattr_fentry, 0, cfg->op_funcs[F_GETATTR]);
+		err = err ?: bpf_program__set_attach_target(obj->progs.getattr_fexit, 0, cfg->op_funcs[F_GETATTR]);
 	} else {
 		bpf_program__set_autoload(obj->progs.getattr_fentry, false);
 		bpf_program__set_autoload(obj->progs.getattr_fexit, false);
@@ -298,41 +298,41 @@ static int attach_kprobes(struct fsdist_bpf *obj)
 	long err = 0;
 	struct fs_config *cfg = &fs_configs[fs_type];
 
-	/* READ */
-	obj->links.file_read_entry = bpf_program__attach_kprobe(obj->progs.file_read_entry, false, cfg->op_funcs[READ]);
+	/* F_READ */
+	obj->links.file_read_entry = bpf_program__attach_kprobe(obj->progs.file_read_entry, false, cfg->op_funcs[F_READ]);
 	if (!obj->links.file_read_entry)
 		goto errout;
-	obj->links.file_read_exit = bpf_program__attach_kprobe(obj->progs.file_read_exit, true, cfg->op_funcs[READ]);
+	obj->links.file_read_exit = bpf_program__attach_kprobe(obj->progs.file_read_exit, true, cfg->op_funcs[F_READ]);
 	if (!obj->links.file_read_exit)
 		goto errout;
-	/* WRITE */
-	obj->links.file_write_entry = bpf_program__attach_kprobe(obj->progs.file_write_entry, false, cfg->op_funcs[WRITE]);
+	/* F_WRITE */
+	obj->links.file_write_entry = bpf_program__attach_kprobe(obj->progs.file_write_entry, false, cfg->op_funcs[F_WRITE]);
 	if (!obj->links.file_write_entry)
 		goto errout;
-	obj->links.file_write_exit = bpf_program__attach_kprobe(obj->progs.file_write_exit, true, cfg->op_funcs[WRITE]);
+	obj->links.file_write_exit = bpf_program__attach_kprobe(obj->progs.file_write_exit, true, cfg->op_funcs[F_WRITE]);
 	if (!obj->links.file_write_exit)
 		goto errout;
-	/* OPEN */
-	obj->links.file_open_entry = bpf_program__attach_kprobe(obj->progs.file_open_entry, false, cfg->op_funcs[OPEN]);
+	/* F_OPEN */
+	obj->links.file_open_entry = bpf_program__attach_kprobe(obj->progs.file_open_entry, false, cfg->op_funcs[F_OPEN]);
 	if (!obj->links.file_open_entry)
 		goto errout;
-	obj->links.file_open_exit = bpf_program__attach_kprobe(obj->progs.file_open_exit, true, cfg->op_funcs[OPEN]);
+	obj->links.file_open_exit = bpf_program__attach_kprobe(obj->progs.file_open_exit, true, cfg->op_funcs[F_OPEN]);
 	if (!obj->links.file_open_exit)
 		goto errout;
-	/* FSYNC */
-	obj->links.file_sync_entry = bpf_program__attach_kprobe(obj->progs.file_sync_entry, false, cfg->op_funcs[FSYNC]);
+	/* F_FSYNC */
+	obj->links.file_sync_entry = bpf_program__attach_kprobe(obj->progs.file_sync_entry, false, cfg->op_funcs[F_FSYNC]);
 	if (!obj->links.file_sync_entry)
 		goto errout;
-	obj->links.file_sync_exit = bpf_program__attach_kprobe(obj->progs.file_sync_exit, true, cfg->op_funcs[FSYNC]);
+	obj->links.file_sync_exit = bpf_program__attach_kprobe(obj->progs.file_sync_exit, true, cfg->op_funcs[F_FSYNC]);
 	if (!obj->links.file_sync_exit)
 		goto errout;
-	/* GETATTR */
-	if (!cfg->op_funcs[GETATTR])
+	/* F_GETATTR */
+	if (!cfg->op_funcs[F_GETATTR])
 		return 0;
-	obj->links.getattr_entry = bpf_program__attach_kprobe(obj->progs.getattr_entry, false, cfg->op_funcs[GETATTR]);
+	obj->links.getattr_entry = bpf_program__attach_kprobe(obj->progs.getattr_entry, false, cfg->op_funcs[F_GETATTR]);
 	if (!obj->links.getattr_entry)
 		goto errout;
-	obj->links.getattr_exit = bpf_program__attach_kprobe(obj->progs.getattr_exit, true, cfg->op_funcs[GETATTR]);
+	obj->links.getattr_exit = bpf_program__attach_kprobe(obj->progs.getattr_exit, true, cfg->op_funcs[F_GETATTR]);
 	if (!obj->links.getattr_exit)
 		goto errout;
 	return 0;

@@ -82,7 +82,7 @@ static int probe_exit(void *ctx, enum fs_file_op op, ssize_t size)
 	event.delta_us = delta_ns / 1000;
 	event.end_ns = end_ns;
 	event.offset = datap->start;
-	if (op != FSYNC)
+	if (op != F_FSYNC)
 		event.size = size;
 	else
 		event.size = datap->end - datap->start;
@@ -109,7 +109,7 @@ int BPF_KPROBE(file_read_entry, struct kiocb *iocb)
 SEC("kretprobe/dummy_file_read")
 int BPF_KRETPROBE(file_read_exit, ssize_t ret)
 {
-	return probe_exit(ctx, READ, ret);
+	return probe_exit(ctx, F_READ, ret);
 }
 
 SEC("kprobe/dummy_file_write")
@@ -124,7 +124,7 @@ int BPF_KPROBE(file_write_entry, struct kiocb *iocb)
 SEC("kretprobe/dummy_file_write")
 int BPF_KRETPROBE(file_write_exit, ssize_t ret)
 {
-	return probe_exit(ctx, WRITE, ret);
+	return probe_exit(ctx, F_WRITE, ret);
 }
 
 SEC("kprobe/dummy_file_open")
@@ -136,7 +136,7 @@ int BPF_KPROBE(file_open_entry, struct inode *inode, struct file *file)
 SEC("kretprobe/dummy_file_open")
 int BPF_KRETPROBE(file_open_exit)
 {
-	return probe_exit(ctx, OPEN, 0);
+	return probe_exit(ctx, F_OPEN, 0);
 }
 
 SEC("kprobe/dummy_file_sync")
@@ -148,7 +148,7 @@ int BPF_KPROBE(file_sync_entry, struct file *file, loff_t start, loff_t end)
 SEC("kretprobe/dummy_file_sync")
 int BPF_KRETPROBE(file_sync_exit)
 {
-	return probe_exit(ctx, FSYNC, 0);
+	return probe_exit(ctx, F_FSYNC, 0);
 }
 
 SEC("fentry/dummy_file_read")
@@ -163,7 +163,7 @@ int BPF_PROG(file_read_fentry, struct kiocb *iocb)
 SEC("fexit/dummy_file_read")
 int BPF_PROG(file_read_fexit, struct kiocb *iocb, struct iov_iter *to, ssize_t ret)
 {
-	return probe_exit(ctx, READ, ret);
+	return probe_exit(ctx, F_READ, ret);
 }
 
 SEC("fentry/dummy_file_write")
@@ -178,7 +178,7 @@ int BPF_PROG(file_write_fentry, struct kiocb *iocb)
 SEC("fexit/dummy_file_write")
 int BPF_PROG(file_write_fexit, struct kiocb *iocb, struct iov_iter *from, ssize_t ret)
 {
-	return probe_exit(ctx, WRITE, ret);
+	return probe_exit(ctx, F_WRITE, ret);
 }
 
 SEC("fentry/dummy_file_open")
@@ -190,7 +190,7 @@ int BPF_PROG(file_open_fentry, struct inode *inode, struct file *file)
 SEC("fexit/dummy_file_open")
 int BPF_PROG(file_open_fexit)
 {
-	return probe_exit(ctx, OPEN, 0);
+	return probe_exit(ctx, F_OPEN, 0);
 }
 
 SEC("fentry/dummy_file_sync")
@@ -202,7 +202,7 @@ int BPF_PROG(file_sync_fentry, struct file *file, loff_t start, loff_t end)
 SEC("fexit/dummy_file_sync")
 int BPF_PROG(file_sync_fexit)
 {
-	return probe_exit(ctx, FSYNC, 0);
+	return probe_exit(ctx, F_FSYNC, 0);
 }
 
 char LICENSE[] SEC("license") = "GPL";
