@@ -315,8 +315,6 @@ static int trace_to_value(struct btf *btf, struct func *func, char *argname,
 		strncpy(val->name, argname, sizeof(val->name));
 
 	for (i = 0; i < MAX_TRACES; i++) {
-		if (!func->args[i].name)
-			continue;
 		if (strcmp(argname, func->args[i].name) != 0)
 			continue;
 		p_debug("setting base arg for val %s to %d", val->name, i);
