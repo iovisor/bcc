@@ -69,6 +69,13 @@ Kernel compile flags can usually be checked by looking at `/proc/config.gz` or
 
 `bcc` and its tools are available in the standard Debian main repository, from the source package [bpfcc](https://packages.debian.org/source/sid/bpfcc) under the names `bpfcc-tools`, `python3-bpfcc`, `libbpfcc` and `libbpfcc-dev`.
 
+To install:
+
+```bash
+echo deb http://cloudfront.debian.net/debian sid main >> /etc/apt/sources.list
+sudo apt-get install -y bpfcc-tools libbpfcc libbpfcc-dev linux-headers-$(uname -r)
+```
+
 ## Ubuntu - Binary
 
 Versions of bcc are available in the standard Ubuntu
