@@ -78,7 +78,7 @@ struct data_t {
 };
 
 BPF_ARRAY(data_map, struct data_t, 1);
-PERF_TABLE
+BPF_PERF_OUTPUT(events);
 
 static int do_tty_write(void *ctx, const char __user *buf, size_t count)
 {
@@ -106,7 +106,7 @@ static int do_tty_write(void *ctx, const char __user *buf, size_t count)
             data->count = BUFSIZE;
         else
             data->count = count;
-        PERF_OUTPUT_CTX
+        events.perf_submit(ctx, data, sizeof(*data));
         if (count < BUFSIZE)
             return 0;
         count -= BUFSIZE;
@@ -162,22 +162,6 @@ KFUNC_PROBE(tty_write, struct kiocb *iocb, struct iov_iter *from)
 #endif
 """
 
-kernel_release = open('/proc/sys/kernel/osrelease').read().split('.')
-if int(kernel_release[0]) >= 5 and int(kernel_release[1]) >= 8:
-    PERF_MODE = "USE_BPF_RING_BUF"
-else:
-    PERF_MODE = "USE_BPF_PERF_BUF"
-
-if PERF_MODE == "USE_BPF_RING_BUF":
-    bpf_text = bpf_text.replace('PERF_TABLE',
-                            'BPF_RINGBUF_OUTPUT(events, 64);')
-    bpf_text = bpf_text.replace('PERF_OUTPUT_CTX',
-                            'events.ringbuf_output(data, sizeof(*data), 0);')
-else:
-    bpf_text = bpf_text.replace('PERF_TABLE', 'BPF_PERF_OUTPUT(events);')
-    bpf_text = bpf_text.replace('PERF_OUTPUT_CTX',
-                            'events.perf_submit(ctx, data, sizeof(*data));')
-
 bpf_text = bpf_text.replace('PTS', str(pi.st_ino))
 if debug or args.ebpf:
     print(bpf_text)
@@ -200,16 +184,9 @@ def print_event(cpu, data, size):
     sys.stdout.flush()
 
 # loop with callback to print_event
-if PERF_MODE == "USE_BPF_RING_BUF":
-    b["events"].open_ring_buffer(print_event)
-else:
-    b["events"].open_perf_buffer(print_event, page_cnt=64)
-
+b["events"].open_perf_buffer(print_event)
 while 1:
     try:
-        if PERF_MODE == "USE_BPF_RING_BUF":
-            b.ring_buffer_poll()
-        else:
-            b.perf_buffer_poll()
+        b.perf_buffer_poll()
     except KeyboardInterrupt:
         exit()
