@@ -400,6 +400,103 @@ TEST_CASE("resolve symbol addresses for a given PID", "[c_api]") {
   bcc_free_symcache(lazy_resolver, getpid());
 }
 
+TEST_CASE("resolve symbol addresses for an exited process", "[c-api]") {
+  struct bcc_symbol sym;
+  struct bcc_symbol lazy_sym;
+  static struct bcc_symbol_option lazy_opt {
+    .use_debug_file = 1, .check_debug_file_crc = 1, .lazy_symbolize = 1,
+#if defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
+    .use_symbol_type = BCC_SYM_ALL_TYPES | (1 << STT_PPC64_ELFV2_SYM_LEP),
+#else
+    .use_symbol_type = BCC_SYM_ALL_TYPES,
+#endif
+  };
+
+  SECTION("resolve in current namespace") {
+    pid_t child = spawn_child(nullptr, false, false, [](void *) {
+      sleep(5);
+      return 0;
+    });
+    void *resolver = bcc_symcache_new(child, nullptr);
+    void *lazy_resolver = bcc_symcache_new(child, &lazy_opt);
+
+    REQUIRE(resolver);
+    REQUIRE(lazy_resolver);
+
+    kill(child, SIGTERM);
+
+    REQUIRE(bcc_symcache_resolve(resolver, (uint64_t)&_a_test_function, &sym) ==
+            0);
+
+    char *this_exe = realpath("/proc/self/exe", NULL);
+    REQUIRE(string(this_exe) == sym.module);
+    free(this_exe);
+
+    REQUIRE(string("_a_test_function") == sym.name);
+
+    REQUIRE(bcc_symcache_resolve(lazy_resolver, (uint64_t)&_a_test_function,
+                                 &lazy_sym) == 0);
+    REQUIRE(string(lazy_sym.name) == sym.name);
+    REQUIRE(string(lazy_sym.module) == sym.module);
+  }
+
+  SECTION("resolve in separate pid namespace") {
+    pid_t child = spawn_child(nullptr, true, false, [](void *) {
+      sleep(5);
+      return 0;
+    });
+    void *resolver = bcc_symcache_new(child, nullptr);
+    void *lazy_resolver = bcc_symcache_new(child, &lazy_opt);
+
+    REQUIRE(resolver);
+    REQUIRE(lazy_resolver);
+
+    kill(child, SIGTERM);
+
+    REQUIRE(bcc_symcache_resolve(resolver, (uint64_t)&_a_test_function, &sym) ==
+            0);
+
+    char *this_exe = realpath("/proc/self/exe", NULL);
+    REQUIRE(string(this_exe) == sym.module);
+    free(this_exe);
+
+    REQUIRE(string("_a_test_function") == sym.name);
+
+    REQUIRE(bcc_symcache_resolve(lazy_resolver, (uint64_t)&_a_test_function,
+                                 &lazy_sym) == 0);
+    REQUIRE(string(lazy_sym.name) == sym.name);
+    REQUIRE(string(lazy_sym.module) == sym.module);
+  }
+
+  SECTION("resolve in separate pid and mount namespace") {
+    pid_t child = spawn_child(nullptr, true, true, [](void *) {
+      sleep(5);
+      return 0;
+    });
+    void *resolver = bcc_symcache_new(child, nullptr);
+    void *lazy_resolver = bcc_symcache_new(child, &lazy_opt);
+
+    REQUIRE(resolver);
+    REQUIRE(lazy_resolver);
+
+    kill(child, SIGTERM);
+
+    REQUIRE(bcc_symcache_resolve(resolver, (uint64_t)&_a_test_function, &sym) ==
+            0);
+
+    char *this_exe = realpath("/proc/self/exe", NULL);
+    REQUIRE(string(this_exe) == sym.module);
+    free(this_exe);
+
+    REQUIRE(string("_a_test_function") == sym.name);
+
+    REQUIRE(bcc_symcache_resolve(lazy_resolver, (uint64_t)&_a_test_function,
+                                 &lazy_sym) == 0);
+    REQUIRE(string(lazy_sym.name) == sym.name);
+    REQUIRE(string(lazy_sym.module) == sym.module);
+  }
+}
+
 #define STACK_SIZE (1024 * 1024)
 static char child_stack[STACK_SIZE];
 
