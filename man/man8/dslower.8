@@ -1,0 +1,76 @@
+.TH dslower 8  "2022-12-11" "USER COMMANDS"
+.SH NAME
+dslower \- Trace long process block time(in D state). Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B dslower [\-h] [\-p PID | \-t TID] [\-s] [min_us]
+.SH DESCRIPTION
+This script traces long process block time(in D state).
+This measures the time between a task was switched off cpu because of
+uninterruptible sleep and been woken up. ie: sched_switch -> ttwu_do_wakeup
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-p PID
+Trace this process ID only (filtered in-kernel).
+.TP
+\-t TID
+Trace this thread ID only (filtered in-kernel).
+.TP
+\-s
+also show stack trace
+.SH EXAMPLES
+.TP
+Trace block time longer than 10ms for all process
+#
+.B dslower
+.TP
+Trace only  PID 181:
+#
+.B dslower \-p 181
+.TP
+show stack
+#
+.B dslower \-s
+.SH FIELDS
+.TP
+TIME
+Time of the event.
+.TP
+CPU
+cpu id the event occur
+.TP
+TID
+Thread ID
+.TP
+COMM
+Process name for the PID.
+.TP
+LAT
+block time in us
+.SH OVERHEAD
+This traces scheduler functions, which can become very frequent. While eBPF
+has very low overhead, and this tool uses in-kernel maps for efficiency, the
+frequency of scheduler events for some workloads may be high enough that the
+overhead of this tool becomes significant. Measure in a lab environment
+to quantify the overhead before use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Curu Wong
+.SH SEE ALSO
+runqslower(8)

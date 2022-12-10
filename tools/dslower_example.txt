@@ -1,0 +1,68 @@
+Demonstrations of dslower, the Linux eBPF/bcc version.
+
+dslower shows long process block on D state time.
+This measures the time between a task was switched off because
+of uninterruptible sleep and been woken up.
+
+Tracing block time longer higher than 10000 us
+TIME     CPU   COMM             TID     LAT(us)
+01:34:01 [005] kworker/3:2      593976  13855
+01:34:01 [002] kworker/3:2      593976  10934
+01:34:09 [007] dd               597842  10002
+01:34:09 [007] dd               597842  14809
+01:34:09 [007] dd               597842  12453
+01:34:11 [007] dd               597842  10055
+01:34:11 [007] dd               597842  11328
+01:34:11 [007] dd               597842  10152
+01:34:11 [007] dd               597842  10051
+01:34:11 [007] dd               597842  11869
+01:34:11 [007] dd               597842  11760
+01:34:11 [007] dd               597842  10681
+[...]
+
+show block stack trace:
+dslower -s
+Tracing block time longer higher than 10000 us
+TIME     CPU   COMM             TID     LAT(us)
+01:55:21 [001] dd               14821   19566
+    finish_task_switch+0x1
+    schedule+0x29
+    schedule_timeout+0x221
+    io_schedule_timeout+0xad
+    io_schedule+0x18
+    bit_wait_io+0x11
+    __wait_on_bit+0x67
+    wait_on_page_bit+0x81
+    __filemap_fdatawait_range+0x111
+    filemap_fdatawait_range+0x14
+    filemap_write_and_wait_range+0x56
+    ext4_sync_file+0xba
+    generic_write_sync+0x4f
+    generic_file_aio_write+0x77
+    ext4_file_write+0x348
+    do_sync_write+0x93
+    vfs_write+0xc0
+    sys_write+0x55
+    tracesys+0xa6
+
+USAGE message:
+
+usage: dslower [-h] [-p PID | -t TID] [-s] [min_us]
+
+Trace process block on D state time. (uninterruptible sleep)
+
+positional arguments:
+  min_us             minimum block time to trace, in us (default 10000)
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -p PID, --pid PID  trace this PID only
+  -t TID, --tid TID  trace this TID only
+  -s, --stack        also show block stack trace
+
+examples:
+    ./dslower         # trace process block longer than 10000 us (default)
+    ./dslower 1000    # trace process block longer than 1000 us
+    ./dslower -p 123  # trace pid 123
+    ./dslower -t 123  # trace tid 123 (use for threads only)
+    ./dslower -s  # also show stack trace
