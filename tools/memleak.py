@@ -344,16 +344,26 @@ int pvalloc_exit(struct pt_regs *ctx) {
 }
 """
 
-bpf_source_kernel = """
+bpf_source_kernel_node = """
 
-TRACEPOINT_PROBE(kmem, kmalloc) {
+TRACEPOINT_PROBE(kmem, kmalloc_node) {
         if (WORKAROUND_MISSING_FREE)
             gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
         gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
         return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
 }
 
-TRACEPOINT_PROBE(kmem, kmalloc_node) {
+TRACEPOINT_PROBE(kmem, kmem_cache_alloc_node) {
+        if (WORKAROUND_MISSING_FREE)
+            gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
+        gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
+        return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
+}
+"""
+
+bpf_source_kernel = """
+
+TRACEPOINT_PROBE(kmem, kmalloc) {
         if (WORKAROUND_MISSING_FREE)
             gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
         gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
@@ -365,13 +375,6 @@ TRACEPOINT_PROBE(kmem, kfree) {
 }
 
 TRACEPOINT_PROBE(kmem, kmem_cache_alloc) {
-        if (WORKAROUND_MISSING_FREE)
-            gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
-        gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
-        return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
-}
-
-TRACEPOINT_PROBE(kmem, kmem_cache_alloc_node) {
         if (WORKAROUND_MISSING_FREE)
             gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
         gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
@@ -409,6 +412,8 @@ if kernel_trace:
                 bpf_source += bpf_source_percpu
         else:
                 bpf_source += bpf_source_kernel
+                if BPF.tracepoint_exists("kmem", "kmalloc_node"):
+                        bpf_source += bpf_source_kernel_node
 
 if kernel_trace:
     bpf_source = bpf_source.replace("WORKAROUND_MISSING_FREE", "1"
