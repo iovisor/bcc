@@ -11,6 +11,7 @@
 /btrfsdist
 /btrfsslower
 /cachestat
+/capable
 /cpudist
 /cpufreq
 /drsnoop
