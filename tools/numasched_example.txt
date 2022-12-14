@@ -1,0 +1,55 @@
+Demonstrations of numasched.py, the Linux eBPF/bcc version.
+
+This example trace the task switch numa. Some example output:
+
+NUMA Information:
+
+  $ numactl --hardware
+  available: 4 nodes (0-3)
+  node 0 cpus: 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
+  node 0 size: 97373 MB
+  node 0 free: 1756 MB
+  node 1 cpus: 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47
+  node 1 size: 98192 MB
+  node 1 free: 1269 MB
+  node 2 cpus: 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71
+  node 2 size: 98192 MB
+  node 2 free: 4811 MB
+  node 3 cpus: 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95
+  node 3 size: 98135 MB
+  node 3 free: 1617 MB
+  node distances:
+  node   0   1   2   3
+    0:  10  12  20  22
+    1:  12  10  22  24
+    2:  20  22  10  12
+    3:  22  24  12  10
+
+
+Terminal 1, start a task running on NUMA0:
+
+  $ taskset -c 1 yes >/dev/null
+
+
+Terminal 2, start tracing:
+
+  $ sudo ./numasched.py
+
+
+Terminal 3
+
+  # taskset 'yes' task to NUMA1(cpu=24):
+  $ taskset -p 0x1000000 $(pidof yes)
+
+  # taskset 'yes' task to NUMA2(cpu=48):
+  $ taskset -p 0x1000000000000 $(pidof yes)
+
+
+Then, Terminal 2 shows:
+
+  $ sudo ./numasched.py
+  Tracing task NUMA switch...
+  TIME     PID      TID      SRC_NID     DST_NID  COMM
+  20:55:35 355842   355842   0        -> 1        b'yes'
+  20:55:50 355842   355842   1        -> 2        b'yes'
+
