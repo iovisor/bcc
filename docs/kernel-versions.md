@@ -251,6 +251,8 @@ Helper | Kernel version | License | Commit |
 `BPF_FUNC_bind()` | 4.17 |  | [`d74bad4e74ee`](https://github.com/torvalds/linux/commit/d74bad4e74ee373787a9ae24197c17b7cdc428d5) |
 `BPF_FUNC_bprm_opts_set()` | 5.11 |  | [`3f6719c7b62f`](https://github.com/torvalds/linux/commit/3f6719c7b62f0327c9091e26d0da10e65668229e)
 `BPF_FUNC_btf_find_by_name_kind()` | 5.14 |  | [`3d78417b60fb`](https://github.com/torvalds/linux/commit/3d78417b60fba249cc555468cb72d96f5cde2964)
+`BPF_FUNC_cgrp_storage_delete()` | 6.2 | | [`c4bcfb38a95e`](https://github.com/torvalds/linux/commit/c4bcfb38a95edb1021a53f2d0356a78120ecfbe4)
+`BPF_FUNC_cgrp_storage_get()` | 6.2 | | [`c4bcfb38a95e`](https://github.com/torvalds/linux/commit/c4bcfb38a95edb1021a53f2d0356a78120ecfbe4)
 `BPF_FUNC_check_mtu()` | 5.12 |  | [`34b2021cc616`](https://github.com/torvalds/linux/commit/34b2021cc61642d61c3cf943d9e71925b827941b)
 `BPF_FUNC_clone_redirect()` | 4.2 |  | [`3896d655f4d4`](https://github.com/torvalds/linux/commit/3896d655f4d491c67d669a15f275a39f713410f8)
 `BPF_FUNC_copy_from_user()` | 5.10 |  | [`07be4c4a3e7a`](https://github.com/torvalds/linux/commit/07be4c4a3e7a0db148e44b16c5190e753d1c8569)

@@ -314,6 +314,8 @@ static struct bpf_helper helpers[] = {
   {"tcp_raw_check_syncookie_ipv6", "6.0"},
   {"ktime_get_tai_ns", "6.1"},
   {"user_ringbuf_drain", "6.1"},
+  {"cgrp_storage_get", "6.2"},
+  {"cgrp_storage_delete", "6.2"},
 };
 
 static uint64_t ptr_to_u64(void *ptr)
