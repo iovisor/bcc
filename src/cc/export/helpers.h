@@ -1029,6 +1029,12 @@ static __u64 (*bpf_ktime_get_tai_ns)(void) = (void *)BPF_FUNC_ktime_get_tai_ns;
 static long (*bpf_user_ringbuf_drain)(void *map, void *callback_fn, void *ctx, __u64 flags) =
   (void *)BPF_FUNC_user_ringbuf_drain;
 
+struct cgroup;
+static void *(*bpf_cgrp_storage_get)(void *map, struct cgroup *cgroup, void *value, __u64 flags) =
+  (void *)BPF_FUNC_cgrp_storage_get;
+static long (*bpf_cgrp_storage_delete)(void *map, struct cgroup *cgroup) =
+  (void *)BPF_FUNC_cgrp_storage_delete;
+
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
  */
