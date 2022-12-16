@@ -165,6 +165,7 @@ optional arguments:
   -h, --help            show this help message and exit
   -p PID, --pid PID     trace only this pid
   -t TID, --tid TID     trace only this tid
+  -c PPID, --ppid PPID  trace only child of this pid
   -i INTERVAL, --interval INTERVAL
                         print summary at this interval (seconds)
   -d DURATION, --duration DURATION
