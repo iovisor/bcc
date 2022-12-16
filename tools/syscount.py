@@ -49,6 +49,8 @@ parser.add_argument("-p", "--pid", type=int,
     help="trace only this pid")
 parser.add_argument("-t", "--tid", type=int,
     help="trace only this tid")
+parser.add_argument("-c", "--ppid", type=int,
+    help="trace only child of this pid")
 parser.add_argument("-i", "--interval", type=int,
     help="print summary at this interval (seconds)")
 parser.add_argument("-d", "--duration", type=int,
@@ -94,6 +96,8 @@ if args.list:
     sys.exit(0)
 
 text = """
+#include <linux/sched.h>
+
 #ifdef LATENCY
 struct data_t {
     u64 count;
@@ -127,6 +131,13 @@ TRACEPOINT_PROBE(raw_syscalls, sys_enter) {
         return 0;
 #endif
 
+#ifdef FILTER_PPID
+    struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+    u32 ppid = task->real_parent->tgid;
+    if (ppid != FILTER_PPID)
+        return 0;
+#endif
+
     u64 t = bpf_ktime_get_ns();
     start.update(&pid_tgid, &t);
     return 0;
@@ -150,6 +161,13 @@ TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
 
 #ifdef FILTER_TID
     if (tid != FILTER_TID)
+        return 0;
+#endif
+
+#ifdef FILTER_PPID
+    struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+    u32 ppid = task->real_parent->tgid;
+    if (ppid != FILTER_PPID)
         return 0;
 #endif
 
@@ -195,6 +213,8 @@ if args.pid:
     text = ("#define FILTER_PID %d\n" % args.pid) + text
 elif args.tid:
     text = ("#define FILTER_TID %d\n" % args.tid) + text
+elif args.ppid:
+    text = ("#define FILTER_PPID %d\n" % args.ppid) + text
 if args.failures:
     text = "#define FILTER_FAILED\n" + text
 if args.errno:
