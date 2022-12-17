@@ -46,7 +46,10 @@ thread_group.add_argument("-p", "--pid", metavar="PID", dest="pid",
     help="trace this PID only", type=int)
 thread_group.add_argument("-t", "--tid", metavar="TID", dest="tid",
     help="trace this TID only", type=int)
-
+thread_group.add_argument("-c", "--ppid", type=int,
+    help="trace only process whose ppid is PPID")
+parser.add_argument("--state", choices=["S", "D", ""], default="D",
+    help="filter task state(default D)")
 parser.add_argument("-s", "--stack", action="store_true",
     help="also show block stack trace")
 
@@ -90,15 +93,19 @@ bpf_text_kprobe = """
 //int trace_finish_task_switch(struct pt_regs *ctx, struct task_struct *prev)
 int trace_finish_task_switch(struct pt_regs *ctx, struct rq *rq, struct task_struct *prev)
 {
-    u32 pid, tgid;
+    u32 pid, tgid, ppid;
     u64 ts = bpf_ktime_get_ns();
 
     // prev task go to sleep
-    if ((prev->STATE_FIELD & TASK_UNINTERRUPTIBLE) && !(prev->STATE_FIELD & TASK_NOLOAD)) {
+    u32 state = prev->STATE_FIELD;
+    if (state != 0) {
+        if(STATE_FILTER)
+            return 0;
         pid = prev->pid;
         tgid = prev->tgid;
+        ppid = prev->real_parent->tgid;
         if (pid != 0) {
-            if (!(FILTER_PID) && !(FILTER_TGID)) {
+            if (!(FILTER_PID) && !(FILTER_TGID) && !(FILTER_PPID)) {
                 struct ts_stack_t ts_stack = { .ts = ts };
                 start.update(&pid, &ts_stack);
             }
@@ -156,8 +163,9 @@ RAW_TRACEPOINT_PROBE(sched_wakeup)
     u64 *tsp, delta_us;
     u32 pid = p->pid;
     u32 tgid = p->tgid;
+    u32 ppid = p->real_parent->tgid;
 
-    if (FILTER_PID || FILTER_TGID || pid == 0)
+    if (FILTER_PID || FILTER_TGID || FILTER_PPID || pid == 0)
         return 0;
 
     u64 ts = bpf_ktime_get_ns();
@@ -198,15 +206,19 @@ RAW_TRACEPOINT_PROBE(sched_switch)
     // TP_PROTO(bool preempt, struct task_struct *prev, struct task_struct *next)
     struct task_struct *prev = (struct task_struct *)ctx->args[1];
 
-    u32 pid, tgid;
+    u32 pid, tgid, ppid;
 
     // prev task go to sleep
-    if ((prev->STATE_FIELD & TASK_UNINTERRUPTIBLE) && !(prev->STATE_FIELD & TASK_NOLOAD)) {
+    u32 state = prev->STATE_FIELD;
+    if ( state != 0 ) {
+        if(STATE_FILTER)
+            return 0;
         pid = prev->pid;
         tgid = prev->tgid;
+        ppid = prev->real_parent->tgid;
         u64 ts = bpf_ktime_get_ns();
         if (pid != 0) {
-            if (!(FILTER_PID) && !(FILTER_TGID)) {
+            if (!(FILTER_PID) && !(FILTER_TGID) && !(FILTER_PPID)) {
                 struct ts_stack_t ts_stack = { .ts = ts };
 #ifdef SHOW_STACK
                 ts_stack.stack_id = stack_traces.get_stackid(ctx, 0);
@@ -244,6 +256,19 @@ if args.pid:
     bpf_text = bpf_text.replace('FILTER_TGID', 'tgid != %s' % args.pid)
 else:
     bpf_text = bpf_text.replace('FILTER_TGID', '0')
+if args.ppid:
+    bpf_text = bpf_text.replace('FILTER_PPID', 'ppid != %s' % args.ppid)
+else:
+    bpf_text = bpf_text.replace('FILTER_PPID', '0')
+
+if args.state == 'S':
+    bpf_text = bpf_text.replace('STATE_FILTER', '!(state & TASK_INTERRUPTIBLE)')
+elif args.state == 'D':
+    bpf_text = bpf_text.replace('STATE_FILTER', 
+        '!( (state & TASK_UNINTERRUPTIBLE) && !(state & TASK_NOLOAD) )')
+else:
+    bpf_text = bpf_text.replace('STATE_FILTER', '0');
+
 
 if debug or args.ebpf:
     print(bpf_text)
