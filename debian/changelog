@@ -1,5 +1,16 @@
 bcc (0.25.0-1) unstable; urgency=low
 
+  * Support for kernel up to 6.1
+  * bcc tool updates for biosnoop, opensnoop, biopattern, killsnoop, runqslower, offcputime, wakeuptime, etc.
+  * libbpf-tools updates for klockstat, sigsnoop, hardirqs, softirqs, opensnoop, statsnoop, offcputime, tcplife, cpufreq, cpudist, etc.
+  * new libbpf-tools: tcptop, tcpstates, biotop, capable
+  * ci: add support for fedora 36 container and new workflow for containers
+  * doc update, bug fixes and other tools improvement
+
+ -- Yonghong Song <ys114321@gmail.com>  Wed, 10 Aug 2022 17:00:00 +0000
+
+bcc (0.25.0-1) unstable; urgency=low
+
   * Support for kernel up to 5.19
   * bcc tool updates for oomkill.py, biolatpcts.py, sslsniff.py, tcpaccept.py, etc.
   * libbpf tool updates for klockstat, opensnoop, tcpconnect, etc.
