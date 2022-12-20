@@ -14,6 +14,7 @@ from bcc import BPF
 from time import sleep, strftime
 import argparse
 import os
+import json
 
 examples = """examples:
     ./biopattern            # show block device I/O pattern.
@@ -30,6 +31,8 @@ parser.add_argument("interval", nargs="?", default=99999999,
     help="Output interval in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
     help="Number of outputs")
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 countdown = int(args.count)
 
@@ -108,15 +111,7 @@ b = BPF(text=bpf_text)
 exiting = 0 if args.interval else 1
 counters = b.get_table("counters")
 
-print("%-9s %-7s %5s %5s %8s %10s" % 
-    ("TIME", "DISK", "%RND", "%SEQ", "COUNT", "KBYTES"))
-
-while True:
-    try:
-        sleep(int(args.interval))
-    except KeyboardInterrupt:
-        exiting = 1
-    
+def print_event(partitions, counters):
     for k, v in counters.items():
         total = v.random + v.sequential
         if total == 0:
@@ -132,6 +127,40 @@ while True:
             100 - random_percent,
             total,
             v.bytes / 1024))
+
+def print_event_json(partitions, counters):
+    for k, v in counters.items():
+        total = v.random + v.sequential
+        if total == 0:
+            continue
+
+        part_name = partitions.get(k.value, "Unknown")
+        random_percent = int(round(v.random * 100 / total))
+
+        json_dict = {
+            "time": strftime("%H:%M:%S"),
+            "disk": part_name,
+            "random": random_percent,
+            "sequential": 100 - random_percent,
+            "count": total,
+            "kbytes": v.bytes / 1024
+        }
+        print(json.dumps(json_dict))
+
+if not args.json:
+    print("%-9s %-7s %5s %5s %8s %10s" % 
+        ("TIME", "DISK", "%RND", "%SEQ", "COUNT", "KBYTES"))
+
+while True:
+    try:
+        sleep(int(args.interval))
+    except KeyboardInterrupt:
+        exiting = 1
+    
+    if args.json:
+        print_event_json(partitions, counters)
+    else:
+        print_event(partitions, counters)
 
     counters.clear()
 
