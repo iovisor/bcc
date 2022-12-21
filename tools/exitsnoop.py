@@ -8,6 +8,7 @@ import platform
 import re
 import signal
 import sys
+import json
 
 from bcc import BPF
 from datetime import datetime
@@ -67,6 +68,7 @@ def _getParser():
     a("--ebpf",            action="store_true", help=argparse.SUPPRESS)
     # RHEL 7.6 keeps task->start_time as struct timespec, convert to u64 nanoseconds
     a("--timespec",        action="store_true", help=argparse.SUPPRESS)
+    a("-j", "--json",      action="store_true", help="output in JSON format")
     return parser.parse_args
 
 
@@ -179,6 +181,22 @@ def _print_event(cpu, data, size): # callback
             print(", core dumped ", end="")
         print()
 
+def _print_event_json(cpu, data, size): # callback
+    """Print the exit event in JSON format."""
+    e = buffer["events"].event(data)
+    now = datetime.utcnow() if Global.args.utc else datetime.now()
+    age = (e.exit_time - e.start_time) / 1e9
+    print(json.dumps({
+        "timestamp": now.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3],
+        "task": e.task.decode(),
+        "pid": e.pid,
+        "ppid": e.ppid,
+        "tid": e.tid,
+        "age": age,
+        "exit_code": e.exit_code,
+        "sig_info": e.sig_info,
+    }))
+
 # =============================
 # Module: These functions are available for import
 # =============================
@@ -252,8 +270,11 @@ def main():
         if rc:
             print(buffer)
             sys.exit(0 if Global.args.ebpf else rc)
-        _print_header()
-        snoop(buffer, _print_event)
+        if not Global.args.json:
+            _print_header()
+            snoop(buffer, _print_event)
+        else:
+            snoop(buffer, _print_event_json)
     except KeyboardInterrupt:
         print()
         sys.exit()
