@@ -37,6 +37,8 @@ parser.add_argument(
 )
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 
 # load BPF program
@@ -99,7 +101,8 @@ except Exception:
     print("Failed to attach to a hardware event. Is this a virtual machine?")
     exit()
 
-print("Running for {} seconds or hit Ctrl-C to end.".format(args.duration))
+if not args.json:
+    print("Running for {} seconds or hit Ctrl-C to end.".format(args.duration))
 
 try:
     sleep(float(args.duration))
@@ -122,7 +125,8 @@ if args.tid:
 header_text += 'NAME             CPU     REFERENCE         MISS    HIT%'
 format_text += '{:<16s} {:<4d} {:>12d} {:>12d} {:>6.2f}%'
 
-print(header_text)
+if not args.json:
+    print(header_text)
 tot_ref = 0
 tot_miss = 0
 for (k, v) in b.get_table('ref_count').items():
@@ -137,13 +141,25 @@ for (k, v) in b.get_table('ref_count').items():
     tot_miss += miss
     # This happens on some PIDs due to missed counts caused by sampling
     hit = (v.value - miss) if (v.value >= miss) else 0
-    if args.tid:
-        print(format_text.format(
-            k.pid, k.tid, k.name.decode('utf-8', 'replace'), k.cpu, v.value, miss,
-            (float(hit) / float(v.value)) * 100.0))
+    if not args.json:
+        if args.tid:
+            print(format_text.format(
+                k.pid, k.tid, k.name.decode('utf-8', 'replace'), k.cpu, v.value, miss,
+                (float(hit) / float(v.value)) * 100.0))
+        else:
+            print(format_text.format(
+                k.pid, k.name.decode('utf-8', 'replace'), k.cpu, v.value, miss,
+                (float(hit) / float(v.value)) * 100.0))
     else:
-        print(format_text.format(
-            k.pid, k.name.decode('utf-8', 'replace'), k.cpu, v.value, miss,
-            (float(hit) / float(v.value)) * 100.0))
-print('Total References: {} Total Misses: {} Hit Rate: {:.2f}%'.format(
-    tot_ref, tot_miss, (float(tot_ref - tot_miss) / float(tot_ref)) * 100.0))
+        if args.tid:
+            print('{"pid": %d, "tid": %d, "name": "%s", "cpu": %d, "ref": %d, "miss": %d, "hit": %.2f}' % (
+                k.pid, k.tid, k.name.decode('utf-8', 'replace'), k.cpu, v.value, miss,
+                (float(hit) / float(v.value)) * 100.0))
+        else:
+            print('{"pid": %d, "name": "%s", "cpu": %d, "ref": %d, "miss": %d, "hit": %.2f}' % (
+                k.pid, k.name.decode('utf-8', 'replace'), k.cpu, v.value, miss,
+                (float(hit) / float(v.value)) * 100.0))
+
+if not args.json:
+    print('Total References: {} Total Misses: {} Hit Rate: {:.2f}%'.format(
+        tot_ref, tot_miss, (float(tot_ref - tot_miss) / float(tot_ref)) * 100.0))
