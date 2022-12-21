@@ -18,6 +18,7 @@ from bcc import BPF
 from time import sleep, strftime
 import argparse
 from subprocess import call
+import json
 
 # arguments
 examples = """examples:
@@ -48,6 +49,8 @@ parser.add_argument("count", nargs="?", default=99999999,
     help="number of outputs")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 interval = int(args.interval)
 countdown = int(args.count)
@@ -205,10 +208,22 @@ while 1:
             name = name[:-3] + "..."
 
         # print line
-        print("%-7d %-16s %-6d %-6d %-7d %-7d %1s %s" % (k.pid,
-            k.comm.decode('utf-8', 'replace'), v.reads, v.writes,
-            v.rbytes / 1024, v.wbytes / 1024,
-            k.type.decode('utf-8', 'replace'), name))
+        if args.json:
+            print("%s" % {
+                "pid": k.pid,
+                "comm": k.comm.decode('utf-8', 'replace'),
+                "reads": v.reads,
+                "writes": v.writes,
+                "rbytes": v.rbytes / 1024,
+                "wbytes": v.wbytes / 1024,
+                "type": k.type.decode('utf-8', 'replace'),
+                "name": name,
+            })
+        else:
+            print("%-7d %-16s %-6d %-6d %-7d %-7d %1s %s" % (k.pid,
+                k.comm.decode('utf-8', 'replace'), v.reads, v.writes,
+                v.rbytes / 1024, v.wbytes / 1024,
+                k.type.decode('utf-8', 'replace'), name))
 
         line += 1
         if line >= maxrows:
