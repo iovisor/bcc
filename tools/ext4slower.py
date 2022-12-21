@@ -29,6 +29,7 @@ from __future__ import print_function
 from bcc import BPF
 import argparse
 from time import strftime
+import json
 
 # symbols
 kallsyms = "/proc/kallsyms"
@@ -53,6 +54,8 @@ parser.add_argument("min_ms", nargs="?", default='10',
     help="minimum I/O duration to trace, in ms (default 10)")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 min_ms = int(args.min_ms)
 pid = args.pid
@@ -309,6 +312,13 @@ def print_event(cpu, data, size):
         event.offset / 1024, float(event.delta_us) / 1000,
         event.file.decode('utf-8', 'replace')))
 
+def print_event_json(cpu, data, size):
+    event = b["events"].event(data)
+    print(json.dumps({ "time" : strftime("%H:%M:%S"), "task" : event.task.decode('utf-8', 'replace'),
+        "pid" : event.pid, "type" : event.type, "size" : event.size,
+        "offset" : event.offset, "delta" : float(event.delta_us) / 1000,
+        "filename" : event.file.decode('utf-8', 'replace') }))
+
 # initialize BPF
 b = BPF(text=bpf_text)
 
@@ -329,18 +339,22 @@ b.attach_kretprobe(event="ext4_file_open", fn_name="trace_open_return")
 b.attach_kretprobe(event="ext4_sync_file", fn_name="trace_fsync_return")
 
 # header
-if (csv):
-    print("ENDTIME_us,TASK,PID,TYPE,BYTES,OFFSET_b,LATENCY_us,FILE")
-else:
-    if min_ms == 0:
-        print("Tracing ext4 operations")
+if not args.json:
+    if (csv):
+        print("ENDTIME_us,TASK,PID,TYPE,BYTES,OFFSET_b,LATENCY_us,FILE")
     else:
-        print("Tracing ext4 operations slower than %d ms" % min_ms)
-    print("%-8s %-14s %-6s %1s %-7s %-8s %7s %s" % ("TIME", "COMM", "PID", "T",
-        "BYTES", "OFF_KB", "LAT(ms)", "FILENAME"))
+        if min_ms == 0:
+            print("Tracing ext4 operations")
+        else:
+            print("Tracing ext4 operations slower than %d ms" % min_ms)
+        print("%-8s %-14s %-6s %1s %-7s %-8s %7s %s" % ("TIME", "COMM", "PID", "T",
+            "BYTES", "OFF_KB", "LAT(ms)", "FILENAME"))
 
 # read events
-b["events"].open_perf_buffer(print_event, page_cnt=64)
+if args.json:
+    b["events"].open_perf_buffer(print_event_json, page_cnt=64)
+else:
+    b["events"].open_perf_buffer(print_event, page_cnt=64)
 while 1:
     try:
         b.perf_buffer_poll()
