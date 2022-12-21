@@ -42,6 +42,8 @@ parser.add_argument("count", nargs="?", default=99999999,
     help="number of outputs")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 pid = args.pid
 countdown = int(args.count)
@@ -224,11 +226,15 @@ while (1):
     except KeyboardInterrupt:
         exiting = 1
 
-    print()
-    if args.interval and (not args.notimestamp):
-        print(strftime("%H:%M:%S:"))
+    if not args.json:
+        print()
+        if args.interval and (not args.notimestamp):
+            print(strftime("%H:%M:%S:"))
 
-    dist.print_log2_hist(label, "operation", section_print_fn=bytes.decode)
+        dist.print_log2_hist(label, "operation", section_print_fn=bytes.decode)
+    else:
+        dist.print_json_hist(label, "operation", section_print_fn=bytes.decode)
+        
     dist.clear()
 
     countdown -= 1
