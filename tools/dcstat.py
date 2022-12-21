@@ -20,23 +20,23 @@ from bcc import BPF
 from ctypes import c_int
 from time import sleep, strftime
 from sys import argv
+import argparse
 
-def usage():
-    print("USAGE: %s [interval [count]]" % argv[0])
-    exit()
-
-# arguments
-interval = 1
-count = -1
-if len(argv) > 1:
-    try:
-        interval = int(argv[1])
-        if interval == 0:
-            raise
-        if len(argv) > 2:
-            count = int(argv[2])
-    except:  # also catches -h, --help
-        usage()
+examples = """examples:
+    ./dcstat           # display entry cache (dcache) stats
+    ./dcstat -j        # display output in json format
+"""
+parser = argparse.ArgumentParser(
+    description="Directory entry cache (dcache) stats",
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    epilog=examples)
+parser.add_argument("interval", nargs="?", default=1,
+    help="output interval, in seconds")
+parser.add_argument("count", nargs="?", default=-1,
+    help="number of outputs")
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
+args = parser.parse_args()
 
 # define BPF program
 bpf_text = """
@@ -98,30 +98,11 @@ stats = {
     "MISS": 3
 }
 
-# header
-print("%-8s  " % "TIME", end="")
-for stype, idx in sorted(stats.items(), key=lambda k_v: (k_v[1], k_v[0])):
-    print(" %8s" % (stype + "/s"), end="")
-print(" %8s" % "HIT%")
-
-# output
-i = 0
-while (1):
-    if count > 0:
-        i += 1
-        if i > count:
-            exit()
-    try:
-        sleep(interval)
-    except KeyboardInterrupt:
-        exit()
-
-    print("%-8s: " % strftime("%H:%M:%S"), end="")
-
+def print_event(b):
     # print each statistic as a column
     for stype, idx in sorted(stats.items(), key=lambda k_v: (k_v[1], k_v[0])):
         try:
-            val = b["stats"][c_int(idx)].value / interval
+            val = b["stats"][c_int(idx)].value / int(args.interval)
             print(" %8d" % val, end="")
         except:
             print(" %8d" % 0, end="")
@@ -135,5 +116,51 @@ while (1):
         print(" %8.2f" % pct)
     except:
         print(" %7s%%" % "-")
+
+def print_event_json(b):
+    json_dict = {}
+    for stype, idx in sorted(stats.items(), key=lambda k_v: (k_v[1], k_v[0])):
+        try:
+            val = b["stats"][c_int(idx)].value / int(args.interval)
+            json_dict[stype] = val
+        except:
+            json_dict[stype] = 0
+    
+    try:
+        ref = b["stats"][c_int(stats["REFS"])].value
+        miss = b["stats"][c_int(stats["MISS"])].value
+        hit = ref - miss
+        pct = float(100) * hit / ref
+        json_dict["HIT%"] = pct
+    except:
+        json_dict["HIT%"] = "-"
+
+    print("%s" % json_dict)
+
+# header
+if not args.json:
+    print("%-8s  " % "TIME", end="")
+    for stype, idx in sorted(stats.items(), key=lambda k_v: (k_v[1], k_v[0])):
+        print(" %8s" % (stype + "/s"), end="")
+    print(" %8s" % "HIT%")
+
+# output
+i = 0
+while (1):
+    if int(args.count) > 0:
+        i += 1
+        if i > int(args.count):
+            exit()
+    try:
+        sleep(int(args.interval))
+    except KeyboardInterrupt:
+        exit()
+
+    if not args.json:
+        print("%-8s: " % strftime("%H:%M:%S"), end="")
+
+        print_event(b)
+    else:
+        print_event_json(b)
 
     b["stats"].clear()
