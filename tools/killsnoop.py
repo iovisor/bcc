@@ -40,6 +40,8 @@ parser.add_argument("-s", "--signal",
     help="trace this signal only")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 debug = 0
 
@@ -152,8 +154,9 @@ except:
     pass # not fatal error, just use the default value
 
 # header
-print("%-9s %-*s %-16s %-4s %-*s %s" % (
-    "TIME", pid_bytes, "PID", "COMM", "SIG", pid_bytes, "TPID", "RESULT"))
+if not args.json:
+    print("%-9s %-*s %-16s %-4s %-*s %s" % (
+        "TIME", pid_bytes, "PID", "COMM", "SIG", pid_bytes, "TPID", "RESULT"))
 
 # process event
 def print_event(cpu, data, size):
@@ -165,8 +168,26 @@ def print_event(cpu, data, size):
     printb(b"%-9s %-*d %-16s %-4d %-*d %d" % (strftime("%H:%M:%S").encode('ascii'),
         pid_bytes, event.pid, event.comm, event.sig, pid_bytes, event.tpid, event.ret))
 
+def print_event_json(cpu, data, size):
+    event = b["events"].event(data)
+
+    if (args.failed and (event.ret >= 0)):
+        return
+
+    print("%s" % {
+        "timestamp": strftime("%H:%M:%S"),
+        "pid": event.pid,
+        "comm": event.comm,
+        "sig": event.sig,
+        "tpid": event.tpid,
+        "ret": event.ret,
+    })
+
 # loop with callback to print_event
-b["events"].open_perf_buffer(print_event)
+if args.json:
+    b["events"].open_perf_buffer(print_event_json)
+else:
+    b["events"].open_perf_buffer(print_event)
 while 1:
     try:
         b.perf_buffer_poll()
