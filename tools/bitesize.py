@@ -15,6 +15,20 @@
 
 from bcc import BPF
 from time import sleep
+import argparse
+
+# arguments
+examples = """examples:
+    ./bitesize          # block I/O size histogram
+    ./bitesize -j       # print json output
+"""
+parser = argparse.ArgumentParser(
+    description="Block I/O size histogram",
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    epilog=examples)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
+args = parser.parse_args()
 
 bpf_text = """
 #include <uapi/linux/ptrace.h>
@@ -47,5 +61,9 @@ dist = b.get_table("dist")
 try:
     sleep(99999999)
 except KeyboardInterrupt:
-    dist.print_log2_hist("Kbytes", "Process Name",
+    if args.json:
+        dist.print_json_hist("Kbytes", "Process Name",
+            section_print_fn=bytes.decode)
+    else:
+        dist.print_log2_hist("Kbytes", "Process Name",
             section_print_fn=bytes.decode)
