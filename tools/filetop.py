@@ -18,7 +18,6 @@ from bcc import BPF
 from time import sleep, strftime
 import argparse
 from subprocess import call
-import json
 
 # arguments
 examples = """examples:
