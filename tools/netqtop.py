@@ -135,6 +135,65 @@ def print_table(table, qnum):
     else:
         print()
 
+def print_json_table(table, qnum, direction):
+    global print_interval
+
+    # ------- calculates --------------
+    qids=[]
+    tBPS = 0
+    tPPS = 0
+    tAVG = 0
+    tGroup = [0,0,0,0,0]
+    tpkt = 0
+    tlen = 0
+    for k, v in table.items():
+        qids += [k.value]
+        tlen += v.total_pkt_len
+        tpkt += v.num_pkt
+        tGroup[0] += v.size_64B
+        tGroup[1] += v.size_512B
+        tGroup[2] += v.size_2K
+        tGroup[3] += v.size_16K
+        tGroup[4] += v.size_64K
+    tBPS = tlen / print_interval
+    tPPS = tpkt / print_interval
+    if tpkt != 0:
+        tAVG = tlen / tpkt
+
+    # -------- print table --------------
+    for k in range(qnum):
+        if k in qids:
+            item = table[c_ushort(k)]
+            data = [
+                k,
+                item.total_pkt_len,
+                item.num_pkt,
+                item.size_64B,
+                item.size_512B,
+                item.size_2K,
+                item.size_16K,
+                item.size_64K
+            ]
+        else:
+            data = [k,0,0,0,0,0,0,0]
+        
+        # print a line per queue
+        avg = 0
+        if data[2] != 0:
+            avg = data[1] / data[2]
+        print('{"time": "%s", "direction": "%s", "queue": %d, "avg_size": %d, "size_64B": %d, "size_512B": %d, "size_2K": %d, "size_16K": %d, "size_64K": %d, "BPS": %d, "PPS": %d}' % (
+            asctime(localtime(time())),
+            direction,
+            data[0],
+            avg,
+            data[3],
+            data[4],
+            data[5],
+            data[6],
+            data[7],
+            data[1] / print_interval,
+            data[2] / print_interval
+        ))
 
 def print_result(b):
     # --------- print tx queues ---------------
@@ -155,12 +214,25 @@ def print_result(b):
     else:
         print("-"*77)
 
+def print_json(b):
+    # --------- print tx queues ---------------
+    table = b['tx_q']
+    print_json_table(table, tx_num, "tx")
+    b['tx_q'].clear()
+
+    # --------- print rx queues ---------------
+    table = b['rx_q']
+    print_json_table(table, rx_num, "rx")
+    b['rx_q'].clear()
+
 ############## specify network interface #################
 parser = argparse.ArgumentParser(description="")
 parser.add_argument("--name", "-n", type=str, default="")
 parser.add_argument("--interval", "-i", type=float, default=1)
 parser.add_argument("--throughput", "-t", action="store_true")
 parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 
 if args.ebpf:
@@ -214,6 +286,9 @@ devname_map[0] = _name
 while 1:
     try:
         sleep(print_interval)
-        print_result(b)
+        if args.json:
+            print_json(b)
+        else:
+            print_result(b)
     except KeyboardInterrupt:
         exit()
