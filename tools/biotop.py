@@ -20,6 +20,7 @@ from bcc import BPF
 from time import sleep, strftime
 import argparse
 from subprocess import call
+import json
 
 # arguments
 examples = """examples:
@@ -45,6 +46,8 @@ parser.add_argument("count", nargs="?", default=99999999,
     help="number of outputs")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 interval = int(args.interval)
 countdown = int(args.count)
@@ -226,14 +229,7 @@ with open(diskstats) as stats:
         a = line.split()
         disklookup[a[0] + "," + a[1]] = a[2]
 
-# output
-exiting = 0
-while 1:
-    try:
-        sleep(interval)
-    except KeyboardInterrupt:
-        exiting = 1
-
+def print_event(counts):
     # header
     if clear:
         call("clear")
@@ -244,8 +240,6 @@ while 1:
     print("%-7s %-16s %1s %-3s %-3s %-8s %5s %7s %6s" % ("PID", "COMM",
         "D", "MAJ", "MIN", "DISK", "I/O", "Kbytes", "AVGms"))
 
-    # by-PID output
-    counts = b.get_table("counts")
     line = 0
     for k, v in reversed(sorted(counts.items(),
                                 key=lambda counts: counts[1].bytes)):
@@ -266,6 +260,46 @@ while 1:
         line += 1
         if line >= maxrows:
             break
+
+def print_event_json(counts):
+    json_dict = {}
+    for k, v in reversed(sorted(counts.items(),
+                                key=lambda counts: counts[1].bytes)):
+        # lookup disk
+        disk = str(k.major) + "," + str(k.minor)
+        if disk in disklookup:
+            diskname = disklookup[disk]
+        else:
+            diskname = "?"
+
+        json_dict[k.pid] = {
+            "name": k.name.decode('utf-8', 'replace'),
+            "rwflag": k.rwflag,
+            "major": k.major,
+            "minor": k.minor,
+            "io": v.io,
+            "bytes": v.bytes,
+            "us": v.us,
+            "disk": diskname
+        }
+    print(json.dumps(json_dict))
+
+# output
+exiting = 0
+while 1:
+    try:
+        sleep(interval)
+    except KeyboardInterrupt:
+        exiting = 1
+
+    # by-PID output
+    counts = b.get_table("counts")
+    
+    if args.json:
+        print_event_json(counts)
+    else:
+        print_event(counts)
+
     counts.clear()
 
     countdown -= 1
