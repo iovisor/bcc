@@ -28,7 +28,7 @@
 #include <clang/Lex/Lexer.h>
 
 #include "frontend_action_common.h"
-#include "b_frontend_action.h"
+#include "libbpf_frontend_action.h"
 #include "bpf_module.h"
 #include "common.h"
 #include "loader.h"
@@ -331,9 +331,9 @@ class ProbeSetter : public RecursiveASTVisitor<ProbeSetter> {
   int nb_derefs_;
 };
 
-MapVisitor::MapVisitor(set<Decl *> &m) : m_(m) {}
+BtoLibbpfMapVisitor::BtoLibbpfMapVisitor(set<Decl *> &m) : m_(m) {}
 
-bool MapVisitor::VisitCallExpr(CallExpr *Call) {
+bool BtoLibbpfMapVisitor::VisitCallExpr(CallExpr *Call) {
   if (MemberExpr *Memb = dyn_cast<MemberExpr>(Call->getCallee()->IgnoreImplicit())) {
     StringRef memb_name = Memb->getMemberDecl()->getName();
     if (DeclRefExpr *Ref = dyn_cast<DeclRefExpr>(Memb->getBase())) {
@@ -353,7 +353,7 @@ bool MapVisitor::VisitCallExpr(CallExpr *Call) {
   return true;
 }
 
-ProbeVisitor::ProbeVisitor(ASTContext &C, Rewriter &rewriter,
+BtoLibbpfProbeVisitor::BtoLibbpfProbeVisitor(ASTContext &C, Rewriter &rewriter,
                            set<Decl *> &m, bool track_helpers) :
   C(C), rewriter_(rewriter), m_(m), ctx_(nullptr), track_helpers_(track_helpers),
   addrof_stmt_(nullptr), is_addrof_(false) {
@@ -361,7 +361,7 @@ ProbeVisitor::ProbeVisitor(ASTContext &C, Rewriter &rewriter,
   cannot_fall_back_safely = (calling_conv_regs == calling_conv_regs_s390x || calling_conv_regs == calling_conv_regs_riscv64);
 }
 
-bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbDerefs) {
+bool BtoLibbpfProbeVisitor::assignsExtPtr(Expr *E, int *nbDerefs) {
   if (IsContextMemberExpr(E)) {
     *nbDerefs = 0;
     return true;
@@ -390,7 +390,7 @@ bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbDerefs) {
       StringRef memb_name = Memb->getMemberDecl()->getName();
       if (DeclRefExpr *Ref = dyn_cast<DeclRefExpr>(Memb->getBase())) {
         if (SectionAttr *A = Ref->getDecl()->getAttr<SectionAttr>()) {
-          if (!A->getName().startswith("maps"))
+          if (!A->getName().startswith(".maps"))
             return false;
 
           if (memb_name == "lookup" || memb_name == "lookup_or_init" ||
@@ -412,7 +412,7 @@ bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbDerefs) {
   }
   return false;
 }
-bool ProbeVisitor::VisitVarDecl(VarDecl *D) {
+bool BtoLibbpfProbeVisitor::VisitVarDecl(VarDecl *D) {
   if (Expr *E = D->getInit()) {
     int nbDerefs;
     if (assignsExtPtr(E, &nbDerefs)) {
@@ -424,10 +424,10 @@ bool ProbeVisitor::VisitVarDecl(VarDecl *D) {
   return true;
 }
 
-bool ProbeVisitor::TraverseStmt(Stmt *S) {
+bool BtoLibbpfProbeVisitor::TraverseStmt(Stmt *S) {
   if (whitelist_.find(S) != whitelist_.end())
     return true;
-  auto ret = RecursiveASTVisitor<ProbeVisitor>::TraverseStmt(S);
+  auto ret = RecursiveASTVisitor<BtoLibbpfProbeVisitor>::TraverseStmt(S);
   if (addrof_stmt_ == S) {
     addrof_stmt_ = nullptr;
     is_addrof_ = false;
@@ -435,7 +435,7 @@ bool ProbeVisitor::TraverseStmt(Stmt *S) {
   return ret;
 }
 
-bool ProbeVisitor::VisitCallExpr(CallExpr *Call) {
+bool BtoLibbpfProbeVisitor::VisitCallExpr(CallExpr *Call) {
   Decl *decl = Call->getCalleeDecl();
   if (decl == nullptr)
       return true;
@@ -480,7 +480,7 @@ bool ProbeVisitor::VisitCallExpr(CallExpr *Call) {
   }
   return true;
 }
-bool ProbeVisitor::VisitReturnStmt(ReturnStmt *R) {
+bool BtoLibbpfProbeVisitor::VisitReturnStmt(ReturnStmt *R) {
   /* If this function wasn't called by another, there's no need to check the
    * return statement for external pointers. */
   if (ptregs_returned_.size() == 0)
@@ -508,7 +508,7 @@ bool ProbeVisitor::VisitReturnStmt(ReturnStmt *R) {
   }
   return true;
 }
-bool ProbeVisitor::VisitBinaryOperator(BinaryOperator *E) {
+bool BtoLibbpfProbeVisitor::VisitBinaryOperator(BinaryOperator *E) {
   if (!E->isAssignmentOp())
     return true;
 
@@ -520,7 +520,7 @@ bool ProbeVisitor::VisitBinaryOperator(BinaryOperator *E) {
   }
   return true;
 }
-bool ProbeVisitor::VisitUnaryOperator(UnaryOperator *E) {
+bool BtoLibbpfProbeVisitor::VisitUnaryOperator(UnaryOperator *E) {
   if (E->getOpcode() == UO_AddrOf) {
     addrof_stmt_ = E;
     is_addrof_ = true;
@@ -535,16 +535,13 @@ bool ProbeVisitor::VisitUnaryOperator(UnaryOperator *E) {
   memb_visited_.insert(E);
   string pre, post;
   pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
-  if (cannot_fall_back_safely)
-    pre += " bpf_probe_read_kernel(&_val, sizeof(_val), (void *)";
-  else
-    pre += " bpf_probe_read(&_val, sizeof(_val), (void *)";
+  pre += " bpf_core_read((void*)&_val, sizeof(_val), (void *)";
   post = "); _val; })";
   rewriter_.ReplaceText(expansionLoc(E->getOperatorLoc()), 1, pre);
   rewriter_.InsertTextAfterToken(expansionLoc(GET_ENDLOC(sub)), post);
   return true;
 }
-bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
+bool BtoLibbpfProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   if (memb_visited_.find(E) != memb_visited_.end()) return true;
 
   Expr *base;
@@ -562,6 +559,7 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   }
   if (!found)
     return true;
+
   if (member.isInvalid()) {
     error(GET_ENDLOC(base), "internal error: MemberLoc is invalid while preparing probe rewrite");
     return false;
@@ -590,6 +588,7 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   // through bpf_probe_read.
   if (!ProbeChecker(base, ptregs_, track_helpers_).needs_probe())
     return true;
+  // No supported by CO-RE?
 
   // If the base is an array, we will skip rewriting. See issue #2352.
   if (E->getType()->isArrayType())
@@ -598,17 +597,13 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   string rhs = rewriter_.getRewrittenText(expansionRange(SourceRange(rhs_start, GET_ENDLOC(E))));
   string base_type = base->getType()->getPointeeType().getAsString();
   string pre, post;
-  pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
-  if (cannot_fall_back_safely)
-    pre += " bpf_probe_read_kernel(&_val, sizeof(_val), (void *)&";
-  else
-    pre += " bpf_probe_read(&_val, sizeof(_val), (void *)&";
-  post = rhs + "); _val; })";
+  pre = "BPF_CORE_READ(";
+  post = string(", ") + rhs + ")";
   rewriter_.InsertText(expansionLoc(GET_BEGINLOC(E)), pre);
-  rewriter_.ReplaceText(expansionRange(SourceRange(member, GET_ENDLOC(E))), post);
+  rewriter_.ReplaceText(expansionRange(SourceRange(E->getOperatorLoc(), GET_ENDLOC(E))), post);
   return true;
 }
-bool ProbeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
+bool BtoLibbpfProbeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
   if (memb_visited_.find(E) != memb_visited_.end()) return true;
   if (!ProbeChecker(E, ptregs_, track_helpers_).needs_probe())
     return true;
@@ -653,10 +648,7 @@ bool ProbeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
     return true;
 
   pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
-  if (cannot_fall_back_safely)
-    pre += " bpf_probe_read_kernel(&_val, sizeof(_val), (void *)((";
-  else
-    pre += " bpf_probe_read(&_val, sizeof(_val), (void *)((";
+  pre += " bpf_core_read((void*)&_val, sizeof(_val), (void *)((";
   if (isMemberDereference(base)) {
     pre += "&";
     // If the base of the array subscript is a member dereference, we'll rewrite
@@ -678,7 +670,7 @@ bool ProbeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
   return true;
 }
 
-bool ProbeVisitor::isMemberDereference(Expr *E) {
+bool BtoLibbpfProbeVisitor::isMemberDereference(Expr *E) {
   if (E->IgnoreParenCasts()->getStmtClass() != Stmt::MemberExprClass)
     return false;
   for (MemberExpr *M = dyn_cast<MemberExpr>(E->IgnoreParenCasts()); M;
@@ -688,7 +680,7 @@ bool ProbeVisitor::isMemberDereference(Expr *E) {
   }
   return false;
 }
-bool ProbeVisitor::IsContextMemberExpr(Expr *E) {
+bool BtoLibbpfProbeVisitor::IsContextMemberExpr(Expr *E) {
   if (!E->getType()->isPointerType())
     return false;
 
@@ -728,7 +720,7 @@ bool ProbeVisitor::IsContextMemberExpr(Expr *E) {
 }
 
 SourceRange
-ProbeVisitor::expansionRange(SourceRange range) {
+BtoLibbpfProbeVisitor::expansionRange(SourceRange range) {
 #if LLVM_MAJOR_VERSION >= 7
   return rewriter_.getSourceMgr().getExpansionRange(range).getAsRange();
 #else
@@ -737,23 +729,23 @@ ProbeVisitor::expansionRange(SourceRange range) {
 }
 
 SourceLocation
-ProbeVisitor::expansionLoc(SourceLocation loc) {
+BtoLibbpfProbeVisitor::expansionLoc(SourceLocation loc) {
   return rewriter_.getSourceMgr().getExpansionLoc(loc);
 }
 
 template <unsigned N>
-DiagnosticBuilder ProbeVisitor::error(SourceLocation loc, const char (&fmt)[N]) {
+DiagnosticBuilder BtoLibbpfProbeVisitor::error(SourceLocation loc, const char (&fmt)[N]) {
   unsigned int diag_id = C.getDiagnostics().getCustomDiagID(DiagnosticsEngine::Error, fmt);
   return C.getDiagnostics().Report(loc, diag_id);
 }
 
-BTypeVisitor::BTypeVisitor(ASTContext &C, BFrontendAction &fe)
+BtoLibbpfTypeVisitor::BtoLibbpfTypeVisitor(ASTContext &C, BtoLibbpfFrontendAction &fe)
     : C(C), diag_(C.getDiagnostics()), fe_(fe), rewriter_(fe.rewriter()), out_(llvm::errs()) {
   const char **calling_conv_regs = get_call_conv();
   cannot_fall_back_safely = (calling_conv_regs == calling_conv_regs_s390x || calling_conv_regs == calling_conv_regs_riscv64);
 }
 
-void BTypeVisitor::genParamDirectAssign(FunctionDecl *D, string& preamble,
+void BtoLibbpfTypeVisitor::genParamDirectAssign(FunctionDecl *D, string& preamble,
                                         const char **calling_conv_regs) {
   for (size_t idx = 0; idx < fn_args_.size(); idx++) {
     ParmVarDecl *arg = fn_args_[idx];
@@ -772,7 +764,7 @@ void BTypeVisitor::genParamDirectAssign(FunctionDecl *D, string& preamble,
   }
 }
 
-void BTypeVisitor::genParamIndirectAssign(FunctionDecl *D, string& preamble,
+void BtoLibbpfTypeVisitor::genParamIndirectAssign(FunctionDecl *D, string& preamble,
                                           const char **calling_conv_regs) {
   string new_ctx;
 
@@ -792,18 +784,15 @@ void BTypeVisitor::genParamIndirectAssign(FunctionDecl *D, string& preamble,
       size_t d = idx - 1;
       const char *reg = calling_conv_regs[d];
       preamble += "\n " + text + ";";
-      if (cannot_fall_back_safely)
-        preamble += " bpf_probe_read_kernel";
-      else
-        preamble += " bpf_probe_read";
-      preamble += "(&" + arg->getName().str() + ", sizeof(" +
+      preamble += " bpf_core_read";
+      preamble += "((void*)&" + arg->getName().str() + ", sizeof(" +
                   arg->getName().str() + "), &" + new_ctx + "->" +
                   string(reg) + ");";
     }
   }
 }
 
-void BTypeVisitor::rewriteFuncParam(FunctionDecl *D) {
+void BtoLibbpfTypeVisitor::rewriteFuncParam(FunctionDecl *D) {
   string preamble = "{\n";
   if (D->param_size() > 1) {
     bool is_syscall = false;
@@ -836,7 +825,7 @@ void BTypeVisitor::rewriteFuncParam(FunctionDecl *D) {
     rewriter_.ReplaceText(S->getLBracLoc(), 1, preamble);
 }
 
-bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
+bool BtoLibbpfTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
   // put each non-static non-inline function decl in its own section, to be
   // extracted by the MemoryManager
   auto real_start_loc = rewriter_.getSourceMgr().getFileLoc(GET_BEGINLOC(D));
@@ -856,8 +845,7 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
     func_info->src_ = bd;
     fe_.func_range_[current_fn_] = expansionRange(D->getSourceRange());
     if (!D->getAttr<SectionAttr>()) {
-      string attr = string("__attribute__((section(\"") + BPF_FN_PREFIX +
-                    D->getName().str() + "\")))\n";
+      string attr = string("SEC(\"kprobe\")\n");
       rewriter_.InsertText(real_start_loc, attr);
     }
     if (D->param_size() > MAX_CALLING_CONV_REGS + 1) {
@@ -880,7 +868,7 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
              rewriter_.getSourceMgr().getFileID(real_start_loc)
                == rewriter_.getSourceMgr().getMainFileID()) {
     // rewritable functions that are static should be always treated as helper
-    rewriter_.InsertText(real_start_loc, "__attribute__((always_inline))\n");
+    // rewriter_.InsertText(real_start_loc, "__attribute__((always_inline))\n");
   }
   return true;
 }
@@ -888,7 +876,7 @@ bool BTypeVisitor::VisitFunctionDecl(FunctionDecl *D) {
 // Reverse the order of call traversal so that parameters inside of
 // function calls will get rewritten before the call itself, otherwise
 // text mangling will result.
-bool BTypeVisitor::TraverseCallExpr(CallExpr *Call) {
+bool BtoLibbpfTypeVisitor::TraverseCallExpr(CallExpr *Call) {
   for (auto child : Call->children())
     if (!TraverseStmt(child))
       return false;
@@ -901,7 +889,7 @@ bool BTypeVisitor::TraverseCallExpr(CallExpr *Call) {
 //  table.foo(&key)
 // to:
 //  bpf_table_foo_elem(bpf_pseudo_fd(table), &key [,&leaf])
-bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
+bool BtoLibbpfTypeVisitor::VisitCallExpr(CallExpr *Call) {
   // make sure node is a reference to a bpf table, which is assured by the
   // presence of the section("maps/<typename>") GNU __attribute__
   if (MemberExpr *Memb = dyn_cast<MemberExpr>(Call->getCallee()->IgnoreImplicit())) {
@@ -933,17 +921,8 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           string name = string(Ref->getDecl()->getName());
           string arg0 = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
           string arg1 = rewriter_.getRewrittenText(expansionRange(Call->getArg(1)->getSourceRange()));
-          string lookup = "bpf_map_lookup_elem_(bpf_pseudo_fd(1, " + fd + ")";
-          string update = "bpf_map_update_elem_(bpf_pseudo_fd(1, " + fd + ")";
-          txt  = "({typeof(" + name + ".leaf) *leaf = " + lookup + ", " + arg0 + "); ";
-          txt += "if (!leaf) {";
-          txt += " " + update + ", " + arg0 + ", " + arg1 + ", BPF_NOEXIST);";
-          txt += " leaf = " + lookup + ", " + arg0 + ");";
-          if (memb_name == "lookup_or_init") {
-            txt += " if (!leaf) return 0;";
-          }
-          txt += "}";
-          txt += "leaf;})";
+          string lookup = string("(") + Call->getArg(1)->getType().getAsString() + ")bpf_map_lookup_or_try_init(&" + name;
+          txt  = lookup + ", " + arg0 + ", " + arg1 + ") ";
         } else if (memb_name == "increment" || memb_name == "atomic_increment") {
           string name = string(Ref->getDecl()->getName());
           string arg0 = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
@@ -954,21 +933,22 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
 
           }
 
-          string lookup = "bpf_map_lookup_elem_(bpf_pseudo_fd(1, " + fd + ")";
-          string update = "bpf_map_update_elem_(bpf_pseudo_fd(1, " + fd + ")";
-          txt  = "({ typeof(" + name + ".key) _key = " + arg0 + "; ";
-          txt += "typeof(" + name + ".leaf) *_leaf = " + lookup + ", &_key); ";
-          txt += "if (_leaf) ";
+          // string lookup = "bpf_map_lookup_elem_(bpf_pseudo_fd(1, " + fd + ")";
+          // string update = "bpf_map_update_elem_(bpf_pseudo_fd(1, " + fd + ")";
+          // txt  = "({ typeof(" + name + ".key) _key = " + arg0 + "; ";
+          // txt += "typeof(" + name + ".leaf) *_leaf = " + lookup + ", &_key); ";
+          // txt += "if (_leaf) ";
 
           if (memb_name == "atomic_increment") {
-            txt += "lock_xadd(_leaf, " + increment_value + ");";
+            txt = "__atomic_add_fetch(" + name + ", " + increment_value + ", __ATOMIC_RELAXED);";
           } else {
-            txt += "(*_leaf) += " + increment_value + ";";
+            txt = "__sync_fetch_and_add(" + name + ", " + increment_value + "); ";
+            //txt += "(*_leaf) += " + increment_value + ";";
           }
           if (desc->second.type == BPF_MAP_TYPE_HASH) {
-            txt += "else { typeof(" + name + ".leaf) _zleaf; __builtin_memset(&_zleaf, 0, sizeof(_zleaf)); ";
-            txt += "_zleaf += " + increment_value + ";";
-            txt += update + ", &_key, &_zleaf, BPF_NOEXIST); } ";
+            // txt += "else { typeof(" + name + ".leaf) _zleaf; __builtin_memset(&_zleaf, 0, sizeof(_zleaf)); ";
+            // txt += "_zleaf += " + increment_value + ";";
+            // txt += update + ", &_key, &_zleaf, BPF_NOEXIST); } ";
           }
           txt += "})";
         } else if (memb_name == "perf_submit") {
@@ -976,7 +956,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           string arg0 = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
           string args_other = rewriter_.getRewrittenText(expansionRange(SourceRange(GET_BEGINLOC(Call->getArg(1)),
                                                            GET_ENDLOC(Call->getArg(2)))));
-          txt = "bpf_perf_event_output(" + arg0 + ", (void *)bpf_pseudo_fd(1, " + fd + ")";
+          txt = "bpf_perf_event_output(" + arg0 + ", &" + name;
           txt += ", CUR_CPU_IDENTIFIER, " + args_other + ")";
 
           // e.g.
@@ -1003,9 +983,10 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           string skb_len = rewriter_.getRewrittenText(expansionRange(Call->getArg(1)->getSourceRange()));
           string meta = rewriter_.getRewrittenText(expansionRange(Call->getArg(2)->getSourceRange()));
           string meta_len = rewriter_.getRewrittenText(expansionRange(Call->getArg(3)->getSourceRange()));
+          string name = string(Ref->getDecl()->getName());
           txt = "bpf_perf_event_output(" +
             skb + ", " +
-            "(void *)bpf_pseudo_fd(1, " + fd + "), " +
+            "&" + name + ", " +
             "((__u64)" + skb_len + " << 32) | BPF_F_CURRENT_CPU, " +
             meta + ", " +
             meta_len + ");";
@@ -1013,8 +994,9 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           if (desc->second.type == BPF_MAP_TYPE_STACK_TRACE) {
             string arg0 =
                 rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
-            txt = "bcc_get_stackid(";
-            txt += "bpf_pseudo_fd(1, " + fd + "), " + arg0;
+            txt = "bpf_get_stackid(";
+            string name = string(Ref->getDecl()->getName());
+            txt += "&" + name + ", " + arg0;
             rewrite_end = GET_ENDLOC(Call->getArg(0));
             } else {
               error(GET_BEGINLOC(Call), "get_stackid only available on stacktrace maps");
@@ -1024,13 +1006,14 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           string ctx = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
           string keyp = rewriter_.getRewrittenText(expansionRange(Call->getArg(1)->getSourceRange()));
           string flag = rewriter_.getRewrittenText(expansionRange(Call->getArg(2)->getSourceRange()));
+          string name = string(Ref->getDecl()->getName());
           txt = "bpf_" + string(memb_name) + "(" + ctx + ", " +
-            "(void *)bpf_pseudo_fd(1, " + fd + "), " + keyp + ", " + flag + ");";
+            "&" + name + ", " + keyp + ", " + flag + ");";
         } else if (memb_name == "ringbuf_output") {
           string name = string(Ref->getDecl()->getName());
           string args = rewriter_.getRewrittenText(expansionRange(SourceRange(GET_BEGINLOC(Call->getArg(0)),
                                                            GET_ENDLOC(Call->getArg(2)))));
-          txt = "bpf_ringbuf_output((void *)bpf_pseudo_fd(1, " + fd + ")";
+          txt = "bpf_ringbuf_output(&" + name;
           txt += ", " + args + ")";
 
           // e.g.
@@ -1052,7 +1035,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
         } else if (memb_name == "ringbuf_reserve") {
           string name = string(Ref->getDecl()->getName());
           string arg0 = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
-          txt = "bpf_ringbuf_reserve((void *)bpf_pseudo_fd(1, " + fd + ")";
+          txt = "bpf_ringbuf_reserve(&" + name;
           txt += ", " + arg0 + ", 0)"; // Flags in reserve are meaningless
         } else if (memb_name == "ringbuf_discard") {
           string name = string(Ref->getDecl()->getName());
@@ -1154,7 +1137,8 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
             error(GET_BEGINLOC(Call), "invalid bpf_table operation %0") << memb_name;
             return false;
           }
-          prefix += "((void *)bpf_pseudo_fd(1, " + fd + "), ";
+          string name = string(Ref->getDecl()->getName());
+          prefix += "(&" + name + ", ";
 
           txt = prefix + args + suffix;
         }
@@ -1207,19 +1191,21 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           text += args[0] + ", " + args[1] + ", " + args[2];
           text += ", ((" + args[3] + " & 0x1) << 4) | sizeof(" + args[2] + "))";
           rewriter_.ReplaceText(expansionRange(Call->getSourceRange()), text);
-        } else if (Decl->getName() == "bpf_trace_printk") {
+        }
+        else if (Decl->getName() == "bpf_trace_printk") {
           checkFormatSpecifiers(args[0], GET_BEGINLOC(Call->getArg(0)));
           //  #define bpf_trace_printk(fmt, args...)
           //    ({ char _fmt[] = fmt; bpf_trace_printk_(_fmt, sizeof(_fmt), args...); })
-          text = "({ char _fmt[] = " + args[0] + "; bpf_trace_printk_(_fmt, sizeof(_fmt)";
+          text = "bpf_printk(" + args[0];
           if (args.size() <= 1) {
-            text += "); })";
+            text += ")";
             rewriter_.ReplaceText(expansionRange(Call->getSourceRange()), text);
           } else {
             rewriter_.ReplaceText(expansionRange(SourceRange(GET_BEGINLOC(Call), GET_ENDLOC(Call->getArg(0)))), text);
-            rewriter_.InsertTextAfter(GET_ENDLOC(Call), "); }");
+            // rewriter_.InsertTextAfter(GET_ENDLOC(Call), ")");
           }
-        } else if (Decl->getName() == "bpf_num_cpus") {
+        } 
+        else if (Decl->getName() == "bpf_num_cpus") {
           int numcpu = sysconf(_SC_NPROCESSORS_ONLN);
           if (numcpu <= 0)
             numcpu = 1;
@@ -1261,7 +1247,7 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
   return true;
 }
 
-bool BTypeVisitor::checkFormatSpecifiers(const string& fmt, SourceLocation loc) {
+bool BtoLibbpfTypeVisitor::checkFormatSpecifiers(const string& fmt, SourceLocation loc) {
   unsigned nb_specifiers = 0, i, j;
   bool has_s = false;
   for (i = 0; i < fmt.length(); i++) {
@@ -1309,7 +1295,7 @@ bool BTypeVisitor::checkFormatSpecifiers(const string& fmt, SourceLocation loc) 
   return true;
 }
 
-bool BTypeVisitor::VisitBinaryOperator(BinaryOperator *E) {
+bool BtoLibbpfTypeVisitor::VisitBinaryOperator(BinaryOperator *E) {
   if (!E->isAssignmentOp())
     return true;
   Expr *LHS = E->getLHS()->IgnoreImplicit();
@@ -1344,7 +1330,7 @@ bool BTypeVisitor::VisitBinaryOperator(BinaryOperator *E) {
   }
   return true;
 }
-bool BTypeVisitor::VisitImplicitCastExpr(ImplicitCastExpr *E) {
+bool BtoLibbpfTypeVisitor::VisitImplicitCastExpr(ImplicitCastExpr *E) {
   // use dext only for RValues
   if (E->getCastKind() != CK_LValueToRValue)
     return true;
@@ -1373,7 +1359,7 @@ bool BTypeVisitor::VisitImplicitCastExpr(ImplicitCastExpr *E) {
 }
 
 SourceRange
-BTypeVisitor::expansionRange(SourceRange range) {
+BtoLibbpfTypeVisitor::expansionRange(SourceRange range) {
 #if LLVM_MAJOR_VERSION >= 7
   return rewriter_.getSourceMgr().getExpansionRange(range).getAsRange();
 #else
@@ -1382,18 +1368,18 @@ BTypeVisitor::expansionRange(SourceRange range) {
 }
 
 template <unsigned N>
-DiagnosticBuilder BTypeVisitor::error(SourceLocation loc, const char (&fmt)[N]) {
+DiagnosticBuilder BtoLibbpfTypeVisitor::error(SourceLocation loc, const char (&fmt)[N]) {
   unsigned int diag_id = C.getDiagnostics().getCustomDiagID(DiagnosticsEngine::Error, fmt);
   return C.getDiagnostics().Report(loc, diag_id);
 }
 
 template <unsigned N>
-DiagnosticBuilder BTypeVisitor::warning(SourceLocation loc, const char (&fmt)[N]) {
+DiagnosticBuilder BtoLibbpfTypeVisitor::warning(SourceLocation loc, const char (&fmt)[N]) {
   unsigned int diag_id = C.getDiagnostics().getCustomDiagID(DiagnosticsEngine::Warning, fmt);
   return C.getDiagnostics().Report(loc, diag_id);
 }
 
-int64_t BTypeVisitor::getFieldValue(VarDecl *Decl, FieldDecl *FDecl, int64_t OrigFValue) {
+int64_t BtoLibbpfTypeVisitor::getFieldValue(VarDecl *Decl, FieldDecl *FDecl, int64_t OrigFValue) {
   unsigned idx = FDecl->getFieldIndex();
 
   if (auto I = dyn_cast_or_null<InitListExpr>(Decl->getInit())) {
@@ -1415,7 +1401,7 @@ int64_t BTypeVisitor::getFieldValue(VarDecl *Decl, FieldDecl *FDecl, int64_t Ori
 
 // Open table FDs when bpf tables (as denoted by section("maps*") attribute)
 // are declared.
-bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
+bool BtoLibbpfTypeVisitor::VisitVarDecl(VarDecl *Decl) {
   const RecordType *R = Decl->getType()->getAs<RecordType>();
   if (SectionAttr *A = Decl->getAttr<SectionAttr>()) {
     if (!A->getName().startswith("maps"))
@@ -1646,7 +1632,7 @@ bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
 }
 
 // First traversal of AST to retrieve maps with external pointers.
-BTypeConsumer::BTypeConsumer(ASTContext &C, BFrontendAction &fe,
+BtoLibbpfTypeConsumer::BtoLibbpfTypeConsumer(ASTContext &C, BtoLibbpfFrontendAction &fe,
                              Rewriter &rewriter, set<Decl *> &m)
     : fe_(fe),
       map_visitor_(m),
@@ -1654,15 +1640,15 @@ BTypeConsumer::BTypeConsumer(ASTContext &C, BFrontendAction &fe,
       probe_visitor1_(C, rewriter, m, true),
       probe_visitor2_(C, rewriter, m, false) {}
 
-void BTypeConsumer::HandleTranslationUnit(ASTContext &Context) {
+void BtoLibbpfTypeConsumer::HandleTranslationUnit(ASTContext &Context) {
   DeclContext::decl_iterator it;
   DeclContext *DC = TranslationUnitDecl::castToDeclContext(Context.getTranslationUnitDecl());
 
   /**
-   * In a first traversal, ProbeVisitor tracks external pointers identified
+   * In a first traversal, BtoLibbpfProbeVisitor tracks external pointers identified
    * through each function's arguments and replaces their dereferences with
    * calls to bpf_probe_read. It also passes all identified pointers to
-   * external addresses to MapVisitor.
+   * external addresses to BtoLibbpfMapVisitor.
    */
   for (it = DC->decls_begin(); it != DC->decls_end(); it++) {
     Decl *D = *it;
@@ -1695,13 +1681,13 @@ void BTypeConsumer::HandleTranslationUnit(ASTContext &Context) {
   }
 
   /**
-   * MapVisitor uses external pointers identified by the first ProbeVisitor
+   * BtoLibbpfMapVisitor uses external pointers identified by the first BtoLibbpfProbeVisitor
    * traversal to identify all maps with external pointers as values.
-   * MapVisitor runs only after ProbeVisitor finished its traversal of the
-   * whole translation unit to clearly separate the role of each ProbeVisitor's
+   * BtoLibbpfMapVisitor runs only after BtoLibbpfProbeVisitor finished its traversal of the
+   * whole translation unit to clearly separate the role of each BtoLibbpfProbeVisitor's
    * traversal: the first tracks external pointers from function arguments,
    * whereas the second tracks external pointers from maps. Without this clear
-   * separation, ProbeVisitor might attempt to replace several times the same
+   * separation, BtoLibbpfProbeVisitor might attempt to replace several times the same
    * dereferences.
    */
   for (it = DC->decls_begin(); it != DC->decls_end(); it++) {
@@ -1714,10 +1700,10 @@ void BTypeConsumer::HandleTranslationUnit(ASTContext &Context) {
   }
 
   /**
-   * In a second traversal, ProbeVisitor tracks pointers passed through the
-   * maps identified by MapVisitor and replaces their dereferences with calls
+   * In a second traversal, BtoLibbpfProbeVisitor tracks pointers passed through the
+   * maps identified by BtoLibbpfMapVisitor and replaces their dereferences with calls
    * to bpf_probe_read.
-   * This last traversal runs after MapVisitor went through an entire
+   * This last traversal runs after BtoLibbpfMapVisitor went through an entire
    * translation unit, to ensure maps with external pointers have all been
    * identified.
    */
@@ -1734,7 +1720,7 @@ void BTypeConsumer::HandleTranslationUnit(ASTContext &Context) {
 
 }
 
-BFrontendAction::BFrontendAction(
+BtoLibbpfFrontendAction::BtoLibbpfFrontendAction(
     llvm::raw_ostream &os, unsigned flags, TableStorage &ts,
     const std::string &id, const std::string &main_path,
     ProgFuncInfo &prog_func_info, std::string &mod_src,
@@ -1753,13 +1739,13 @@ BFrontendAction::BFrontendAction(
       fake_fd_map_(fake_fd_map),
       perf_events_(perf_events) {}
 
-bool BFrontendAction::is_rewritable_ext_func(FunctionDecl *D) {
+bool BtoLibbpfFrontendAction::is_rewritable_ext_func(FunctionDecl *D) {
   StringRef file_name = rewriter_->getSourceMgr().getFilename(GET_BEGINLOC(D));
   return (D->isExternallyVisible() && D->hasBody() &&
           (file_name.empty() || file_name == main_path_));
 }
 
-void BFrontendAction::DoMiscWorkAround() {
+void BtoLibbpfFrontendAction::DoMiscWorkAround() {
   // In 4.16 and later, CONFIG_CC_STACKPROTECTOR is moved out of Kconfig and into
   // Makefile. It will be set depending on CONFIG_CC_STACKPROTECTOR_{AUTO|REGULAR|STRONG}.
   // CONFIG_CC_STACKPROTECTOR is still used in various places, e.g., struct task_struct,
@@ -1772,10 +1758,10 @@ void BFrontendAction::DoMiscWorkAround() {
     kresolver = NULL;
   }
   if (probefunc == "bpf_probe_read") {
-    probefunc = "#define bpf_probe_read_kernel bpf_probe_read\n"
-      "#define bpf_probe_read_kernel_str bpf_probe_read_str\n"
-      "#define bpf_probe_read_user bpf_probe_read\n"
-      "#define bpf_probe_read_user_str bpf_probe_read_str\n";
+    probefunc = "#define bpf_probe_read_kernel bpf_core_read\n"
+      "#define bpf_probe_read_kernel_str bpf_core_read_str\n"
+      "#define bpf_probe_read_user bpf_core_read\n"
+      "#define bpf_probe_read_user_str bpf_core_read_str\n";
   }
   else {
     probefunc = "";
@@ -1789,7 +1775,11 @@ void BFrontendAction::DoMiscWorkAround() {
     "    || defined(CONFIG_CC_STACKPROTECTOR_STRONG)\n"
     "#define CONFIG_CC_STACKPROTECTOR\n"
     "#endif\n"
-    "#endif\n";
+    "#endif\n"
+    "// #include \"bcc/proto.h\"\n"
+    "#include \"bcc/helpers.h\"\n"
+    "#include \"bcc/bpf_workaround.h\"\n";
+
   prologue = prologue + probefunc;
   rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).InsertText(0,
     prologue,
@@ -1801,10 +1791,10 @@ void BFrontendAction::DoMiscWorkAround() {
 #else
     rewriter_->getSourceMgr().getBuffer(rewriter_->getSourceMgr().getMainFileID())->getBufferSize(),
 #endif
-    "\n#include <bcc/footer.h>\n");
+    "\n#include \"bcc/footer.h\"\n");
 }
 
-void BFrontendAction::EndSourceFileAction() {
+void BtoLibbpfFrontendAction::EndSourceFileAction() {
   // Additional misc rewrites
   DoMiscWorkAround();
 
@@ -1829,14 +1819,14 @@ void BFrontendAction::EndSourceFileAction() {
     if (fn)
       fn->src_rewritten_ = bd;
   }
-  rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).write(os_);
+  rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).write(llvm::outs());
   os_.flush();
 }
 
-unique_ptr<ASTConsumer> BFrontendAction::CreateASTConsumer(CompilerInstance &Compiler, llvm::StringRef InFile) {
+unique_ptr<ASTConsumer> BtoLibbpfFrontendAction::CreateASTConsumer(CompilerInstance &Compiler, llvm::StringRef InFile) {
   rewriter_->setSourceMgr(Compiler.getSourceManager(), Compiler.getLangOpts());
   vector<unique_ptr<ASTConsumer>> consumers;
-  consumers.push_back(unique_ptr<ASTConsumer>(new BTypeConsumer(Compiler.getASTContext(), *this, *rewriter_, m_)));
+  consumers.push_back(unique_ptr<ASTConsumer>(new BtoLibbpfTypeConsumer(Compiler.getASTContext(), *this, *rewriter_, m_)));
   return unique_ptr<ASTConsumer>(new MultiplexConsumer(std::move(consumers)));
 }
 
