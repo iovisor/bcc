@@ -1,0 +1,8 @@
+command.sh
+output.bpf.c
+pre_output.bpf.c
+source_rewrite.bcc.c
+bcc-front
+preprocess.err
+*.json
+*.o
