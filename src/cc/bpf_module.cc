@@ -132,12 +132,13 @@ class MyMemoryManager : public SectionMemoryManager {
 };
 
 BPFModule::BPFModule(unsigned flags, TableStorage *ts, bool rw_engine_enabled,
-                     const std::string &maps_ns, bool allow_rlimit,
+                     const std::string &maps_ns, bool allow_rlimit, bool aot_enabled, 
                      const char *dev_name)
     : flags_(flags),
       rw_engine_enabled_(rw_engine_enabled && bpf_module_rw_engine_enabled()),
       used_b_loader_(false),
       allow_rlimit_(allow_rlimit),
+      aot_enabled_(aot_enabled),
       ctx_(new LLVMContext),
       id_(std::to_string((uintptr_t)this)),
       maps_ns_(maps_ns),
@@ -205,7 +206,7 @@ int BPFModule::free_bcc_memory() {
 
 // load an entire c file as a module
 int BPFModule::load_cfile(const string &file, bool in_memory, const char *cflags[], int ncflags) {
-  ClangLoader clang_loader(&*ctx_, flags_);
+  ClangLoader clang_loader(&*ctx_, flags_, aot_enabled_);
   if (clang_loader.parse(&mod_, *ts_, file, in_memory, cflags, ncflags, id_,
                          *prog_func_info_, mod_src_, maps_ns_, fake_fd_map_,
                          perf_events_))
@@ -219,7 +220,7 @@ int BPFModule::load_cfile(const string &file, bool in_memory, const char *cflags
 // Load in a pre-built list of functions into the initial Module object, then
 // build an ExecutionEngine.
 int BPFModule::load_includes(const string &text) {
-  ClangLoader clang_loader(&*ctx_, flags_);
+  ClangLoader clang_loader(&*ctx_, flags_, aot_enabled_);
   const char *cflags[] = {"-DB_WORKAROUND"};
   if (clang_loader.parse(&mod_, *ts_, text, true, cflags, 1, "",
                          *prog_func_info_, mod_src_, "", fake_fd_map_,
@@ -557,7 +558,7 @@ int BPFModule::finalize() {
   sections_p = rw_engine_enabled_ ? &sections_ : &tmp_sections;
 
   string err;
-  EngineBuilder builder(move(mod_));
+  EngineBuilder builder(std::move(mod_));
   builder.setErrorStr(&err);
   builder.setMCJITMemoryManager(
       ebpf::make_unique<MyMemoryManager>(sections_p, &*prog_func_info_));

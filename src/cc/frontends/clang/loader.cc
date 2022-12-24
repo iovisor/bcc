@@ -56,6 +56,7 @@
 #include "kbuild_helper.h"
 #include "b_frontend_action.h"
 #include "tp_frontend_action.h"
+#include "libbpf_frontend_action.h"
 #include "loader.h"
 #include "arch_helper.h"
 
@@ -104,8 +105,8 @@ optional<FuncInfo &> ProgFuncInfo::add_func(std::string name) {
   return get_func(name);
 }
 
-ClangLoader::ClangLoader(llvm::LLVMContext *ctx, unsigned flags)
-    : ctx_(ctx), flags_(flags)
+ClangLoader::ClangLoader(llvm::LLVMContext *ctx, unsigned flags, bool aot_mode)
+    : ctx_(ctx), flags_(flags), aot_mode_(aot_mode)
 {
   for (auto f : ExportedFiles::headers())
     remapped_headers_[f.first] = llvm::MemoryBuffer::getMemBuffer(f.second);
@@ -487,10 +488,17 @@ int ClangLoader::do_compile(
   // capture the rewritten c file
   string out_str1;
   llvm::raw_string_ostream os1(out_str1);
+  if (aot_mode_) {
+    BtoLibbpfFrontendAction bact(os1, flags_, ts, id, main_path, prog_func_info, mod_src,
+                       maps_ns, fake_fd_map, perf_events);
+    if (!compiler1.ExecuteAction(bact))
+      return -1;
+    // In AOT mode, exit after generating libbpf source.
+    // TODO: is there other ways?
+    exit(0);
+  }
   BFrontendAction bact(os1, flags_, ts, id, main_path, prog_func_info, mod_src,
                        maps_ns, fake_fd_map, perf_events);
-  if (!compiler1.ExecuteAction(bact))
-    return -1;
   unique_ptr<llvm::MemoryBuffer> out_buf1 = llvm::MemoryBuffer::getMemBuffer(out_str1);
 
   // second pass, clear input and take rewrite buffer
@@ -514,7 +522,6 @@ int ClangLoader::do_compile(
   if (!compiler2.ExecuteAction(ir_act))
     return -1;
   *mod = ir_act.takeModule();
-
   return 0;
 }
 }  // namespace ebpf
