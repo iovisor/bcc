@@ -28,8 +28,9 @@ from bcc.utils import printb
 import argparse
 from socket import inet_ntop, ntohs, AF_INET, AF_INET6
 from struct import pack
-from time import sleep
+from time import sleep, strftime
 from datetime import datetime
+import json
 
 # arguments
 examples = """examples:
@@ -79,6 +80,8 @@ parser.add_argument("-d", "--dns", action="store_true",
     help="include likely DNS query associated with each connect")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 debug = 0
 
@@ -440,6 +443,63 @@ def print_ipv6_event(cpu, data, size):
             inet_ntop(AF_INET6, event.saddr).encode(),
             dest_ip, event.dport, print_dns(dest_ip)))
 
+def print_ipv4_event_json(cpu, data, size):
+    event = b["ipv4_events"].event(data)
+    global start_ts
+    if args.timestamp:
+        if start_ts == 0:
+            start_ts = event.ts_us
+        ts = (float(event.ts_us) - start_ts) / 1000000
+    else:
+        ts = 0
+    if args.print_uid:
+        uid = event.uid
+    else:
+        uid = 0
+    dest_ip = inet_ntop(AF_INET, pack("I", event.daddr)).encode()
+    if args.lport:
+        print(json.dumps({"ts": ts, "uid": uid, "pid": event.pid,
+            "task": event.task.decode(), "ip": event.ip,
+            "saddr": inet_ntop(AF_INET, pack("I", event.saddr)),
+            "lport": event.lport,
+            "daddr": dest_ip.decode(), "dport": event.dport,
+            "query": print_dns(dest_ip).decode()}))
+    else:
+        print(json.dumps({"ts": ts, "uid": uid, "pid": event.pid,
+            "task": event.task.decode(), "ip": event.ip,
+            "saddr": inet_ntop(AF_INET, pack("I", event.saddr)),
+            "daddr": dest_ip.decode(), "dport": event.dport,
+            "query": print_dns(dest_ip).decode()
+            }))
+
+def print_ipv6_event_json(cpu, data, size):
+    event = b["ipv6_events"].event(data)
+    global start_ts
+    if args.timestamp:
+        if start_ts == 0:
+            start_ts = event.ts_us
+        ts = (float(event.ts_us) - start_ts) / 1000000
+    else:
+        ts = 0
+    if args.print_uid:
+        uid = event.uid
+    else:
+        uid = 0
+    dest_ip = inet_ntop(AF_INET6, event.daddr).encode()
+    if args.lport:
+        print(json.dumps({"ts": ts, "uid": uid, "pid": event.pid,
+            "task": event.task.decode(), "ip": event.ip,
+            "saddr": inet_ntop(AF_INET6, event.saddr),
+            "lport": event.lport,
+            "daddr": dest_ip.decode(), "dport": event.dport,
+            "query": print_dns(dest_ip).decode()}))
+    else:
+        print(json.dumps({"ts": ts, "uid": uid, "pid": event.pid,
+            "task": event.task.decode(), "ip": event.ip,
+            "saddr": inet_ntop(AF_INET6, event.saddr),
+            "daddr": dest_ip.decode(), "dport": event.dport,
+            "query": print_dns(dest_ip).decode("utf8")}))
+
 def depict_cnt(counts_tab, l3prot='ipv4'):
     for k, v in sorted(counts_tab.items(),
                        key=lambda counts: counts[1].value, reverse=True):
@@ -455,6 +515,18 @@ def depict_cnt(counts_tab, l3prot='ipv4'):
 
         print("%s %-10d" % (depict_key, v.value))
 
+def depict_cnt_json(counts_tab, l3prot='ipv4'):
+    time = strftime("%H:%M:%S")
+    for k, v in sorted(counts_tab.items(),
+                       key=lambda counts: counts[1].value, reverse=True):
+        if l3prot == 'ipv4':
+            print(json.dumps({"time": time, "saddr": inet_ntop(AF_INET, pack('I', k.saddr)),
+                              "daddr": inet_ntop(AF_INET, pack('I', k.daddr)),
+                              "dport": k.dport, "count": v.value}))
+        else:
+            print(json.dumps({"time": time, "saddr": inet_ntop(AF_INET6, k.saddr),
+                              "daddr": inet_ntop(AF_INET6, k.daddr),
+                              "dport": k.dport, "count": v.value}))
 def print_dns(dest_ip):
     if not args.dns:
         return b""
@@ -537,7 +609,8 @@ if args.dns:
     b.attach_kretprobe(event="udp_recvmsg", fn_name="trace_udp_ret_recvmsg")
     b.attach_kprobe(event="udpv6_queue_rcv_one_skb", fn_name="trace_udpv6_recvmsg")
 
-print("Tracing connect ... Hit Ctrl-C to end")
+if not args.json:
+    print("Tracing connect ... Hit Ctrl-C to end")
 if args.count:
     try:
         while True:
@@ -553,26 +626,32 @@ if args.count:
 # read events
 else:
     # header
-    if args.timestamp:
-        print("%-9s" % ("TIME(s)"), end="")
-    if args.print_uid:
-        print("%-6s" % ("UID"), end="")
-    if args.lport:
-        print("%-7s %-12s %-2s %-16s %-6s %-16s %-6s" % ("PID", "COMM", "IP", "SADDR",
-            "LPORT", "DADDR", "DPORT"), end="")
-    else:
-        print("%-7s %-12s %-2s %-16s %-16s %-6s" % ("PID", "COMM", "IP", "SADDR",
-            "DADDR", "DPORT"), end="")
-    if args.dns:
-        print(" QUERY")
-    else:
-        print()
+    if not args.json:
+        if args.timestamp:
+            print("%-9s" % ("TIME(s)"), end="")
+        if args.print_uid:
+            print("%-6s" % ("UID"), end="")
+        if args.lport:
+            print("%-7s %-12s %-2s %-16s %-6s %-16s %-6s" % ("PID", "COMM", "IP", "SADDR",
+                "LPORT", "DADDR", "DPORT"), end="")
+        else:
+            print("%-7s %-12s %-2s %-16s %-16s %-6s" % ("PID", "COMM", "IP", "SADDR",
+                "DADDR", "DPORT"), end="")
+        if args.dns:
+            print(" QUERY")
+        else:
+            print()
+    
 
     start_ts = 0
 
     # read events
-    b["ipv4_events"].open_perf_buffer(print_ipv4_event)
-    b["ipv6_events"].open_perf_buffer(print_ipv6_event)
+    if args.json:
+        b["ipv4_events"].open_perf_buffer(print_ipv4_event_json)
+        b["ipv6_events"].open_perf_buffer(print_ipv6_event_json)
+    else:
+        b["ipv4_events"].open_perf_buffer(print_ipv4_event)
+        b["ipv6_events"].open_perf_buffer(print_ipv6_event)
     if args.dns:
         b["dns_events"].open_perf_buffer(save_dns)
     while True:
