@@ -62,6 +62,8 @@ thread_group.add_argument("-p", "--pid", metavar="PID", dest="pid",
     help="trace this PID only", type=int)
 thread_group.add_argument("-t", "--tid", metavar="TID", dest="tid",
     help="trace this TID only", type=int)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 
 min_us = int(args.min_us)
@@ -268,6 +270,16 @@ def print_event(cpu, data, size):
     else:
         print("%-8s %-16s %-6s %14s" % (strftime("%H:%M:%S"), event.task.decode('utf-8', 'replace'), event.pid, event.delta_us))
 
+def print_event_json(cpu, data, size):
+    event = b["events"].event(data)
+    print("%s" % {
+        "task": event.task.decode(),
+        "pid": event.pid,
+        "delta_us": event.delta_us,
+        "prev_task": event.prev_task.decode(),
+        "prev_pid": event.prev_pid,
+    })
+
 max_pid = int(open("/proc/sys/kernel/pid_max").read())
 
 # load BPF program
@@ -278,14 +290,17 @@ if not is_support_raw_tp:
     b.attach_kprobe(event_re="^finish_task_switch$|^finish_task_switch\.isra\.\d$",
                     fn_name="trace_run")
 
-print("Tracing run queue latency higher than %d us" % min_us)
-if args.previous:
-    print("%-8s %-16s %-6s %14s %-16s %-6s" % ("TIME", "COMM", "TID", "LAT(us)", "PREV COMM", "PREV TID"))
-else:
-    print("%-8s %-16s %-6s %14s" % ("TIME", "COMM", "TID", "LAT(us)"))
+if not args.json:
+    print("Tracing run queue latency higher than %d us" % min_us)
+    if args.previous:
+        print("%-8s %-16s %-6s %14s %-16s %-6s" % ("TIME", "COMM", "TID", "LAT(us)", "PREV COMM", "PREV TID"))
+    else:
+        print("%-8s %-16s %-6s %14s" % ("TIME", "COMM", "TID", "LAT(us)"))
 
-# read events
-b["events"].open_perf_buffer(print_event, page_cnt=64)
+    # read events
+    b["events"].open_perf_buffer(print_event, page_cnt=64)
+else:
+    b["events"].open_perf_buffer(print_event_json, page_cnt=64)
 while 1:
     try:
         b.perf_buffer_poll()
