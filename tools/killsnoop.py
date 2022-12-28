@@ -175,7 +175,7 @@ def print_event_json(cpu, data, size):
         return
 
     print("%s" % {
-        "timestamp": strftime("%H:%M:%S"),
+        "time": strftime("%H:%M:%S"),
         "pid": event.pid,
         "comm": event.comm,
         "sig": event.sig,

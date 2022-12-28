@@ -177,7 +177,7 @@ while 1:
 
     if args.json:
         if tstamp:
-            print(json.dumps({"timestamp": strftime("%H:%M:%S"),
+            print(json.dumps({"time": strftime("%H:%M:%S"),
                 "hits": hits, "misses": misses, "dirties": mbd,
                 "hitratio": ratio, "buffers_mb": buff, "cached_mb": cached}))
         else:

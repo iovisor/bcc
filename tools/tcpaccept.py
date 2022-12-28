@@ -263,14 +263,18 @@ def print_ipv6_event(cpu, data, size):
 def print_ipv4_event_json(cpu, data, size):
     event = b["ipv4_events"].event(data)
     global start_ts
-    start_ts = event.ts_us
+
+    if start_ts == 0:
+        start_ts = event.ts_us
     print("%s" % { "timestamp": (float(event.ts_us) - start_ts) / 1000000, "pid": event.pid, "task": event.task.decode('utf8'), "ip": event.ip, 
         "daddr": inet_ntop(AF_INET, pack("I", event.daddr)), "dport": event.dport, 
         "saddr": inet_ntop(AF_INET, pack("I", event.saddr)), "lport": event.lport })
 
 def print_ipv6_event_json(cpu, data, size):
+    event = b["ipv6_events"].event(data)
     global start_ts
-    start_ts = event.ts_us
+    if start_ts == 0:
+        start_ts = event.ts_us
     event = b["ipv6_events"].event(data)
     print("%s" % { "timestamp": (float(event.ts_us) - start_ts) / 1000000, "pid": event.pid, "task": event.task.decode('utf8'), "ip": event.ip, 
         "daddr": inet_ntop(AF_INET6, event.daddr), "dport": event.dport, 

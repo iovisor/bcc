@@ -331,6 +331,11 @@ def print_event_json(cpu, data, size):
     event = b["events"].event(data)
     tid = event.id & 0xffffffff;
 
+    global initial_ts
+
+    if not initial_ts:
+        initial_ts = event.ts
+        
     cnt = min(MAX_FD, event.fd_cnt);
 
     json_dict = {}
