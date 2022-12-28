@@ -50,6 +50,8 @@ parser.add_argument("count", nargs="?", default=99999999,
     help="number of outputs")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 countdown = int(args.count)
 debug = 0
@@ -190,21 +192,10 @@ b.attach_perf_event(ev_type=PerfType.SOFTWARE,
     ev_config=PerfSWConfig.CPU_CLOCK, fn_name="do_perf_event",
     sample_period=0, sample_freq=frequency)
 
-print("Sampling run queue length... Hit Ctrl-C to end.")
+if not args.json:
+    print("Sampling run queue length... Hit Ctrl-C to end.")
 
-# output
-exiting = 0 if args.interval else 1
-dist = b.get_table("dist")
-while (1):
-    try:
-        sleep(int(args.interval))
-    except KeyboardInterrupt:
-        exiting = 1
-
-    print()
-    if args.timestamp:
-        print("%-8s\n" % strftime("%H:%M:%S"), end="")
-
+def print_event_json(dist):
     if args.runqocc:
         if args.cpus:
             # run queue occupancy, per-CPU summary
@@ -228,8 +219,8 @@ while (1):
                     runqocc = float(queued[c]) / samples
                 else:
                     runqocc = 0
-                print("runqocc, CPU %-3d %6.2f%%" % (c, 100 * runqocc))
-
+                print("{{ \"t\": {}, \"cpu\": {}, \"runqocc\": {} }}".format(
+                    strftime("%H:%M:%S"), c, 100 * runqocc))
         else:
             # run queue occupancy, system-wide summary
             idle = 0
@@ -244,11 +235,71 @@ while (1):
                 runqocc = float(queued) / samples
             else:
                 runqocc = 0
-            print("runqocc: %0.2f%%" % (100 * runqocc))
-
+            print("{{ \"t\": {}, \"runqocc\": {} }}".format(
+                strftime("%H:%M:%S"), 100 * runqocc))
     else:
-        # run queue length histograms
-        dist.print_linear_hist("runqlen", "cpu")
+        dist.print_json_hist("runqlen", "cpu")
+
+# output
+exiting = 0 if args.interval else 1
+dist = b.get_table("dist")
+while (1):
+    try:
+        sleep(int(args.interval))
+    except KeyboardInterrupt:
+        exiting = 1
+
+    if not args.json:
+        print()
+        if args.timestamp:
+            print("%-8s\n" % strftime("%H:%M:%S"), end="")
+
+        if args.runqocc:
+            if args.cpus:
+                # run queue occupancy, per-CPU summary
+                idle = {}
+                queued = {}
+                cpumax = 0
+                for k, v in dist.items():
+                    if k.cpu > cpumax:
+                        cpumax = k.cpu
+                for c in range(0, cpumax + 1):
+                    idle[c] = 0
+                    queued[c] = 0
+                for k, v in dist.items():
+                    if k.slot == 0:
+                        idle[k.cpu] += v.value
+                    else:
+                        queued[k.cpu] += v.value
+                for c in range(0, cpumax + 1):
+                    samples = idle[c] + queued[c]
+                    if samples:
+                        runqocc = float(queued[c]) / samples
+                    else:
+                        runqocc = 0
+                    print("runqocc, CPU %-3d %6.2f%%" % (c, 100 * runqocc))
+
+            else:
+                # run queue occupancy, system-wide summary
+                idle = 0
+                queued = 0
+                for k, v in dist.items():
+                    if k.value == 0:
+                        idle += v.value
+                    else:
+                        queued += v.value
+                samples = idle + queued
+                if samples:
+                    runqocc = float(queued) / samples
+                else:
+                    runqocc = 0
+                print("runqocc: %0.2f%%" % (100 * runqocc))
+
+        else:
+            # run queue length histograms
+            dist.print_linear_hist("runqlen", "cpu")
+    else:
+        print_event_json(dist)
 
     dist.clear()
 
