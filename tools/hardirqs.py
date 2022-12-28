@@ -253,7 +253,7 @@ while (1):
                 print("%-26s %11d" % (k.name.decode('utf-8', 'replace'), v.value / factor))
     else:
         if args.dist:
-            dist.print_json_hist(label, "hardirq")
+            dist.print_json_hist(label, "hardirq", section_print_fn=bytes.decode)
         else:
             for k, v in sorted(dist.items(), key=lambda dist: dist[1].value):
                 print("%s" % { "name": k.name.decode('utf-8', 'replace'), "value": v.value / factor })

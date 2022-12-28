@@ -49,6 +49,8 @@ parser.add_argument("count", nargs="?", default=99999999,
     help="number of outputs")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 countdown = int(args.count)
 if args.events and (args.dist or args.nanoseconds):
@@ -186,10 +188,11 @@ def vec_to_name(vec):
     return ["hi", "timer", "net_tx", "net_rx", "block", "irq_poll",
             "tasklet", "sched", "hrtimer", "rcu"][vec]
 
-if args.events:
-    print("Tracing soft irq events... Hit Ctrl-C to end.")
-else:
-    print("Tracing soft irq event time... Hit Ctrl-C to end.")
+if not args.json:
+    if args.events:
+        print("Tracing soft irq events... Hit Ctrl-C to end.")
+    else:
+        print("Tracing soft irq event time... Hit Ctrl-C to end.")
 
 # output
 exiting = 0 if args.interval else 1
@@ -200,16 +203,23 @@ while (1):
     except KeyboardInterrupt:
         exiting = 1
 
-    print()
-    if args.timestamp:
-        print("%-8s\n" % strftime("%H:%M:%S"), end="")
+    if not args.json:
+        print()
+        if args.timestamp:
+            print("%-8s\n" % strftime("%H:%M:%S"), end="")
 
-    if args.dist:
-        dist.print_log2_hist(label, "softirq", section_print_fn=vec_to_name)
+        if args.dist:
+            dist.print_log2_hist(label, "softirq", section_print_fn=vec_to_name)
+        else:
+            print("%-16s %11s" % ("SOFTIRQ", "TOTAL_" + label))
+            for k, v in sorted(dist.items(), key=lambda dist: dist[1].value):
+                print("%-16s %11d" % (vec_to_name(k.vec), v.value / factor))
     else:
-        print("%-16s %11s" % ("SOFTIRQ", "TOTAL_" + label))
-        for k, v in sorted(dist.items(), key=lambda dist: dist[1].value):
-            print("%-16s %11d" % (vec_to_name(k.vec), v.value / factor))
+        if args.dist:
+            dist.print_json_hist(label, "softirq", section_print_fn=vec_to_name)
+        else:
+            for k, v in sorted(dist.items(), key=lambda dist: dist[1].value):
+                print("%s" % { "time": strftime("%H:%M:%S"), "name": vec_to_name(k.vec), "value": v.value / factor })
     dist.clear()
 
     sys.stdout.flush()
