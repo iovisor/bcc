@@ -31,6 +31,7 @@ $(error Architecture $(ARCH) is not supported yet. Please open an issue)
 endif
 
 BZ_APPS = \
+	memleak \
 	opensnoop \
 	#
 
