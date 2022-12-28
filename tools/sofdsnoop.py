@@ -42,6 +42,8 @@ parser.add_argument("-n", "--name",
     help="only print process names containing this name")
 parser.add_argument("-d", "--duration",
     help="total duration of trace in seconds")
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 debug = 0
 
@@ -281,10 +283,11 @@ b.attach_kretprobe(event="scm_detach_fds", fn_name="trace_scm_detach_fds_return"
 initial_ts = 0
 
 # header
-if args.timestamp:
-    print("%-14s" % ("TIME(s)"), end="")
-print("%-6s %-6s %-16s %-25s %-5s %s" %
-      ("ACTION", "TID", "COMM", "SOCKET", "FD", "NAME"))
+if not args.json:
+    if args.timestamp:
+        print("%-14s" % ("TIME(s)"), end="")
+    print("%-6s %-6s %-16s %-25s %-5s %s" %
+        ("ACTION", "TID", "COMM", "SOCKET", "FD", "NAME"))
 
 def get_file(pid, fd):
     proc = "/proc/%d/fd/%d" % (pid, fd)
@@ -324,8 +327,34 @@ def print_event(cpu, data, size):
         fd_file = get_file(tid, fd) if event.action == ACTION_SEND else ""
         print("%-5d %s" % (fd, fd_file))
 
+def print_event_json(cpu, data, size):
+    event = b["events"].event(data)
+    tid = event.id & 0xffffffff;
+
+    cnt = min(MAX_FD, event.fd_cnt);
+
+    json_dict = {}
+    delta = event.ts - initial_ts
+    json_dict["timestamp"] = float(delta) / 1000000
+    json_dict["action"] = "SEND" if event.action == ACTION_SEND else "RECV"
+    json_dict["tid"] = tid
+    json_dict["comm"] = event.comm.decode()
+    json_dict["sock_fd"] = event.sock_fd
+    json_dict["sock_file"] = get_file(tid, event.sock_fd)
+    json_dict["fd"] = []
+
+    for i in range(0, cnt):
+        fd = event.fd[i]
+        fd_file = get_file(tid, fd) if event.action == ACTION_SEND else ""
+        json_dict["fd"].append({"fd": fd, "file": fd_file})
+
+    print("%s" % json_dict)
+
 # loop with callback to print_event
-b["events"].open_perf_buffer(print_event, page_cnt=64)
+if args.json:
+    b["events"].open_perf_buffer(print_event_json,  page_cnt=64)
+else:
+    b["events"].open_perf_buffer(print_event, page_cnt=64)
 start_time = datetime.now()
 while not args.duration or datetime.now() - start_time < args.duration:
     try:
