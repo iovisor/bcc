@@ -20,6 +20,7 @@ from bcc import BPF
 from socket import inet_ntop, AF_INET, AF_INET6
 from struct import pack
 import argparse
+import json
 
 # arg validation
 def positive_float(val):
@@ -65,6 +66,8 @@ parser.add_argument("-v", "--verbose", action="store_true",
     help="print the BPF program for debugging purposes")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 
 if args.duration_ms:
@@ -262,24 +265,64 @@ def print_ipv6_event(cpu, data, size):
             inet_ntop(AF_INET6, event.saddr), inet_ntop(AF_INET6, event.daddr),
             event.dport, float(event.delta_us) / 1000))
 
+def print_ipv4_event_json(cpu, data, size):
+    event = b["ipv4_events"].event(data)
+    global start_ts
+
+    print(json.dumps({
+        "timestamp": (float(event.ts_us) - start_ts) / 1000000,
+        "pid": event.pid,
+        "task": event.task.decode('utf-8', 'replace'),
+        "ip": event.ip,
+        "saddr": inet_ntop(AF_INET, pack("I", event.saddr)),
+        "daddr": inet_ntop(AF_INET, pack("I", event.daddr)),
+        "lport": event.lport,
+        "dport": event.dport,
+        "lat (ms)": float(event.delta_us) / 1000,
+    }))
+
+def print_ipv6_event_json(cpu, data, size):
+    event = b["ipv6_events"].event(data)
+    global start_ts
+
+    print(json.dumps({
+        "timestamp": (float(event.ts_us) - start_ts) / 1000000,
+        "pid": event.pid,
+        "task": event.task.decode('utf-8', 'replace'),
+        "ip": event.ip,
+        "saddr": inet_ntop(AF_INET6, event.saddr),
+        "daddr": inet_ntop(AF_INET6, event.daddr),
+        "lport": event.lport,
+        "dport": event.dport,
+        "lat (ms)": float(event.delta_us) / 1000,
+    }))
+
+
 # header
-if args.timestamp:
-    print("%-9s" % ("TIME(s)"), end="")
-if args.lport:
-    print("%-7s %-12s %-2s %-16s %-6s %-16s %-5s %s" % ("PID", "COMM",
-        "IP", "SADDR", "LPORT", "DADDR", "DPORT", "LAT(ms)"))
-else:
-    print("%-7s %-12s %-2s %-16s %-16s %-5s %s" % ("PID", "COMM", "IP",
-        "SADDR", "DADDR", "DPORT", "LAT(ms)"))
+if not args.json:
+    if args.timestamp:
+        print("%-9s" % ("TIME(s)"), end="")
+    if args.lport:
+        print("%-7s %-12s %-2s %-16s %-6s %-16s %-5s %s" % ("PID", "COMM",
+            "IP", "SADDR", "LPORT", "DADDR", "DPORT", "LAT(ms)"))
+    else:
+        print("%-7s %-12s %-2s %-16s %-16s %-5s %s" % ("PID", "COMM", "IP",
+            "SADDR", "DADDR", "DPORT", "LAT(ms)"))
 
 # read events
 if args.ipv4:
-    b["ipv4_events"].open_perf_buffer(print_ipv4_event)
+    b["ipv4_events"].open_perf_buffer(print_ipv4_event) if not args.json else \
+        b["ipv4_events"].open_perf_buffer(print_ipv4_event_json)
 elif args.ipv6:
-    b["ipv6_events"].open_perf_buffer(print_ipv6_event)
+    b["ipv6_events"].open_perf_buffer(print_ipv6_event) if not args.json else \
+        b["ipv6_events"].open_perf_buffer(print_ipv6_event_json)
 else:
-    b["ipv4_events"].open_perf_buffer(print_ipv4_event)
-    b["ipv6_events"].open_perf_buffer(print_ipv6_event)
+    if not args.json:
+        b["ipv4_events"].open_perf_buffer(print_ipv4_event)
+        b["ipv6_events"].open_perf_buffer(print_ipv6_event)
+    else:
+        b["ipv4_events"].open_perf_buffer(print_ipv4_event_json)
+        b["ipv6_events"].open_perf_buffer(print_ipv6_event_json)
 
 while 1:
     try:
