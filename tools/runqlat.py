@@ -61,6 +61,8 @@ parser.add_argument("count", nargs="?", default=99999999,
     help="number of outputs")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 countdown = int(args.count)
 debug = 0
@@ -296,8 +298,8 @@ if not is_support_raw_tp:
     b.attach_kprobe(event="wake_up_new_task", fn_name="trace_wake_up_new_task")
     b.attach_kprobe(event_re="^finish_task_switch$|^finish_task_switch\.isra\.\d$",
                     fn_name="trace_run")
-
-print("Tracing run queue latency... Hit Ctrl-C to end.")
+if not args.json:
+    print("Tracing run queue latency... Hit Ctrl-C to end.")
 
 # output
 exiting = 0 if args.interval else 1
@@ -308,11 +310,14 @@ while (1):
     except KeyboardInterrupt:
         exiting = 1
 
-    print()
-    if args.timestamp:
-        print("%-8s\n" % strftime("%H:%M:%S"), end="")
+    if not args.json:
+        print()
+        if args.timestamp:
+            print("%-8s\n" % strftime("%H:%M:%S"), end="")
 
-    dist.print_log2_hist(label, section, section_print_fn=int)
+        dist.print_log2_hist(label, section, section_print_fn=int)
+    else:
+        dist.print_json_hist(label, section, section_print_fn=int)
     dist.clear()
 
     countdown -= 1
