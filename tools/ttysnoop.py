@@ -164,15 +164,12 @@ KFUNC_PROBE(tty_write, struct kiocb *iocb, struct iov_iter *from)
 
 if BPF.kernel_struct_has_field(b'bpf_ringbuf', b'waitq') == 1:
     PERF_MODE = "USE_BPF_RING_BUF"
-else:
-    PERF_MODE = "USE_BPF_PERF_BUF"
-
-if PERF_MODE == "USE_BPF_RING_BUF":
     bpf_text = bpf_text.replace('PERF_TABLE',
                             'BPF_RINGBUF_OUTPUT(events, 64);')
     bpf_text = bpf_text.replace('PERF_OUTPUT_CTX',
                             'events.ringbuf_output(data, sizeof(*data), 0);')
 else:
+    PERF_MODE = "USE_BPF_PERF_BUF"
     bpf_text = bpf_text.replace('PERF_TABLE', 'BPF_PERF_OUTPUT(events);')
     bpf_text = bpf_text.replace('PERF_OUTPUT_CTX',
                             'events.perf_submit(ctx, data, sizeof(*data));')
