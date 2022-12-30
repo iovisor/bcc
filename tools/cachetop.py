@@ -293,6 +293,7 @@ def handle_loop(stdscr, args):
                 "time": strftime("%H:%M:%S"),
                 "pid": stat[0],
                 "uid": stat[1],
+                "username": username,
                 "comm": stat[2],
                 "hits": stat[3],
                 "misses": stat[4],
