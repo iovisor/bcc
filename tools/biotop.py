@@ -220,7 +220,8 @@ if BPF.get_kprobe_functions(b'__blk_account_io_done'):
 else:
     b.attach_kprobe(event="blk_account_io_done", fn_name="trace_req_completion")
 
-print('Tracing... Output every %d secs. Hit Ctrl-C to end' % interval)
+if not args.json:
+    print('Tracing... Output every %d secs. Hit Ctrl-C to end' % interval)
 
 # cache disk major,minor -> diskname
 disklookup = {}
@@ -262,7 +263,6 @@ def print_event(counts):
             break
 
 def print_event_json(counts):
-    json_dict = {}
     for k, v in reversed(sorted(counts.items(),
                                 key=lambda counts: counts[1].bytes)):
         # lookup disk
@@ -272,17 +272,18 @@ def print_event_json(counts):
         else:
             diskname = "?"
 
-        json_dict[k.pid] = {
-            "name": k.name.decode('utf-8', 'replace'),
-            "rwflag": k.rwflag,
+        json_dict = {
+            "pid": k.pid,
+            "comm": k.name.decode('utf-8', 'replace') if not k.name.decode('utf-8', 'replace') == "" else "unknown",
+            "operation": "write" if k.rwflag else "read",
             "major": k.major,
             "minor": k.minor,
             "io": v.io,
-            "bytes": v.bytes,
-            "us": v.us,
+            "kbytes": v.bytes / 1024,
+            "avg_ms": (float(v.us) / 1000) / v.io,
             "disk": diskname
         }
-    print(json.dumps(json_dict))
+        print(json.dumps(json_dict))
 
 # output
 exiting = 0
@@ -304,5 +305,6 @@ while 1:
 
     countdown -= 1
     if exiting or countdown == 0:
-        print("Detaching...")
+        if not args.json:
+            print("Detaching...")
         exit()

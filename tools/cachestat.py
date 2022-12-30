@@ -193,5 +193,6 @@ while 1:
     mpa = mbd = apcl = apd = total = misses = hits = cached = buff = 0
 
     if exiting:
-        print("Detaching...")
+        if not args.json:
+            print("Detaching...")
         exit()
