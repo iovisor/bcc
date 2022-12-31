@@ -53,12 +53,14 @@ Source0:        bcc.tar.gz
 
 ExclusiveArch: x86_64 ppc64 aarch64 ppc64le
 BuildRequires: bison cmake >= 2.8.7 flex make
-BuildRequires: gcc gcc-c++ python2-devel elfutils-libelf-devel-static
+BuildRequires: gcc gcc-c++ elfutils-libelf-devel-static
 %if %{with libdebuginfod}
 BuildRequires: elfutils-debuginfod-client-devel
 %endif
 %if %{with python3}
 BuildRequires: python3-devel
+%else
+BuildRequires: python2-devel
 %endif
 %if %{with_lua}
 BuildRequires: luajit luajit-devel
