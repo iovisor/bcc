@@ -213,8 +213,9 @@ b = BPF(text=bpf_text, cflags=["-DMAX_PID=%d" % max_pid])
 b.attach_kprobe(event_re="^finish_task_switch$|^finish_task_switch\.isra\.\d$",
                 fn_name="sched_switch")
 
-print("Tracing %s-CPU time... Hit Ctrl-C to end." %
-      ("off" if args.offcpu else "on"))
+if not args.json:
+    print("Tracing %s-CPU time... Hit Ctrl-C to end." %
+        ("off" if args.offcpu else "on"))
 
 exiting = 0 if args.interval else 1
 dist = b.get_table("dist")

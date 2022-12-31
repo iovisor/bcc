@@ -212,7 +212,8 @@ b.attach_kretprobe(event="ext4_file_write_iter", fn_name="trace_write_return")
 b.attach_kretprobe(event="ext4_file_open", fn_name="trace_open_return")
 b.attach_kretprobe(event="ext4_sync_file", fn_name="trace_fsync_return")
 
-print("Tracing ext4 operation latency... Hit Ctrl-C to end.")
+if not args.json:
+    print("Tracing ext4 operation latency... Hit Ctrl-C to end.")
 
 # output
 exiting = 0

@@ -171,7 +171,8 @@ b.attach_kprobe(event="vfs_write", fn_name="trace_write_entry")
 
 DNAME_INLINE_LEN = 32  # linux/dcache.h
 
-print('Tracing... Output every %d secs. Hit Ctrl-C to end' % interval)
+if not args.json:
+    print('Tracing... Output every %d secs. Hit Ctrl-C to end' % interval)
 
 def sort_fn(counts):
     if args.sort == "all":
@@ -188,14 +189,15 @@ while 1:
         exiting = 1
 
     # header
-    if clear:
-        call("clear")
-    else:
-        print()
-    with open(loadavg) as stats:
-        print("%-8s loadavg: %s" % (strftime("%H:%M:%S"), stats.read()))
-    print("%-7s %-16s %-6s %-6s %-7s %-7s %1s %s" % ("TID", "COMM",
-        "READS", "WRITES", "R_Kb", "W_Kb", "T", "FILE"))
+    if not args.json:
+        if clear:
+            call("clear")
+        else:
+            print()
+        with open(loadavg) as stats:
+            print("%-8s loadavg: %s" % (strftime("%H:%M:%S"), stats.read()))
+        print("%-7s %-16s %-6s %-6s %-7s %-7s %1s %s" % ("TID", "COMM",
+            "READS", "WRITES", "R_Kb", "W_Kb", "T", "FILE"))
 
     # by-TID output
     counts = b.get_table("counts")
@@ -216,7 +218,7 @@ while 1:
                 "rbytes": v.rbytes / 1024,
                 "wbytes": v.wbytes / 1024,
                 "type": k.type.decode('utf-8', 'replace'),
-                "name": name,
+                "file": name,
             })
         else:
             print("%-7d %-16s %-6d %-6d %-7d %-7d %1s %s" % (k.pid,
@@ -231,5 +233,6 @@ while 1:
 
     countdown -= 1
     if exiting or countdown == 0:
-        print("Detaching...")
+        if not args.json:
+            print("Detaching...")
         exit()
