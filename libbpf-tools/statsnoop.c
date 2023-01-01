@@ -156,23 +156,23 @@ int main(int argc, char **argv)
 	obj->rodata->target_pid = target_pid;
 	obj->rodata->trace_failed_only = trace_failed_only;
 
-	if (!tracepoint_exists("syscalls", "statfs")) {
+	if (!tracepoint_exists("syscalls", "sys_enter_statfs")) {
 		bpf_program__set_autoload(obj->progs.handle_statfs_entry, false);
 		bpf_program__set_autoload(obj->progs.handle_statfs_return, false);
 	}
-	if (!tracepoint_exists("syscalls", "statx")) {
+	if (!tracepoint_exists("syscalls", "sys_enter_statx")) {
 		bpf_program__set_autoload(obj->progs.handle_statx_entry, false);
 		bpf_program__set_autoload(obj->progs.handle_statx_return, false);
 	}
-	if (!tracepoint_exists("syscalls", "newstat")) {
+	if (!tracepoint_exists("syscalls", "sys_enter_newstat")) {
 		bpf_program__set_autoload(obj->progs.handle_newstat_entry, false);
 		bpf_program__set_autoload(obj->progs.handle_newstat_return, false);
 	}
-	if (!tracepoint_exists("syscalls", "newfstatat")) {
+	if (!tracepoint_exists("syscalls", "sys_enter_newfstatat")) {
 		bpf_program__set_autoload(obj->progs.handle_newfstatat_entry, false);
 		bpf_program__set_autoload(obj->progs.handle_newfstatat_return, false);
 	}
-	if (!tracepoint_exists("syscalls", "newlstat")) {
+	if (!tracepoint_exists("syscalls", "sys_enter_newlstat")) {
 		bpf_program__set_autoload(obj->progs.handle_newlstat_entry, false);
 		bpf_program__set_autoload(obj->progs.handle_newlstat_return, false);
 	}
