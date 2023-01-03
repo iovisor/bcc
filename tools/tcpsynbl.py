@@ -67,7 +67,7 @@ else:
     b.attach_kprobe(event="tcp_v4_syn_recv_sock", fn_name="do_entry")
     b.attach_kprobe(event="tcp_v6_syn_recv_sock", fn_name="do_entry")
 
-print("Tracing SYN backlog size. Ctrl-C to end.");
+print("Tracing SYN backlog size. Ctrl-C to end.")
 
 try:
     sleep(99999999)
