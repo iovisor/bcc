@@ -219,7 +219,7 @@ while (1):
             dist.print_json_hist(label, "softirq", section_print_fn=vec_to_name)
         else:
             for k, v in sorted(dist.items(), key=lambda dist: dist[1].value):
-                print("%s" % { "time": strftime("%H:%M:%S"), "name": vec_to_name(k.vec), "value": v.value / factor })
+                print("%s" % { "time": strftime("%H:%M:%S"), "softirq": vec_to_name(k.vec), "total_usecs": v.value / factor })
     dist.clear()
 
     sys.stdout.flush()
