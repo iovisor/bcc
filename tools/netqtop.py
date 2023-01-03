@@ -6,6 +6,7 @@ from ctypes import *
 import argparse
 import os
 from time import sleep,time,localtime,asctime
+from datetime import datetime, timedelta
 
 # pre defines -------------------------------
 ROOT_PATH = "/sys/class/net"
@@ -233,7 +234,12 @@ parser.add_argument("--throughput", "-t", action="store_true")
 parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
 parser.add_argument("-j", "--json", action="store_true",
     help="json output")
+parser.add_argument("-d", "--duration", default=99999999,
+    help="total duration of trace in seconds")
 args = parser.parse_args()
+
+if args.duration:
+    args.duration = timedelta(seconds=int(args.duration))
 
 if args.ebpf:
     with open(EBPF_FILE) as fileobj:
@@ -283,7 +289,8 @@ _name = Devname()
 _name.name = dev_name.encode()
 devname_map[0] = _name
 
-while 1:
+start_time = datetime.now()
+while not args.duration or datetime.now() - start_time < args.duration:
     try:
         sleep(print_interval)
         if args.json:
