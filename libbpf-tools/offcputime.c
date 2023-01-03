@@ -38,8 +38,6 @@ static struct env {
 	.duration = 99999999,
 };
 
-static volatile bool exiting;
-
 const char *argp_program_version = "offcputime 0.1";
 const char *argp_program_bug_address =
 	"https://github.com/iovisor/bcc/tree/master/libbpf-tools";
@@ -197,6 +195,9 @@ static void print_map(struct ksyms *ksyms, struct syms_cache *syms_cache,
 	int err, i, ifd, sfd;
 	unsigned long *ip;
 	struct val_t val;
+	char *dso_name;
+	unsigned long dso_offset;
+	int idx;
 
 	ip = calloc(env.perf_max_stack_depth, sizeof(*ip));
 	if (!ip) {
@@ -207,6 +208,8 @@ static void print_map(struct ksyms *ksyms, struct syms_cache *syms_cache,
 	ifd = bpf_map__fd(obj->maps.info);
 	sfd = bpf_map__fd(obj->maps.stackmap);
 	while (!bpf_map_get_next_key(ifd, &lookup_key, &next_key)) {
+		idx = 0;
+
 		err = bpf_map_lookup_elem(ifd, &next_key, &val);
 		if (err < 0) {
 			fprintf(stderr, "failed to lookup info: %d\n", err);
@@ -219,9 +222,17 @@ static void print_map(struct ksyms *ksyms, struct syms_cache *syms_cache,
 			fprintf(stderr, "    [Missed Kernel Stack]\n");
 			goto print_ustack;
 		}
+
 		for (i = 0; i < env.perf_max_stack_depth && ip[i]; i++) {
 			ksym = ksyms__map_addr(ksyms, ip[i]);
-			printf("    %s\n", ksym ? ksym->name : "Unknown");
+			if (!env.verbose) {
+				printf("    %s\n", ksym ? ksym->name : "unknown");
+			} else {
+				if (ksym)
+					printf("    #%-2d 0x%lx %s+0x%lx\n", idx++, ip[i], ksym->name, ip[i] - ksym->addr);
+				else
+					printf("    #%-2d 0x%lx [unknown]\n", idx++, ip[i]);
+			}
 		}
 
 print_ustack:
@@ -230,20 +241,35 @@ print_ustack:
 
 		if (bpf_map_lookup_elem(sfd, &next_key.user_stack_id, ip) != 0) {
 			fprintf(stderr, "    [Missed User Stack]\n");
-			continue;
+			goto skip_ustack;
 		}
 
 		syms = syms_cache__get_syms(syms_cache, next_key.tgid);
 		if (!syms) {
-			fprintf(stderr, "failed to get syms\n");
+			if (!env.verbose) {
+				fprintf(stderr, "failed to get syms\n");
+			} else {
+				for (i = 0; i < env.perf_max_stack_depth && ip[i]; i++)
+					printf("    #%-2d 0x%016lx [unknown]\n", idx++, ip[i]);
+			}
 			goto skip_ustack;
 		}
 		for (i = 0; i < env.perf_max_stack_depth && ip[i]; i++) {
-			sym = syms__map_addr(syms, ip[i]);
-			if (sym)
-				printf("    %s\n", sym->name);
-			else
-				printf("    [unknown]\n");
+			if (!env.verbose) {
+				sym = syms__map_addr(syms, ip[i]);
+				if (sym)
+					printf("    %s\n", sym->name);
+				else
+					printf("    [unknown]\n");
+			} else {
+				sym = syms__map_addr_dso(syms, ip[i], &dso_name, &dso_offset);
+				printf("    #%-2d 0x%016lx", idx++, ip[i]);
+				if (sym)
+					printf(" %s+0x%lx", sym->name, sym->offset);
+				if (dso_name)
+					printf(" (%s+0x%lx)", dso_name, dso_offset);
+				printf("\n");
+			}
 		}
 
 skip_ustack:

@@ -423,6 +423,7 @@ static int dso__add_sym(struct dso *dso, const char *name, uint64_t start,
 	sym->name = (void*)(unsigned long)off;
 	sym->start = start;
 	sym->size = size;
+	sym->offset = 0;
 
 	return 0;
 }
@@ -635,8 +636,10 @@ static struct sym *dso__find_sym(struct dso *dso, uint64_t offset)
 			end = mid - 1;
 	}
 
-	if (start == end && dso->syms[start].start <= offset)
+	if (start == end && dso->syms[start].start <= offset) {
+		(dso->syms[start]).offset = offset - dso->syms[start].start;
 		return &dso->syms[start];
+	}
 	return NULL;
 }
 
@@ -718,6 +721,22 @@ const struct sym *syms__map_addr(const struct syms *syms, unsigned long addr)
 	dso = syms__find_dso(syms, addr, &offset);
 	if (!dso)
 		return NULL;
+	return dso__find_sym(dso, offset);
+}
+
+const struct sym *syms__map_addr_dso(const struct syms *syms, unsigned long addr,
+				     char **dso_name, unsigned long *dso_offset)
+{
+	struct dso *dso;
+	uint64_t offset;
+
+	dso = syms__find_dso(syms, addr, &offset);
+	if (!dso)
+		return NULL;
+
+	*dso_name = dso->name;
+	*dso_offset = offset;
+
 	return dso__find_sym(dso, offset);
 }
 
@@ -954,6 +973,8 @@ void print_linear_hist(unsigned int *vals, int vals_size, unsigned int base,
 	printf("     %-13s : count     distribution\n", val_type);
 	for (i = idx_min; i <= idx_max; i++) {
 		val = vals[i];
+		if (!val)
+			continue;
 		printf("        %-10d : %-8d |", base + i * step, val);
 		print_stars(val, val_max, stars_max);
 		printf("|\n");
@@ -1021,38 +1042,27 @@ static bool fentry_try_attach(int id)
 
 bool fentry_can_attach(const char *name, const char *mod)
 {
-	const char sysfs_vmlinux[] = "/sys/kernel/btf/vmlinux";
-	struct btf *base, *btf = NULL;
-	char sysfs_mod[80];
-	int id = -1, err;
+	struct btf *btf, *vmlinux_btf, *module_btf = NULL;
+	int err, id;
 
-	base = btf__parse(sysfs_vmlinux, NULL);
-	if (!base) {
-		err = -errno;
-		fprintf(stderr, "failed to parse vmlinux BTF at '%s': %s\n",
-			sysfs_vmlinux, strerror(-err));
-		goto err_out;
-	}
-	if (mod && module_btf_exists(mod)) {
-		snprintf(sysfs_mod, sizeof(sysfs_mod), "/sys/kernel/btf/%s", mod);
-		btf = btf__parse_split(sysfs_mod, base);
-		if (!btf) {
-			err = -errno;
-			fprintf(stderr, "failed to load BTF from %s: %s\n",
-				sysfs_mod, strerror(-err));
-			btf = base;
-			base = NULL;
-		}
-	} else {
-		btf = base;
-		base = NULL;
+	vmlinux_btf = btf__load_vmlinux_btf();
+	err = libbpf_get_error(vmlinux_btf);
+	if (err)
+		return false;
+
+	btf = vmlinux_btf;
+
+	if (mod) {
+		module_btf = btf__load_module_btf(mod, vmlinux_btf);
+		err = libbpf_get_error(module_btf);
+		if (!err)
+			btf = module_btf;
 	}
 
 	id = btf__find_by_name_kind(btf, name, BTF_KIND_FUNC);
 
-err_out:
-	btf__free(btf);
-	btf__free(base);
+	btf__free(module_btf);
+	btf__free(vmlinux_btf);
 	return id > 0 && fentry_try_attach(id);
 }
 
@@ -1106,11 +1116,28 @@ slow_path:
 	return false;
 }
 
-bool vmlinux_btf_exists(void)
+bool tracepoint_exists(const char *category, const char *event)
 {
-	if (!access("/sys/kernel/btf/vmlinux", R_OK))
+	char path[PATH_MAX];
+
+	snprintf(path, sizeof(path), "/sys/kernel/debug/tracing/events/%s/%s/format", category, event);
+	if (!access(path, F_OK))
 		return true;
 	return false;
+}
+
+bool vmlinux_btf_exists(void)
+{
+	struct btf *btf;
+	int err;
+
+	btf = btf__load_vmlinux_btf();
+	err = libbpf_get_error(btf);
+	if (err)
+		return false;
+
+	btf__free(btf);
+	return true;
 }
 
 bool module_btf_exists(const char *mod)

@@ -2,7 +2,7 @@
 .SH NAME
 syscount \- Summarize syscall counts and latencies.
 .SH SYNOPSIS
-.B syscount [-h] [-p PID] [-t TID] [-i INTERVAL] [-d DURATION] [-T TOP] [-x] [-e ERRNO] [-L] [-m] [-P] [-l] [--syscall SYSCALL]
+.B syscount [-h] [-p PID] [-t TID] [-c PPID] [-i INTERVAL] [-d DURATION] [-T TOP] [-x] [-e ERRNO] [-L] [-m] [-P] [-l] [--syscall SYSCALL]
 .SH DESCRIPTION
 This tool traces syscall entry and exit tracepoints and summarizes either the
 number of syscalls of each type, or the number of syscalls per process. It can
@@ -22,6 +22,9 @@ Trace only this process.
 .TP
 \-t TID
 Trace only this thread.
+.TP
+\-c PPID
+Trace only child of this pid.
 .TP
 \-i INTERVAL
 Print the summary at the specified interval (in seconds).

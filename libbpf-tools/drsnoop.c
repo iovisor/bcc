@@ -184,6 +184,14 @@ int main(int argc, char **argv)
 		page_size = sysconf(_SC_PAGESIZE);
 	}
 
+	if (probe_tp_btf("mm_vmscan_direct_reclaim_begin")) {
+		bpf_program__set_autoload(obj->progs.direct_reclaim_begin, false);
+		bpf_program__set_autoload(obj->progs.direct_reclaim_end, false);
+	} else {
+		bpf_program__set_autoload(obj->progs.direct_reclaim_begin_btf, false);
+		bpf_program__set_autoload(obj->progs.direct_reclaim_end_btf, false);
+	}
+
 	err = drsnoop_bpf__load(obj);
 	if (err) {
 		fprintf(stderr, "failed to load BPF object: %d\n", err);

@@ -24,6 +24,7 @@ struct sym {
 	const char *name;
 	unsigned long start;
 	unsigned long size;
+	unsigned long offset;
 };
 
 struct syms;
@@ -32,6 +33,8 @@ struct syms *syms__load_pid(int tgid);
 struct syms *syms__load_file(const char *fname);
 void syms__free(struct syms *syms);
 const struct sym *syms__map_addr(const struct syms *syms, unsigned long addr);
+const struct sym *syms__map_addr_dso(const struct syms *syms, unsigned long addr,
+				     char **dso_name, unsigned long *dso_offset);
 
 struct syms_cache;
 
@@ -90,6 +93,7 @@ bool fentry_can_attach(const char *name, const char *mod);
  * which is slower.
  */
 bool kprobe_exists(const char *name);
+bool tracepoint_exists(const char *category, const char *event);
 
 bool vmlinux_btf_exists(void);
 bool module_btf_exists(const char *mod);

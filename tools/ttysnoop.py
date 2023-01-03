@@ -13,6 +13,7 @@
 # Idea: from ttywatcher.
 #
 # 15-Oct-2016   Brendan Gregg   Created this.
+# 13-Dec-2022   Rong Tao        Detect whether kfunc is supported.
 
 from __future__ import print_function
 from bcc import BPF
@@ -120,7 +121,7 @@ static int do_tty_write(void *ctx, const char __user *buf, size_t count)
  * commit 9bb48c82aced (v5.11-rc4) tty: implement write_iter
  * changed arguments of tty_write function
  */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 11)
 int kprobe__tty_write(struct pt_regs *ctx, struct file *file,
     const char __user *buf, size_t count)
 {
@@ -130,7 +131,7 @@ int kprobe__tty_write(struct pt_regs *ctx, struct file *file,
     return do_tty_write(ctx, buf, count);
 }
 #else
-KFUNC_PROBE(tty_write, struct kiocb *iocb, struct iov_iter *from)
+PROBE_TTY_WRITE
 {
     const char __user *buf;
     const struct kvec *kvec;
@@ -161,6 +162,21 @@ KFUNC_PROBE(tty_write, struct kiocb *iocb, struct iov_iter *from)
 }
 #endif
 """
+
+probe_tty_write_kfunc = """
+KFUNC_PROBE(tty_write, struct kiocb *iocb, struct iov_iter *from)
+"""
+
+probe_tty_write_kprobe = """
+int kprobe__tty_write(struct pt_regs *ctx, struct kiocb *iocb,
+    struct iov_iter *from)
+"""
+
+is_support_kfunc = BPF.support_kfunc()
+if is_support_kfunc:
+    bpf_text = bpf_text.replace('PROBE_TTY_WRITE', probe_tty_write_kfunc)
+else:
+    bpf_text = bpf_text.replace('PROBE_TTY_WRITE', probe_tty_write_kprobe)
 
 bpf_text = bpf_text.replace('PTS', str(pi.st_ino))
 if debug or args.ebpf:

@@ -3,6 +3,7 @@
 //
 // Based on filelife(8) from BCC by Brendan Gregg & Allan McAleavy.
 // 20-Mar-2020   Wenbo Zhang   Created this.
+// 13-Nov-2022   Rong Tao      Check btf struct field for CO-RE and add vfs_open()
 #include <argp.h>
 #include <signal.h>
 #include <stdio.h>

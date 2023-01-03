@@ -279,6 +279,11 @@ class SmokeTests(TestCase):
     def test_pidpersec(self):
         self.run_with_int("pidpersec.py")
 
+    @skipUnless(kernel_version_ge(4,17), "requires kernel >= 4.17")
+    @mayFail("This fails on github actions environment, and needs to be fixed")
+    def test_syscount(self):
+        self.run_with_int("ppchcalls.py -i 1")
+
     @skipUnless(kernel_version_ge(4,9), "requires kernel >= 4.9")
     def test_profile(self):
         self.run_with_duration("profile.py 1")

@@ -44,6 +44,7 @@ APPS = \
 	biotop \
 	bitesize \
 	cachestat \
+	capable \
 	cpudist \
 	cpufreq \
 	drsnoop \
