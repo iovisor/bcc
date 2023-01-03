@@ -21,6 +21,7 @@
 #
 # 18-Oct-2016   Brendan Gregg   Created this.
 # 29-Dec-2017      "      "     Added tracepoint support.
+# 03-Jan-2022   Tariro Mukute   Added interval and count, and json output
 
 from __future__ import print_function
 from bcc import BPF
@@ -29,6 +30,7 @@ from socket import inet_ntop, AF_INET, AF_INET6
 from struct import pack
 from time import strftime
 import json
+from datetime import datetime, timedelta
 
 # arguments
 examples = """examples:
@@ -70,9 +72,13 @@ parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 parser.add_argument("-j", "--json", action="store_true",
     help="json output")
+parser.add_argument("-d", "--duration",
+        help="total duration of trace in seconds")
 args = parser.parse_args()
 debug = 0
-
+if args.duration:
+    args.duration = timedelta(seconds=int(args.duration))
+    
 # define BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
@@ -546,8 +552,9 @@ else:
     b["ipv4_events"].open_perf_buffer(print_ipv4_event_json, page_cnt=64)
     b["ipv6_events"].open_perf_buffer(print_ipv6_event_json, page_cnt=64)
     
-while 1:
+start_time = datetime.now()
+while not args.duration or datetime.now() - start_time < args.duration:
     try:
-        b.perf_buffer_poll()
+        b.perf_buffer_poll(timeout=1000)
     except KeyboardInterrupt:
         exit()
