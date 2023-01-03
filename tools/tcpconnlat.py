@@ -21,6 +21,7 @@ from socket import inet_ntop, AF_INET, AF_INET6
 from struct import pack
 import argparse
 import json
+from datetime import datetime, timedelta
 
 # arg validation
 def positive_float(val):
@@ -68,6 +69,8 @@ parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 parser.add_argument("-j", "--json", action="store_true",
     help="json output")
+parser.add_argument("-d", "--duration", default=99999999,
+    help="total duration of trace in seconds")
 args = parser.parse_args()
 
 if args.duration_ms:
@@ -75,6 +78,9 @@ if args.duration_ms:
     duration_us = int(args.duration_ms * 1000)
 else:
     duration_us = 0   # default is show all
+
+if args.duration:
+    args.duration = timedelta(seconds=int(args.duration))
 
 debug = 0
 
@@ -329,7 +335,8 @@ else:
         b["ipv4_events"].open_perf_buffer(print_ipv4_event_json)
         b["ipv6_events"].open_perf_buffer(print_ipv6_event_json)
 
-while 1:
+start_time = datetime.now()
+while not args.duration or datetime.now() - start_time < args.duration:
     try:
         b.perf_buffer_poll()
     except KeyboardInterrupt:
