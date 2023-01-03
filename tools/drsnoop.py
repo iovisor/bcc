@@ -21,6 +21,7 @@ from datetime import datetime, timedelta
 import os
 import math
 import sys
+import json
 
 # symbols
 kallsyms = "/proc/kallsyms"
@@ -59,6 +60,8 @@ parser.add_argument("-v", "--verbose", action="store_true",
                     help="show system memory state")
 parser.add_argument("--ebpf", action="store_true",
                     help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 debug = 0
 if args.duration:
@@ -186,16 +189,17 @@ b = BPF(text=bpf_text)
 initial_ts = 0
 
 # header
-if args.timestamp:
-    print("%-14s" % ("TIME(s)"), end="")
-if args.print_uid:
-    print("%-6s" % ("UID"), end="")
-print("%-14s %-6s %8s %5s" %
-      ("COMM", "TID" if args.tid else "PID", "LAT(ms)", "PAGES"), end="")
-if args.verbose:
-    print("%10s" % ("FREE(KB)"))
-else:
-    print("")
+if not args.json:
+    if args.timestamp:
+        print("%-14s" % ("TIME(s)"), end="")
+    if args.print_uid:
+        print("%-6s" % ("UID"), end="")
+    print("%-14s %-6s %8s %5s" %
+        ("COMM", "TID" if args.tid else "PID", "LAT(ms)", "PAGES"), end="")
+    if args.verbose:
+        print("%10s" % ("FREE(KB)"))
+    else:
+        print("")
 
 # process event
 def print_event(cpu, data, size):
@@ -227,9 +231,34 @@ def print_event(cpu, data, size):
 
     sys.stdout.flush()
 
+def print_event_json(cpu, data, size):
+    event = b["events"].event(data)
+
+    global initial_ts
+
+    if not initial_ts:
+        initial_ts = event.ts
+
+    if args.name and bytes(args.name) not in event.name:
+        return
+
+    delta = event.ts - initial_ts
+
+    print(json.dumps({
+        "timestamp": float(delta) / 1000000,
+        "uid": event.uid,
+        "comm": event.name.decode('utf-8', 'replace'),
+        "pid": event.id & 0xffffffff if args.tid else event.id >> 32,
+        "lat (ms)": float(event.delta) / 1000000, 
+        "pages": event.nr_reclaimed,
+        "free_kb": K(event.vm_stat[NR_FREE_PAGES])
+    }))
 
 # loop with callback to print_event
-b["events"].open_perf_buffer(print_event, page_cnt=64)
+if args.json:
+    b["events"].open_perf_buffer(print_event_json, page_cnt=64)
+else:
+    b["events"].open_perf_buffer(print_event, page_cnt=64)
 start_time = datetime.now()
 while not args.duration or datetime.now() - start_time < args.duration:
     try:
