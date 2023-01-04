@@ -7,6 +7,7 @@
 #include "runqlen.h"
 
 const volatile bool targ_per_cpu = false;
+const volatile bool targ_host = false;
 
 struct hist hists[MAX_CPU_NR] = {};
 
@@ -18,7 +19,10 @@ int do_sample(struct bpf_perf_event_data *ctx)
 	u64 slot, cpu = 0;
 
 	task = (void*)bpf_get_current_task();
-	slot = BPF_CORE_READ(task, se.cfs_rq, nr_running);
+	if (targ_host)
+		slot = BPF_CORE_READ(task, se.cfs_rq, rq, nr_running);
+	else
+		slot = BPF_CORE_READ(task, se.cfs_rq, nr_running);
 	/*
 	 * Calculate run queue length by subtracting the currently running task,
 	 * if present. len 0 == idle, len 1 == one running task.
