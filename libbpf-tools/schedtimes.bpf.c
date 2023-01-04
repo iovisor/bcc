@@ -153,11 +153,15 @@ static int wakeup(struct task_struct *p)
             update_times(p, delta, STATE_SLEEPING);
         if(state_tsp->state == STATE_BLOCKED)
             update_times(p, delta, STATE_BLOCKED);
-        bpf_map_delete_elem(&start, &pid);
     }
     //update queue time
-    state_ts.state = STATE_QUEUED;
-    bpf_map_update_elem(&start, &pid, &state_ts, BPF_ANY);
+    if(state_tsp){
+        state_tsp->ts = state_ts.ts;
+        state_tsp->state = STATE_QUEUED;
+    }else{
+        state_ts.state = STATE_QUEUED;
+        bpf_map_update_elem(&start, &pid, &state_ts, BPF_ANY);
+    }
 
     return 0;
 }
