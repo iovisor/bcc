@@ -4,9 +4,10 @@
 
 #include "memleak.h"
 
-const volatile size_t min_size = 1;
+const volatile pid_t pid = -1;
+const volatile size_t min_size = 0;
 const volatile size_t max_size = -1;
-const volatile size_t page_size = 1; // todo - default?
+const volatile size_t page_size = 0; // todo - default?
 const volatile __u64 sample_every_n = 1;
 const volatile bool trace_all = false;
 const volatile bool kernel_trace = false;
@@ -333,12 +334,14 @@ int tracepoint__mm_page_free(const struct trace_event_raw_mm_page_free *ctx)
 SEC("tracepoint/percpu/percpu_alloc_percpu")
 int tracepoint__percpu_alloc_percpu(const struct trace_event_raw_percpu_alloc_percpu *ctx)
 {
-	return 1;
+	gen_alloc_enter((struct pt_regs *)args, args->size);
+
+	return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
 }
 
 SEC("tracepoint/percpu/percpu_free_percpu")
 int tracepoint__percpu_free_percpu(const struct trace_event_raw_percpu_free_percpu *ctx)
 {
-	return 1;
+	return gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
 }
 */
