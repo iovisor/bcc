@@ -18,6 +18,7 @@ struct {
 } start SEC(".maps");
 
 __u64 counts[NR_SOFTIRQS] = {};
+__u64 time[NR_SOFTIRQS] = {};
 struct hist hists[NR_SOFTIRQS] = {};
 
 static int handle_entry(unsigned int vec_nr)
@@ -44,7 +45,8 @@ static int handle_exit(unsigned int vec_nr)
 		delta /= 1000U;
 
 	if (!targ_dist) {
-		__sync_fetch_and_add(&counts[vec_nr], delta);
+		__sync_fetch_and_add(&counts[vec_nr], 1);
+		__sync_fetch_and_add(&time[vec_nr], delta);
 	} else {
 		struct hist *hist;
 		u64 slot;
