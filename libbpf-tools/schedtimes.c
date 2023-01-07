@@ -22,7 +22,7 @@
 #include "trace_helpers.h"
 #include "map_helpers.h"
 
-#define OUTPUT_ROWS_LIMIT 10240
+#define OUTPUT_ROWS_LIMIT MAX_ENTRIES
 enum SORT {
     ALL,
     RUN,

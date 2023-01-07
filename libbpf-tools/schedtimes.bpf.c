@@ -14,6 +14,8 @@
 #define TASK_INTERRUPTIBLE      0x00000001
 #define TASK_UNINTERRUPTIBLE    0x00000002
 #define TASK_NOLOAD             0x00000400
+#define EXIT_DEAD               0x00000010
+#define EXIT_ZOMBIE             0x00000020
 
 const volatile pid_t target_pid = 0;
 const volatile pid_t target_tgid = 0;
@@ -103,7 +105,6 @@ static int handle_switch(struct task_struct *prev, struct task_struct *next)
         if(state_tsp){
             delta = state_ts.ts - state_tsp->ts;
             update_times(prev, delta, STATE_RUNNING); 
-            bpf_map_delete_elem(&start, &prev_pid);
         }
 
         //update start time
@@ -114,7 +115,18 @@ static int handle_switch(struct task_struct *prev, struct task_struct *next)
         }else if((state & TASK_UNINTERRUPTIBLE) && !(state & TASK_NOLOAD)){
             state_ts.state = STATE_BLOCKED;
         }
-        bpf_map_update_elem(&start, &prev_pid, &state_ts, 0);
+
+        if(state & EXIT_ZOMBIE || state & EXIT_DEAD){
+            //prev_pid exited
+            bpf_map_delete_elem(&start, &prev_pid);
+        }else{
+            if(state_tsp){
+                state_tsp->ts = state_ts.ts;
+                state_tsp->state = state_ts.state;
+            }else{
+                bpf_map_update_elem(&start, &prev_pid, &state_ts, 0);
+            }
+        }
 
     }
     //next_pid sched in
@@ -125,12 +137,16 @@ static int handle_switch(struct task_struct *prev, struct task_struct *next)
         if(state_tsp && state_tsp->state == STATE_QUEUED){
             delta = state_ts.ts - state_tsp->ts;
             update_times(next, delta, STATE_QUEUED);
-            bpf_map_delete_elem(&start, &next_pid);
         }
 
         //update start time
-        //state_ts.state = STATE_RUNNING;
-        bpf_map_update_elem(&start, &next_pid, &state_ts, 0);
+        state_ts.state = STATE_RUNNING;
+        if(state_tsp){
+            state_tsp->ts = state_ts.ts;
+            state_tsp->state = state_ts.state;
+        }else{
+            bpf_map_update_elem(&start, &next_pid, &state_ts, 0);
+        }
     }
     return 0;
 }
@@ -156,11 +172,11 @@ static int wakeup(struct task_struct *p)
             update_times(p, delta, STATE_BLOCKED);
     }
     //update queue time
+    state_ts.state = STATE_QUEUED;
     if(state_tsp){
         state_tsp->ts = state_ts.ts;
-        state_tsp->state = STATE_QUEUED;
+        state_tsp->state = state_ts.state;
     }else{
-        state_ts.state = STATE_QUEUED;
         bpf_map_update_elem(&start, &pid, &state_ts, BPF_ANY);
     }
 
