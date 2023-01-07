@@ -304,6 +304,12 @@ make modules
 sudo make modules_install
 ````
 
+After install the module you will need to change the name of the directory to remove the '+' at the end
+
+````
+mv /lib/modules/$KERNEL_VERSION-microsoft-standard-WSL2+/ /lib/modules/$KERNEL_VERSION-microsoft-standard-WSL2
+````
+
 Then you can install bcc tools package according your distribution.
 
 If you met some problems, try to 
