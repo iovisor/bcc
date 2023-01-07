@@ -36,8 +36,10 @@ struct env {
     pid_t tid;
     pid_t ppid;
     bool verbose;
+    bool nosleep;
 } env = {
     .verbose = false,
+    .nosleep = false,
 };
 
 static volatile sig_atomic_t exiting = 0;
@@ -65,11 +67,12 @@ const char argp_program_doc[] =
 static const struct argp_option opts[] = {
     { "noclear", 'C', NULL, 0, "Don't clear the screen" },
     { "sort", 's', "SORT", 0, "Sort columns, default all [all, run, sleep, block, queue]" },
-    { "pid", 'p', "PID", 0, "trace this process PID only"},
-    { "tid", 't', "TID", 0, "trace this thread TID only"},
-    { "ppid", 'c', "PPID", 0, "trace children of PPID only"},
+    { "pid", 'p', "PID", 0, "Trace this process PID only"},
+    { "tid", 't', "TID", 0, "Trace this thread TID only"},
+    { "ppid", 'c', "PPID", 0, "Trace children of PPID only"},
     { "rows", 'r', "ROWS", 0, "Maximum rows to print, default 20"},
-    { "verbose", 'v', NULL, 0, "show raw addresses" },
+    { "verbose", 'v', NULL, 0, "Verbose debug output" },
+    { "nosleep", 'S', NULL, 0, "Don't show sleep time" },
     { NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
     {},
 };
@@ -83,6 +86,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
     switch (key) {
     case 'C':
         clear_screen = false;
+        break;
+    case 'S':
+        env.nosleep = true;
         break;
     case 's':
         if (!strcmp(arg, "all")) {
@@ -190,23 +196,31 @@ static int sort_column(const void *obj1, const void *obj2)
     struct sched_times_t *s2 = (struct sched_times_t*)obj2;
 
 
-
-    if(sort_by == RUN){
+    switch (sort_by) {
+    case RUN:
         s2_val = s2->run_time;
         s1_val = s1->run_time;
-    }else if(sort_by == SLEEP){
+        break;
+    case SLEEP:
         s2_val = s2->sleep_time;
         s1_val = s1->sleep_time;
-    }else if(sort_by == BLOCK){
+        break;
+    case BLOCK:
         s2_val = s2->block_time;
         s1_val = s1->block_time;
-    }else if(sort_by == QUEUE){
+        break;
+    case QUEUE:
         s2_val = s2->queue_time;
         s1_val = s1->queue_time;
-    }else{
-        //default by total
-        s2_val = s2->run_time + s2->sleep_time + s2->block_time + s2->queue_time;
-        s1_val = s1->run_time + s1->sleep_time + s1->block_time + s1->queue_time;
+        break;
+    default:
+        s2_val = s2->run_time + s2->block_time + s2->queue_time;
+        s1_val = s1->run_time + s1->block_time + s1->queue_time;
+        if(!env.nosleep){
+            s2_val += s2->sleep_time;
+            s1_val += s1->sleep_time;
+        }
+        break;
     }
 
     //workaround int overflow for u64
@@ -232,6 +246,7 @@ static int print_map(struct schedtimes_bpf *obj)
     __u32 value_size = sizeof(datas[0]);
     __u32 i, rows=OUTPUT_ROWS_LIMIT;
     int err=0;
+    __u64 total_time;
 
     schedtimes_fd = bpf_map__fd(obj->maps.sched_times);
 
@@ -239,8 +254,13 @@ static int print_map(struct schedtimes_bpf *obj)
     tm = localtime(&t);
     strftime(ts, sizeof(ts), "%H:%M:%S", tm);
     printf("%s\n", ts);
-    printf("%-16s %-7s %-10s %-10s %-10s %-10s %s\n",
-            "COMM", "PID", "RUN(us)", "SLEEP(us)", "BLOCK(us)", "QUEUE(us)", "TOTAL(us)");
+    if(env.nosleep){
+        printf("%-16s %-7s %-10s %-10s %-10s %s\n",
+                "COMM", "PID", "RUN(us)", "BLOCK(us)", "QUEUE(us)", "TOTAL(us)");
+    }else{
+        printf("%-16s %-7s %-10s %-10s %-10s %-10s %s\n",
+                "COMM", "PID", "RUN(us)", "SLEEP(us)", "BLOCK(us)", "QUEUE(us)", "TOTAL(us)");
+    }
 
     if(dump_hash(schedtimes_fd, keys, key_size, datas, value_size, &rows, &lookup_key)){
         fprintf(stderr, "failed to dump_hash: %d\n", err);
@@ -253,10 +273,21 @@ static int print_map(struct schedtimes_bpf *obj)
     rows = rows < output_rows ? rows : output_rows;
     for(i=0; i<rows; i++){
         val = datas[i];
-        printf("%-16s %-7d %-10llu %-10llu %-10llu %-10llu %-10llu\n",
-            val.comm, val.key,
-            val.run_time/1000, val.sleep_time/1000, val.block_time/1000, val.queue_time/1000,
-            (val.run_time + val.sleep_time + val.block_time +val.queue_time)/1000);
+        total_time =  val.run_time + val.block_time +val.queue_time;
+        if(!env.nosleep){
+            total_time += val.sleep_time;
+        }
+        if(env.nosleep){
+            printf("%-16s %-7d %-10llu %-10llu %-10llu %-10llu\n",
+                val.comm, val.key,
+                val.run_time/1000, val.block_time/1000, val.queue_time/1000,
+                total_time/1000);
+        }else{
+            printf("%-16s %-7d %-10llu %-10llu %-10llu %-10llu %-10llu\n",
+                val.comm, val.key,
+                val.run_time/1000, val.sleep_time/1000, val.block_time/1000, val.queue_time/1000,
+                total_time/1000);
+        }
     }
     printf("\n");
 
@@ -308,6 +339,7 @@ int main(int argc, char **argv)
     obj->rodata->target_pid = env.tid;
     obj->rodata->target_tgid = env.pid;
     obj->rodata->target_ppid = env.ppid;
+    obj->rodata->no_sleeptime = env.nosleep;
 
     if (probe_tp_btf("sched_wakeup")) {
         bpf_program__set_autoload(obj->progs.handle_sched_wakeup, false);

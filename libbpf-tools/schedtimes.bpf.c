@@ -18,6 +18,7 @@
 const volatile pid_t target_pid = 0;
 const volatile pid_t target_tgid = 0;
 const volatile pid_t target_ppid = 0;
+const volatile bool no_sleeptime = false;
 
 /* key: pid.  value: start time and state */
 struct {
@@ -149,7 +150,7 @@ static int wakeup(struct task_struct *p)
     state_tsp = bpf_map_lookup_elem(&start, &pid);
     if(state_tsp){
         delta = state_ts.ts - state_tsp->ts;
-        if(state_tsp->state == STATE_SLEEPING)
+        if(state_tsp->state == STATE_SLEEPING && !no_sleeptime)
             update_times(p, delta, STATE_SLEEPING);
         if(state_tsp->state == STATE_BLOCKED)
             update_times(p, delta, STATE_BLOCKED);
