@@ -9,6 +9,7 @@
  */
 #include <argp.h>
 #include <signal.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,7 +20,7 @@
 #include "schedtimes.h"
 #include "schedtimes.skel.h"
 #include "trace_helpers.h"
-#include <unistd.h>
+#include "map_helpers.h"
 
 #define OUTPUT_ROWS_LIMIT 10240
 enum SORT {
@@ -226,7 +227,11 @@ static int print_map(struct schedtimes_bpf *obj)
     char ts[15];
 
     static struct sched_times_t datas[OUTPUT_ROWS_LIMIT];
-    int i, err=0, rows=0;
+    static __u32 keys[OUTPUT_ROWS_LIMIT];
+    __u32 key_size = sizeof(__u32);
+    __u32 value_size = sizeof(datas[0]);
+    __u32 i, rows=OUTPUT_ROWS_LIMIT;
+    int err=0;
 
     schedtimes_fd = bpf_map__fd(obj->maps.sched_times);
 
@@ -237,17 +242,12 @@ static int print_map(struct schedtimes_bpf *obj)
     printf("%-16s %-7s %-10s %-10s %-10s %-10s %s\n",
             "COMM", "PID", "RUN(us)", "SLEEP(us)", "BLOCK(us)", "QUEUE(us)", "TOTAL(us)");
 
-
-    while (!bpf_map_get_next_key(schedtimes_fd, &lookup_key, &next_key)){
-        err = bpf_map_lookup_elem(schedtimes_fd, &next_key, &datas[rows]);
-        if (err < 0) {
-            fprintf(stderr, "failed to lookup info: %d\n", err);
-            return err;
-        }
-        datas[rows].key = next_key;
-
-        lookup_key = next_key;
-        rows++;
+    if(dump_hash(schedtimes_fd, keys, key_size, datas, value_size, &rows, &lookup_key)){
+        fprintf(stderr, "failed to dump_hash: %d\n", err);
+    }
+    //copy key to datas for qsort
+    for(i=0; i < rows; i++){
+        datas[i].key = keys[i];
     }
     qsort(datas, rows, sizeof(struct sched_times_t), sort_column);
     rows = rows < output_rows ? rows : output_rows;
