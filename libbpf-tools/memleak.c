@@ -1,6 +1,14 @@
 #include <argp.h>
+#include <poll.h>
+#include <signal.h>
 #include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <sys/eventfd.h>
+#include <sys/signalfd.h>
+#include <sys/timerfd.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #include "memleak.skel.h"
 
@@ -46,12 +54,11 @@ static const struct argp_option argp_options[] = {
 	{"command", 'c', "COMMAND", 0, "execute and trace the specified command"},
 	{"combined-only", 'C', 0, 0, "show combined allocation statistics only"},
 	{"wa-missing-free", 'F', 0, 0, "Workaround to alleviate misjudgments when free is missing"},
-	{"sample-rate", 'r', "SAMPLE_RATE", 0, "sample every N-th allocation to decrease the overhead"},
-	{"top", 'T', "TOP_SIZE", 0, "display only this many top allocating stacks (by size)"},
-	{"min-size", 'N', "MIN_SIZE", 0, "capture only allocations larger than this size"},
-	{"max-size", 'X', "MAX_SIZE", 0, "capture only allocations smaller than this size"},
-	{"obj", 'O', "OBJECT", 0, "attach to allocator functions in the specified object"}, // note - default="c" in original bcc
-	{"ebpf", 'b', "EBPF", 0, ""}, // note - suppressed in original bcc
+	{"sample-rate", 's', "SAMPLE_RATE", 0, "sample every N-th allocation to decrease the overhead"},
+	{"top", 'T', "TOP", 0, "display only this many top allocating stacks (by size)"},
+	{"min-size", 'z', "MIN_SIZE", 0, "capture only allocations larger than this size"},
+	{"max-size", 'Z', "MAX_SIZE", 0, "capture only allocations smaller than this size"},
+	{"obj", 'O', "OBJ", 0, "attach to allocator functions in the specified object"}, // note - default="c" in original bcc
 	{"percpu", 'x', 0, 0, "trace percpu allocations"},
 	{},
 };
@@ -70,6 +77,8 @@ static long argp_parse_long(int key, const char *arg, struct argp_state *state)
 
 static error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 {
+	static int pos_args;
+
 	switch (key) {
 	case 'p':
 		env.pid = argp_parse_long(key, arg, state);
@@ -81,7 +90,7 @@ static error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 		env.interval = argp_parse_long(key, arg, state);
 		break;
 	case 'n':
-		env.num_prints = arg_parse_long(key, arg, state);
+		env.num_prints = argp_parse_long(key, arg, state);
 		break;
 	case 'a':
 		break;
@@ -90,10 +99,21 @@ static error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'c':
 		strncpy(env.command, arg, sizeof(env.command));
+		printf("parsed command: %s\n", env.command);
 		break;
 	case ARGP_KEY_ARG:
-		fprintf(stderr, "Unrecognized positional argument: %s\n", arg);
-		argp_usage(state);
+		++pos_args;
+
+		if (pos_args == 1)
+			env.interval = argp_parse_long(key, arg, state);
+		else if (pos_args == 2)
+			env.num_prints = argp_parse_long(key, arg, state);
+		else {
+			fprintf(stderr, "Unrecognized positional argument: %s\n", arg);
+			argp_usage(state);
+		}
+
+		break;
 	default:
 		fprintf(stderr, "unknown arg:%c %s\n", (char)key, arg);
 		return ARGP_ERR_UNKNOWN;
@@ -109,11 +129,49 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 	return vfprintf(stderr, format, args);
 }
 
-static struct ring_buffer *rb;
+static int timer_fd = -1;
+static int signal_fd = -1;
+static int child_exec_event_fd = -1;
 
-static int handle_event(void *ctx, void *data, size_t len)
+pid_t spawn_and_wait_on_event(const char *command, int event_fd)
 {
-	return 0;
+	const pid_t pid = fork();
+
+	switch (pid) {
+	case -1:
+		perror("failed to create child process");
+		break;
+	case 0: {
+		// todo - any redirection?
+
+		uint64_t event = 0;
+		const ssize_t bytes = read(event_fd, &event, sizeof(event));
+		if (bytes < 0) {
+			perror("failed to read child exec event fd");
+			exit(1);
+		} else if (bytes != sizeof(event)) {
+			fprintf(stderr, "read unexpected size\n");
+			exit(1);
+		}
+
+		if (event != 1) {
+			fprintf(stderr, "received no-go event. exiting child process\n");
+			exit(1);
+		}
+
+		const int err = execl(command, "todo - child name", NULL);
+		if (err) {
+			perror("failed to execute child command");
+			return -1;
+		}
+
+		break;
+	}
+	default:
+		break;
+	}
+
+	return pid;
 }
 
 int main(int argc, char *argv[])
@@ -128,62 +186,147 @@ int main(int argc, char *argv[])
 	if (err)
 		return err;
 
-	if (env.min_size
-
-	if (strcmp(env.cmd, "\0") != 0)
-		printf("running command: %s\n", env.cmd);
-	else if (env.pid == -1)
-		env.kernel_trace = true;
-
-	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
-	libbpf_set_print(libbpf_print_fn);
-
-	struct memleak_bpf *skel = memleak_bpf__open();
-	if (!skel) {
-		fprintf(stderr, "failed to open bpf object\n");
+	if (env.min_size > env.max_size) {
+		fprintf(stderr, "min size (-z) can't be greater than max_size (-Z)\n");
 		return 1;
 	}
 
-	skel->rodata->pid = -1;
-	skel->rodata->min_size = 0;
-	skel->rodata->max_size = -1;
-	skel->rodata->page_size = 0; // todo - default?
-	skel->rodata->sample_every_n = 1;
-	skel->rodata->trace_all = false;
-	skel->rodata->kernel_trace = false;
-	skel->rodata->wa_missing_free = false;
+	struct itimerspec timer_spec;
+	timer_spec.it_interval.tv_sec= env.interval;
+	timer_spec.it_interval.tv_nsec = 0;
+	timer_spec.it_value.tv_sec= env.interval;
+	timer_spec.it_value.tv_nsec = 0;
 
-	if (memleak_bpf__load(skel)) {
-		fprintf(stderr, "failed to load bpf object\n");
-		goto cleanup;
+	timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC | TFD_NONBLOCK);
+	if (timer_fd < 0) {
+		perror("failed to create timerfd");
 	}
 
-	if (memleak_bpf__attach(skel)) {
-		fprintf(stderr, "failed to attach bpf program(s)\n");
-		goto cleanup;
+	if (timerfd_settime(timer_fd, 0, &timer_spec, NULL)) {
+		perror("timerfd settime fail");
+		return 1;
 	}
 
-	rb = ring_buffer__new(bpf_map__fd(skel->maps.rb), handle_event, NULL, NULL);
-	if (!rb) {
-		fprintf(stderr, "failed to create ring buffer\n");
-		goto cleanup;
+	printf("timer fd interval set at %d\n", env.interval);
+
+	sigset_t sigset;
+	sigemptyset(&sigset);
+	sigaddset(&sigset, SIGINT);
+	sigaddset(&sigset, SIGQUIT);
+
+	if (sigprocmask(SIG_BLOCK, &sigemptyset, NULL)) {
+		perror("failed to block signal mask");
+		return 1;
 	}
 
-	const int timeout = 1000; // milliseconds
+	signal_fd = signalfd(-1, &sigset, SFD_CLOEXEC);
+	if (signal_fd < 0) {
+		perror("failed to create signal fd");
+		return 1;
+	}
+
+	if (strcmp(env.command, "\0") != 0) {
+		child_exec_event_fd = eventfd(0, EFD_CLOEXEC);
+		if (child_exec_event_fd) {
+			perror("failed to create child exec event fd");
+			return 1;
+		}
+
+		const pid_t child_pid = spawn_and_wait_on_event(env.command, child_exec_event_fd);
+		if (child_pid < 0) {
+			perror("failed to spawn child process");
+			return 1;
+		}
+
+		printf("running command: %s\n", env.command);
+	}
+	else if (env.pid == -1)
+		env.kernel_trace = true;
+
+	//libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
+	//libbpf_set_print(libbpf_print_fn);
+
+	//struct memleak_bpf *skel = memleak_bpf__open();
+	//if (!skel) {
+	//	fprintf(stderr, "failed to open bpf object\n");
+	//	return 1;
+	//}
+
+	//skel->rodata->pid = env.pid;
+	//skel->rodata->min_size = env.min_size;
+	//skel->rodata->max_size = env.max_size;
+	//skel->rodata->page_size = 0; // todo - default?
+	//skel->rodata->sample_every_n = env.sample_every_n;
+	//skel->rodata->trace_all = env.trace_all;
+	//skel->rodata->kernel_trace = env.kernel_trace;
+	//skel->rodata->wa_missing_free = env.wa_missing_free;
+
+	//if (memleak_bpf__load(skel)) {
+	//	fprintf(stderr, "failed to load bpf object\n");
+	//	goto cleanup;
+	//}
+
+	if (strcmp(env.command, "\0") != 0) {
+		const uint64_t event = 1;
+		const ssize_t bytes = write(child_exec_event_fd, &event, sizeof(event));
+		if (bytes < 0) {
+			perror("failed to write child exec event");
+			goto cleanup;
+		}
+	}
+
+	//if (memleak_bpf__attach(skel)) {
+	//	fprintf(stderr, "failed to attach bpf program(s)\n");
+	//	goto cleanup;
+	//}
+
+	const int timeout_ms = 1000; // milliseconds
 
 	printf("begin polling\n");
 
+	struct pollfd fds[] = {
+		{.fd = timer_fd, .events = POLLIN},
+		{.fd = signal_fd, .events = POLLIN},
+	};
+
+	const nfds_t nfds = sizeof(fds) / sizeof(struct pollfd);
+
 	for (;;) {
-		err = ring_buffer__poll(rb, timeout);
+		err = poll(fds, nfds, -1);
 		if (err < 0) {
-			if (err == -EINTR) {
-				err = 0;
-				printf("polling interrupted\n");
-			} else {
-				fprintf(stderr, "failed to poll ring buffer: %d\n", err);
+			perror("failed to poll");
+			return 1;
+		}
+
+		if (fds[0].revents & POLLIN) {
+			printf("input on timer fd\n");
+			uint64_t buffer = 0;
+			read(fds[0].fd, &buffer, sizeof(buffer));
+			fds[0].revents = 0;
+		}
+
+		if (fds[1].revents & POLLIN) {
+			printf("input on signal fd\n");
+			struct signalfd_siginfo buffer = {};
+			read(fds[1].fd, &buffer, sizeof(buffer));
+
+			switch (buffer.ssi_signo) {
+			case SIGINT:
+				printf("read SIGINT\n");
+				break;
+			case SIGQUIT:
+				printf("read SIGQUIT\n");
+				break;
+			case SIGCHLD:
+				printf("read SIGCHLD\n");
+				break;
+			default:
+				printf("other signal\n");
+				break;
 			}
 
-			break;
+			fds[1].revents = 0;
+			goto cleanup;
 		}
 
 		printf("poll ok\n");
@@ -192,5 +335,6 @@ int main(int argc, char *argv[])
 	printf("end polling\n");
 
 cleanup:
-	memleak_bpf__destroy(skel);
+	//memleak_bpf__destroy(skel);
+	printf("done\n");
 }
