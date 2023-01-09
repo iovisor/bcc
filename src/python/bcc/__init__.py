@@ -748,7 +748,7 @@ class BPF(object):
                 # Exclude all gcc 8's extra .cold functions
                 elif re.match(b'^.*\.cold(\.\d+)?$', fn):
                     continue
-                if (t.lower() in [b't', b'w']) and re.match(event_re, fn) \
+                if (t.lower() in [b't', b'w']) and re.fullmatch(event_re, fn) \
                     and fn not in blacklist:
                     fns.append(fn)
         return set(fns)     # Some functions may appear more than once
