@@ -159,6 +159,8 @@ pid_t spawn_and_wait_on_event(const char *command, int event_fd)
 			exit(1);
 		}
 
+		printf("received go event. executing child command\n");
+
 		const int err = execl(command, "todo - child name", NULL);
 		if (err) {
 			perror("failed to execute child command");
@@ -191,30 +193,13 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	struct itimerspec timer_spec;
-	timer_spec.it_interval.tv_sec= env.interval;
-	timer_spec.it_interval.tv_nsec = 0;
-	timer_spec.it_value.tv_sec= env.interval;
-	timer_spec.it_value.tv_nsec = 0;
-
-	timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC | TFD_NONBLOCK);
-	if (timer_fd < 0) {
-		perror("failed to create timerfd");
-	}
-
-	if (timerfd_settime(timer_fd, 0, &timer_spec, NULL)) {
-		perror("timerfd settime fail");
-		return 1;
-	}
-
-	printf("timer fd interval set at %d\n", env.interval);
-
 	sigset_t sigset;
 	sigemptyset(&sigset);
 	sigaddset(&sigset, SIGINT);
 	sigaddset(&sigset, SIGQUIT);
+	sigaddset(&sigset, SIGCHLD);
 
-	if (sigprocmask(SIG_BLOCK, &sigemptyset, NULL)) {
+	if (sigprocmask(SIG_BLOCK, &sigset, NULL)) {
 		perror("failed to block signal mask");
 		return 1;
 	}
@@ -227,7 +212,7 @@ int main(int argc, char *argv[])
 
 	if (strcmp(env.command, "\0") != 0) {
 		child_exec_event_fd = eventfd(0, EFD_CLOEXEC);
-		if (child_exec_event_fd) {
+		if (child_exec_event_fd < 0) {
 			perror("failed to create child exec event fd");
 			return 1;
 		}
@@ -280,7 +265,23 @@ int main(int argc, char *argv[])
 	//	goto cleanup;
 	//}
 
-	const int timeout_ms = 1000; // milliseconds
+	struct itimerspec timer_spec;
+	timer_spec.it_interval.tv_sec= env.interval;
+	timer_spec.it_interval.tv_nsec = 0;
+	timer_spec.it_value.tv_sec= env.interval;
+	timer_spec.it_value.tv_nsec = 0;
+
+	timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC | TFD_NONBLOCK);
+	if (timer_fd < 0) {
+		perror("failed to create timerfd");
+	}
+
+	if (timerfd_settime(timer_fd, 0, &timer_spec, NULL)) {
+		perror("timerfd settime fail");
+		return 1;
+	}
+
+	printf("timer fd interval set at %d\n", env.interval);
 
 	printf("begin polling\n");
 
