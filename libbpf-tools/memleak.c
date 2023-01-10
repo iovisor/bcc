@@ -34,7 +34,13 @@ static struct env {
 	int count;
 	bool wa_missing_free;
 	bool percpu;
-} env;
+	int perf_max_stack_depth;
+	int stack_max_entries;
+} env = {
+	.pid = -1,
+	.perf_max_stack_depth = 127,
+	.stack_max_entries = 1024,
+};
 
 const char *argp_program_version = "memleak 0.1";
 const char *argp_program_bug_address =
@@ -133,7 +139,7 @@ static int timer_fd = -1;
 static int signal_fd = -1;
 static int child_exec_event_fd = -1;
 
-pid_t spawn_and_wait_on_event(const char *command, int event_fd)
+pid_t fork_and_sync_exec(const char *command, int event_fd)
 {
 	const pid_t pid = fork();
 
@@ -217,7 +223,7 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 
-		const pid_t child_pid = spawn_and_wait_on_event(env.command, child_exec_event_fd);
+		const pid_t child_pid = fork_and_sync_exec(env.command, child_exec_event_fd);
 		if (child_pid < 0) {
 			perror("failed to spawn child process");
 			return 1;
@@ -228,28 +234,32 @@ int main(int argc, char *argv[])
 	else if (env.pid == -1)
 		env.kernel_trace = true;
 
-	//libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
-	//libbpf_set_print(libbpf_print_fn);
+	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
+	libbpf_set_print(libbpf_print_fn);
 
-	//struct memleak_bpf *skel = memleak_bpf__open();
-	//if (!skel) {
-	//	fprintf(stderr, "failed to open bpf object\n");
-	//	return 1;
-	//}
+	struct memleak_bpf *skel = memleak_bpf__open();
+	if (!skel) {
+		fprintf(stderr, "failed to open bpf object\n");
+		return 1;
+	}
 
-	//skel->rodata->pid = env.pid;
-	//skel->rodata->min_size = env.min_size;
-	//skel->rodata->max_size = env.max_size;
-	//skel->rodata->page_size = 0; // todo - default?
-	//skel->rodata->sample_every_n = env.sample_every_n;
-	//skel->rodata->trace_all = env.trace_all;
-	//skel->rodata->kernel_trace = env.kernel_trace;
-	//skel->rodata->wa_missing_free = env.wa_missing_free;
+	skel->rodata->pid = env.pid;
+	skel->rodata->min_size = env.min_size;
+	skel->rodata->max_size = env.max_size;
+	skel->rodata->page_size = 0; // todo - default?
+	skel->rodata->sample_every_n = env.sample_every_n;
+	skel->rodata->trace_all = env.trace_all;
+	skel->rodata->kernel_trace = env.kernel_trace;
+	skel->rodata->wa_missing_free = env.wa_missing_free;
 
-	//if (memleak_bpf__load(skel)) {
-	//	fprintf(stderr, "failed to load bpf object\n");
-	//	goto cleanup;
-	//}
+	bpf_map__set_value_size(skel->maps.stack_traces,
+				env.perf_max_stack_depth * sizeof(unsigned long));
+	bpf_map__set_max_entries(skel->maps.stack_traces, env.stack_max_entries);
+
+	if (memleak_bpf__load(skel)) {
+		fprintf(stderr, "failed to load bpf object\n");
+		goto cleanup;
+	}
 
 	if (strcmp(env.command, "\0") != 0) {
 		const uint64_t event = 1;
@@ -260,10 +270,10 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	//if (memleak_bpf__attach(skel)) {
-	//	fprintf(stderr, "failed to attach bpf program(s)\n");
-	//	goto cleanup;
-	//}
+	if (memleak_bpf__attach(skel)) {
+		fprintf(stderr, "failed to attach bpf program(s)\n");
+		goto cleanup;
+	}
 
 	struct itimerspec timer_spec;
 	timer_spec.it_interval.tv_sec= env.interval;
@@ -336,6 +346,6 @@ int main(int argc, char *argv[])
 	printf("end polling\n");
 
 cleanup:
-	//memleak_bpf__destroy(skel);
+	memleak_bpf__destroy(skel);
 	printf("done\n");
 }

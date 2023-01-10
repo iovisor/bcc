@@ -14,14 +14,10 @@ const volatile bool kernel_trace = false;
 const volatile bool wa_missing_free = false;
 
 struct {
-	__uint(type, BPF_MAP_TYPE_RINGBUF);
-	__uint(max_entries, 1);
-} rb SEC(".maps");
-
-struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__type(key, u32);
 	__type(value, u64);
+	__uint(max_entries, 10240);
 } sizes SEC(".maps");
 
 struct {
@@ -35,13 +31,8 @@ struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__type(key, u64);
 	__type(value, u64);
-} memptrs SEC(".maps");
-
-struct {
-	__uint(type, BPF_MAP_TYPE_STACK_TRACE);
-	__uint(key_size, sizeof(u32));
 	__uint(max_entries, 10240);
-} stack_traces SEC(".maps");
+} memptrs SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
@@ -49,6 +40,12 @@ struct {
 	__type(value, combined_alloc_info_t);
 	__uint(max_entries, 10240);
 } combined_allocs SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_STACK_TRACE);
+	__uint(key_size, sizeof(u32));
+} stack_traces SEC(".maps");
+
 
 static __always_inline void update_statistics_add(u64 stack_id, u64 sz) {
 	combined_alloc_info_t *existing_cinfo;
@@ -345,3 +342,5 @@ int tracepoint__percpu_free_percpu(const struct trace_event_raw_percpu_free_perc
 	return gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
 }
 */
+
+char LICENSE[] SEC("license") = "GPL";
