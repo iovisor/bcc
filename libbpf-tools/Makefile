@@ -13,7 +13,7 @@ CFLAGS := -g -O2 -Wall
 BPFCFLAGS := -g -O2 -Wall
 INSTALL ?= install
 prefix ?= /usr/local
-ARCH := $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/' \
+ARCH ?= $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/' \
 			 | sed 's/ppc64le/powerpc/' | sed 's/mips.*/mips/' \
 			 | sed 's/riscv64/riscv/' | sed 's/loongarch.*/loongarch/')
 BTFHUB_ARCHIVE ?= $(abspath btfhub-archive)
@@ -90,7 +90,7 @@ APPS = \
 	#
 
 # export variables that are used in Makefile.btfgen as well.
-export OUTPUT BPFTOOL ARCH BTFHUB_ARCHIVE APPS
+export OUTPUT BPFTOOL BTFHUB_ARCHIVE APPS
 
 FSDIST_ALIASES = btrfsdist ext4dist nfsdist xfsdist
 FSSLOWER_ALIASES = btrfsslower ext4slower nfsslower xfsslower
