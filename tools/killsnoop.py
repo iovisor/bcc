@@ -4,7 +4,7 @@
 # killsnoop Trace signals issued by the kill() syscall.
 #           For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: killsnoop [-h] [-x] [-p PID] [-T PID]
+# USAGE: killsnoop [-h] [-x] [-p PID] [-T PID] [-s SIGNAL]
 #
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
