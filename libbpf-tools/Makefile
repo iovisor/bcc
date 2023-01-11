@@ -90,7 +90,7 @@ APPS = \
 	#
 
 # export variables that are used in Makefile.btfgen as well.
-export OUTPUT BPFTOOL BTFHUB_ARCHIVE APPS
+export OUTPUT BPFTOOL ARCH BTFHUB_ARCHIVE APPS
 
 FSDIST_ALIASES = btrfsdist ext4dist nfsdist xfsdist
 FSSLOWER_ALIASES = btrfsslower ext4slower nfsslower xfsslower
