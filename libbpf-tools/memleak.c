@@ -4,42 +4,64 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/eventfd.h>
 #include <sys/signalfd.h>
 #include <sys/timerfd.h>
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <bpf/libbpf.h>
+#include <bpf/bpf.h>
+
+#include "memleak.h"
 #include "memleak.skel.h"
+#include "trace_helpers.h"
 
 #define TASK_COMM_LEN 16
 
 static struct env {
 	pid_t pid;
-	char command[TASK_COMM_LEN];
-	bool kernel_trace;
 	bool trace_all;
-	//bool show_allocs;
-	//bool combined_only;
 	int interval;
+	int count;
+	bool show_allocs;
+	bool combined_only;
 	int min_age_ns;
 	int sample_every_n;
 	int sample_rate;
-	int num_prints;
 	int top_stacks;
 	size_t min_size;
 	size_t max_size;
 	char *object;
 
-	int count;
 	bool wa_missing_free;
 	bool percpu;
 	int perf_max_stack_depth;
 	int stack_max_entries;
+	long page_size;
+	bool kernel_trace;
+	char command[TASK_COMM_LEN];
 } env = {
-	.pid = -1,
+	.pid = -1, // -p --pid
+	.trace_all = false, // -t --trace
+	.interval = 5, // posarg 1
+	.count = -1, // posarg 2
+	.show_allocs = false, // -a --show-allocs
+	.combined_only = false, // --combined-only
+	.min_age_ns = 500, // -o --older val * 1e6
+	.wa_missing_free = false, // --wa-missing-free
+	.sample_rate = 1, // -s --sample-rate
+	.top_stacks = 10, // -T --top
+	.min_size = 0, // -z --min-size
+	.max_size = 0, // -Z --max-size
+	// object // -O --obj
+	.percpu = false, // --percpu
 	.perf_max_stack_depth = 127,
 	.stack_max_entries = 1024,
+	.page_size = 1,
+	.kernel_trace = true,
+	.command = {}, // -c --command
 };
 
 const char *argp_program_version = "memleak 0.1";
@@ -95,9 +117,6 @@ static error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 	case 'i':
 		env.interval = argp_parse_long(key, arg, state);
 		break;
-	case 'n':
-		env.num_prints = argp_parse_long(key, arg, state);
-		break;
 	case 'a':
 		break;
 	case 'O':
@@ -107,13 +126,16 @@ static error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 		strncpy(env.command, arg, sizeof(env.command));
 		printf("parsed command: %s\n", env.command);
 		break;
+	case 'T':
+		env.top_stacks = argp_parse_long(key, arg, state);
+		break;
 	case ARGP_KEY_ARG:
 		++pos_args;
 
 		if (pos_args == 1)
 			env.interval = argp_parse_long(key, arg, state);
 		else if (pos_args == 2)
-			env.num_prints = argp_parse_long(key, arg, state);
+			env.count = argp_parse_long(key, arg, state);
 		else {
 			fprintf(stderr, "Unrecognized positional argument: %s\n", arg);
 			argp_usage(state);
@@ -182,6 +204,39 @@ pid_t fork_and_sync_exec(const char *command, int event_fd)
 	return pid;
 }
 
+static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
+{
+	printf("[%s] Top %d stacks with outstanding allocations:\n",
+			"%H:%M:%S", env.top_stacks);
+
+	alloc_info_t alloc_info = {};
+    uint64_t *prev_key = NULL;
+    uint64_t curr_key = 0;
+
+	for (; !bpf_map_get_next_key(allocs_fd, prev_key, &curr_key);
+			prev_key = &curr_key) {
+		puts("loop");
+		const int err = bpf_map_lookup_elem(allocs_fd, &curr_key, &alloc_info);
+
+		if (get_ktime_ns() - env.min_age_ns < alloc_info.timestamp_ns) {
+			puts("< min_age");
+			continue;
+		}
+
+		if (alloc_info.stack_id < 0) {
+			puts("stack_id -1");
+			continue;
+		}
+		else {
+			printf("show alloc\n");
+		}
+
+		return 0;
+	}
+
+	return 0;
+}
+
 int main(int argc, char *argv[])
 {
 	static const struct argp argp = {
@@ -216,7 +271,11 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	if (strcmp(env.command, "\0") != 0) {
+	env.page_size = sysconf(_SC_PAGE_SIZE);
+
+	if (strlen(env.command)) {
+		env.kernel_trace = false;
+
 		child_exec_event_fd = eventfd(0, EFD_CLOEXEC);
 		if (child_exec_event_fd < 0) {
 			perror("failed to create child exec event fd");
@@ -246,7 +305,7 @@ int main(int argc, char *argv[])
 	skel->rodata->pid = env.pid;
 	skel->rodata->min_size = env.min_size;
 	skel->rodata->max_size = env.max_size;
-	skel->rodata->page_size = 0; // todo - default?
+	skel->rodata->page_size = env.page_size;
 	skel->rodata->sample_every_n = env.sample_every_n;
 	skel->rodata->trace_all = env.trace_all;
 	skel->rodata->kernel_trace = env.kernel_trace;
@@ -261,13 +320,24 @@ int main(int argc, char *argv[])
 		goto cleanup;
 	}
 
-	if (strcmp(env.command, "\0") != 0) {
+	if (strlen(env.command)) {
 		const uint64_t event = 1;
-		const ssize_t bytes = write(child_exec_event_fd, &event, sizeof(event));
-		if (bytes < 0) {
+		if (write(child_exec_event_fd, &event, sizeof(event)) != sizeof(event)) {
 			perror("failed to write child exec event");
 			goto cleanup;
 		}
+	}
+
+	int allocs_fd = bpf_map__fd(skel->maps.allocs);
+	if (allocs_fd < 0) {
+		fprintf(stderr, "failed to get fd for allocs map\n");
+		return 1;
+	}
+
+	int stack_traces_fd = bpf_map__fd(skel->maps.stack_traces);
+	if (stack_traces_fd < 0) {
+		fprintf(stderr, "failed to get fd for stack_traces map\n");
+		return 1;
 	}
 
 	if (memleak_bpf__attach(skel)) {
@@ -293,8 +363,6 @@ int main(int argc, char *argv[])
 
 	printf("timer fd interval set at %d\n", env.interval);
 
-	printf("begin polling\n");
-
 	struct pollfd fds[] = {
 		{.fd = timer_fd, .events = POLLIN},
 		{.fd = signal_fd, .events = POLLIN},
@@ -303,6 +371,8 @@ int main(int argc, char *argv[])
 	const nfds_t nfds = sizeof(fds) / sizeof(struct pollfd);
 
 	for (;;) {
+		printf("polling\n");
+
 		err = poll(fds, nfds, -1);
 		if (err < 0) {
 			perror("failed to poll");
@@ -312,14 +382,23 @@ int main(int argc, char *argv[])
 		if (fds[0].revents & POLLIN) {
 			printf("input on timer fd\n");
 			uint64_t buffer = 0;
-			read(fds[0].fd, &buffer, sizeof(buffer));
+			if (read(fds[0].fd, &buffer, sizeof(buffer)) != sizeof(buffer)) {
+				perror("failed to read timerfd");
+				return 1;
+			}
+
+			print_outstanding_allocs(allocs_fd, stack_traces_fd);
+
 			fds[0].revents = 0;
 		}
 
 		if (fds[1].revents & POLLIN) {
 			printf("input on signal fd\n");
 			struct signalfd_siginfo buffer = {};
-			read(fds[1].fd, &buffer, sizeof(buffer));
+			if (read(fds[1].fd, &buffer, sizeof(buffer)) != sizeof(buffer)) {
+				perror("failed to read sig fd");
+				return 1;
+			}
 
 			switch (buffer.ssi_signo) {
 			case SIGINT:

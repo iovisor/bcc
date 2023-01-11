@@ -30,16 +30,16 @@ struct {
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__type(key, u64);
-	__type(value, u64);
+	__type(value, combined_alloc_info_t);
 	__uint(max_entries, 10240);
-} memptrs SEC(".maps");
+} combined_allocs SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__type(key, u64);
-	__type(value, combined_alloc_info_t);
+	__type(value, u64);
 	__uint(max_entries, 10240);
-} combined_allocs SEC(".maps");
+} memptrs SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_STACK_TRACE);
