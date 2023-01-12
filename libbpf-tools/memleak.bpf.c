@@ -90,18 +90,18 @@ static __always_inline int gen_alloc_enter(struct pt_regs *ctx, size_t size)
 			return 0;
 	}
 
-	const u64 pid = bpf_get_current_pid_tgid() >> 32;
-	const u64 size64 = size;
+	pid_t pid = bpf_get_current_pid_tgid() >> 32;
+	u64 size64 = size;
 	bpf_map_update_elem(&sizes, &pid, &size64, BPF_ANY); // todo - flags?
 
 	if (trace_all)
-		bpf_trace_printk("alloc entered, size = %u\\n", size);
+		bpf_trace_printk("alloc entered, size = %lu\\n", size64);
 
 	return 0;
 }
 
 static __always_inline int gen_alloc_exit2(struct pt_regs *ctx, u64 address) {
-	const u64 pid = bpf_get_current_pid_tgid() >> 32;
+	const pid_t pid = bpf_get_current_pid_tgid() >> 32;
 	const u64* size64 = bpf_map_lookup_elem(&sizes, &pid);
 	alloc_info_t info = {0};
 	int flags = 0;
@@ -138,17 +138,19 @@ static __always_inline int gen_alloc_exit(struct pt_regs *ctx) {
 }
 
 static __always_inline int gen_free_enter(struct pt_regs *ctx, void *address) {
-	const u64 addr = (u64)address;
-	const alloc_info_t *info = bpf_map_lookup_elem(&allocs, &addr);
+	const alloc_info_t *info = bpf_map_lookup_elem(&allocs, (u64 *)address);
 	if (!info)
 		return 0;
 
-	bpf_map_delete_elem(&allocs, &addr);
-	update_statistics_del(info->stack_id, info->size);
+	int stack_id = info->stack_id;
+	size_t size = info->size;
+
+	bpf_map_delete_elem(&allocs, (u64 *)address);
+	update_statistics_del(stack_id, size);
 
 	if (trace_all) {
 		bpf_trace_printk("free entered, address = %lx, size = %lu\\n",
-				address, info->size); // todo - integer conversion?
+				address, size); // todo - integer conversion?
 	}
 	return 0;
 }
@@ -199,7 +201,7 @@ int posix_memalign_enter(struct pt_regs *ctx, void **memptr, size_t alignment,
 		size_t size)
 {
 	const u64 memptr64 = (u64)(size_t)memptr;
-	const u64 pid = bpf_get_current_pid_tgid() >> 32;
+	const pid_t pid = bpf_get_current_pid_tgid() >> 32;
 
 	bpf_map_update_elem(&memptrs, &pid, &memptr64, BPF_ANY); // todo - flags?
 
@@ -207,7 +209,7 @@ int posix_memalign_enter(struct pt_regs *ctx, void **memptr, size_t alignment,
 }
 
 int posix_memalign_exit(struct pt_regs *ctx) {
-	const u64 pid = bpf_get_current_pid_tgid() >> 32;
+	const pid_t pid = bpf_get_current_pid_tgid() >> 32;
 	const u64 *memptr64;
 	void *addr;
 

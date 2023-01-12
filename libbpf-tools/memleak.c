@@ -108,7 +108,6 @@ static const struct argp_option argp_options[] = {
 	// name/longopt:str, key/shortopt:int, arg:str, flags:int, doc:str
 	{"pid", 'p', "PID", 0, "Process ID to trace. if not specified, trace kernel allocs"},
 	{"trace", 't', 0, 0, "print trace messages for each alloc/free call" },
-	{"interval", 'i', "INTERVAL", 5, "interval in seconds to print outstanding allocs"},
 	{"count", 'n', "COUNT", 0, "number of times to print the report before exiting"},
 	{"show-allocs", 'a', 0, 0, "show allocation addresses and sizes as well as call stacks"},
 	{"older", 'O', "AGE_MS", 0, "prune allocations younger than this age in milliseconds"},
@@ -142,9 +141,11 @@ static error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 
 	switch (key) {
 	case 'p':
+		puts("arg pid");
 		env.pid = argp_parse_long(key, arg, state);
 		break;
 	case 't':
+		puts("arg trace_all");
 		env.trace_all = true;
 		break;
 	case 'i':
@@ -165,11 +166,14 @@ static error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 	case ARGP_KEY_ARG:
 		++pos_args;
 
-		if (pos_args == 1)
+		if (pos_args == 1) {
+			puts("arg interval");
 			env.interval = argp_parse_long(key, arg, state);
-		else if (pos_args == 2)
+		}
+		else if (pos_args == 2) {
+			puts("arg count");
 			env.count = argp_parse_long(key, arg, state);
-		else {
+		} else {
 			fprintf(stderr, "Unrecognized positional argument: %s\n", arg);
 			argp_usage(state);
 		}
