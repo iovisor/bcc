@@ -17,8 +17,15 @@
 #include "memleak.h"
 #include "memleak.skel.h"
 #include "trace_helpers.h"
+#ifdef USE_BLAZESYM
+#include "blazesym.h"
+#endif
 
 #define TASK_COMM_LEN 16
+
+#ifdef USE_BLAZESYM
+static blazesym *symbolizer;
+#endif
 
 static struct env {
 	pid_t pid;
@@ -41,12 +48,13 @@ static struct env {
 	int stack_max_entries;
 	long page_size;
 	bool kernel_trace;
+	bool verbose;
 	char command[TASK_COMM_LEN];
 } env = {
 	.pid = -1, // -p --pid
 	.trace_all = false, // -t --trace
 	.interval = 5, // posarg 1
-	.count = -1, // posarg 2
+	.count = 0, // posarg 2
 	.show_allocs = false, // -a --show-allocs
 	.combined_only = false, // --combined-only
 	.min_age_ns = 500, // -o --older val * 1e6
@@ -61,6 +69,7 @@ static struct env {
 	.stack_max_entries = 1024,
 	.page_size = 1,
 	.kernel_trace = true,
+	.verbose = false,
 	.command = {}, // -c --command
 };
 
@@ -68,8 +77,32 @@ const char *argp_program_version = "memleak 0.1";
 const char *argp_program_bug_address =
 	"https://github.com/iovisor/bcc/tree/master/libbpf-tools";
 
-const char argp_args_doc[] = "trace mem leaks\n"
-"\n";
+const char argp_args_doc[] =
+"Trace open family syscalls\n"
+"\n"
+"USAGE: opensnoop [-h] [-T] [-U] [-x] [-p PID] [-t TID] [-u UID] [-d DURATION]\n"
+"\n"
+"EXAMPLES:\n"
+
+"./memleak -p $(pidof allocs)"
+"        Trace allocations and display a summary of 'leaked' (outstanding)"
+"        allocations every 5 seconds"
+"./memleak -p $(pidof allocs) -t"
+"        Trace allocations and display each individual allocator function call"
+"./memleak -ap $(pidof allocs) 10"
+"        Trace allocations and display allocated addresses, sizes, and stacks"
+"        every 10 seconds for outstanding allocations"
+"./memleak -c './allocs'"
+"        Run the specified command and trace its allocations"
+"./memleak"
+"        Trace allocations in kernel mode and display a summary of outstanding"
+"        allocations every 5 seconds"
+"./memleak -o 60000"
+"        Trace allocations in kernel mode and display a summary of outstanding"
+"        allocations that are at least one minute (60 seconds) old"
+"./memleak -s 5"
+"        Trace roughly every 5th allocation, to reduce overhead"
+"";
 
 static const struct argp_option argp_options[] = {
 	// name/longopt:str, key/shortopt:int, arg:str, flags:int, doc:str
@@ -154,6 +187,9 @@ static error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 
 static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
+	if (level == LIBBPF_DEBUG && !env.verbose)
+		return 0;
+
 	return vfprintf(stderr, format, args);
 }
 
@@ -213,6 +249,14 @@ static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
     uint64_t *prev_key = NULL;
     uint64_t curr_key = 0;
 
+	uint64_t *stack;
+
+	stack = calloc(env.perf_max_stack_depth, sizeof(*stack));
+	if (!stack) {
+		fprintf(stderr, "failed to alloc stack\n");
+		return -1;
+	}
+
 	for (; !bpf_map_get_next_key(allocs_fd, prev_key, &curr_key);
 			prev_key = &curr_key) {
 		puts("loop");
@@ -227,12 +271,46 @@ static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 			puts("stack_id -1");
 			continue;
 		}
-		else {
-			printf("show alloc\n");
+
+		if (bpf_map_lookup_elem(stack_traces_fd, &alloc_info.stack_id, stack)) {
+			fprintf(stderr, "failed to lookup stack trace\n");
+			free(stack);
+			return -1;
 		}
 
-		return 0;
+		printf("stack id: %d\n", alloc_info.stack_id);
+
+		sym_src_cfg src_cfg = {};
+
+		if (env.pid < 0) {
+			src_cfg.src_type = SRC_T_KERNEL;
+			src_cfg.params.kernel.kallsyms = NULL;
+			src_cfg.params.kernel.kernel_image = NULL;
+		} else {
+			src_cfg.src_type = SRC_T_PROCESS;
+			src_cfg.params.process.pid = env.pid;
+		}
+
+		const blazesym_result *result = NULL;
+		const blazesym_csym *sym;
+		int i, j;
+		result = blazesym_symbolize(symbolizer, &src_cfg, 1, stack, 1);
+
+		for (i = 0; result && i < result->size; i++) {
+			if (result->entries[i].size == 0)
+				continue;
+			sym = &result->entries[i].syms[0];
+
+			if (sym->line_no)
+				printf("%s:%ld\n", sym->symbol, sym->line_no);
+			else
+				printf("%s\n", sym->symbol);
+		}
+
+		blazesym_result_free(result);
 	}
+
+	free(stack);
 
 	return 0;
 }
@@ -272,6 +350,7 @@ int main(int argc, char *argv[])
 	}
 
 	env.page_size = sysconf(_SC_PAGE_SIZE);
+	printf("page size: %ld\n", env.page_size);
 
 	if (strlen(env.command)) {
 		env.kernel_trace = false;
@@ -351,7 +430,7 @@ int main(int argc, char *argv[])
 	timer_spec.it_value.tv_sec= env.interval;
 	timer_spec.it_value.tv_nsec = 0;
 
-	timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC | TFD_NONBLOCK);
+	timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC);
 	if (timer_fd < 0) {
 		perror("failed to create timerfd");
 	}
@@ -369,6 +448,8 @@ int main(int argc, char *argv[])
 	};
 
 	const nfds_t nfds = sizeof(fds) / sizeof(struct pollfd);
+
+	int i = 0;
 
 	for (;;) {
 		printf("polling\n");
@@ -388,6 +469,11 @@ int main(int argc, char *argv[])
 			}
 
 			print_outstanding_allocs(allocs_fd, stack_traces_fd);
+
+			if (++i >= env.count) {
+				puts("reached target count");
+				break;
+			}
 
 			fds[0].revents = 0;
 		}

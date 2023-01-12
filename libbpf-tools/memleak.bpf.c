@@ -90,7 +90,7 @@ static __always_inline int gen_alloc_enter(struct pt_regs *ctx, size_t size)
 			return 0;
 	}
 
-	const u64 pid = bpf_get_current_pid_tgid();
+	const u64 pid = bpf_get_current_pid_tgid() >> 32;
 	const u64 size64 = size;
 	bpf_map_update_elem(&sizes, &pid, &size64, BPF_ANY); // todo - flags?
 
@@ -101,7 +101,7 @@ static __always_inline int gen_alloc_enter(struct pt_regs *ctx, size_t size)
 }
 
 static __always_inline int gen_alloc_exit2(struct pt_regs *ctx, u64 address) {
-	const u64 pid = bpf_get_current_pid_tgid();
+	const u64 pid = bpf_get_current_pid_tgid() >> 32;
 	const u64* size64 = bpf_map_lookup_elem(&sizes, &pid);
 	alloc_info_t info = {0};
 	int flags = 0;
@@ -199,7 +199,7 @@ int posix_memalign_enter(struct pt_regs *ctx, void **memptr, size_t alignment,
 		size_t size)
 {
 	const u64 memptr64 = (u64)(size_t)memptr;
-	const u64 pid = bpf_get_current_pid_tgid();
+	const u64 pid = bpf_get_current_pid_tgid() >> 32;
 
 	bpf_map_update_elem(&memptrs, &pid, &memptr64, BPF_ANY); // todo - flags?
 
@@ -207,7 +207,7 @@ int posix_memalign_enter(struct pt_regs *ctx, void **memptr, size_t alignment,
 }
 
 int posix_memalign_exit(struct pt_regs *ctx) {
-	const u64 pid = bpf_get_current_pid_tgid();
+	const u64 pid = bpf_get_current_pid_tgid() >> 32;
 	const u64 *memptr64;
 	void *addr;
 
