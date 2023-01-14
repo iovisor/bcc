@@ -79,7 +79,7 @@ static __always_inline void update_statistics_del(u64 stack_id, u64 sz) {
 	bpf_map_update_elem(&combined_allocs, &stack_id, &cinfo, BPF_ANY); // todo - flags?
 }
 
-static __always_inline int gen_alloc_enter(struct pt_regs *ctx, size_t size)
+static __always_inline int gen_alloc_enter(void *ctx, size_t size)
 {
 	if (size < min_size || size > max_size)
 		return 0;
@@ -100,7 +100,7 @@ static __always_inline int gen_alloc_enter(struct pt_regs *ctx, size_t size)
 	return 0;
 }
 
-static __always_inline int gen_alloc_exit2(struct pt_regs *ctx, u64 address) {
+static __always_inline int gen_alloc_exit2(void *ctx, u64 address) {
 	const pid_t pid = bpf_get_current_pid_tgid() >> 32;
 	const u64* size64 = bpf_map_lookup_elem(&sizes, &pid);
 	alloc_info_t info = {0};
@@ -259,74 +259,96 @@ int pvalloc_exit(struct pt_regs *ctx) {
 	return gen_alloc_exit(ctx);
 }
 
-SEC("tracepoint/kmem/kmalloc_node")
-int tracepoint__kmalloc_node(const struct trace_event_raw_kmem_alloc_node *ctx)
+SEC("raw_tracepoint/kmem/kmalloc_node")
+int tracepoint__kmalloc_node(const struct bpf_raw_tracepoint_args *ctx)
 {
+	struct pt_regs *regs = (struct pt_regs *)ctx->args[0];
+	const size_t size = (size_t)ctx->args[3];
+	void *ptr = (void *)ctx->args[2];
+
 	if (wa_missing_free)
-		gen_free_enter((struct pt_regs *)ctx, (void *)ctx->ptr);
+		gen_free_enter(regs, ptr);
 
-	gen_alloc_enter((struct pt_regs *)ctx, ctx->bytes_alloc);
+	gen_alloc_enter(regs, size);
 
-	return gen_alloc_exit2((struct pt_regs *)ctx, (size_t)ctx->ptr);
+	return gen_alloc_exit2(regs, (size_t)ptr);
 }
 
-SEC("tracepoint/kmem/kmem_cache_alloc_node")
-int tracepoint__kmem_cache_alloc_node(const struct trace_event_raw_kmem_alloc_node *ctx) // todo type?
+SEC("raw_tracepoint/kmem/kmem_cache_alloc_node")
+int tracepoint__kmem_cache_alloc_node(const struct bpf_raw_tracepoint_args *ctx)
 {
+	struct pt_regs *regs = (struct pt_regs *)ctx->args[0];
+	const size_t size = (size_t)ctx->args[3];
+	void *ptr = (void *)ctx->args[2];
+
 	if (wa_missing_free)
-		gen_free_enter((struct pt_regs *)ctx, (void *)ctx->ptr);
+		gen_free_enter(regs, ptr);
 
-	gen_alloc_enter((struct pt_regs *)ctx, ctx->bytes_alloc);
+	gen_alloc_enter(regs, size);
 
-	return gen_alloc_exit2((struct pt_regs *)ctx, (size_t)ctx->ptr);
+	return gen_alloc_exit2(regs, (u64)ptr);
 }
 
-SEC("tracepoint/kmem/kmalloc")
-int tracepoint__kmalloc(const struct trace_event_raw_kmem_alloc *ctx)
+SEC("raw_tracepoint/kmem/kmalloc")
+int tracepoint__kmalloc(const struct bpf_raw_tracepoint_args *ctx)
 {
+	struct pt_regs *regs = (struct pt_regs *)ctx->args[0];
+	const size_t size = (size_t)ctx->args[3];
+	void *ptr = (void *)ctx->args[2];
+
 	if (wa_missing_free)
-		gen_free_enter((struct pt_regs *)ctx, (void *)ctx->ptr);
+		gen_free_enter(regs, ptr);
 
-	gen_alloc_enter((struct pt_regs *)ctx, ctx->bytes_alloc);
+	gen_alloc_enter(regs, size);
 
-	return gen_alloc_exit2((struct pt_regs *)ctx, (size_t)ctx->ptr);
+	return gen_alloc_exit2(regs, (u64)ptr);
 }
 
-SEC("tracepoint/kmem/kfree")
-int tracepoint__kfree(const struct trace_event_raw_kfree *ctx)
+SEC("raw_tracepoint/kmem/kfree")
+int tracepoint__kfree(const struct bpf_raw_tracepoint_args *ctx)
 {
-	return gen_free_enter((struct pt_regs *)ctx, (void *)ctx->ptr);
+	struct pt_regs *regs = (struct pt_regs *)ctx->args[0];
+	void *ptr = (void *)ctx->args[2];
+
+	return gen_free_enter(regs, ptr);
 }
 
-SEC("tracepoint/kmem/kmem_cache_alloc")
-int tracepoint__kmem_cache_alloc(const struct trace_event_raw_kmem_alloc *ctx) // todo - type?
+SEC("raw_tracepoint/kmem/kmem_cache_alloc")
+int tracepoint__kmem_cache_alloc(const struct bpf_raw_tracepoint_args *ctx)
 {
+	struct pt_regs *regs = (struct pt_regs *)ctx->args[0];
+	const size_t size = (size_t)ctx->args[3];
+	void *ptr = (void *)ctx->args[2];
+
 	if (wa_missing_free)
-		gen_free_enter((struct pt_regs *)ctx, (void *)ctx->ptr);
+		gen_free_enter(regs, ptr);
 
-	gen_alloc_enter((struct pt_regs *)ctx, ctx->bytes_alloc);
+	gen_alloc_enter(regs, size);
 
-	return gen_alloc_exit2((struct pt_regs *)ctx, (size_t)ctx->ptr);
+	return gen_alloc_exit2(regs, (u64)ptr);
 }
 
-SEC("tracepoint/kmem/kmem_cache_free")
-int tracepoint__kmem_cache_free(const struct trace_event_raw_kmem_cache_free *ctx)
+SEC("raw_tracepoint/kmem/kmem_cache_free")
+int tracepoint__kmem_cache_free(const struct bpf_raw_tracepoint_args *ctx)
 {
-	return gen_free_enter((struct pt_regs *)ctx, (void *)ctx->ptr);
+	struct pt_regs *regs = (struct pt_regs *)ctx->args[0];
+	void *ptr = (void *)ctx->args[2];
+
+	return gen_free_enter(regs, ptr);
 }
 
 SEC("tracepoint/kmem/mm_page_alloc")
-int tracepoint__mm_page_alloc(const struct trace_event_raw_mm_page_alloc *ctx)
+int tracepoint__mm_page_alloc(struct trace_event_raw_mm_page_alloc *ctx)
 {
-	gen_alloc_enter((struct pt_regs *)ctx, page_size << ctx->order);
+	gen_alloc_enter(NULL, page_size << ctx->order);
 
-	return gen_alloc_exit2((struct pt_regs *)ctx, ctx->pfn);
+	return gen_alloc_exit2((void *)ctx, ctx->pfn);
 }
 
 SEC("tracepoint/kmem/mm_page_free")
 int tracepoint__mm_page_free(const struct trace_event_raw_mm_page_free *ctx)
 {
-	return gen_free_enter((struct pt_regs *)ctx, (void *)ctx->pfn);
+	return gen_free_enter(NULL, (void *)ctx->pfn);
 }
 
 /*
