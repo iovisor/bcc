@@ -62,7 +62,7 @@ static struct env {
 	.sample_rate = 1, // -s --sample-rate
 	.top_stacks = 10, // -T --top
 	.min_size = 0, // -z --min-size
-	.max_size = 0, // -Z --max-size
+	.max_size = -1, // -Z --max-size
 	// object // -O --obj
 	.percpu = false, // --percpu
 	.perf_max_stack_depth = 127,
@@ -201,7 +201,7 @@ static int timer_fd = -1;
 static int signal_fd = -1;
 static int child_exec_event_fd = -1;
 
-pid_t fork_and_sync_exec(const char *command, int event_fd)
+pid_t fork_sync_exec(const char *command, int event_fd)
 {
 	const pid_t pid = fork();
 
@@ -253,9 +253,7 @@ static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
     uint64_t *prev_key = NULL;
     uint64_t curr_key = 0;
 
-	uint64_t *stack;
-
-	stack = calloc(env.perf_max_stack_depth, sizeof(*stack));
+	uint64_t *stack = calloc(env.perf_max_stack_depth, sizeof(*stack));
 	if (!stack) {
 		fprintf(stderr, "failed to alloc stack\n");
 		return -1;
@@ -264,7 +262,14 @@ static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 	for (; !bpf_map_get_next_key(allocs_fd, prev_key, &curr_key);
 			prev_key = &curr_key) {
 		puts("loop");
-		const int err = bpf_map_lookup_elem(allocs_fd, &curr_key, &alloc_info);
+
+		if (bpf_map_lookup_elem(allocs_fd, &curr_key, &alloc_info)) {
+			if (errno == ENOENT)
+				break; // no more keys
+
+			perror("map lookup error");
+			return -1;
+		}
 
 		if (get_ktime_ns() - env.min_age_ns < alloc_info.timestamp_ns) {
 			puts("< min_age");
@@ -298,7 +303,7 @@ static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 		const blazesym_result *result = NULL;
 		const blazesym_csym *sym;
 		int i, j;
-		result = blazesym_symbolize(symbolizer, &src_cfg, 1, stack, 1);
+		result = blazesym_symbolize(symbolizer, &src_cfg, 1, stack, env.perf_max_stack_depth);
 
 		for (i = 0; result && i < result->size; i++) {
 			if (result->entries[i].size == 0)
@@ -365,11 +370,13 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 
-		const pid_t child_pid = fork_and_sync_exec(env.command, child_exec_event_fd);
+		const pid_t child_pid = fork_sync_exec(env.command, child_exec_event_fd);
 		if (child_pid < 0) {
 			perror("failed to spawn child process");
 			return 1;
 		}
+
+		env.pid = child_pid;
 
 		printf("running command: %s\n", env.command);
 	}
@@ -427,6 +434,8 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "failed to attach bpf program(s)\n");
 		goto cleanup;
 	}
+
+	symbolizer = blazesym_new();
 
 	struct itimerspec timer_spec;
 	timer_spec.it_interval.tv_sec= env.interval;
@@ -499,6 +508,7 @@ int main(int argc, char *argv[])
 				break;
 			case SIGCHLD:
 				printf("read SIGCHLD\n");
+				// todo - reap
 				break;
 			default:
 				printf("other signal\n");
@@ -515,6 +525,7 @@ int main(int argc, char *argv[])
 	printf("end polling\n");
 
 cleanup:
+	blazesym_free(symbolizer);
 	memleak_bpf__destroy(skel);
 	printf("done\n");
 }
