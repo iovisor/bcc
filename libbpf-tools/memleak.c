@@ -9,6 +9,7 @@
 #include <sys/signalfd.h>
 #include <sys/timerfd.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -34,7 +35,7 @@ static struct env {
 	pid_t pid;
 	bool trace_all;
 	int interval;
-	int count;
+	int intervals;
 	bool show_allocs;
 	bool combined_only;
 	int min_age_ns;
@@ -57,7 +58,7 @@ static struct env {
 	.pid = -1, // -p --pid
 	.trace_all = false, // -t --trace
 	.interval = 5, // posarg 1
-	.count = 0, // posarg 2
+	.intervals = 0, // posarg 2
 	.show_allocs = false, // -a --show-allocs
 	.combined_only = false, // --combined-only
 	.min_age_ns = 500, // -o --older val * 1e6
@@ -181,8 +182,8 @@ static error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 			env.interval = argp_parse_long(key, arg, state);
 		}
 		else if (pos_args == 2) {
-			puts("arg count");
-			env.count = argp_parse_long(key, arg, state);
+			puts("arg intervals");
+			env.intervals = argp_parse_long(key, arg, state);
 		} else {
 			fprintf(stderr, "Unrecognized positional argument: %s\n", arg);
 			argp_usage(state);
@@ -248,6 +249,8 @@ pid_t fork_sync_exec(const char *command, int event_fd)
 		break;
 	}
 	default:
+		printf("child created with pid: %d\n", pid);
+
 		break;
 	}
 
@@ -383,7 +386,7 @@ int main(int argc, char *argv[])
 
 		env.pid = child_pid;
 
-		printf("running command: %s\n", env.command);
+		printf("spawned child process at pid:%d, comm:%s\n", env.pid, env.command);
 	}
 	else if (env.pid < 0)
 		env.kernel_trace = true;
@@ -415,14 +418,6 @@ int main(int argc, char *argv[])
 		goto cleanup;
 	}
 
-	if (strlen(env.command)) {
-		const uint64_t event = 1;
-		if (write(child_exec_event_fd, &event, sizeof(event)) != sizeof(event)) {
-			perror("failed to write child exec event");
-			goto cleanup;
-		}
-	}
-
 	int allocs_fd = bpf_map__fd(skel->maps.allocs);
 	if (allocs_fd < 0) {
 		fprintf(stderr, "failed to get fd for allocs map\n");
@@ -435,13 +430,21 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	printf("settings\n"
+			"binary path: %s\n"
+			"child pid: %d\n"
+			"pid: %d\n",
+			env.binary_path, env.pid, getpid());
+
 	char resolved_path[PATH_MAX];
 	if (resolve_binary_path(env.binary_path, env.pid, resolved_path, sizeof(resolved_path))) {
 		fprintf(stderr, "failed to resolve binary path\n");
 		return 1;
 	}
 
-	const off_t func_offset = get_elf_func_offset(resolved_path, "malloc");
+	printf("resolved binary path: %s\n", resolved_path);
+
+	const off_t func_offset = get_elf_func_offset(resolved_path, "work");
 	if (func_offset < 0) {
 		fprintf(stderr, "failed to find func offset\n");
 		goto cleanup;
@@ -451,8 +454,8 @@ int main(int argc, char *argv[])
 	goto cleanup;
 
 	if (env.pid > 0) {
-		skel->links.uprobe__malloc_enter = bpf_program__attach_uprobe(
-				skel->progs.uprobe__malloc_enter,
+		skel->links.uprobe__test = bpf_program__attach_uprobe(
+				skel->progs.uprobe__test,
 				false, // not a return probe
 				env.pid, // --pid or --command then fork()
 				resolved_path, // resolved binary path
@@ -463,6 +466,14 @@ int main(int argc, char *argv[])
 	if (memleak_bpf__attach(skel)) {
 		fprintf(stderr, "failed to attach bpf program(s)\n");
 		goto cleanup;
+	}
+
+	if (strlen(env.command)) {
+		const uint64_t event = 1;
+		if (write(child_exec_event_fd, &event, sizeof(event)) != sizeof(event)) {
+			perror("failed to write child exec event");
+			goto cleanup;
+		}
 	}
 
 	symbolizer = blazesym_new();
@@ -513,8 +524,8 @@ int main(int argc, char *argv[])
 
 			print_outstanding_allocs(allocs_fd, stack_traces_fd);
 
-			if (env.count && (++i >= env.count)) {
-				puts("reached target count");
+			if (env.intervals && (++i >= env.intervals)) {
+				puts("reached target interval count");
 				break;
 			}
 
@@ -538,7 +549,9 @@ int main(int argc, char *argv[])
 				break;
 			case SIGCHLD:
 				printf("read SIGCHLD\n");
-				// todo - reap
+				int wstatus = 0;
+				const pid_t pid = wait(&wstatus);
+				printf("reaped pid:%d, status:%d\n", pid, wstatus);
 				break;
 			default:
 				printf("other signal\n");
@@ -548,8 +561,6 @@ int main(int argc, char *argv[])
 			fds[1].revents = 0;
 			goto cleanup;
 		}
-
-		printf("poll ok\n");
 	}
 
 	printf("end polling\n");

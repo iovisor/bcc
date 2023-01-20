@@ -250,11 +250,18 @@ int tracepoint__percpu_free_percpu(struct trace_event_raw_percpu_free_percpu *ct
 }
 
 SEC("uprobe")
+int uprobe__test()
+{
+	bpf_printk("uprobe test\n");
+	return 0;
+}
+
+/*
+SEC("uprobe")
 int uprobe__malloc_enter(struct pt_regs *ctx, size_t size) {
         return gen_alloc_enter(size);
 }
 
-/*
 SEC("uretprobe")
 int uretprobe__malloc_exit(struct pt_regs *ctx) {
         return gen_alloc_exit(ctx);
