@@ -7,7 +7,7 @@
 const volatile pid_t pid = -1;
 const volatile size_t min_size = 0;
 const volatile size_t max_size = -1;
-const volatile size_t page_size = 0; // todo - default?
+const volatile size_t page_size = 4096;
 const volatile __u64 sample_every_n = 1;
 const volatile bool trace_all = false;
 const volatile bool kernel_trace = false;
@@ -226,7 +226,7 @@ int tracepoint__mm_page_alloc(struct trace_event_raw_mm_page_alloc *ctx)
 {
 	gen_alloc_enter(page_size << ctx->order);
 
-	return gen_alloc_exit2((void *)ctx, ctx->pfn);
+	return gen_alloc_exit2(ctx, ctx->pfn);
 }
 
 SEC("tracepoint/kmem/mm_page_free")

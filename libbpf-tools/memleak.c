@@ -9,6 +9,7 @@
 #include <sys/signalfd.h>
 #include <sys/timerfd.h>
 #include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <bpf/libbpf.h>
@@ -246,12 +247,10 @@ pid_t fork_sync_exec(const char *command, int event_fd)
 
 static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 {
-	printf("[%s] Top %d stacks with outstanding allocations:\n",
-			"%H:%M:%S", env.top_stacks);
-
-	alloc_info_t alloc_info = {};
-    uint64_t *prev_key = NULL;
-    uint64_t curr_key = 0;
+	time_t t = time(NULL);
+	struct tm *tm = localtime(&t);
+	printf("[%d:%d:%d] Top %d stacks with outstanding allocations:\n",
+			tm->tm_hour, tm->tm_min, tm->tm_sec, env.top_stacks);
 
 	uint64_t *stack = calloc(env.perf_max_stack_depth, sizeof(*stack));
 	if (!stack) {
@@ -259,14 +258,12 @@ static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 		return -1;
 	}
 
-	for (; !bpf_map_get_next_key(allocs_fd, prev_key, &curr_key);
-			prev_key = &curr_key) {
-		puts("loop");
+	alloc_info_t alloc_info = {};
+	uint64_t *prev_key = NULL;
+	uint64_t curr_key = 0;
 
+	for (; !bpf_map_get_next_key(allocs_fd, prev_key, &curr_key); prev_key = &curr_key) {
 		if (bpf_map_lookup_elem(allocs_fd, &curr_key, &alloc_info)) {
-			if (errno == ENOENT)
-				break; // no more keys
-
 			perror("map lookup error");
 			return -1;
 		}
@@ -277,7 +274,6 @@ static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 		}
 
 		if (alloc_info.stack_id < 0) {
-			puts("stack_id -1");
 			continue;
 		}
 
@@ -287,7 +283,7 @@ static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 			return -1;
 		}
 
-		printf("stack id: %d\n", alloc_info.stack_id);
+		printf("\taddr = %p size = %llu\n", (void *)curr_key, alloc_info.size);
 
 		sym_src_cfg src_cfg = {};
 
@@ -483,7 +479,7 @@ int main(int argc, char *argv[])
 
 			print_outstanding_allocs(allocs_fd, stack_traces_fd);
 
-			if (++i >= env.count) {
+			if (env.count && (++i >= env.count)) {
 				puts("reached target count");
 				break;
 			}
