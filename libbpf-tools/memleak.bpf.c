@@ -22,14 +22,14 @@ struct {
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
-	__type(key, u64);
+	__type(key, u64); // address
 	__type(value, alloc_info_t);
 	__uint(max_entries, 1000000);
 } allocs SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
-	__type(key, u64);
+	__type(key, u64); // stack id
 	__type(value, combined_alloc_info_t);
 	__uint(max_entries, 10240);
 } combined_allocs SEC(".maps");
@@ -248,5 +248,109 @@ int tracepoint__percpu_free_percpu(struct trace_event_raw_percpu_free_percpu *ct
 {
 	return gen_free_enter(ctx->ptr);
 }
+
+SEC("uprobe")
+int uprobe__malloc_enter(struct pt_regs *ctx, size_t size) {
+        return gen_alloc_enter(size);
+}
+
+/*
+SEC("uretprobe")
+int uretprobe__malloc_exit(struct pt_regs *ctx) {
+        return gen_alloc_exit(ctx);
+}
+
+int free_enter(struct pt_regs *ctx, void *address) {
+        return gen_free_enter(ctx, address);
+}
+
+int calloc_enter(struct pt_regs *ctx, size_t nmemb, size_t size) {
+        return gen_alloc_enter(ctx, nmemb * size);
+}
+
+int calloc_exit(struct pt_regs *ctx) {
+        return gen_alloc_exit(ctx);
+}
+
+int realloc_enter(struct pt_regs *ctx, void *ptr, size_t size) {
+        gen_free_enter(ctx, ptr);
+        return gen_alloc_enter(ctx, size);
+}
+
+int realloc_exit(struct pt_regs *ctx) {
+        return gen_alloc_exit(ctx);
+}
+
+int mmap_enter(struct pt_regs *ctx) {
+        size_t size = (size_t)PT_REGS_PARM2(ctx);
+        return gen_alloc_enter(ctx, size);
+}
+
+int mmap_exit(struct pt_regs *ctx) {
+        return gen_alloc_exit(ctx);
+}
+
+int munmap_enter(struct pt_regs *ctx, void *address) {
+        return gen_free_enter(ctx, address);
+}
+
+int posix_memalign_enter(struct pt_regs *ctx, void **memptr, size_t alignment,
+                         size_t size) {
+        u64 memptr64 = (u64)(size_t)memptr;
+        u64 pid = bpf_get_current_pid_tgid();
+
+        memptrs.update(&pid, &memptr64);
+        return gen_alloc_enter(ctx, size);
+}
+
+int posix_memalign_exit(struct pt_regs *ctx) {
+        u64 pid = bpf_get_current_pid_tgid();
+        u64 *memptr64 = memptrs.lookup(&pid);
+        void *addr;
+
+        if (memptr64 == 0)
+                return 0;
+
+        memptrs.delete(&pid);
+
+        if (bpf_probe_read_user(&addr, sizeof(void*), (void*)(size_t)*memptr64))
+                return 0;
+
+        u64 addr64 = (u64)(size_t)addr;
+        return gen_alloc_exit2(ctx, addr64);
+}
+
+int aligned_alloc_enter(struct pt_regs *ctx, size_t alignment, size_t size) {
+        return gen_alloc_enter(ctx, size);
+}
+
+int aligned_alloc_exit(struct pt_regs *ctx) {
+        return gen_alloc_exit(ctx);
+}
+
+int valloc_enter(struct pt_regs *ctx, size_t size) {
+        return gen_alloc_enter(ctx, size);
+}
+
+int valloc_exit(struct pt_regs *ctx) {
+        return gen_alloc_exit(ctx);
+}
+
+int memalign_enter(struct pt_regs *ctx, size_t alignment, size_t size) {
+        return gen_alloc_enter(ctx, size);
+}
+
+int memalign_exit(struct pt_regs *ctx) {
+        return gen_alloc_exit(ctx);
+}
+
+int pvalloc_enter(struct pt_regs *ctx, size_t size) {
+        return gen_alloc_enter(ctx, size);
+}
+
+int pvalloc_exit(struct pt_regs *ctx) {
+        return gen_alloc_exit(ctx);
+}
+*/
 
 char LICENSE[] SEC("license") = "GPL";

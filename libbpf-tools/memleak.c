@@ -15,14 +15,16 @@
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 
-#include "memleak.h"
-#include "memleak.skel.h"
-#include "trace_helpers.h"
 #ifdef USE_BLAZESYM
 #include "blazesym.h"
 #endif
+#include "memleak.h"
+#include "memleak.skel.h"
+#include "trace_helpers.h"
+#include "uprobe_helpers.h"
 
 #define TASK_COMM_LEN 16
+#define PATH_MAX 4096
 
 #ifdef USE_BLAZESYM
 static blazesym *symbolizer;
@@ -41,7 +43,7 @@ static struct env {
 	int top_stacks;
 	size_t min_size;
 	size_t max_size;
-	char *object;
+	char binary_path[PATH_MAX];
 
 	bool wa_missing_free;
 	bool percpu;
@@ -64,7 +66,7 @@ static struct env {
 	.top_stacks = 10, // -T --top
 	.min_size = 0, // -z --min-size
 	.max_size = -1, // -Z --max-size
-	// object // -O --obj
+	.binary_path = {}, // -O --obj
 	.percpu = false, // --percpu
 	.perf_max_stack_depth = 127,
 	.stack_max_entries = 1024,
@@ -155,7 +157,8 @@ static error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 	case 'a':
 		break;
 	case 'O':
-		env.min_age_ns = 1e6 * argp_parse_long(key, arg, state);
+		strncpy(env.binary_path, arg, sizeof(env.binary_path));
+		printf("parsed binary_path: %s\n", env.binary_path);
 		break;
 	case 'c':
 		strncpy(env.command, arg, sizeof(env.command));
@@ -163,6 +166,12 @@ static error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'T':
 		env.top_stacks = argp_parse_long(key, arg, state);
+		break;
+	case 'z':
+		env.min_size = argp_parse_long(key, arg, state);
+		break;
+	case 'Z':
+		env.max_size = argp_parse_long(key, arg, state);
 		break;
 	case ARGP_KEY_ARG:
 		++pos_args;
@@ -376,7 +385,7 @@ int main(int argc, char *argv[])
 
 		printf("running command: %s\n", env.command);
 	}
-	else if (env.pid == -1)
+	else if (env.pid < 0)
 		env.kernel_trace = true;
 
 	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
@@ -425,6 +434,31 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "failed to get fd for stack_traces map\n");
 		return 1;
 	}
+
+	char resolved_path[PATH_MAX];
+	if (resolve_binary_path(env.binary_path, env.pid, resolved_path, sizeof(resolved_path))) {
+		fprintf(stderr, "failed to resolve binary path\n");
+		return 1;
+	}
+
+	const off_t func_offset = get_elf_func_offset(resolved_path, "malloc");
+	if (func_offset < 0) {
+		fprintf(stderr, "failed to find func offset\n");
+		goto cleanup;
+	}
+
+	printf("resolved path: %s\n", resolved_path);
+	goto cleanup;
+
+	if (env.pid > 0) {
+		skel->links.uprobe__malloc_enter = bpf_program__attach_uprobe(
+				skel->progs.uprobe__malloc_enter,
+				false, // not a return probe
+				env.pid, // --pid or --command then fork()
+				resolved_path, // resolved binary path
+				func_offset);
+	}
+
 
 	if (memleak_bpf__attach(skel)) {
 		fprintf(stderr, "failed to attach bpf program(s)\n");
