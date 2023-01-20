@@ -858,17 +858,8 @@ namespace {
 constexpr size_t kEventNameSizeLimit = 224;
 
 std::string shorten_event_name(const std::string& name) {
-  constexpr size_t kHashSuffixLen = 16;
-  std::string res;
-  res.reserve(kEventNameSizeLimit);
-  res.assign(name);
-  res.resize(kEventNameSizeLimit - kHashSuffixLen);
-
-  std::stringstream stream;
-  size_t hash = std::hash<std::string>{}(name);
-  stream << std::hex << hash;
-  res.append(stream.str());
-  return res;
+  std::string hash = uint_to_hex(std::hash<std::string>{}(name));
+  return name.substr(0, kEventNameSizeLimit - hash.size()) + hash;
 }
 
 } // namespace
