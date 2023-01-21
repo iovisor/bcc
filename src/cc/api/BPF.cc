@@ -853,6 +853,17 @@ bool BPF::add_module(std::string module)
     false : true;
 }
 
+namespace {
+
+constexpr size_t kEventNameSizeLimit = 224;
+
+std::string shorten_event_name(const std::string& name) {
+  std::string hash = uint_to_hex(std::hash<std::string>{}(name));
+  return name.substr(0, kEventNameSizeLimit - hash.size()) + hash;
+}
+
+} // namespace
+
 std::string BPF::get_uprobe_event(const std::string& binary_path,
                                   uint64_t offset, bpf_probe_attach_type type,
                                   pid_t pid) {
@@ -861,6 +872,9 @@ std::string BPF::get_uprobe_event(const std::string& binary_path,
   res += "_0x" + uint_to_hex(offset);
   if (pid != -1)
     res += "_" + std::to_string(pid);
+  if (res.size() > kEventNameSizeLimit) {
+    return shorten_event_name(res);
+  }
   return res;
 }
 
