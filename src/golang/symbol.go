@@ -1,4 +1,5 @@
 // Copyright 2017 Louis McCormack
+// Copyright 2023 Microsoft
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
