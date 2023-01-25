@@ -24,7 +24,7 @@ import (
 	"testing"
 	"unsafe"
 
-	bcc "github.com/iovisor/bcc/src/golang"
+	bcc "github.com/iovisor/bcc"
 )
 
 var simple1 string = `
