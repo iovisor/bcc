@@ -44,7 +44,7 @@ static struct env {
 	int top_stacks;
 	size_t min_size;
 	size_t max_size;
-	char binary_path[PATH_MAX];
+	char object[PATH_MAX];
 
 	bool wa_missing_free;
 	bool percpu;
@@ -67,7 +67,7 @@ static struct env {
 	.top_stacks = 10, // -T --top
 	.min_size = 0, // -z --min-size
 	.max_size = -1, // -Z --max-size
-	.binary_path = {}, // -O --obj
+	.object = {}, // -O --obj
 	.percpu = false, // --percpu
 	.perf_max_stack_depth = 127,
 	.stack_max_entries = 1024,
@@ -158,8 +158,8 @@ static error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 	case 'a':
 		break;
 	case 'O':
-		strncpy(env.binary_path, arg, sizeof(env.binary_path));
-		printf("parsed binary_path: %s\n", env.binary_path);
+		strncpy(env.object, arg, sizeof(env.object));
+		printf("parsed object: %s\n", env.object);
 		break;
 	case 'c':
 		strncpy(env.command, arg, sizeof(env.command));
@@ -276,7 +276,11 @@ static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 
 	for (; !bpf_map_get_next_key(allocs_fd, prev_key, &curr_key); prev_key = &curr_key) {
 		if (bpf_map_lookup_elem(allocs_fd, &curr_key, &alloc_info)) {
+			if (errno == ENOENT)
+				continue;
+
 			perror("map lookup error");
+			free(stack);
 			return -1;
 		}
 
@@ -290,12 +294,15 @@ static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 		}
 
 		if (bpf_map_lookup_elem(stack_traces_fd, &alloc_info.stack_id, stack)) {
+			if (errno == ENOENT)
+				continue;
+
 			fprintf(stderr, "failed to lookup stack trace\n");
 			free(stack);
 			return -1;
 		}
 
-		printf("\taddr = %p size = %llu\n", (void *)curr_key, alloc_info.size);
+		//printf("\taddr = %p size = %llu\n", (void *)curr_key, alloc_info.size);
 
 		sym_src_cfg src_cfg = {};
 
@@ -369,27 +376,27 @@ int main(int argc, char *argv[])
 	env.page_size = sysconf(_SC_PAGE_SIZE);
 	printf("page size: %ld\n", env.page_size);
 
-	if (strlen(env.command)) {
-		env.kernel_trace = false;
+	const bool has_pid = env.pid >= 0;
+	const bool has_cmd = strlen(env.command) > 0;
 
+	if (has_cmd) {
 		child_exec_event_fd = eventfd(0, EFD_CLOEXEC);
 		if (child_exec_event_fd < 0) {
 			perror("failed to create child exec event fd");
 			return 1;
 		}
-
 		const pid_t child_pid = fork_sync_exec(env.command, child_exec_event_fd);
 		if (child_pid < 0) {
 			perror("failed to spawn child process");
 			return 1;
 		}
-
 		env.pid = child_pid;
-
-		printf("spawned child process at pid:%d, comm:%s\n", env.pid, env.command);
 	}
-	else if (env.pid < 0)
-		env.kernel_trace = true;
+
+	if (has_pid && has_cmd) {
+		fprintf(stderr, "cannot specify both pid and cmd\n");
+		goto cleanup;
+	}
 
 	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
@@ -431,37 +438,42 @@ int main(int argc, char *argv[])
 	}
 
 	printf("settings\n"
-			"binary path: %s\n"
+			"object: %s\n"
 			"child pid: %d\n"
 			"pid: %d\n",
-			env.binary_path, env.pid, getpid());
+			env.object, env.pid, getpid());
 
 	char resolved_path[PATH_MAX];
-	if (resolve_binary_path(env.binary_path, env.pid, resolved_path, sizeof(resolved_path))) {
+	if (resolve_binary_path(env.object, env.pid, resolved_path, sizeof(resolved_path))) {
 		fprintf(stderr, "failed to resolve binary path\n");
 		return 1;
 	}
 
-	printf("resolved binary path: %s\n", resolved_path);
+	printf("resolved path: %s\n", resolved_path);
 
-	const off_t func_offset = get_elf_func_offset(resolved_path, "work");
+	const off_t func_offset = get_elf_func_offset(resolved_path, "malloc");
 	if (func_offset < 0) {
 		fprintf(stderr, "failed to find func offset\n");
 		goto cleanup;
 	}
 
-	printf("resolved path: %s\n", resolved_path);
-	goto cleanup;
+	printf("func_offset: %ld\n", func_offset);
 
 	if (env.pid > 0) {
-		skel->links.uprobe__test = bpf_program__attach_uprobe(
-				skel->progs.uprobe__test,
+		skel->links.malloc_enter = bpf_program__attach_uprobe(
+				skel->progs.malloc_enter,
 				false, // not a return probe
 				env.pid, // --pid or --command then fork()
 				resolved_path, // resolved binary path
 				func_offset);
-	}
 
+		skel->links.malloc_exit = bpf_program__attach_uprobe(
+				skel->progs.malloc_exit,
+				true, // is a return probe
+				env.pid, // --pid or --command then fork()
+				resolved_path, // resolved binary path
+				func_offset);
+	}
 
 	if (memleak_bpf__attach(skel)) {
 		fprintf(stderr, "failed to attach bpf program(s)\n");

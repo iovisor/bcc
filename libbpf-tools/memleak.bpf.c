@@ -143,6 +143,10 @@ static __always_inline int gen_alloc_exit2(void *ctx, u64 address) {
 	return 0;
 }
 
+static __always_inline int gen_alloc_exit(struct pt_regs *ctx) {
+	return gen_alloc_exit2(ctx, PT_REGS_RC(ctx));
+}
+
 static __always_inline int gen_free_enter(const void *address) {
 	u64 addr = (u64)address;
 	const alloc_info_t *info = bpf_map_lookup_elem(&allocs, &addr);
@@ -249,24 +253,25 @@ int tracepoint__percpu_free_percpu(struct trace_event_raw_percpu_free_percpu *ct
 	return gen_free_enter(ctx->ptr);
 }
 
-SEC("uprobe")
 int uprobe__test()
 {
 	bpf_printk("uprobe test\n");
 	return 0;
 }
 
-/*
 SEC("uprobe")
-int uprobe__malloc_enter(struct pt_regs *ctx, size_t size) {
+int BPF_KPROBE(malloc_enter, size_t size)
+{
         return gen_alloc_enter(size);
 }
 
 SEC("uretprobe")
-int uretprobe__malloc_exit(struct pt_regs *ctx) {
+int BPF_KRETPROBE(malloc_exit)
+{
         return gen_alloc_exit(ctx);
 }
 
+/*
 int free_enter(struct pt_regs *ctx, void *address) {
         return gen_free_enter(ctx, address);
 }
