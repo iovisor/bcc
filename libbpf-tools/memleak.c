@@ -24,7 +24,6 @@
 #include "trace_helpers.h"
 #include "uprobe_helpers.h"
 
-#define TASK_COMM_LEN 16
 #define PATH_MAX 4096
 
 #ifdef USE_BLAZESYM
@@ -44,7 +43,7 @@ static struct env {
 	int top_stacks;
 	size_t min_size;
 	size_t max_size;
-	char object[PATH_MAX];
+	char *object;
 
 	bool wa_missing_free;
 	bool percpu;
@@ -53,7 +52,7 @@ static struct env {
 	long page_size;
 	bool kernel_trace;
 	bool verbose;
-	char command[TASK_COMM_LEN];
+	char *command;
 } env = {
 	.pid = -1, // -p --pid
 	.trace_all = false, // -t --trace
@@ -67,14 +66,14 @@ static struct env {
 	.top_stacks = 10, // -T --top
 	.min_size = 0, // -z --min-size
 	.max_size = -1, // -Z --max-size
-	.object = {}, // -O --obj
+	.object = "libc.so.6", // -O --obj
 	.percpu = false, // --percpu
 	.perf_max_stack_depth = 127,
 	.stack_max_entries = 1024,
 	.page_size = 1,
 	.kernel_trace = true,
 	.verbose = false,
-	.command = {}, // -c --command
+	.command = NULL, // -c --command
 };
 
 const char *argp_program_version = "memleak 0.1";
@@ -158,11 +157,11 @@ static error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 	case 'a':
 		break;
 	case 'O':
-		strncpy(env.object, arg, sizeof(env.object));
+		env.object = strdup(arg);
 		printf("parsed object: %s\n", env.object);
 		break;
 	case 'c':
-		strncpy(env.command, arg, sizeof(env.command));
+		env.command = strdup(arg);
 		printf("parsed command: %s\n", env.command);
 		break;
 	case 'T':
@@ -334,7 +333,63 @@ static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 		blazesym_result_free(result);
 	}
 
+	printf("print loop iters: %d\n", i);
+
 	free(stack);
+
+	return 0;
+}
+
+int disable_kernel_tracepoints(struct memleak_bpf *skel)
+{
+	if (bpf_program__set_autoload(skel->progs.tracepoint__kmalloc, false)) {
+		fprintf(stderr, "failed to set autoload off for kmalloc\n");
+
+		return -errno;
+	}
+
+	printf("set autoload off for kmalloc");
+
+	return 0;
+}
+
+int attach_uprobes(struct memleak_bpf *skel)
+{
+	LIBBPF_OPTS(bpf_uprobe_opts, uprobe_opts,
+			.func_name = "malloc");
+	LIBBPF_OPTS(bpf_uprobe_opts, uretprobe_opts,
+			.func_name = "malloc",
+			.retprobe = true);
+
+	skel->links.malloc_enter = bpf_program__attach_uprobe_opts(
+			skel->progs.malloc_enter,
+			env.pid,
+			env.object,
+			0,
+			&uprobe_opts);
+
+	if (!skel->links.malloc_enter) {
+		fprintf(stderr, "failed to attach uprobe for malloc_enter\n");
+
+		return -errno;
+	}
+
+	printf("attached uprobe for malloc_enter\n");
+
+	skel->links.malloc_exit = bpf_program__attach_uprobe_opts(
+			skel->progs.malloc_exit,
+			env.pid,
+			env.object,
+			0,
+			&uretprobe_opts);
+
+	if (!skel->links.malloc_exit) {
+		fprintf(stderr, "failed to attach uprobe for malloc_exit\n");
+
+		return -errno;
+	}
+
+	printf("attached uprobe for malloc_exit\n");
 
 	return 0;
 }
@@ -376,10 +431,15 @@ int main(int argc, char *argv[])
 	env.page_size = sysconf(_SC_PAGE_SIZE);
 	printf("page size: %ld\n", env.page_size);
 
-	const bool has_pid = env.pid >= 0;
-	const bool has_cmd = strlen(env.command) > 0;
+	env.kernel_trace = env.pid < 0 && !env.command;
+	printf("kernel trace: %s\n", env.kernel_trace ? "true" : "false");
 
-	if (has_cmd) {
+	if (env.command) {
+		if (env.pid >= 0) {
+			fprintf(stderr, "cannot specify both command and pid\n");
+			goto cleanup;
+		}
+
 		child_exec_event_fd = eventfd(0, EFD_CLOEXEC);
 		if (child_exec_event_fd < 0) {
 			perror("failed to create child exec event fd");
@@ -391,11 +451,6 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 		env.pid = child_pid;
-	}
-
-	if (has_pid && has_cmd) {
-		fprintf(stderr, "cannot specify both pid and cmd\n");
-		goto cleanup;
 	}
 
 	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
@@ -420,6 +475,11 @@ int main(int argc, char *argv[])
 				env.perf_max_stack_depth * sizeof(unsigned long));
 	bpf_map__set_max_entries(skel->maps.stack_traces, env.stack_max_entries);
 
+	if (!env.kernel_trace && disable_kernel_tracepoints(skel)) {
+		fprintf(stderr, "failed to disable kernel tracepoints\n");
+		goto cleanup;
+	}
+
 	if (memleak_bpf__load(skel)) {
 		fprintf(stderr, "failed to load bpf object\n");
 		goto cleanup;
@@ -437,42 +497,11 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	printf("settings\n"
-			"object: %s\n"
-			"child pid: %d\n"
-			"pid: %d\n",
-			env.object, env.pid, getpid());
-
-	char resolved_path[PATH_MAX];
-	if (resolve_binary_path(env.object, env.pid, resolved_path, sizeof(resolved_path))) {
-		fprintf(stderr, "failed to resolve binary path\n");
-		return 1;
-	}
-
-	printf("resolved path: %s\n", resolved_path);
-
-	const off_t func_offset = get_elf_func_offset(resolved_path, "malloc");
-	if (func_offset < 0) {
-		fprintf(stderr, "failed to find func offset\n");
-		goto cleanup;
-	}
-
-	printf("func_offset: %ld\n", func_offset);
-
-	if (env.pid > 0) {
-		skel->links.malloc_enter = bpf_program__attach_uprobe(
-				skel->progs.malloc_enter,
-				false, // not a return probe
-				env.pid, // --pid or --command then fork()
-				resolved_path, // resolved binary path
-				func_offset);
-
-		skel->links.malloc_exit = bpf_program__attach_uprobe(
-				skel->progs.malloc_exit,
-				true, // is a return probe
-				env.pid, // --pid or --command then fork()
-				resolved_path, // resolved binary path
-				func_offset);
+	if (!env.kernel_trace) {
+		if (attach_uprobes(skel)) {
+			fprintf(stderr, "failed to attach uprobes\n");
+			goto cleanup;
+		}
 	}
 
 	if (memleak_bpf__attach(skel)) {
@@ -480,12 +509,13 @@ int main(int argc, char *argv[])
 		goto cleanup;
 	}
 
-	if (strlen(env.command)) {
+	if (env.command) {
 		const uint64_t event = 1;
 		if (write(child_exec_event_fd, &event, sizeof(event)) != sizeof(event)) {
 			perror("failed to write child exec event");
 			goto cleanup;
 		}
+		printf("wrote child exec event\n");
 	}
 
 	symbolizer = blazesym_new();
@@ -534,7 +564,7 @@ int main(int argc, char *argv[])
 				return 1;
 			}
 
-			print_outstanding_allocs(allocs_fd, stack_traces_fd);
+			//print_outstanding_allocs(allocs_fd, stack_traces_fd);
 
 			if (env.intervals && (++i >= env.intervals)) {
 				puts("reached target interval count");
@@ -552,19 +582,30 @@ int main(int argc, char *argv[])
 				return 1;
 			}
 
+			print_outstanding_allocs(allocs_fd, stack_traces_fd);
+
 			switch (buffer.ssi_signo) {
-			case SIGINT:
+			case SIGINT: {
 				printf("read SIGINT\n");
+				if (env.pid > 0) {
+					kill(SIGINT, env.pid);
+					int wstatus = 0;
+					const pid_t pid = wait(&wstatus);
+					printf("reaped pid:%d, status:%d\n", pid, wstatus);
+				}
+
 				break;
+			}
 			case SIGQUIT:
 				printf("read SIGQUIT\n");
 				break;
-			case SIGCHLD:
+			case SIGCHLD: {
 				printf("read SIGCHLD\n");
 				int wstatus = 0;
 				const pid_t pid = wait(&wstatus);
 				printf("reaped pid:%d, status:%d\n", pid, wstatus);
 				break;
+			}
 			default:
 				printf("other signal\n");
 				break;

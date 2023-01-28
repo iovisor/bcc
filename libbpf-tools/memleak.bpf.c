@@ -253,46 +253,54 @@ int tracepoint__percpu_free_percpu(struct trace_event_raw_percpu_free_percpu *ct
 	return gen_free_enter(ctx->ptr);
 }
 
-int uprobe__test()
-{
-	bpf_printk("uprobe test\n");
-	return 0;
-}
-
 SEC("uprobe")
 int BPF_KPROBE(malloc_enter, size_t size)
 {
-        return gen_alloc_enter(size);
+	bpf_printk("malloc enter\n");
+
+	return gen_alloc_enter(size);
 }
 
 SEC("uretprobe")
 int BPF_KRETPROBE(malloc_exit)
 {
-        return gen_alloc_exit(ctx);
+	bpf_printk("malloc exit\n");
+
+	return gen_alloc_exit(ctx);
+}
+
+SEC("uprobe")
+int BPF_KRETPROBE(free_enter, void *address)
+{
+	return gen_free_enter(address);
+}
+
+SEC("uprobe")
+int BPF_KPROBE(calloc_enter, size_t nmemb, size_t size)
+{
+	return gen_alloc_enter(nmemb * size);
+}
+
+SEC("uretprobe")
+int BPF_KRETPROBE(calloc_exit)
+{
+	return gen_alloc_exit(ctx);
+}
+
+SEC("uprobe")
+int BPF_KPROBE(realloc_enter, void *ptr, size_t size)
+{
+	gen_free_enter(ptr);
+	return gen_alloc_enter(size);
+}
+
+SEC("uretprobe")
+int BPF_KRETPROBE(realloc_exit)
+{
+	return gen_alloc_exit(ctx);
 }
 
 /*
-int free_enter(struct pt_regs *ctx, void *address) {
-        return gen_free_enter(ctx, address);
-}
-
-int calloc_enter(struct pt_regs *ctx, size_t nmemb, size_t size) {
-        return gen_alloc_enter(ctx, nmemb * size);
-}
-
-int calloc_exit(struct pt_regs *ctx) {
-        return gen_alloc_exit(ctx);
-}
-
-int realloc_enter(struct pt_regs *ctx, void *ptr, size_t size) {
-        gen_free_enter(ctx, ptr);
-        return gen_alloc_enter(ctx, size);
-}
-
-int realloc_exit(struct pt_regs *ctx) {
-        return gen_alloc_exit(ctx);
-}
-
 int mmap_enter(struct pt_regs *ctx) {
         size_t size = (size_t)PT_REGS_PARM2(ctx);
         return gen_alloc_enter(ctx, size);
