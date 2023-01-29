@@ -134,9 +134,9 @@ int kprobe__tty_write(struct pt_regs *ctx, struct file *file,
 #else
 PROBE_TTY_WRITE
 {
-    const char __user *buf;
+    const char __user *buf = NULL;
     const struct kvec *kvec;
-    size_t count;
+    size_t count = 0;
 
     if (iocb->ki_filp->f_inode->i_ino != PTS)
         return 0;
