@@ -14,8 +14,7 @@ struct {
 __u64 latency = 0;
 __u64 num = 0;
 
-SEC("fentry/migrate_misplaced_page")
-int BPF_PROG(migrate_misplaced_page)
+static int __migrate_misplaced_page(void)
 {
 	u32 pid = bpf_get_current_pid_tgid();
 	u64 ts = bpf_ktime_get_ns();
@@ -24,8 +23,19 @@ int BPF_PROG(migrate_misplaced_page)
 	return 0;
 }
 
-SEC("fexit/migrate_misplaced_page")
-int BPF_PROG(migrate_misplaced_page_exit)
+SEC("fentry/migrate_misplaced_page")
+int BPF_PROG(fentry_migrate_misplaced_page)
+{
+	return __migrate_misplaced_page();
+}
+
+SEC("kprobe/migrate_misplaced_page")
+int BPF_PROG(kprobe_migrate_misplaced_page)
+{
+	return __migrate_misplaced_page();
+}
+
+static int __migrate_misplaced_page_exit(void)
 {
 	u32 pid = bpf_get_current_pid_tgid();
 	u64 *tsp, ts = bpf_ktime_get_ns();
@@ -43,6 +53,18 @@ int BPF_PROG(migrate_misplaced_page_exit)
 cleanup:
 	bpf_map_delete_elem(&start, &pid);
 	return 0;
+}
+
+SEC("fexit/migrate_misplaced_page")
+int BPF_PROG(fexit_migrate_misplaced_page_exit)
+{
+	return __migrate_misplaced_page_exit();
+}
+
+SEC("kretprobe/migrate_misplaced_page")
+int BPF_PROG(kretprobe_migrate_misplaced_page_exit)
+{
+	return __migrate_misplaced_page_exit();
 }
 
 char LICENSE[] SEC("license") = "GPL";
