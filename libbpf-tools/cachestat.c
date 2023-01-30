@@ -2,7 +2,9 @@
 // Copyright (c) 2021 Wenbo Zhang
 //
 // Based on cachestat(8) from BCC by Brendan Gregg and Allan McAleavy.
-// 8-Mar-2021   Wenbo Zhang   Created this.
+//  8-Mar-2021   Wenbo Zhang   Created this.
+// 30-Jan-2023   Rong Tao      Add kprobe and use fentry_can_attach() decide
+//                             use fentry/kprobe
 #include <argp.h>
 #include <signal.h>
 #include <stdio.h>
@@ -153,12 +155,43 @@ int main(int argc, char **argv)
 	 * in kernel commit 203a31516616 ("mm/writeback: Add __folio_mark_dirty()")
 	 */
 	if (fentry_can_attach("folio_account_dirtied", NULL)) {
-		err = bpf_program__set_attach_target(obj->progs.account_page_dirtied, 0,
+		err = bpf_program__set_attach_target(obj->progs.fentry_account_page_dirtied, 0,
 						     "folio_account_dirtied");
 		if (err) {
 			fprintf(stderr, "failed to set attach target\n");
 			goto cleanup;
 		}
+	}
+	if (kprobe_exists("folio_account_dirtied")) {
+		bpf_program__set_autoload(obj->progs.kprobe_account_page_dirtied, false);
+	} else {
+		bpf_program__set_autoload(obj->progs.kprobe_folio_account_dirtied, false);
+	}
+
+	/* It fallbacks to kprobes when kernel does not support fentry. */
+	if (fentry_can_attach("folio_account_dirtied", NULL)
+		|| fentry_can_attach("account_page_dirtied", NULL)) {
+		bpf_program__set_autoload(obj->progs.kprobe_account_page_dirtied, false);
+	} else {
+		bpf_program__set_autoload(obj->progs.fentry_account_page_dirtied, false);
+	}
+
+	if (fentry_can_attach("add_to_page_cache_lru", NULL)) {
+		bpf_program__set_autoload(obj->progs.kprobe_add_to_page_cache_lru, false);
+	} else {
+		bpf_program__set_autoload(obj->progs.fentry_add_to_page_cache_lru, false);
+	}
+
+	if (fentry_can_attach("mark_page_accessed", NULL)) {
+		bpf_program__set_autoload(obj->progs.kprobe_mark_page_accessed, false);
+	} else {
+		bpf_program__set_autoload(obj->progs.fentry_mark_page_accessed, false);
+	}
+
+	if (fentry_can_attach("mark_buffer_dirty", NULL)) {
+		bpf_program__set_autoload(obj->progs.kprobe_mark_buffer_dirty, false);
+	} else {
+		bpf_program__set_autoload(obj->progs.fentry_mark_buffer_dirty, false);
 	}
 
 	err = cachestat_bpf__load(obj);
