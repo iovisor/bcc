@@ -24,11 +24,16 @@ import (
 )
 
 /*
-#cgo CFLAGS: -I/usr/include/bcc/compat
-#cgo LDFLAGS: -lbcc
+#cgo pkg-config: libbcc
+#ifdef LOCAL
+#include <bcc_common.h>
+#include <libbpf.h>
+#include <perf_reader.h>
+#else
 #include <bcc/bcc_common.h>
 #include <bcc/libbpf.h>
 #include <bcc/perf_reader.h>
+#endif
 
 // perf_reader_raw_cb and perf_reader_lost_cb as defined in bcc libbpf.h
 // typedef void (*perf_reader_raw_cb)(void *cb_cookie, void *raw, int raw_size);

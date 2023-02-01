@@ -25,11 +25,15 @@ import (
 )
 
 /*
-#cgo CFLAGS: -I/usr/include/bcc/compat
-#cgo LDFLAGS: -lbcc
+#cgo pkg-config: libbcc
 #include <linux/bpf.h>
+#ifdef LOCAL
+#include <bcc_common.h>
+#include <libbpf.h>
+#else
 #include <bcc/bcc_common.h>
 #include <bcc/libbpf.h>
+#endif
 */
 import "C"
 

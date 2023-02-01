@@ -26,12 +26,29 @@ import (
 	"github.com/iovisor/bcc/pkg/cpuonline"
 )
 
+// If you want to compile golang bindings with a specific version of libbcc, you
+// should follow this instructions:
+// 1. You first need to compile libbcc:
+//    git clone https://github.com/iovisor/bcc.git
+//    mkdir bcc/build; cd bcc/build
+//    cmake ..
+//    make
+// 2. Now, to compile the golang bindings, you need to set CGO_CPPFLAGS and
+// LD_PRELOAD to point toward local libbcc:
+//    cd examples/golang/execsnoop
+//    CGO_CPPFLAGS="-DLOCAL=1 -I$PWD/../../../src/cc/ -I$PWD/../../../build/src/cc/" CGO_LDFLAGS="-L$PWD/../../../build/src/cc/ -lbcc" PKG_CONFIG_PATH=$PWD/../../../build/src/cc/ go build
+
 /*
-#cgo CFLAGS: -I/usr/include/bcc/compat
-#cgo LDFLAGS: -lbcc
+#cgo pkg-config: libbcc
+#ifdef LOCAL
+#include <bcc_common.h>
+#include <libbpf.h>
+#include <bcc_version.h>
+#else
 #include <bcc/bcc_common.h>
 #include <bcc/libbpf.h>
 #include <bcc/bcc_version.h>
+#endif
 
 #ifndef LIBBCC_VERSION_GEQ
 #define LIBBCC_VERSION_GEQ(a, b, c) 0

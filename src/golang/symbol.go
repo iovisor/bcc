@@ -22,11 +22,16 @@ import (
 )
 
 /*
-#cgo CFLAGS: -I/usr/include/bcc/compat
-#cgo LDFLAGS: -lbcc
+#cgo pkg-config: libbcc
+#ifdef LOCAL
+#include <bcc_common.h>
+#include <libbpf.h>
+#include <bcc_syms.h>
+#else
 #include <bcc/bcc_common.h>
 #include <bcc/libbpf.h>
 #include <bcc/bcc_syms.h>
+#endif
 extern void foreach_symbol_callback(char*, uint64_t);
 */
 import "C"
