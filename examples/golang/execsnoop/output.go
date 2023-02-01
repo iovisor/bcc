@@ -37,7 +37,7 @@ type tableOutput struct {
 }
 
 func (t tableOutput) PrintHeader() {
-	header := "%-16s %-6s %-6s %3s %s\n"
+	header := "%-16s %-7s %-7s %3s %s\n"
 	args := []interface{}{"PCOMM", "PID", "PPID", "RET", "ARGS"}
 	if t.timestamp {
 		header = "%-8s" + header
@@ -47,7 +47,7 @@ func (t tableOutput) PrintHeader() {
 }
 
 func (t tableOutput) PrintLine(e eventPayload) {
-	header := "%-16s %-6d %-6s %3d %s\n"
+	header := "%-16s %-7d %-7s %3d %s\n"
 	args := []interface{}{e.Comm, e.Pid, e.Ppid, e.RetVal, e.Argv}
 	if t.timestamp {
 		header = "%-8.3f" + header

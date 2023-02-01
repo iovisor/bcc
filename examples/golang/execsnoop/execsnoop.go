@@ -24,7 +24,7 @@ import (
 	"strings"
 	"unsafe"
 
-	bpf "github.com/iovisor/gobpf/bcc"
+	bpf "github.com/iovisor/bcc"
 )
 
 import "C"
