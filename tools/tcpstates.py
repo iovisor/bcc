@@ -19,7 +19,6 @@ from __future__ import print_function
 from bcc import BPF
 import argparse
 from socket import inet_ntop, AF_INET, AF_INET6
-from struct import pack
 from time import strftime, time
 from os import getuid
 
@@ -78,8 +77,8 @@ BPF_HASH(last, struct sock *, u64);
 struct ipv4_data_t {
     u64 ts_us;
     u64 skaddr;
-    u32 saddr;
-    u32 daddr;
+    u32 saddr[1];
+    u32 daddr[1];
     u64 span_us;
     u32 pid;
     u16 lport;
@@ -93,8 +92,8 @@ BPF_PERF_OUTPUT(ipv4_events);
 struct ipv6_data_t {
     u64 ts_us;
     u64 skaddr;
-    unsigned __int128 saddr;
-    unsigned __int128 daddr;
+    u32 saddr[4];
+    u32 daddr[4];
     u64 span_us;
     u32 pid;
     u16 lport;
@@ -350,9 +349,9 @@ def journal_fields(event, addr_family):
         'OBJECT_PID': str(event.pid),
         'OBJECT_COMM': event.task.decode('utf-8', 'replace'),
         # Custom fields, aka "stuff we sort of made up".
-        'OBJECT_' + addr_pfx + '_SOURCE_ADDRESS': inet_ntop(addr_family, pack("I", event.saddr)),
+        'OBJECT_' + addr_pfx + '_SOURCE_ADDRESS': inet_ntop(addr_family, event.saddr),
         'OBJECT_TCP_SOURCE_PORT': str(event.lport),
-        'OBJECT_' + addr_pfx + '_DESTINATION_ADDRESS': inet_ntop(addr_family, pack("I", event.daddr)),
+        'OBJECT_' + addr_pfx + '_DESTINATION_ADDRESS': inet_ntop(addr_family, event.daddr),
         'OBJECT_TCP_DESTINATION_PORT': str(event.dport),
         'OBJECT_TCP_OLD_STATE': tcpstate2str(event.oldstate),
         'OBJECT_TCP_NEW_STATE': tcpstate2str(event.newstate),
@@ -373,8 +372,7 @@ def journal_fields(event, addr_family):
     return fields
 
 # process event
-def print_ipv4_event(cpu, data, size):
-    event = b["ipv4_events"].event(data)
+def print_event(event, addr_family):
     global start_ts
     if args.time:
         if args.csv:
@@ -389,39 +387,26 @@ def print_ipv4_event(cpu, data, size):
             print("%.6f," % delta_s, end="")
         else:
             print("%-9.6f " % delta_s, end="")
+    if addr_family == AF_INET:
+        version = "4"
+    else:
+        version = "6"
     print(format_string % (event.skaddr, event.pid, event.task.decode('utf-8', 'replace'),
-        "4" if args.wide or args.csv else "",
-        inet_ntop(AF_INET, pack("I", event.saddr)), event.lport,
-        inet_ntop(AF_INET, pack("I", event.daddr)), event.dport,
+        version if args.wide or args.csv else "",
+        inet_ntop(addr_family, event.saddr), event.lport,
+        inet_ntop(addr_family, event.daddr), event.dport,
         tcpstate2str(event.oldstate), tcpstate2str(event.newstate),
         float(event.span_us) / 1000))
     if args.journal:
-        journal.send(**journal_fields(event, AF_INET))
+        journal.send(**journal_fields(event, addr_family))
+
+def print_ipv4_event(cpu, data, size):
+    event = b["ipv4_events"].event(data)
+    print_event(event, AF_INET)
 
 def print_ipv6_event(cpu, data, size):
     event = b["ipv6_events"].event(data)
-    global start_ts
-    if args.time:
-        if args.csv:
-            print("%s," % strftime("%H:%M:%S"), end="")
-        else:
-            print("%-8s " % strftime("%H:%M:%S"), end="")
-    if args.timestamp:
-        if start_ts == 0:
-            start_ts = event.ts_us
-        delta_s = (float(event.ts_us) - start_ts) / 1000000
-        if args.csv:
-            print("%.6f," % delta_s, end="")
-        else:
-            print("%-9.6f " % delta_s, end="")
-    print(format_string % (event.skaddr, event.pid, event.task.decode('utf-8', 'replace'),
-        "6" if args.wide or args.csv else "",
-        inet_ntop(AF_INET6, event.saddr), event.lport,
-        inet_ntop(AF_INET6, event.daddr), event.dport,
-        tcpstate2str(event.oldstate), tcpstate2str(event.newstate),
-        float(event.span_us) / 1000))
-    if args.journal:
-        journal.send(**journal_fields(event, AF_INET6))
+    print_event(event, AF_INET6)
 
 # initialize BPF
 b = BPF(text=bpf_text)
