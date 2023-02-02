@@ -298,6 +298,10 @@ class SmokeTests(TestCase):
     def test_scsilatency(self):
         self.run_with_duration("scsilatency 1 1")
 
+    @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
+    def test_scsisnoop(self):
+        self.run_with_duration("scsisnoop")
+
     @skipUnless(kernel_version_ge(4,8), "requires kernel >= 4.8")
     def test_shmsnoop(self):
         self.run_with_int("shmsnoop.py")
