@@ -1,0 +1,162 @@
+Demonstrations of f2fsdist, the Linux eBPF/bcc version.
+
+
+f2fsdist traces f2fs reads, writes, opens, and fsyncs, and summarizes their
+latency as a power-of-2 histogram. For example:
+
+# ./f2fsdist 
+Tracing f2fs operation latency... Hit Ctrl-C to end.
+^C
+
+operation = write
+     usecs               : count     distribution
+         0 -> 1          : 8775     |******                                  |
+         2 -> 3          : 42759    |******************************          |
+         4 -> 7          : 55178    |****************************************|
+         8 -> 15         : 13147    |*********                               |
+        16 -> 31         : 239      |                                        |
+        32 -> 63         : 572      |                                        |
+        64 -> 127        : 539      |                                        |
+       128 -> 255        : 53       |                                        |
+       256 -> 511        : 489      |                                        |
+       512 -> 1023       : 15       |                                        |
+      1024 -> 2047       : 12       |                                        |
+
+operation = read
+     usecs               : count     distribution
+         0 -> 1          : 5487     |*****                                   |
+         2 -> 3          : 20530    |**********************                  |
+         4 -> 7          : 9118     |*********                               |
+         8 -> 15         : 852      |                                        |
+        16 -> 31         : 76       |                                        |
+        32 -> 63         : 38       |                                        |
+        64 -> 127        : 36862    |****************************************|
+       128 -> 255        : 10475    |***********                             |
+       256 -> 511        : 708      |                                        |
+       512 -> 1023       : 103      |                                        |
+      1024 -> 2047       : 95       |                                        |
+      2048 -> 4095       : 4        |                                        |
+      4096 -> 8191       : 9        |                                        |
+      8192 -> 16383      : 7        |                                        |
+     16384 -> 32767      : 41       |                                        |
+
+operation = open
+     usecs               : count     distribution
+         0 -> 1          : 1        |                                        |
+         2 -> 3          : 29       |*                                       |
+         4 -> 7          : 26       |*                                       |
+         8 -> 15         : 39       |**                                      |
+        16 -> 31         : 738      |****************************************|
+        32 -> 63         : 339      |******************                      |
+        64 -> 127        : 27       |*                                       |
+       128 -> 255        : 5        |                                        |
+       256 -> 511        : 1        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 1        |                                        |
+
+operation = fsync
+     usecs               : count     distribution
+         0 -> 1          : 1185     |*                                       |
+         2 -> 3          : 44305    |****************************************|
+         4 -> 7          : 1503     |*                                       |
+         8 -> 15         : 1304     |*                                       |
+        16 -> 31         : 344      |                                        |
+        32 -> 63         : 219      |                                        |
+        64 -> 127        : 755      |                                        |
+       128 -> 255        : 14444    |*************                           |
+       256 -> 511        : 297      |                                        |
+       512 -> 1023       : 324      |                                        |
+      1024 -> 2047       : 122      |                                        |
+      2048 -> 4095       : 221      |                                        |
+      4096 -> 8191       : 17       |                                        |
+      8192 -> 16383      : 3        |                                        |
+     16384 -> 32767      : 1        |                                        |
+     32768 -> 65535      : 0        |                                        |
+     65536 -> 131071     : 6        |                                        |
+    131072 -> 262143     : 3        |                                        |
+
+
+This output shows a bi-modal distribution for read latency, with a faster
+mode of less than 7 microseconds, and a slower mode of between 256 and 1023
+microseconds. The count column shows how many events fell into that latency
+range. It's likely that the faster mode was a hit from the in-memory file
+system cache, and the slower mode is a read from a storage device (disk).
+
+This "latency" is measured from when the operation was issued from the VFS
+interface to the file system, to when it completed. This spans everything:
+block device I/O (disk I/O), file system CPU cycles, file system locks, run
+queue latency, etc. This is a better measure of the latency suffered by
+applications reading from the file system than measuring this down at the
+block device interface.
+
+Note that this only traces the common file system operations previously
+listed: other file system operations (eg, inode operations including
+getattr()) are not traced.
+
+
+An optional interval and a count can be provided, as well as -m to show the
+distributions in milliseconds. For example:
+
+# ./f2fsdist -m 1 5
+Tracing f2fs operation latency... Hit Ctrl-C to end.
+
+00:15:18:
+
+operation = read
+     msecs               : count     distribution
+         0 -> 1          : 2        |****************************************|
+
+operation = open
+     msecs               : count     distribution
+         0 -> 1          : 2        |****************************************|
+
+00:15:19:
+
+00:15:20:
+
+operation = read
+     msecs               : count     distribution
+         0 -> 1          : 12       |****************************************|
+
+operation = write
+     msecs               : count     distribution
+         0 -> 1          : 13       |****************************************|
+
+operation = open
+     msecs               : count     distribution
+         0 -> 1          : 2        |****************************************|
+
+operation = fsync
+     msecs               : count     distribution
+         0 -> 1          : 4        |****************************************|
+
+00:15:21:
+
+00:15:22:
+
+
+This shows a mixed workload.
+
+
+USAGE message:
+
+# ./f2fsdist -h
+usage: f2fsdist [-h] [-T] [-m] [-p PID] [interval] [count]
+
+Summarize f2fs operation latency
+
+positional arguments:
+  interval            output interval, in seconds
+  count               number of outputs
+
+optional arguments:
+  -h, --help          show this help message and exit
+  -T, --notimestamp   don't include timestamp on interval output
+  -m, --milliseconds  output in milliseconds
+  -p PID, --pid PID   trace this PID only
+
+examples:
+    ./f2fsdist            # show operation latency as a histogram
+    ./f2fsdist -p 181     # trace PID 181 only
+    ./f2fsdist 1 10       # print 1 second summaries, 10 times
+    ./f2fsdist -m 5       # 5s summaries, milliseconds

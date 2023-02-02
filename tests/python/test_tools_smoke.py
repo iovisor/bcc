@@ -177,6 +177,9 @@ class SmokeTests(TestCase):
     def test_ext4slower(self):
         self.run_with_int("ext4slower.py")
 
+    def test_f2fsdist(self):
+        self.run_with_duration("f2fsdist.py 1 1")
+
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_filelife(self):
         self.run_with_int("filelife.py")
