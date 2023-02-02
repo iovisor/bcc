@@ -1,0 +1,260 @@
+Demonstrations of f2fsslower, the Linux eBPF/bcc version.
+
+
+f2fsslower shows f2fs reads, writes, opens, and fsyncs, slower than a threshold.
+For example:
+
+# ./f2fsslower
+Tracing f2fs operations slower than 10 ms
+TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
+23:27:14 Thread-11      13086  R 33554432 0         123.24 0
+23:27:14 Thread-11      13086  R 33554432 32768      16.73 0
+23:27:14 Thread-11      13086  R 33554432 0          16.39 1
+23:27:14 Thread-11      13086  R 33554432 32768      16.33 1
+23:27:14 Thread-11      13086  R 33554432 0          16.38 2
+23:27:14 Thread-11      13086  R 33554432 32768      16.29 2
+23:27:14 Thread-11      13086  R 33554432 0          16.47 3
+23:27:14 Thread-11      13086  R 33554432 32768      16.29 3
+23:27:14 Thread-11      13086  R 33554432 0          16.34 4
+23:27:14 Thread-11      13086  R 33554432 32768      16.63 4
+23:27:14 Thread-11      13086  R 33554432 0          16.27 5
+23:27:14 Thread-11      13086  R 33554432 32768      16.32 5
+23:27:14 Thread-11      13086  R 33554432 0          16.25 6
+23:27:14 Thread-11      13086  R 33554432 32768      16.56 6
+23:27:14 Thread-11      13086  R 33554432 0          17.29 7
+23:27:14 Thread-11      13086  R 33554432 32768      16.27 7
+23:27:14 Thread-11      13086  R 33554432 0          17.51 0
+23:27:14 Thread-11      13086  R 33554432 32768      16.29 0
+23:27:14 Thread-11      13086  R 33554432 0          16.41 1
+23:27:14 Thread-11      13086  R 33554432 32768      16.31 1
+23:27:14 Thread-11      13086  R 33554432 0          16.21 2
+23:27:14 Thread-11      13086  R 33554432 32768      16.44 2
+23:27:14 Thread-11      13086  R 33554432 0          16.31 3
+23:27:14 Thread-11      13086  R 33554432 32768      16.28 3
+23:27:14 Thread-11      13086  R 33554432 0          16.22 4
+23:27:14 Thread-11      13086  R 33554432 32768      16.22 4
+23:27:14 Thread-11      13086  R 33554432 0          16.25 5
+23:27:14 Thread-11      13086  R 33554432 32768      16.21 5
+23:27:14 Thread-11      13086  R 33554432 0          16.20 6
+23:27:14 Thread-11      13086  R 33554432 32768      16.35 6
+23:27:14 Thread-11      13086  R 33554432 0          16.26 7
+23:27:14 Thread-11      13086  R 33554432 32768      16.32 7
+23:27:14 Thread-11      13086  R 33554432 0          17.13 0
+23:27:14 Thread-11      13086  R 33554432 32768      16.12 0
+23:27:14 Thread-11      13086  R 33554432 0          16.65 1
+23:27:14 Thread-11      13086  R 33554432 32768      16.34 1
+23:27:14 Thread-11      13086  R 33554432 0          16.30 2
+23:27:14 Thread-11      13086  R 33554432 32768      16.30 2
+23:27:14 Thread-11      13086  R 33554432 0          16.39 3
+23:27:14 Thread-11      13086  R 33554432 32768      16.46 3
+23:27:14 Thread-11      13086  R 33554432 0          16.21 4
+23:27:14 Thread-11      13086  R 33554432 32768      16.34 4
+23:27:14 Thread-11      13086  R 33554432 0          16.43 5
+23:27:15 Thread-11      13086  R 33554432 32768      16.42 5
+23:27:15 Thread-11      13086  R 33554432 0          17.29 6
+23:27:15 Thread-11      13086  R 33554432 32768      16.64 6
+23:27:15 Thread-11      13086  R 33554432 0          16.56 7
+23:27:15 Thread-11      13086  R 33554432 32768      16.42 7
+[...]
+
+This shows various system tasks reading from f2fs. The high latency here is
+due to disk I/O, as I had just evicted the file system cache for this example.
+
+This "latency" is measured from when the operation was issued from the VFS
+interface to the file system, to when it completed. This spans everything:
+block device I/O (disk I/O), file system CPU cycles, file system locks, run
+queue latency, etc. This is a better measure of the latency suffered by
+applications reading from the file system than measuring this down at the
+block device interface.
+
+Note that this only traces the common file system operations previously
+listed: other file system operations (eg, inode operations including
+getattr()) are not traced.
+
+
+The threshold can be provided as an argument. Eg, I/O slower than 1 ms:
+
+# ./f2fsslower 1
+Tracing f2fs operations slower than 1 ms
+TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
+23:31:14 Thread-12      13086  R 33554432 0         124.63 0
+23:31:14 Thread-12      13086  R 33554432 32768      16.84 0
+23:31:14 Thread-12      13086  R 33554432 0          16.56 1
+23:31:14 Thread-12      13086  R 33554432 32768      16.54 1
+23:31:14 Thread-12      13086  R 33554432 0          16.56 2
+23:31:14 Thread-12      13086  R 33554432 32768      16.56 2
+23:31:14 Thread-12      13086  R 33554432 0          16.63 3
+23:31:14 Thread-12      13086  R 33554432 32768      16.47 3
+23:31:14 Thread-12      13086  R 33554432 0          16.57 4
+23:31:14 Thread-12      13086  R 33554432 32768      16.36 4
+23:31:14 Thread-12      13086  R 33554432 0          16.30 5
+23:31:14 Thread-12      13086  R 33554432 32768      16.25 5
+23:31:14 Thread-12      13086  R 33554432 0          16.28 6
+23:31:14 Thread-12      13086  R 33554432 32768      16.51 6
+23:31:14 Thread-12      13086  R 33554432 0          16.28 7
+23:31:14 Thread-12      13086  R 33554432 32768      16.36 7
+23:31:14 Thread-12      13086  R 33554432 0          16.62 0
+23:31:14 Thread-12      13086  R 33554432 32768      16.43 0
+23:31:14 Thread-12      13086  R 33554432 0          16.44 1
+23:31:14 Thread-12      13086  R 33554432 32768      16.20 1
+23:31:14 Thread-12      13086  R 33554432 0          16.19 2
+23:31:14 Thread-12      13086  R 33554432 32768      16.18 2
+23:31:14 Thread-12      13086  R 33554432 0          16.16 3
+23:31:14 Thread-12      13086  R 33554432 32768      16.20 3
+23:31:14 Thread-12      13086  R 33554432 0          16.15 4
+23:31:14 Thread-12      13086  R 33554432 32768      16.18 4
+23:31:14 Thread-12      13086  R 33554432 0          16.17 5
+23:31:14 Thread-12      13086  R 33554432 32768      16.35 5
+23:31:14 Thread-12      13086  R 33554432 0          16.44 6
+23:31:14 Thread-12      13086  R 33554432 32768      16.47 6
+23:31:14 Thread-12      13086  R 33554432 0          17.01 7
+23:31:14 Thread-12      13086  R 33554432 32768      16.19 7
+23:31:14 Thread-12      13086  R 33554432 0          17.15 0
+23:31:14 Thread-12      13086  R 33554432 32768      16.41 0
+23:31:14 Thread-12      13086  R 33554432 0          16.74 1
+23:31:14 Thread-12      13086  R 33554432 32768      16.26 1
+23:31:14 Thread-12      13086  R 33554432 0          16.51 2
+23:31:14 Thread-12      13086  R 33554432 32768      16.50 2
+23:31:14 Thread-12      13086  R 33554432 0          16.71 3
+23:31:14 Thread-12      13086  R 33554432 32768      16.51 3
+23:31:14 Thread-12      13086  R 33554432 0          16.53 4
+23:31:14 Thread-12      13086  R 33554432 32768      16.54 4
+23:31:14 Thread-12      13086  R 33554432 0          16.52 5
+23:31:14 Thread-12      13086  R 33554432 32768      16.44 5
+23:31:14 Thread-12      13086  R 33554432 0          16.67 6
+23:31:14 Thread-12      13086  R 33554432 32768      16.68 6
+23:31:15 Thread-12      13086  R 33554432 0          16.74 7
+23:31:15 Thread-12      13086  R 33554432 32768      16.65 7
+[...]
+
+This time a cksum(1) command can be seen reading various files (from /usr/bin).
+
+
+A threshold of 0 will trace all operations. Warning: the output will be
+verbose, as it will include all file system cache hits.
+
+# ./f2fsslower 0
+Tracing f2fs operations
+TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
+23:35:53 iop@2.0-servic 882    R 16      0           0.04 io-prefetcher.db
+23:35:53 iop@2.0-servic 882    R 16      0           0.01 io-prefetcher.db
+23:35:53 iop@2.0-servic 882    R 16      0           0.01 io-prefetcher.db
+23:35:53 iop@2.0-servic 882    R 16      0           0.01 io-prefetcher.db
+23:35:53 iop@2.0-servic 882    W 4096    0           0.08 io-prefetcher.db
+23:35:53 iop@2.0-servic 882    W 4096    32          0.01 io-prefetcher.db
+23:35:53 iop@2.0-servic 882    S 0       0           0.01 io-prefetcher.db
+23:35:54 perf@2.2-servi 886    O 0       0           0.04 current_fps
+23:35:54 perf@2.2-servi 886    W 2       0           0.09 current_fps
+23:35:54 perf@2.2-servi 886    O 0       0           0.03 current_fps
+23:35:54 perf@2.2-servi 886    W 2       0           0.07 current_fps
+23:35:54 perf@2.2-servi 886    O 0       0           0.03 current_fps
+23:35:54 perf@2.2-servi 886    W 2       0           0.10 current_fps
+23:35:54 TaskSnapshotPe 1544   O 0       0           0.15 24.proto.new
+23:35:54 perf@2.2-servi 886    O 0       0           0.03 current_fps
+23:35:54 TaskSnapshotPe 1544   W 82      0           0.05 24.proto.new
+23:35:54 perf@2.2-servi 886    W 2       0           0.08 current_fps
+23:35:54 TaskSnapshotPe 1544   S 0       0           2.43 24.proto.new
+23:35:54 perf@2.2-servi 886    O 0       0           0.07 current_fps
+23:35:54 perf@2.2-servi 886    W 2       0           0.07 current_fps
+23:35:54 iop@2.0-servic 882    R 16      0           0.03 io-prefetcher.db
+23:35:54 iop@2.0-servic 882    R 16      0           0.02 io-prefetcher.db
+23:35:54 perf@2.2-servi 886    O 0       0           0.02 current_fps
+23:35:54 perf@2.2-servi 886    W 2       0           0.07 current_fps
+23:35:54 perf@2.2-servi 886    O 0       0           0.03 current_fps
+23:35:54 perf@2.2-servi 886    W 2       0           0.09 current_fps
+23:35:54 perf@2.2-servi 886    O 0       0           0.03 current_fps
+23:35:54 perf@2.2-servi 886    W 2       0           0.08 current_fps
+23:35:54 TaskSnapshotPe 1544   O 0       0           0.01 24.jpg
+23:35:54 perf@2.2-servi 886    O 0       0           0.02 current_fps
+23:35:54 perf@2.2-servi 886    W 2       0           0.06 current_fps
+23:35:54 TaskSnapshotPe 1544   W 1024    0           0.04 24.jpg
+23:35:54 TaskSnapshotPe 1544   W 1024    1           0.01 24.jpg
+23:35:54 perf@2.2-servi 886    O 0       0           0.01 current_fps
+23:35:54 TaskSnapshotPe 1544   W 1024    2           0.01 24.jpg
+23:35:54 TaskSnapshotPe 1544   W 1024    3           0.00 24.jpg
+[...]
+
+The output now includes open operations ("O"), and writes ("W").
+
+
+A -j option will print just the fields (parsable output, csv):
+
+# ./f2fsslower -j 1
+ENDTIME_us,TASK,PID,TYPE,BYTES,OFFSET_b,LATENCY_us,FILE
+32897720717,Thread-14,13086,S,0,0,85033,3
+32897838343,Thread-14,13086,S,0,0,91010,4
+32898079447,Thread-14,13086,S,0,0,216140,5
+32898200395,Thread-14,13086,S,0,0,94777,6
+32898312396,Thread-14,13086,S,0,0,86556,7
+32898518082,Thread-14,13086,R,33554432,0,124118,0
+32898534981,Thread-14,13086,R,33554432,33554432,16830,0
+32898551645,Thread-14,13086,R,33554432,0,16585,1
+32898568083,Thread-14,13086,R,33554432,33554432,16388,1
+32898584740,Thread-14,13086,R,33554432,0,16604,2
+32898601152,Thread-14,13086,R,33554432,33554432,16368,2
+32898617857,Thread-14,13086,R,33554432,0,16659,3
+32898634356,Thread-14,13086,R,33554432,33554432,16456,3
+32898650861,Thread-14,13086,R,33554432,0,16457,4
+32898667344,Thread-14,13086,R,33554432,33554432,16434,4
+32898683804,Thread-14,13086,R,33554432,0,16411,5
+32898700276,Thread-14,13086,R,33554432,33554432,16421,5
+32898716713,Thread-14,13086,R,33554432,0,16372,6
+32898733204,Thread-14,13086,R,33554432,33554432,16420,6
+32898749801,Thread-14,13086,R,33554432,0,16530,7
+32898766804,Thread-14,13086,R,33554432,33554432,16937,7
+32898807153,Thread-14,13086,R,33554432,0,17290,0
+32898823493,Thread-14,13086,R,33554432,33554432,16300,0
+32898840179,Thread-14,13086,R,33554432,0,16646,1
+32898856655,Thread-14,13086,R,33554432,33554432,16442,1
+32898872967,Thread-14,13086,R,33554432,0,16268,2
+32898889270,Thread-14,13086,R,33554432,33554432,16258,2
+32898906083,Thread-14,13086,R,33554432,0,16772,3
+32898922423,Thread-14,13086,R,33554432,33554432,16298,3
+32898938893,Thread-14,13086,R,33554432,0,16430,4
+32898955217,Thread-14,13086,R,33554432,33554432,16287,4
+32898971737,Thread-14,13086,R,33554432,0,16481,5
+32898988188,Thread-14,13086,R,33554432,33554432,16415,5
+32899004665,Thread-14,13086,R,33554432,0,16439,6
+32899021297,Thread-14,13086,R,33554432,33554432,16596,6
+32899038039,Thread-14,13086,R,33554432,0,16697,7
+32899054685,Thread-14,13086,R,33554432,33554432,16604,7
+32899094190,Thread-14,13086,R,33554432,0,18062,0
+32899110914,Thread-14,13086,R,33554432,33554432,16677,0
+32899127424,Thread-14,13086,R,33554432,0,16467,1
+32899143724,Thread-14,13086,R,33554432,33554432,16259,1
+32899159998,Thread-14,13086,R,33554432,0,16235,2
+32899176506,Thread-14,13086,R,33554432,33554432,16458,2
+32899193020,Thread-14,13086,R,33554432,0,16449,3
+32899209410,Thread-14,13086,R,33554432,33554432,16326,3
+32899225756,Thread-14,13086,R,33554432,0,16281,4
+32899242571,Thread-14,13086,R,33554432,33554432,16762,4
+32899258945,Thread-14,13086,R,33554432,0,16320,5
+32899275445,Thread-14,13086,R,33554432,33554432,16453,5
+[...]
+
+This may be useful for visualizing with another tool, for example, for
+producing a scatter plot of ENDTIME vs LATENCY, to look for time-based
+patterns.
+
+
+USAGE message:
+
+# ./f2fsslower -h
+usage: f2fsslower [-h] [-j] [-p PID] [min_ms]
+
+Trace common f2fs file operations slower than a threshold
+
+positional arguments:
+  min_ms             minimum I/O duration to trace, in ms (default 10)
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -j, --csv          just print fields: comma-separated values
+  -p PID, --pid PID  trace this PID only
+
+examples:
+    ./f2fsslower             # trace operations slower than 10 ms (default)
+    ./f2fsslower 1           # trace operations slower than 1 ms
+    ./f2fsslower -j 1        # ... 1 ms, parsable output (csv)
+    ./f2fsslower 0           # trace all operations (warning: verbose)
+    ./f2fsslower -p 185      # trace PID 185 only
