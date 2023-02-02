@@ -1,4 +1,5 @@
 #include <argp.h>
+#include <errno.h>
 #include <poll.h>
 #include <signal.h>
 #include <stdio.h>
@@ -31,10 +32,10 @@ static blazesym *symbolizer;
 #endif
 
 static struct env {
+	int interval;
+	int nr_intervals;
 	pid_t pid;
 	bool trace_all;
-	int interval;
-	int intervals;
 	bool show_allocs;
 	bool combined_only;
 	int min_age_ns;
@@ -54,10 +55,10 @@ static struct env {
 	bool verbose;
 	char *command;
 } env = {
+	.interval = 5, // posarg 1
+	.nr_intervals = 0, // posarg 2
 	.pid = -1, // -p --pid
 	.trace_all = false, // -t --trace
-	.interval = 5, // posarg 1
-	.intervals = 0, // posarg 2
 	.show_allocs = false, // -a --show-allocs
 	.combined_only = false, // --combined-only
 	.min_age_ns = 500, // -o --older val * 1e6
@@ -144,12 +145,12 @@ static error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 
 	switch (key) {
 	case 'p':
-		puts("arg pid");
-		env.pid = argp_parse_long(key, arg, state);
+		env.pid = atoi(arg);
+		printf("parsed pid: %d\n", env.pid);
 		break;
 	case 't':
-		puts("arg trace_all");
 		env.trace_all = true;
+		puts("arg trace_all");
 		break;
 	case 'i':
 		env.interval = argp_parse_long(key, arg, state);
@@ -181,8 +182,8 @@ static error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 			env.interval = argp_parse_long(key, arg, state);
 		}
 		else if (pos_args == 2) {
-			puts("arg intervals");
-			env.intervals = argp_parse_long(key, arg, state);
+			puts("arg nr_intervals");
+			env.nr_intervals = argp_parse_long(key, arg, state);
 		} else {
 			fprintf(stderr, "Unrecognized positional argument: %s\n", arg);
 			argp_usage(state);
@@ -256,31 +257,99 @@ pid_t fork_sync_exec(const char *command, int event_fd)
 	return pid;
 }
 
+static int print_stacks(alloc_info_t *allocs, size_t nr_allocs, int stack_traces_fd)
+{
+	int ret = 0;
+
+	uint64_t *stack = calloc(env.perf_max_stack_depth, sizeof(*stack));
+	if (!stack) {
+		fprintf(stderr, "failed to alloc stack array\n");
+		return -ENOMEM;
+	}
+
+	sym_src_cfg src_cfg = {};
+
+	if (env.pid < 0) {
+		src_cfg.src_type = SRC_T_KERNEL;
+		src_cfg.params.kernel.kallsyms = NULL;
+		src_cfg.params.kernel.kernel_image = NULL;
+	} else {
+		src_cfg.src_type = SRC_T_PROCESS;
+		src_cfg.params.process.pid = env.pid;
+	}
+
+	for (size_t i = 0; i < nr_allocs; ++i) {
+		alloc_info_t *alloc = &allocs[i];
+
+		if (bpf_map_lookup_elem(stack_traces_fd, &alloc->stack_id, stack)) {
+			if (errno == ENOENT)
+				continue;
+
+			fprintf(stderr, "failed to lookup stack trace\n");
+			ret =  -errno;
+			break;
+		}
+
+		const blazesym_result *result = NULL;
+		const blazesym_csym *sym = NULL;
+		result = blazesym_symbolize(symbolizer, &src_cfg, 1, stack, env.perf_max_stack_depth);
+
+		for (size_t j = 0; result && j < result->size; j++) {
+			if (result->entries[j].size == 0)
+				continue;
+			sym = &result->entries[j].syms[0];
+
+			if (sym->line_no)
+				printf("%s:%ld\n", sym->symbol, sym->line_no);
+			else
+				printf("%s\n", sym->symbol);
+		}
+
+		puts("=============");
+
+		blazesym_result_free(result);
+	}
+
+	free(stack);
+
+	return ret;
+}
+
 static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 {
+	int ret = 0;
+
 	time_t t = time(NULL);
 	struct tm *tm = localtime(&t);
 	printf("[%d:%d:%d] Top %d stacks with outstanding allocations:\n",
 			tm->tm_hour, tm->tm_min, tm->tm_sec, env.top_stacks);
 
-	uint64_t *stack = calloc(env.perf_max_stack_depth, sizeof(*stack));
-	if (!stack) {
-		fprintf(stderr, "failed to alloc stack\n");
-		return -1;
+	alloc_info_t *top_allocs = calloc(env.top_stacks, sizeof(*top_allocs));
+	if (!top_allocs) {
+		fprintf(stderr, "failed to top allocs array\n");
+		return -ENOMEM;
 	}
 
 	alloc_info_t alloc_info = {};
 	uint64_t *prev_key = NULL;
 	uint64_t curr_key = 0;
 
-	for (; !bpf_map_get_next_key(allocs_fd, prev_key, &curr_key); prev_key = &curr_key) {
+	int i = 0;
+	while (i < env.top_stacks) {
+		if (bpf_map_get_next_key(allocs_fd, prev_key, &curr_key)) {
+			if (errno == ENOENT)
+				break; // no more keys
+		}
+
+		prev_key = &curr_key;
+
 		if (bpf_map_lookup_elem(allocs_fd, &curr_key, &alloc_info)) {
 			if (errno == ENOENT)
 				continue;
 
 			perror("map lookup error");
-			free(stack);
-			return -1;
+			ret = -errno;
+			break;
 		}
 
 		if (get_ktime_ns() - env.min_age_ns < alloc_info.timestamp_ns) {
@@ -292,50 +361,18 @@ static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 			continue;
 		}
 
-		if (bpf_map_lookup_elem(stack_traces_fd, &alloc_info.stack_id, stack)) {
-			if (errno == ENOENT)
-				continue;
+		memcpy(&top_allocs[i], &alloc_info, sizeof(alloc_info));
+		i++;
 
-			fprintf(stderr, "failed to lookup stack trace\n");
-			free(stack);
-			return -1;
-		}
+		printf("\taddr = %p size = %llu\n", (void *)curr_key, alloc_info.size);
 
-		//printf("\taddr = %p size = %llu\n", (void *)curr_key, alloc_info.size);
-
-		sym_src_cfg src_cfg = {};
-
-		if (env.pid < 0) {
-			src_cfg.src_type = SRC_T_KERNEL;
-			src_cfg.params.kernel.kallsyms = NULL;
-			src_cfg.params.kernel.kernel_image = NULL;
-		} else {
-			src_cfg.src_type = SRC_T_PROCESS;
-			src_cfg.params.process.pid = env.pid;
-		}
-
-		const blazesym_result *result = NULL;
-		const blazesym_csym *sym;
-		int i, j;
-		result = blazesym_symbolize(symbolizer, &src_cfg, 1, stack, env.perf_max_stack_depth);
-
-		for (i = 0; result && i < result->size; i++) {
-			if (result->entries[i].size == 0)
-				continue;
-			sym = &result->entries[i].syms[0];
-
-			if (sym->line_no)
-				printf("%s:%ld\n", sym->symbol, sym->line_no);
-			else
-				printf("%s\n", sym->symbol);
-		}
-
-		blazesym_result_free(result);
 	}
 
-	printf("print loop iters: %d\n", i);
+	print_stacks(top_allocs, i, stack_traces_fd);
 
-	free(stack);
+	free(top_allocs);
+
+	printf("print loop iters: %d\n", i);
 
 	return 0;
 }
@@ -564,9 +601,9 @@ int main(int argc, char *argv[])
 				return 1;
 			}
 
-			//print_outstanding_allocs(allocs_fd, stack_traces_fd);
+			print_outstanding_allocs(allocs_fd, stack_traces_fd);
 
-			if (env.intervals && (++i >= env.intervals)) {
+			if (env.nr_intervals && (++i >= env.nr_intervals)) {
 				puts("reached target interval count");
 				break;
 			}
