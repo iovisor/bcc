@@ -1,6 +1,8 @@
 #ifndef __MEMLEAK_H
 #define __MEMLEAK_H
 
+#define ALLOCS_MAX_ENTRIES 1000000
+
 typedef struct {
 	__u64 size;
 	__u64 timestamp_ns;

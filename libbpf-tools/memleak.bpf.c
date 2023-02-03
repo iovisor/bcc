@@ -24,7 +24,7 @@ struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__type(key, u64); // address
 	__type(value, alloc_info_t);
-	__uint(max_entries, 1000000);
+	__uint(max_entries, ALLOCS_MAX_ENTRIES);
 } allocs SEC(".maps");
 
 struct {

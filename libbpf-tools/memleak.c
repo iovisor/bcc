@@ -281,6 +281,8 @@ static int print_stacks(alloc_info_t *allocs, size_t nr_allocs, int stack_traces
 	for (size_t i = 0; i < nr_allocs; ++i) {
 		alloc_info_t *alloc = &allocs[i];
 
+		printf("alloc stack_id:%d, size:%llu\n", alloc->stack_id, alloc->size);
+
 		if (bpf_map_lookup_elem(stack_traces_fd, &alloc->stack_id, stack)) {
 			if (errno == ENOENT)
 				continue;
@@ -315,6 +317,21 @@ static int print_stacks(alloc_info_t *allocs, size_t nr_allocs, int stack_traces
 	return ret;
 }
 
+static int alloc_compare(const void *a, const void *b)
+{
+	const alloc_info_t *x = (alloc_info_t *)a;
+	const alloc_info_t *y = (alloc_info_t *)b;
+
+	if (x->size > y->size)
+		return -2;
+
+	if (x->size < y->size)
+		return 1;
+
+	return 0;
+}
+
+
 static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 {
 	int ret = 0;
@@ -324,8 +341,8 @@ static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 	printf("[%d:%d:%d] Top %d stacks with outstanding allocations:\n",
 			tm->tm_hour, tm->tm_min, tm->tm_sec, env.top_stacks);
 
-	alloc_info_t *top_allocs = calloc(env.top_stacks, sizeof(*top_allocs));
-	if (!top_allocs) {
+	alloc_info_t *allocs = calloc(ALLOCS_MAX_ENTRIES, sizeof(*allocs));
+	if (!allocs) {
 		fprintf(stderr, "failed to top allocs array\n");
 		return -ENOMEM;
 	}
@@ -335,10 +352,14 @@ static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 	uint64_t curr_key = 0;
 
 	int i = 0;
-	while (i < env.top_stacks) {
+	for (;;) {
 		if (bpf_map_get_next_key(allocs_fd, prev_key, &curr_key)) {
 			if (errno == ENOENT)
 				break; // no more keys
+
+			perror("map get next key error");
+			ret = -errno;
+			break;
 		}
 
 		prev_key = &curr_key;
@@ -361,16 +382,19 @@ static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 			continue;
 		}
 
-		memcpy(&top_allocs[i], &alloc_info, sizeof(alloc_info));
+		memcpy(&allocs[i], &alloc_info, sizeof(alloc_info));
 		i++;
 
-		printf("\taddr = %p size = %llu\n", (void *)curr_key, alloc_info.size);
+		//printf("\taddr = %p size = %llu\n", (void *)curr_key, alloc_info.size);
 
 	}
 
-	print_stacks(top_allocs, i, stack_traces_fd);
+	qsort(allocs, i, sizeof(allocs[0]), alloc_compare);
 
-	free(top_allocs);
+	const nr_allocs = i < env.top_stacks ? i : env.top_stacks;
+	print_stacks(allocs, nr_allocs, stack_traces_fd);
+
+	free(allocs);
 
 	printf("print loop iters: %d\n", i);
 
