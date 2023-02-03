@@ -34,6 +34,7 @@
 |  | CONFIG_HAVE_KPROBES | Check if krpobes enabled |
 |  | CONFIG_HAVE_REGS_AND_STACK_ACCESS_API | This symbol should be selected by an architecture if it supports the API needed to access registers and stack entries from pt_regs. For example the kprobes-based event tracer needs this API. |
 |  | CONFIG_KPROBES_ON_FTRACE | Have kprobes on function tracer if arch supports full passing of pt_regs to function tracing |
+| **kprobe multi** | CONFIG_FPROBE | Enable fprobe to attach the probe on multiple functions at once |
 | **kprobe override** | CONFIG_BPF_KPROBE_OVERRIDE | Enable BPF programs to override a kprobed function |
 | **uprobes** | CONFIG_UPROBE_EVENTS | Enable uprobes-based dynamic events |
 |  | CONFIG_ARCH_SUPPORTS_UPROBES | Arch specific uprobes support |
