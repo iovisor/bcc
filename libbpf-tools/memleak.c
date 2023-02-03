@@ -347,12 +347,14 @@ static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 		return -ENOMEM;
 	}
 
-	alloc_info_t alloc_info = {};
 	uint64_t *prev_key = NULL;
 	uint64_t curr_key = 0;
 
-	int i = 0;
+	size_t nr_allocs = 0;
 	for (;;) {
+		alloc_info_t alloc_info = {};
+		memset(&alloc_info, 0, sizeof(alloc_info));
+
 		if (bpf_map_get_next_key(allocs_fd, prev_key, &curr_key)) {
 			if (errno == ENOENT)
 				break; // no more keys
@@ -382,23 +384,38 @@ static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 			continue;
 		}
 
-		memcpy(&allocs[i], &alloc_info, sizeof(alloc_info));
-		i++;
+		// if stack_id exists
+		//   increment size with alloc_info.size
+		bool alloc_exists = false;
+
+		for (size_t i = 0; !alloc_exists && i < nr_allocs; ++i) {
+			if (allocs[i].stack_id == alloc_info.stack_id) {
+				allocs[i].size += alloc_info.size;
+
+				alloc_exists = true;
+			}
+		}
+
+		if (alloc_exists)
+			continue;
+
+		// else
+		memcpy(&allocs[nr_allocs], &alloc_info, sizeof(alloc_info));
+		nr_allocs++;
 
 		//printf("\taddr = %p size = %llu\n", (void *)curr_key, alloc_info.size);
-
 	}
 
-	qsort(allocs, i, sizeof(allocs[0]), alloc_compare);
+	qsort(allocs, nr_allocs, sizeof(allocs[0]), alloc_compare);
 
-	const nr_allocs = i < env.top_stacks ? i : env.top_stacks;
+	nr_allocs = nr_allocs < env.top_stacks ? nr_allocs : env.top_stacks;
 	print_stacks(allocs, nr_allocs, stack_traces_fd);
 
 	free(allocs);
 
-	printf("print loop iters: %d\n", i);
+	printf("print nr_allocs: %zu\n", nr_allocs);
 
-	return 0;
+	return ret;
 }
 
 int disable_kernel_tracepoints(struct memleak_bpf *skel)
