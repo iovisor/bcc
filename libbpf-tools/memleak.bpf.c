@@ -87,7 +87,6 @@ static __always_inline int gen_alloc_enter(size_t size)
 	}
 
 	if (sample_every_n > 1) {
-		//const u64 ts = bpf_ktime_get_ns();
 		if (bpf_ktime_get_ns() % sample_every_n != 0) {
 			bpf_printk("time reject\n");
 			return 0;
@@ -270,7 +269,7 @@ int BPF_KRETPROBE(malloc_exit)
 }
 
 SEC("uprobe")
-int BPF_KRETPROBE(free_enter, void *address)
+int BPF_KPROBE(free_enter, void *address)
 {
 	return gen_free_enter(address);
 }
@@ -291,6 +290,7 @@ SEC("uprobe")
 int BPF_KPROBE(realloc_enter, void *ptr, size_t size)
 {
 	gen_free_enter(ptr);
+
 	return gen_alloc_enter(size);
 }
 
@@ -300,77 +300,103 @@ int BPF_KRETPROBE(realloc_exit)
 	return gen_alloc_exit(ctx);
 }
 
-/*
-int mmap_enter(struct pt_regs *ctx) {
-        size_t size = (size_t)PT_REGS_PARM2(ctx);
-        return gen_alloc_enter(ctx, size);
+SEC("uprobe")
+int BPF_KPROBE(mmap_enter)
+{
+	size_t size = (size_t)PT_REGS_PARM2(ctx);
+
+	return gen_alloc_enter(size);
 }
 
-int mmap_exit(struct pt_regs *ctx) {
-        return gen_alloc_exit(ctx);
+SEC("uretprobe")
+int BPF_KRETPROBE(mmap_exit)
+{
+	return gen_alloc_exit(ctx);
 }
 
-int munmap_enter(struct pt_regs *ctx, void *address) {
-        return gen_free_enter(ctx, address);
+SEC("uprobe")
+int BPF_KPROBE(munmap_enter, void *address) {
+	return gen_free_enter(address);
 }
 
-int posix_memalign_enter(struct pt_regs *ctx, void **memptr, size_t alignment,
-                         size_t size) {
-        u64 memptr64 = (u64)(size_t)memptr;
-        u64 pid = bpf_get_current_pid_tgid();
+SEC("uprobe")
+int BPF_KPROBE(posix_memalign_enter, void **memptr, size_t alignment, size_t size)
+{
+	const u64 memptr64 = (u64)(size_t)memptr;
+	const u64 pid = bpf_get_current_pid_tgid();
+	bpf_map_update_elem(&memptrs, &pid, &memptr64, 0); // todo - flags?
 
-        memptrs.update(&pid, &memptr64);
-        return gen_alloc_enter(ctx, size);
+	return gen_alloc_enter(size);
 }
 
-int posix_memalign_exit(struct pt_regs *ctx) {
-        u64 pid = bpf_get_current_pid_tgid();
-        u64 *memptr64 = memptrs.lookup(&pid);
-        void *addr;
+SEC("uretprobe")
+int BPF_KRETPROBE(posix_memalign_exit)
+{
+	const u64 pid = bpf_get_current_pid_tgid();
+	u64 *memptr64;
+	void *addr;
 
-        if (memptr64 == 0)
-                return 0;
+	memptr64 = bpf_map_lookup_elem(&memptrs, &pid);
 
-        memptrs.delete(&pid);
+	if (!memptr64)
+		return 0;
 
-        if (bpf_probe_read_user(&addr, sizeof(void*), (void*)(size_t)*memptr64))
-                return 0;
+	bpf_map_delete_elem(&memptrs, &pid);
 
-        u64 addr64 = (u64)(size_t)addr;
-        return gen_alloc_exit2(ctx, addr64);
+	if (bpf_probe_read_user(&addr, sizeof(void*), (void*)(size_t)*memptr64))
+		return 0;
+
+	const u64 addr64 = (u64)(size_t)addr;
+
+	return gen_alloc_exit2(ctx, addr64);
 }
 
-int aligned_alloc_enter(struct pt_regs *ctx, size_t alignment, size_t size) {
-        return gen_alloc_enter(ctx, size);
+SEC("uprobe")
+int BPF_KPROBE(aligned_alloc_enter, size_t alignment, size_t size)
+{
+	return gen_alloc_enter(size);
 }
 
-int aligned_alloc_exit(struct pt_regs *ctx) {
-        return gen_alloc_exit(ctx);
+SEC("uretprobe")
+int BPF_KRETPROBE(aligned_alloc_exit)
+{
+	return gen_alloc_exit(ctx);
 }
 
-int valloc_enter(struct pt_regs *ctx, size_t size) {
-        return gen_alloc_enter(ctx, size);
+SEC("uprobe")
+int BPF_KPROBE(valloc_enter, size_t size)
+{
+	return gen_alloc_enter(size);
 }
 
-int valloc_exit(struct pt_regs *ctx) {
-        return gen_alloc_exit(ctx);
+SEC("uretprobe")
+int BPF_KRETPROBE(valloc_exit)
+{
+	return gen_alloc_exit(ctx);
 }
 
-int memalign_enter(struct pt_regs *ctx, size_t alignment, size_t size) {
-        return gen_alloc_enter(ctx, size);
+SEC("uprobe")
+int BPF_KPROBE(memalign_enter, size_t alignment, size_t size)
+{
+	return gen_alloc_enter(size);
 }
 
-int memalign_exit(struct pt_regs *ctx) {
-        return gen_alloc_exit(ctx);
+SEC("uretprobe")
+int BPF_KRETPROBE(memalign_exit)
+{
+	return gen_alloc_exit(ctx);
 }
 
-int pvalloc_enter(struct pt_regs *ctx, size_t size) {
-        return gen_alloc_enter(ctx, size);
+SEC("uprobe")
+int BPF_KPROBE(pvalloc_enter, size_t size)
+{
+	return gen_alloc_enter(size);
 }
 
-int pvalloc_exit(struct pt_regs *ctx) {
-        return gen_alloc_exit(ctx);
+SEC("uretprobe")
+int BPF_KRETPROBE(pvalloc_exit)
+{
+	return gen_alloc_exit(ctx);
 }
-*/
 
 char LICENSE[] SEC("license") = "GPL";

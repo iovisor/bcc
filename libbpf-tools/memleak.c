@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <poll.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -77,14 +78,45 @@ static struct env {
 	.command = NULL, // -c --command
 };
 
+#define __ATTACH_UPROBE(skel, sym_name, prog_name, is_retprobe) \
+	do { \
+		LIBBPF_OPTS(bpf_uprobe_opts, uprobe_opts, \
+				.func_name = #sym_name, \
+				.retprobe = is_retprobe); \
+		skel->links.prog_name = bpf_program__attach_uprobe_opts( \
+				skel->progs.prog_name, \
+				env.pid, \
+				env.object, \
+				0, \
+				&uprobe_opts); \
+		if (!skel->links.prog_name) { \
+			perror("failed to attach uprobe for " #sym_name); \
+			return -errno; \
+		} \
+		printf("attached uprobe for " #sym_name"\n"); \
+		return 0; \
+	} while (false)
+
+#define ATTACH_UPROBE(skel, sym_name, prog_name) __ATTACH_UPROBE(skel, sym_name, prog_name, false)
+#define ATTACH_URETPROBE(skel, sym_name, prog_name) __ATTACH_UPROBE(skel, sym_name, prog_name, true)
+
+#define DISABLE_TRACEPOINT(skel, prog_name) \
+	do { \
+		if (bpf_program__set_autoload(skel->progs.prog_name, false)) { \
+			fprintf(stderr, "failed to set autoload off for kmalloc\n"); \
+			return -errno; \
+		} \
+		printf("set autoload off for " #prog_name"\n"); \
+	} while (false)
+
 const char *argp_program_version = "memleak 0.1";
 const char *argp_program_bug_address =
 	"https://github.com/iovisor/bcc/tree/master/libbpf-tools";
 
 const char argp_args_doc[] =
-"Trace open family syscalls\n"
+"Trace outstanding memory allocations\n"
 "\n"
-"USAGE: opensnoop [-h] [-T] [-U] [-x] [-p PID] [-t TID] [-u UID] [-d DURATION]\n"
+"USAGE: memleak [-h] [-T] [-U] [-x] [-p PID] [-t TID] [-u UID] [-d DURATION]\n"
 "\n"
 "EXAMPLES:\n"
 
@@ -270,10 +302,12 @@ static int print_stacks(alloc_info_t *allocs, size_t nr_allocs, int stack_traces
 	sym_src_cfg src_cfg = {};
 
 	if (env.pid < 0) {
+		puts("stacks kernel");
 		src_cfg.src_type = SRC_T_KERNEL;
 		src_cfg.params.kernel.kallsyms = NULL;
 		src_cfg.params.kernel.kernel_image = NULL;
 	} else {
+		puts("stacks userspace");
 		src_cfg.src_type = SRC_T_PROCESS;
 		src_cfg.params.process.pid = env.pid;
 	}
@@ -284,13 +318,16 @@ static int print_stacks(alloc_info_t *allocs, size_t nr_allocs, int stack_traces
 		printf("alloc stack_id:%d, size:%llu\n", alloc->stack_id, alloc->size);
 
 		if (bpf_map_lookup_elem(stack_traces_fd, &alloc->stack_id, stack)) {
-			if (errno == ENOENT)
+			perror("stack lookup fail");
+			if (errno == ENOENT || errno == EEXIST) {
 				continue;
+			}
 
-			fprintf(stderr, "failed to lookup stack trace\n");
+			perror("failed to lookup stack trace");
 			ret =  -errno;
 			break;
 		}
+		puts("stack found");
 
 		const blazesym_result *result = NULL;
 		const blazesym_csym *sym = NULL;
@@ -317,13 +354,14 @@ static int print_stacks(alloc_info_t *allocs, size_t nr_allocs, int stack_traces
 	return ret;
 }
 
-static int alloc_compare(const void *a, const void *b)
+static int alloc_size_compare(const void *a, const void *b)
 {
 	const alloc_info_t *x = (alloc_info_t *)a;
 	const alloc_info_t *y = (alloc_info_t *)b;
 
+	// compares for descending order
 	if (x->size > y->size)
-		return -2;
+		return -1;
 
 	if (x->size < y->size)
 		return 1;
@@ -406,7 +444,7 @@ static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 		//printf("\taddr = %p size = %llu\n", (void *)curr_key, alloc_info.size);
 	}
 
-	qsort(allocs, nr_allocs, sizeof(allocs[0]), alloc_compare);
+	qsort(allocs, nr_allocs, sizeof(allocs[0]), alloc_size_compare);
 
 	nr_allocs = nr_allocs < env.top_stacks ? nr_allocs : env.top_stacks;
 	print_stacks(allocs, nr_allocs, stack_traces_fd);
@@ -420,54 +458,51 @@ static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 
 int disable_kernel_tracepoints(struct memleak_bpf *skel)
 {
-	if (bpf_program__set_autoload(skel->progs.tracepoint__kmalloc, false)) {
-		fprintf(stderr, "failed to set autoload off for kmalloc\n");
-
-		return -errno;
-	}
-
-	printf("set autoload off for kmalloc");
+	DISABLE_TRACEPOINT(skel, tracepoint__kmalloc);
+	DISABLE_TRACEPOINT(skel, tracepoint__kmalloc_node);
+	DISABLE_TRACEPOINT(skel, tracepoint__kfree);
+	DISABLE_TRACEPOINT(skel, tracepoint__kmem_cache_alloc);
+	DISABLE_TRACEPOINT(skel, tracepoint__kmem_cache_alloc_node);
+	DISABLE_TRACEPOINT(skel, tracepoint__kmem_cache_free);
+	DISABLE_TRACEPOINT(skel, tracepoint__mm_page_alloc);
+	DISABLE_TRACEPOINT(skel, tracepoint__mm_page_free);
+	DISABLE_TRACEPOINT(skel, tracepoint__percpu_alloc_percpu);
+	DISABLE_TRACEPOINT(skel, tracepoint__percpu_free_percpu);
 
 	return 0;
 }
 
 int attach_uprobes(struct memleak_bpf *skel)
 {
-	LIBBPF_OPTS(bpf_uprobe_opts, uprobe_opts,
-			.func_name = "malloc");
-	LIBBPF_OPTS(bpf_uprobe_opts, uretprobe_opts,
-			.func_name = "malloc",
-			.retprobe = true);
+	ATTACH_UPROBE(skel, malloc, malloc_enter);
+	ATTACH_URETPROBE(skel, malloc, malloc_exit);
 
-	skel->links.malloc_enter = bpf_program__attach_uprobe_opts(
-			skel->progs.malloc_enter,
-			env.pid,
-			env.object,
-			0,
-			&uprobe_opts);
+	ATTACH_UPROBE(skel, calloc, calloc_enter);
+	ATTACH_URETPROBE(skel, calloc, calloc_exit);
 
-	if (!skel->links.malloc_enter) {
-		fprintf(stderr, "failed to attach uprobe for malloc_enter\n");
+	ATTACH_UPROBE(skel, realloc, realloc_enter);
+	ATTACH_URETPROBE(skel, realloc, realloc_exit);
 
-		return -errno;
-	}
+	ATTACH_UPROBE(skel, mmap, mmap_enter);
+	ATTACH_URETPROBE(skel, mmap, mmap_exit);
 
-	printf("attached uprobe for malloc_enter\n");
+	ATTACH_UPROBE(skel, posix_memalign, posix_memalign_enter);
+	ATTACH_URETPROBE(skel, posix_memalign, posix_memalign_exit);
 
-	skel->links.malloc_exit = bpf_program__attach_uprobe_opts(
-			skel->progs.malloc_exit,
-			env.pid,
-			env.object,
-			0,
-			&uretprobe_opts);
+	ATTACH_UPROBE(skel, memalign, memalign_enter);
+	ATTACH_URETPROBE(skel, memalign, memalign_exit);
 
-	if (!skel->links.malloc_exit) {
-		fprintf(stderr, "failed to attach uprobe for malloc_exit\n");
+	ATTACH_UPROBE(skel, valloc, valloc_enter); // can fail
+	ATTACH_URETPROBE(skel, valloc, valloc_exit); // can fail
 
-		return -errno;
-	}
+	ATTACH_UPROBE(skel, pvalloc, pvalloc_enter); // can fail
+	ATTACH_URETPROBE(skel, pvalloc, pvalloc_exit); // can fail
 
-	printf("attached uprobe for malloc_exit\n");
+	ATTACH_UPROBE(skel, aligned_alloc, aligned_alloc_enter); // can fail
+	ATTACH_URETPROBE(skel, aligned_alloc, aligned_alloc_exit); // can fail
+
+	ATTACH_UPROBE(skel, free, free_enter);
+	ATTACH_UPROBE(skel, munmap, munmap_enter);
 
 	return 0;
 }
@@ -580,12 +615,15 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "failed to attach uprobes\n");
 			goto cleanup;
 		}
+		puts("attached uprobes");
 	}
 
 	if (memleak_bpf__attach(skel)) {
 		fprintf(stderr, "failed to attach bpf program(s)\n");
 		goto cleanup;
 	}
+
+	puts("bpf program attached");
 
 	if (env.command) {
 		const uint64_t event = 1;
