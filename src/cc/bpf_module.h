@@ -95,7 +95,7 @@ class BPFModule {
 
  public:
   BPFModule(unsigned flags, TableStorage *ts = nullptr, bool rw_engine_enabled = true,
-            const std::string &maps_ns = "", bool allow_rlimit = true,
+            const std::string &maps_ns = "", bool allow_rlimit = true, bool aot_enabled = false, 
             const char *dev_name = nullptr);
   ~BPFModule();
   int free_bcc_memory();
@@ -156,6 +156,7 @@ class BPFModule {
   bool rw_engine_enabled_;
   bool used_b_loader_;
   bool allow_rlimit_;
+  bool aot_enabled_;
   std::string filename_;
   std::string proto_filename_;
   std::unique_ptr<llvm::LLVMContext> ctx_;
