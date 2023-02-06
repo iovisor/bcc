@@ -9,8 +9,9 @@ import re
 from unittest import main, skipUnless, TestCase
 from utils import mayFail, kernel_version_ge
 import ast
+import json
 
-TOOLS_DIR = "/home/tariro/Documents/phd/bcc/tools/"
+TOOLS_DIR = "./tools/"
 
 def _helpful_rc_msg(rc, allow_early, kill):
     s = "rc was %d\n" % rc
@@ -34,12 +35,15 @@ def _helpful_rc_msg(rc, allow_early, kill):
 class SmokeTests(TestCase):
     # Use this for commands that have a built-in timeout, so they only need
     # to be killed in case of a hard hang.
-    def run_with_duration(self, command, output={'time': '12:12:45', 'syscall': 'sched_yield', 'count': 11407}, timeout=10):
+    def run_with_duration(self, command, output={}, timeout=10):
         full_command = TOOLS_DIR + command
-        stdout, _ = subprocess.Popen(full_command, shell=True, stdout=subprocess.PIPE).communicate()
-        
-        self.assertEqual(ast.literal_eval(stdout.decode().split("\n")[0]).keys(),
-                            output.keys(), ("Failed to get the expected json output for %s" % command))
+        with subprocess.Popen(full_command, shell=True, stdout=subprocess.PIPE) as p:
+            while True:
+                line = p.stdout.readline()
+                if not line:
+                    break
+                self.assertEqual(json.loads(line.decode().replace("\'", "\"")).keys(),
+                                    output.keys(), ("Failed to get the expected json output for %s" % command))
 
     # Use this for commands that don't have a built-in timeout, so we have
     # to Ctrl-C out of them by sending SIGINT. If that still doesn't stop
@@ -78,7 +82,23 @@ class SmokeTests(TestCase):
 
     @mayFail("This fails on github actions environment, and needs to be fixed")
     def test_argdist(self):
-        self.run_with_duration("syscount.py -j -i 1 -d 1")
+        sample = {'time': '14:20:49', 'syscall': 'read', 'count': 2245}
+        self.run_with_duration("syscount.py -j -i 1 -d 1", sample)
+
+    # TODO: enable run_with_int test 
+    # @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
+    # def test_bashreadline(self):
+    #     self.run_with_int("bashreadline.py")
+
+    # TODO: enable run_with_int test
+    # @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
+    # def test_bindsnoop(self):
+    #     self.run_with_int("bindsnoop.py")
+    
+    @mayFail("This fails on github actions environment, and needs to be fixed")
+    def test_biolatency(self):
+        sample = {'ts': '2023-02-06 14:02:39', 'val_type': 'usecs', 'data': [{'interval-start': 0, 'interval-end': 1, 'count': 0}, {'interval-start': 2, 'interval-end': 3, 'count': 0}, {'interval-start': 4, 'interval-end': 7, 'count': 0}, {'interval-start': 8, 'interval-end': 15, 'count': 0}, {'interval-start': 16, 'interval-end': 31, 'count': 0}, {'interval-start': 32, 'interval-end': 63, 'count': 1}, {'interval-start': 64, 'interval-end': 127, 'count': 2}, {'interval-start': 128, 'interval-end': 255, 'count': 3}, {'interval-start': 256, 'interval-end': 511, 'count': 4}]}
+        self.run_with_duration("biolatency.py -j 1 1", sample)
 
 if __name__ == "__main__":
     main()
