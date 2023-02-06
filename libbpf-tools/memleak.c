@@ -93,8 +93,7 @@ static struct env {
 			perror("failed to attach uprobe for " #sym_name); \
 			return -errno; \
 		} \
-		printf("attached uprobe for " #sym_name"\n"); \
-		return 0; \
+		printf("attached uprobe for " #sym_name "with pid %d\n", env.pid); \
 	} while (false)
 
 #define ATTACH_UPROBE(skel, sym_name, prog_name) __ATTACH_UPROBE(skel, sym_name, prog_name, false)
@@ -116,7 +115,7 @@ const char *argp_program_bug_address =
 const char argp_args_doc[] =
 "Trace outstanding memory allocations\n"
 "\n"
-"USAGE: memleak [-h] [-T] [-U] [-x] [-p PID] [-t TID] [-u UID] [-d DURATION]\n"
+"USAGE: memleak [-h] [-c COMMAND] [-p PID] [-t] [-n] [-a] [-o AGE_MS] [-C] [-F] [-s SAMPLE_RATE] [-T TOP_STACKS] [-z MIN_SIZE] [-Z MAX_SIZE] [-O OBJECT] [-P PERCPU] [INTERVAL] [INTERVALS]\n"
 "\n"
 "EXAMPLES:\n"
 
@@ -146,16 +145,16 @@ static const struct argp_option argp_options[] = {
 	{"trace", 't', 0, 0, "print trace messages for each alloc/free call" },
 	{"count", 'n', "COUNT", 0, "number of times to print the report before exiting"},
 	{"show-allocs", 'a', 0, 0, "show allocation addresses and sizes as well as call stacks"},
-	{"older", 'O', "AGE_MS", 0, "prune allocations younger than this age in milliseconds"},
+	{"older", 'o', "AGE_MS", 0, "prune allocations younger than this age in milliseconds"},
 	{"command", 'c', "COMMAND", 0, "execute and trace the specified command"},
 	{"combined-only", 'C', 0, 0, "show combined allocation statistics only"},
 	{"wa-missing-free", 'F', 0, 0, "Workaround to alleviate misjudgments when free is missing"},
 	{"sample-rate", 's', "SAMPLE_RATE", 0, "sample every N-th allocation to decrease the overhead"},
-	{"top", 'T', "TOP", 0, "display only this many top allocating stacks (by size)"},
+	{"top", 'T', "TOP_STACKS", 0, "display only this many top allocating stacks (by size)"},
 	{"min-size", 'z', "MIN_SIZE", 0, "capture only allocations larger than this size"},
 	{"max-size", 'Z', "MAX_SIZE", 0, "capture only allocations smaller than this size"},
-	{"obj", 'O', "OBJ", 0, "attach to allocator functions in the specified object"}, // note - default="c" in original bcc
-	{"percpu", 'x', 0, 0, "trace percpu allocations"},
+	{"obj", 'O', "OBJECT", 0, "attach to allocator functions in the specified object"},
+	{"percpu", 'P', "PERCPU", 0, "trace percpu allocations"},
 	{},
 };
 
@@ -320,6 +319,7 @@ static int print_stacks(alloc_info_t *allocs, size_t nr_allocs, int stack_traces
 		if (bpf_map_lookup_elem(stack_traces_fd, &alloc->stack_id, stack)) {
 			perror("stack lookup fail");
 			if (errno == ENOENT || errno == EEXIST) {
+				puts("key no longer exists");
 				continue;
 			}
 
@@ -329,14 +329,14 @@ static int print_stacks(alloc_info_t *allocs, size_t nr_allocs, int stack_traces
 		}
 		puts("stack found");
 
-		const blazesym_result *result = NULL;
-		const blazesym_csym *sym = NULL;
-		result = blazesym_symbolize(symbolizer, &src_cfg, 1, stack, env.perf_max_stack_depth);
+		const blazesym_result *result = blazesym_symbolize(symbolizer, &src_cfg, 1, stack, env.perf_max_stack_depth);
+		printf("blazesym result - size:%lu\n", result->size);
 
 		for (size_t j = 0; result && j < result->size; j++) {
 			if (result->entries[j].size == 0)
 				continue;
-			sym = &result->entries[j].syms[0];
+
+			const blazesym_csym *sym = &result->entries[j].syms[0];
 
 			if (sym->line_no)
 				printf("%s:%ld\n", sym->symbol, sym->line_no);
@@ -376,8 +376,6 @@ static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 
 	time_t t = time(NULL);
 	struct tm *tm = localtime(&t);
-	printf("[%d:%d:%d] Top %d stacks with outstanding allocations:\n",
-			tm->tm_hour, tm->tm_min, tm->tm_sec, env.top_stacks);
 
 	alloc_info_t *allocs = calloc(ALLOCS_MAX_ENTRIES, sizeof(*allocs));
 	if (!allocs) {
@@ -422,7 +420,7 @@ static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 			continue;
 		}
 
-		// if stack_id exists
+		// when the stack_id exists in the allocs array,
 		//   increment size with alloc_info.size
 		bool alloc_exists = false;
 
@@ -431,27 +429,31 @@ static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 				allocs[i].size += alloc_info.size;
 
 				alloc_exists = true;
+				break;
 			}
 		}
 
 		if (alloc_exists)
 			continue;
 
-		// else
+		// when the stack_id does not exist in the allocs array,
+		//   insert it into the array
 		memcpy(&allocs[nr_allocs], &alloc_info, sizeof(alloc_info));
 		nr_allocs++;
-
-		//printf("\taddr = %p size = %llu\n", (void *)curr_key, alloc_info.size);
 	}
 
+	// sort the allocs array in descending order
 	qsort(allocs, nr_allocs, sizeof(allocs[0]), alloc_size_compare);
 
 	nr_allocs = nr_allocs < env.top_stacks ? nr_allocs : env.top_stacks;
+
+	printf("print nr_allocs: %zu\n", nr_allocs);
+	printf("[%d:%d:%d] Top %zu stacks with outstanding allocations:\n",
+			tm->tm_hour, tm->tm_min, tm->tm_sec, nr_allocs);
+
 	print_stacks(allocs, nr_allocs, stack_traces_fd);
 
 	free(allocs);
-
-	printf("print nr_allocs: %zu\n", nr_allocs);
 
 	return ret;
 }
@@ -503,6 +505,8 @@ int attach_uprobes(struct memleak_bpf *skel)
 
 	ATTACH_UPROBE(skel, free, free_enter);
 	ATTACH_UPROBE(skel, munmap, munmap_enter);
+
+	puts("finished attach_uprobes");
 
 	return 0;
 }

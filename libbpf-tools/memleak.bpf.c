@@ -102,6 +102,8 @@ static __always_inline int gen_alloc_enter(size_t size)
 	//if (trace_all)
 		//bpf_trace_printk("alloc entered, size = %lu\\n", size64);
 
+	bpf_printk("gen_alloc_enter, pid:%llu\n", pid);
+
 	return 0;
 }
 
@@ -112,9 +114,6 @@ static __always_inline int gen_alloc_exit2(void *ctx, u64 address) {
 	int flags = 0;
 
 	const u64* size64 = bpf_map_lookup_elem(&sizes, &pid);
-
-	__builtin_memset(&info, 0, sizeof(info));
-
 	if (!size64)
 		return 0; // missed alloc entry
 
@@ -127,7 +126,7 @@ static __always_inline int gen_alloc_exit2(void *ctx, u64 address) {
 		if (!kernel_trace)
 			flags |= BPF_F_USER_STACK;
 
-		info.stack_id = bpf_get_stackid(ctx, &stack_traces, flags); //
+		info.stack_id = bpf_get_stackid(ctx, &stack_traces, flags);
 
 		bpf_map_update_elem(&allocs, &address, &info, BPF_ANY); // todo - flags?
 
@@ -139,6 +138,7 @@ static __always_inline int gen_alloc_exit2(void *ctx, u64 address) {
 	//			info.size, address);
 	//}
 
+	bpf_printk("gen_alloc_exit2, pid:%llu\n", pid);
 	return 0;
 }
 
@@ -271,6 +271,8 @@ int BPF_KRETPROBE(malloc_exit)
 SEC("uprobe")
 int BPF_KPROBE(free_enter, void *address)
 {
+	bpf_printk("free enter\n");
+
 	return gen_free_enter(address);
 }
 
@@ -323,8 +325,10 @@ SEC("uprobe")
 int BPF_KPROBE(posix_memalign_enter, void **memptr, size_t alignment, size_t size)
 {
 	const u64 memptr64 = (u64)(size_t)memptr;
-	const u64 pid = bpf_get_current_pid_tgid();
+	const u64 pid = bpf_get_current_pid_tgid() >> 32;
 	bpf_map_update_elem(&memptrs, &pid, &memptr64, 0); // todo - flags?
+
+	bpf_printk("posix_memalign_enter, pid:%llu\n", pid);
 
 	return gen_alloc_enter(size);
 }
@@ -332,7 +336,7 @@ int BPF_KPROBE(posix_memalign_enter, void **memptr, size_t alignment, size_t siz
 SEC("uretprobe")
 int BPF_KRETPROBE(posix_memalign_exit)
 {
-	const u64 pid = bpf_get_current_pid_tgid();
+	const u64 pid = bpf_get_current_pid_tgid() >> 32;
 	u64 *memptr64;
 	void *addr;
 
@@ -347,6 +351,8 @@ int BPF_KRETPROBE(posix_memalign_exit)
 		return 0;
 
 	const u64 addr64 = (u64)(size_t)addr;
+
+	bpf_printk("posix_memalign_exit, pid:%llu\n", pid);
 
 	return gen_alloc_exit2(ctx, addr64);
 }
