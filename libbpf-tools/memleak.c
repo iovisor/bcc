@@ -301,12 +301,12 @@ static int print_stacks(alloc_info_t *allocs, size_t nr_allocs, int stack_traces
 	sym_src_cfg src_cfg = {};
 
 	if (env.pid < 0) {
-		puts("stacks kernel");
+		printf("blazesym configured for kernelspace\n");
 		src_cfg.src_type = SRC_T_KERNEL;
 		src_cfg.params.kernel.kallsyms = NULL;
 		src_cfg.params.kernel.kernel_image = NULL;
 	} else {
-		puts("stacks userspace");
+		printf("blazesym configured for userspace @ pid:%d\n", env.pid);
 		src_cfg.src_type = SRC_T_PROCESS;
 		src_cfg.params.process.pid = env.pid;
 	}
