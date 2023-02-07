@@ -18,15 +18,14 @@
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 
-#ifdef USE_BLAZESYM
-#include "blazesym.h"
-#endif
 #include "memleak.h"
 #include "memleak.skel.h"
 #include "trace_helpers.h"
-#include "uprobe_helpers.h"
 
-#define PATH_MAX 4096
+#ifdef USE_BLAZESYM
+#include "blazesym.h"
+#endif
+
 
 #ifdef USE_BLAZESYM
 static blazesym *symbolizer;
@@ -241,22 +240,83 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 
 static int child_exec_event_fd = -1;
 
-static volatile bool exiting;
-static volatile bool child_exited;
+static volatile sig_atomic_t exiting;
+static volatile sig_atomic_t child_exited;
 
 static void sig_handler(int signo)
 {
-	exiting = true;
-
 	if (signo == SIGCHLD)
-		child_exited = true;
+		child_exited = 1;
+
+	exiting = 1;
 }
 
 static struct sigaction sig_action = {
-	.sa_handler = sig_handler,
+	.sa_handler = sig_handler
 };
 
-pid_t fork_sync_exec(const char *command, int event_fd)
+static int event_init(int *fd)
+{
+	if (!fd) {
+		fprintf(stderr, "pointer to fd is null\n");
+
+		return 1;
+	}
+
+	const int tmp_fd = eventfd(0, EFD_CLOEXEC);
+	if (tmp_fd < 0) {
+		perror("failed to create event fd");
+
+		return -errno;
+	}
+
+	*fd = tmp_fd;
+
+	return 0;
+}
+
+static int event_wait(int fd, uint64_t expected_event)
+{
+	uint64_t event = 0;
+	const ssize_t bytes = read(fd, &event, sizeof(event));
+	if (bytes < 0) {
+		perror("failed to read from fd");
+
+		return -errno;
+	} else if (bytes != sizeof(event)) {
+		fprintf(stderr, "read unexpected size\n");
+
+		return 1;
+	}
+
+	if (event != expected_event) {
+		fprintf(stderr, "read event %lu, expected %lu\n", event, expected_event);
+
+		return 1;
+	}
+
+	return 0;
+}
+
+static int event_notify(int fd, uint64_t event)
+{
+	const ssize_t bytes = write(fd, &event, sizeof(event));
+	if (bytes < 0) {
+		perror("failed to write to fd");
+
+		return -errno;
+	} else if (bytes != sizeof(event)) {
+		fprintf(stderr, "attempted to write %zu bytes, wrote %zd bytes\n", sizeof(event), bytes);
+
+		return 1;
+	}
+
+	printf("wrote child exec event\n");
+
+	return 0;
+}
+
+static pid_t fork_sync_exec(const char *command, int fd)
 {
 	const pid_t pid = fork();
 
@@ -265,21 +325,10 @@ pid_t fork_sync_exec(const char *command, int event_fd)
 		perror("failed to create child process");
 		break;
 	case 0: {
-		// todo - any redirection?
-
-		uint64_t event = 0;
-		const ssize_t bytes = read(event_fd, &event, sizeof(event));
-		if (bytes < 0) {
-			perror("failed to read child exec event fd");
-			exit(1);
-		} else if (bytes != sizeof(event)) {
-			fprintf(stderr, "read unexpected size\n");
-			exit(1);
-		}
-
-		if (event != 1) {
-			fprintf(stderr, "received no-go event. exiting child process\n");
-			exit(1);
+		const uint64_t event = 1;
+		if (event_wait(fd, event)) {
+			fprintf(stderr, "failed to wait on event");
+			exit(EXIT_FAILURE);
 		}
 
 		printf("received go event. executing child command\n");
@@ -350,12 +399,10 @@ static int print_stack_frames(alloc_info_t *allocs, size_t nr_allocs, int stack_
 			ret =  -errno;
 			break;
 		}
-		puts("stack found");
 
 		const blazesym_result *result = blazesym_symbolize(symbolizer, &src_cfg, 1, stack, env.perf_max_stack_depth);
-		printf("blazesym result - size:%lu\n", result->size);
 
-		for (size_t j = 0; j < env.perf_max_stack_depth; ++j) {
+		for (size_t j = 0; j < result->size; ++j) {
 			const uint64_t addr = stack[j];
 
 			if (addr == 0)
@@ -407,7 +454,6 @@ static int alloc_size_compare(const void *a, const void *b)
 	return 0;
 }
 
-
 static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 {
 	int ret = 0;
@@ -425,6 +471,7 @@ static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 	uint64_t curr_key = 0;
 
 	size_t nr_allocs = 0;
+
 	for (;;) {
 		alloc_info_t alloc_info = {};
 		memset(&alloc_info, 0, sizeof(alloc_info));
@@ -544,14 +591,14 @@ int attach_uprobes(struct memleak_bpf *skel)
 	ATTACH_UPROBE(skel, free, free_enter);
 	ATTACH_UPROBE(skel, munmap, munmap_enter);
 
-	puts("finished attach_uprobes");
-
 	return 0;
 }
 
 int main(int argc, char *argv[])
 {
 	int ret = 0;
+
+	struct memleak_bpf *skel = NULL;
 
 	static const struct argp argp = {
 		.options = argp_options,
@@ -568,23 +615,9 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	sigset_t sigset;
-	sigemptyset(&sigset);
-	sigaddset(&sigset, SIGINT);
-	sigaddset(&sigset, SIGQUIT);
-	sigaddset(&sigset, SIGCHLD);
 
-	memcpy(&sig_action.sa_mask, &sigset, sizeof(sig_action.sa_mask));
-
-	if (sigaction(SIGINT, &sig_action, 0)) {
+	if (sigaction(SIGINT, &sig_action, NULL) || sigaction(SIGCHLD, &sig_action, NULL)) {
 		perror("failed to set up signal handling");
-		ret = -errno;
-
-		goto cleanup;
-	}
-
-	if (sigprocmask(SIG_BLOCK, &sigset, NULL)) {
-		perror("failed to block signal mask");
 		ret = -errno;
 
 		goto cleanup;
@@ -604,10 +637,8 @@ int main(int argc, char *argv[])
 			goto cleanup;
 		}
 
-		child_exec_event_fd = eventfd(0, EFD_CLOEXEC);
-		if (child_exec_event_fd < 0) {
-			perror("failed to create child exec event fd");
-			ret = -errno;
+		if (event_init(&child_exec_event_fd)) {
+			fprintf(stderr, "failed to init child event\n");
 
 			goto cleanup;
 		}
@@ -626,7 +657,7 @@ int main(int argc, char *argv[])
 	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
 
-	struct memleak_bpf *skel = memleak_bpf__open();
+	skel = memleak_bpf__open();
 	if (!skel) {
 		fprintf(stderr, "failed to open bpf object\n");
 		ret = 1;
@@ -684,7 +715,6 @@ int main(int argc, char *argv[])
 
 			goto cleanup;
 		}
-		puts("attached uprobes");
 	}
 
 	if (memleak_bpf__attach(skel)) {
@@ -697,14 +727,12 @@ int main(int argc, char *argv[])
 	puts("bpf program attached");
 
 	if (env.command) {
-		const uint64_t event = 1;
-		if (write(child_exec_event_fd, &event, sizeof(event)) != sizeof(event)) {
-			perror("failed to write child exec event");
-			ret = -errno;
+		ret = event_notify(child_exec_event_fd, 1);
+		if (ret) {
+			fprintf(stderr, "failed to notify child to perform exec\n");
 
 			goto cleanup;
 		}
-		printf("wrote child exec event\n");
 	}
 
 	symbolizer = blazesym_new();
@@ -724,7 +752,9 @@ int main(int argc, char *argv[])
 	printf("loop end - intervals:%d\n", i);
 
 	if (env.pid > 0) {
+		puts("deciding how to clean up child process");
 		if (!child_exited) {
+			puts("sending SIGTERM");
 			if (kill(env.pid, SIGTERM)) {
 				perror("failed to signal child process");
 				ret = -errno;
@@ -733,6 +763,7 @@ int main(int argc, char *argv[])
 			}
 		}
 
+		puts("waiting on child");
 		int wstatus = 0;
 		const pid_t pid = wait(&wstatus);
 
