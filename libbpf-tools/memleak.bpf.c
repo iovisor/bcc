@@ -8,7 +8,7 @@ const volatile pid_t pid = -1;
 const volatile size_t min_size = 0;
 const volatile size_t max_size = -1;
 const volatile size_t page_size = 4096;
-const volatile __u64 sample_every_n = 1;
+const volatile __u64 sample_rate = 1;
 const volatile bool trace_all = false;
 const volatile bool kernel_trace = false;
 const volatile bool wa_missing_free = false;
@@ -82,13 +82,11 @@ static __always_inline void update_statistics_del(u64 stack_id, u64 sz) {
 static __always_inline int gen_alloc_enter(size_t size)
 {
 	if (size < min_size || size > max_size) {
-		bpf_printk("size reject\n");
 		return 0;
 	}
 
-	if (sample_every_n > 1) {
-		if (bpf_ktime_get_ns() % sample_every_n != 0) {
-			bpf_printk("time reject\n");
+	if (sample_rate > 1) {
+		if (bpf_ktime_get_ns() % sample_rate != 0) {
 			return 0;
 		}
 	}
@@ -115,7 +113,7 @@ static __always_inline int gen_alloc_exit2(void *ctx, u64 address) {
 
 	const u64* size64 = bpf_map_lookup_elem(&sizes, &pid);
 	if (!size64)
-		return 0; // missed alloc entry
+		return 0; // not an error - missed alloc entry
 
 	info.size = *size64;
 	bpf_map_delete_elem(&sizes, &pid);
@@ -326,7 +324,7 @@ int BPF_KPROBE(posix_memalign_enter, void **memptr, size_t alignment, size_t siz
 {
 	const u64 memptr64 = (u64)(size_t)memptr;
 	const u64 pid = bpf_get_current_pid_tgid() >> 32;
-	bpf_map_update_elem(&memptrs, &pid, &memptr64, 0); // todo - flags?
+	bpf_map_update_elem(&memptrs, &pid, &memptr64, BPF_ANY); // todo - flags?
 
 	bpf_printk("posix_memalign_enter, pid:%llu\n", pid);
 
