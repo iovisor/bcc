@@ -271,8 +271,9 @@ class Tool(object):
     def run(self):
         self.probe.load()
         self.probe.attach()
-        print("Tracing %d functions for \"%s\"... Hit Ctrl-C to end." %
-              (self.probe.matched, bytes(self.args.pattern)))
+        if not self.args.json:
+            print("Tracing %d functions for \"%s\"... Hit Ctrl-C to end." %
+                (self.probe.matched, bytes(self.args.pattern)))
         exiting = 0 if self.args.interval else 1
         seconds = 0
         while True:
@@ -301,11 +302,12 @@ class Tool(object):
                         (self.probe.trace_functions[k.value].decode('utf-8', 'replace'), v.value))
             else:
                 counts = self.probe.counts()
-                print("%s", {self.probe.trace_functions[k.value].decode('utf-8', 'replace'): v.value
+                print({self.probe.trace_functions[k.value].decode('utf-8', 'replace'): v.value
                                   for k, v in counts.items() if v.value != 0})
 
             if exiting:
-                print("Detaching...")
+                if not self.args.json:
+                    print("Detaching...")
                 exit()
             else:
                 self.probe.clear()

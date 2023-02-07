@@ -114,7 +114,7 @@ def print_json(b):
     time = strftime("%H:%M:%S")
     for k, v in sorted(counts.items(), key=lambda counts: counts[1].size):
        print("{{\"time\": \"{}\", \"cache\": \"{}\", \"allocs\": {}, \"bytes\": {}}}".format(
-           time, k.name, v.count, v.size))
+           time, k.name.decode(), v.count, v.size))
     counts.clear()
 
 # initialize BPF
