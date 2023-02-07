@@ -50,7 +50,7 @@ static struct env {
 	bool wa_missing_free;
 	bool percpu;
 	int perf_max_stack_depth;
-	int stack_max_entries;
+	int stack_map_max_entries;
 	long page_size;
 	bool kernel_trace;
 	bool verbose;
@@ -71,7 +71,7 @@ static struct env {
 	.object = "libc.so.6", // -O --obj
 	.percpu = false, // --percpu
 	.perf_max_stack_depth = 127,
-	.stack_max_entries = 1024,
+	.stack_map_max_entries = 1024,
 	.page_size = 1,
 	.kernel_trace = true,
 	.verbose = false,
@@ -102,7 +102,7 @@ static struct env {
 #define DISABLE_TRACEPOINT(skel, prog_name) \
 	do { \
 		if (bpf_program__set_autoload(skel->progs.prog_name, false)) { \
-			fprintf(stderr, "failed to set autoload off for kmalloc\n"); \
+			fprintf(stderr, "failed to set autoload off for " #prog_name "\n"); \
 			return -errno; \
 		} \
 		printf("set autoload off for " #prog_name"\n"); \
@@ -239,9 +239,22 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 	return vfprintf(stderr, format, args);
 }
 
-static int timer_fd = -1;
-static int signal_fd = -1;
 static int child_exec_event_fd = -1;
+
+static volatile bool exiting;
+static volatile bool child_exited;
+
+static void sig_handler(int signo)
+{
+	exiting = true;
+
+	if (signo == SIGCHLD)
+		child_exited = true;
+}
+
+static struct sigaction sig_action = {
+	.sa_handler = sig_handler,
+};
 
 pid_t fork_sync_exec(const char *command, int event_fd)
 {
@@ -288,7 +301,17 @@ pid_t fork_sync_exec(const char *command, int event_fd)
 	return pid;
 }
 
-static int print_stacks(alloc_info_t *allocs, size_t nr_allocs, int stack_traces_fd)
+static void print_stack_frame(size_t frame, uint64_t addr, const blazesym_csym *sym)
+{
+	if (!sym)
+		printf("%zu [<%016lx>]\n", frame, addr);
+	else if (sym->path && strlen(sym->path))
+		printf("%zu [<%016lx>] %s+0x%lx %s:%ld\n", frame, addr, sym->symbol, addr - sym->start_address, sym->path, sym->line_no);
+	else
+		printf("%zu [<%016lx>] %s+0x%lx\n", frame, addr, sym->symbol, addr - sym->start_address);
+}
+
+static int print_stack_frames(alloc_info_t *allocs, size_t nr_allocs, int stack_traces_fd)
 {
 	int ret = 0;
 
@@ -332,16 +355,30 @@ static int print_stacks(alloc_info_t *allocs, size_t nr_allocs, int stack_traces
 		const blazesym_result *result = blazesym_symbolize(symbolizer, &src_cfg, 1, stack, env.perf_max_stack_depth);
 		printf("blazesym result - size:%lu\n", result->size);
 
-		for (size_t j = 0; result && j < result->size; j++) {
-			if (result->entries[j].size == 0)
+		for (size_t j = 0; j < env.perf_max_stack_depth; ++j) {
+			const uint64_t addr = stack[j];
+
+			if (addr == 0)
+				break;
+
+			if (!result || j >= result->size || result->entries[j].size == 0) {
+				print_stack_frame(j, addr, NULL);
 				continue;
+			}
 
-			const blazesym_csym *sym = &result->entries[j].syms[0];
+			if (result->entries[j].size == 1) {
+				const blazesym_csym *sym = &result->entries[j].syms[0];
+				print_stack_frame(j, addr, sym);
 
-			if (sym->line_no)
-				printf("%s:%ld\n", sym->symbol, sym->line_no);
-			else
-				printf("%s\n", sym->symbol);
+				continue;
+			}
+
+			printf("[<%016lx>] (%lu entries)\n", addr, result->entries[j].size);
+			for (size_t k = 0; k < result->entries[j].size; ++k) {
+				const blazesym_csym *sym = &result->entries[j].syms[k];
+				printf("    %s@0x%lx %s:%ld\n", sym->symbol, sym->start_address,
+						sym->path, sym->line_no);
+			}
 		}
 
 		puts("=============");
@@ -359,7 +396,8 @@ static int alloc_size_compare(const void *a, const void *b)
 	const alloc_info_t *x = (alloc_info_t *)a;
 	const alloc_info_t *y = (alloc_info_t *)b;
 
-	// compares for descending order
+	// descending order
+
 	if (x->size > y->size)
 		return -1;
 
@@ -451,7 +489,7 @@ static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 	printf("[%d:%d:%d] Top %zu stacks with outstanding allocations:\n",
 			tm->tm_hour, tm->tm_min, tm->tm_sec, nr_allocs);
 
-	print_stacks(allocs, nr_allocs, stack_traces_fd);
+	print_stack_frames(allocs, nr_allocs, stack_traces_fd);
 
 	free(allocs);
 
@@ -513,6 +551,8 @@ int attach_uprobes(struct memleak_bpf *skel)
 
 int main(int argc, char *argv[])
 {
+	int ret = 0;
+
 	static const struct argp argp = {
 		.options = argp_options,
 		.parser = argp_parse_arg,
@@ -534,15 +574,20 @@ int main(int argc, char *argv[])
 	sigaddset(&sigset, SIGQUIT);
 	sigaddset(&sigset, SIGCHLD);
 
-	if (sigprocmask(SIG_BLOCK, &sigset, NULL)) {
-		perror("failed to block signal mask");
-		return 1;
+	memcpy(&sig_action.sa_mask, &sigset, sizeof(sig_action.sa_mask));
+
+	if (sigaction(SIGINT, &sig_action, 0)) {
+		perror("failed to set up signal handling");
+		ret = -errno;
+
+		goto cleanup;
 	}
 
-	signal_fd = signalfd(-1, &sigset, SFD_CLOEXEC);
-	if (signal_fd < 0) {
-		perror("failed to create signal fd");
-		return 1;
+	if (sigprocmask(SIG_BLOCK, &sigset, NULL)) {
+		perror("failed to block signal mask");
+		ret = -errno;
+
+		goto cleanup;
 	}
 
 	env.page_size = sysconf(_SC_PAGE_SIZE);
@@ -554,19 +599,27 @@ int main(int argc, char *argv[])
 	if (env.command) {
 		if (env.pid >= 0) {
 			fprintf(stderr, "cannot specify both command and pid\n");
+			ret = 1;
+
 			goto cleanup;
 		}
 
 		child_exec_event_fd = eventfd(0, EFD_CLOEXEC);
 		if (child_exec_event_fd < 0) {
 			perror("failed to create child exec event fd");
-			return 1;
+			ret = -errno;
+
+			goto cleanup;
 		}
+
 		const pid_t child_pid = fork_sync_exec(env.command, child_exec_event_fd);
 		if (child_pid < 0) {
 			perror("failed to spawn child process");
-			return 1;
+			ret = -errno;
+
+			goto cleanup;
 		}
+
 		env.pid = child_pid;
 	}
 
@@ -576,7 +629,9 @@ int main(int argc, char *argv[])
 	struct memleak_bpf *skel = memleak_bpf__open();
 	if (!skel) {
 		fprintf(stderr, "failed to open bpf object\n");
-		return 1;
+		ret = 1;
+
+		goto cleanup;
 	}
 
 	skel->rodata->pid = env.pid;
@@ -590,33 +645,43 @@ int main(int argc, char *argv[])
 
 	bpf_map__set_value_size(skel->maps.stack_traces,
 				env.perf_max_stack_depth * sizeof(unsigned long));
-	bpf_map__set_max_entries(skel->maps.stack_traces, env.stack_max_entries);
+	bpf_map__set_max_entries(skel->maps.stack_traces, env.stack_map_max_entries);
 
 	if (!env.kernel_trace && disable_kernel_tracepoints(skel)) {
 		fprintf(stderr, "failed to disable kernel tracepoints\n");
+		ret = 1;
+
 		goto cleanup;
 	}
 
 	if (memleak_bpf__load(skel)) {
 		fprintf(stderr, "failed to load bpf object\n");
+		ret = 1;
+
 		goto cleanup;
 	}
 
 	int allocs_fd = bpf_map__fd(skel->maps.allocs);
 	if (allocs_fd < 0) {
 		fprintf(stderr, "failed to get fd for allocs map\n");
-		return 1;
+		ret = 1;
+
+		goto cleanup;
 	}
 
 	int stack_traces_fd = bpf_map__fd(skel->maps.stack_traces);
 	if (stack_traces_fd < 0) {
 		fprintf(stderr, "failed to get fd for stack_traces map\n");
-		return 1;
+		ret = 1;
+
+		goto cleanup;
 	}
 
 	if (!env.kernel_trace) {
 		if (attach_uprobes(skel)) {
 			fprintf(stderr, "failed to attach uprobes\n");
+			ret = 1;
+
 			goto cleanup;
 		}
 		puts("attached uprobes");
@@ -624,6 +689,8 @@ int main(int argc, char *argv[])
 
 	if (memleak_bpf__attach(skel)) {
 		fprintf(stderr, "failed to attach bpf program(s)\n");
+		ret = 1;
+
 		goto cleanup;
 	}
 
@@ -633,6 +700,8 @@ int main(int argc, char *argv[])
 		const uint64_t event = 1;
 		if (write(child_exec_event_fd, &event, sizeof(event)) != sizeof(event)) {
 			perror("failed to write child exec event");
+			ret = -errno;
+
 			goto cleanup;
 		}
 		printf("wrote child exec event\n");
@@ -640,106 +709,47 @@ int main(int argc, char *argv[])
 
 	symbolizer = blazesym_new();
 
-	struct itimerspec timer_spec;
-	timer_spec.it_interval.tv_sec= env.interval;
-	timer_spec.it_interval.tv_nsec = 0;
-	timer_spec.it_value.tv_sec= env.interval;
-	timer_spec.it_value.tv_nsec = 0;
-
-	timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC);
-	if (timer_fd < 0) {
-		perror("failed to create timerfd");
-	}
-
-	if (timerfd_settime(timer_fd, 0, &timer_spec, NULL)) {
-		perror("timerfd settime fail");
-		return 1;
-	}
-
-	printf("timer fd interval set at %d\n", env.interval);
-
-	struct pollfd fds[] = {
-		{.fd = timer_fd, .events = POLLIN},
-		{.fd = signal_fd, .events = POLLIN},
-	};
-
-	const nfds_t nfds = sizeof(fds) / sizeof(struct pollfd);
+	printf("loop start - interval:%d, nr_intervals:%d\n", env.interval, env.nr_intervals);
 
 	int i = 0;
 
-	for (;;) {
-		printf("polling\n");
+	while (!exiting) {
+		if (env.nr_intervals && i++ >= env.nr_intervals)
+			break;
 
-		err = poll(fds, nfds, -1);
-		if (err < 0) {
-			perror("failed to poll");
-			return 1;
+		sleep(env.interval);
+
+		print_outstanding_allocs(allocs_fd, stack_traces_fd);
+	}
+	printf("loop end - intervals:%d\n", i);
+
+	if (env.pid > 0) {
+		if (!child_exited) {
+			if (kill(env.pid, SIGTERM)) {
+				perror("failed to signal child process");
+				ret = -errno;
+
+				goto cleanup;
+			}
 		}
 
-		if (fds[0].revents & POLLIN) {
-			printf("input on timer fd\n");
-			uint64_t buffer = 0;
-			if (read(fds[0].fd, &buffer, sizeof(buffer)) != sizeof(buffer)) {
-				perror("failed to read timerfd");
-				return 1;
-			}
+		int wstatus = 0;
+		const pid_t pid = wait(&wstatus);
 
-			print_outstanding_allocs(allocs_fd, stack_traces_fd);
+		if (pid < 0) {
+			perror("failed to reap child process");
+			ret = -errno;
 
-			if (env.nr_intervals && (++i >= env.nr_intervals)) {
-				puts("reached target interval count");
-				break;
-			}
-
-			fds[0].revents = 0;
-		}
-
-		if (fds[1].revents & POLLIN) {
-			printf("input on signal fd\n");
-			struct signalfd_siginfo buffer = {};
-			if (read(fds[1].fd, &buffer, sizeof(buffer)) != sizeof(buffer)) {
-				perror("failed to read sig fd");
-				return 1;
-			}
-
-			print_outstanding_allocs(allocs_fd, stack_traces_fd);
-
-			switch (buffer.ssi_signo) {
-			case SIGINT: {
-				printf("read SIGINT\n");
-				if (env.pid > 0) {
-					kill(SIGINT, env.pid);
-					int wstatus = 0;
-					const pid_t pid = wait(&wstatus);
-					printf("reaped pid:%d, status:%d\n", pid, wstatus);
-				}
-
-				break;
-			}
-			case SIGQUIT:
-				printf("read SIGQUIT\n");
-				break;
-			case SIGCHLD: {
-				printf("read SIGCHLD\n");
-				int wstatus = 0;
-				const pid_t pid = wait(&wstatus);
-				printf("reaped pid:%d, status:%d\n", pid, wstatus);
-				break;
-			}
-			default:
-				printf("other signal\n");
-				break;
-			}
-
-			fds[1].revents = 0;
 			goto cleanup;
 		}
-	}
 
-	printf("end polling\n");
+		printf("reaped child process at pid:%d with status:%d\n", pid, wstatus);
+	}
 
 cleanup:
 	blazesym_free(symbolizer);
 	memleak_bpf__destroy(skel);
 	printf("done\n");
+
+	return ret;
 }
