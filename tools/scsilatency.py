@@ -7,10 +7,14 @@
 #
 # USAGE: scsilatency [-h] [-T] [-Q] [-m] [-D] [-e] [interval] [count]
 #
-# Copyright (c) 10-Oct-2022, Samsung Electronics.  All rights reserved.
-# This source code is licensed under the Apache License, Version 2.0
+# Copyright (c) 2022 Samsung Electronics.  All rights reserved.
+# Licensed under the Apache License, Version 2.0 (the "License").
+# 
+# thanks to Brendan Gregg's scsilatency.bt for inspiring me, that tool online
+# here(https://github.com/brendangregg/bpf-perf-tools-book/blob/master/originals/
+# Ch09_Disks/scsilatency.bt).
 #
-# Written by Weibang Liu<weibang6.liu@samsung.com>.
+# 10-Oct-2022    Weibang Liu    Created this.
 
 from __future__ import print_function
 from bcc import BPF
