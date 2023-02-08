@@ -160,7 +160,7 @@ endif()
 
 if(ENABLE_CPP_API)
   add_subdirectory(api)
-  list(APPEND bcc_common_libs_for_a api-static)
+  target_sources(bcc-static PRIVATE $<TARGET_OBJECTS:api-objects>)
   # Keep all API functions
   list(APPEND bcc_common_libs_for_s -Wl,--whole-archive api-static -Wl,--no-whole-archive)
 endif()
@@ -174,6 +174,8 @@ if(ENABLE_USDT)
 endif()
 
 add_subdirectory(frontends)
+
+target_sources(bcc-static PRIVATE $<TARGET_OBJECTS:clang_frontend-objects>)
 
 # Link against LLVM libraries
 target_link_libraries(bcc-shared ${bcc_common_libs_for_s})

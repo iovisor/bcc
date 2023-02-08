@@ -19,7 +19,7 @@ The second line showed the same signal sent, this time resulting in a -3
 USAGE message:
 
 # ./killsnoop -h
-usage: killsnoop [-h] [-x] [-p PID]
+usage: killsnoop [-h] [-x] [-p PID] [-T PID] [-s SIGNAL]
 
 Trace signals issued by the kill() syscall
 

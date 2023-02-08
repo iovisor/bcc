@@ -32,7 +32,7 @@ BPF_HISTOGRAM(dist, backlog_key_t);
 
 int do_entry(struct pt_regs *ctx) {
     struct sock *sk = (struct sock *)PT_REGS_PARM1(ctx);
-    
+
     backlog_key_t key = {};
     key.backlog = sk->sk_max_ack_backlog;
     key.slot = bpf_log2l(sk->sk_ack_backlog);

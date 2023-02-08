@@ -23,6 +23,7 @@
 #include <bpf/bpf.h>
 #include "biotop.h"
 #include "biotop.skel.h"
+#include "compat.h"
 #include "trace_helpers.h"
 
 #define warn(...) fprintf(stderr, __VA_ARGS__)
@@ -56,7 +57,7 @@ int grow_vector(struct vector *vector) {
 		else
 			vector->capacity *= 2;
 
-		reallocated = reallocarray(vector->elems, vector->capacity, sizeof(*vector->elems));
+		reallocated = libbpf_reallocarray(vector->elems, vector->capacity, sizeof(*vector->elems));
 		if (!reallocated)
 			return -1;
 

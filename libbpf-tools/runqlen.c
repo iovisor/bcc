@@ -29,6 +29,7 @@ struct env {
 	bool per_cpu;
 	bool runqocc;
 	bool timestamp;
+	bool host;
 	time_t interval;
 	int freq;
 	int times;
@@ -55,6 +56,7 @@ const char argp_program_doc[] =
 "    runqlen -T 1    # 1s summaries and timestamps\n"
 "    runqlen -O      # report run queue occupancy\n"
 "    runqlen -C      # show each CPU separately\n"
+"    runqlen -H      # show nr_running from host's rq instead of cfs_rq\n"
 "    runqlen -f 199  # sample at 199HZ\n";
 
 static const struct argp_option opts[] = {
@@ -63,6 +65,7 @@ static const struct argp_option opts[] = {
 	{ "runqocc", 'O', NULL, 0, "Report run queue occupancy" },
 	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
+	{ "host", 'H', NULL, 0, "Report nr_running from host's rq" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
@@ -86,6 +89,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'T':
 		env.timestamp = true;
+		break;
+	case 'H':
+		env.host = true;
 		break;
 	case 'f':
 		errno = 0;
@@ -261,6 +267,7 @@ int main(int argc, char **argv)
 
 	/* initialize global data (filtering options) */
 	obj->rodata->targ_per_cpu = env.per_cpu;
+	obj->rodata->targ_host = env.host;
 
 	err = runqlen_bpf__load(obj);
 	if (err) {

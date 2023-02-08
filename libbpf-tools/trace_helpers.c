@@ -1042,38 +1042,27 @@ static bool fentry_try_attach(int id)
 
 bool fentry_can_attach(const char *name, const char *mod)
 {
-	const char sysfs_vmlinux[] = "/sys/kernel/btf/vmlinux";
-	struct btf *base, *btf = NULL;
-	char sysfs_mod[80];
-	int id = -1, err;
+	struct btf *btf, *vmlinux_btf, *module_btf = NULL;
+	int err, id;
 
-	base = btf__parse(sysfs_vmlinux, NULL);
-	if (!base) {
-		err = -errno;
-		fprintf(stderr, "failed to parse vmlinux BTF at '%s': %s\n",
-			sysfs_vmlinux, strerror(-err));
-		goto err_out;
-	}
-	if (mod && module_btf_exists(mod)) {
-		snprintf(sysfs_mod, sizeof(sysfs_mod), "/sys/kernel/btf/%s", mod);
-		btf = btf__parse_split(sysfs_mod, base);
-		if (!btf) {
-			err = -errno;
-			fprintf(stderr, "failed to load BTF from %s: %s\n",
-				sysfs_mod, strerror(-err));
-			btf = base;
-			base = NULL;
-		}
-	} else {
-		btf = base;
-		base = NULL;
+	vmlinux_btf = btf__load_vmlinux_btf();
+	err = libbpf_get_error(vmlinux_btf);
+	if (err)
+		return false;
+
+	btf = vmlinux_btf;
+
+	if (mod) {
+		module_btf = btf__load_module_btf(mod, vmlinux_btf);
+		err = libbpf_get_error(module_btf);
+		if (!err)
+			btf = module_btf;
 	}
 
 	id = btf__find_by_name_kind(btf, name, BTF_KIND_FUNC);
 
-err_out:
-	btf__free(btf);
-	btf__free(base);
+	btf__free(module_btf);
+	btf__free(vmlinux_btf);
 	return id > 0 && fentry_try_attach(id);
 }
 
@@ -1139,9 +1128,16 @@ bool tracepoint_exists(const char *category, const char *event)
 
 bool vmlinux_btf_exists(void)
 {
-	if (!access("/sys/kernel/btf/vmlinux", R_OK))
-		return true;
-	return false;
+	struct btf *btf;
+	int err;
+
+	btf = btf__load_vmlinux_btf();
+	err = libbpf_get_error(btf);
+	if (err)
+		return false;
+
+	btf__free(btf);
+	return true;
 }
 
 bool module_btf_exists(const char *mod)

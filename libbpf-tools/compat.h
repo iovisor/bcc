@@ -4,6 +4,8 @@
 #ifndef __COMPAT_H
 #define __COMPAT_H
 
+#include <stdlib.h>
+#include <limits.h>
 #include <sys/types.h>
 #include <linux/bpf.h>
 
@@ -20,5 +22,25 @@ int bpf_buffer__open(struct bpf_buffer *buffer, bpf_buffer_sample_fn sample_cb,
 		     bpf_buffer_lost_fn lost_cb, void *ctx);
 int bpf_buffer__poll(struct bpf_buffer *, int timeout_ms);
 void bpf_buffer__free(struct bpf_buffer *);
+
+/* taken from libbpf */
+#ifndef __has_builtin
+#define __has_builtin(x) 0
+#endif
+
+static inline void *libbpf_reallocarray(void *ptr, size_t nmemb, size_t size)
+{
+	size_t total;
+
+#if __has_builtin(__builtin_mul_overflow)
+	if (__builtin_mul_overflow(nmemb, size, &total))
+		return NULL;
+#else
+	if (size == 0 || nmemb > ULONG_MAX / size)
+		return NULL;
+	total = nmemb * size;
+#endif
+	return realloc(ptr, total);
+}
 
 #endif /* __COMPAT_H */
