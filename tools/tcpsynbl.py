@@ -75,7 +75,8 @@ if not args.json:
 try:
     sleep(99999999)
 except KeyboardInterrupt:
-    print()
+    if not args.json:
+        print()
 
 dist = b.get_table("dist")
 if args.json:

@@ -276,7 +276,6 @@ def main():
         else:
             snoop(buffer, _print_event_json)
     except KeyboardInterrupt:
-        print()
         sys.exit()
 
     return 0
