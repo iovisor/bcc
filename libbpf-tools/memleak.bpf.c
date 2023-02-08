@@ -177,7 +177,13 @@ int tracepoint__kmalloc(struct trace_event_raw_kmem_alloc *ctx)
 	return gen_alloc_exit2(ctx, (u64)(ctx->ptr));
 }
 
-SEC("tracepoint/kmem/kmalloc_node")
+SEC("?tracepoint/kmem/dummy")
+int tracepoint__dummy(void *ctx)
+{
+	return 0;
+}
+
+SEC("?tracepoint/kmem/kmalloc_node")
 int tracepoint__kmalloc_node(struct trace_event_raw_kmem_alloc_node *ctx)
 {
 	if (wa_missing_free)
@@ -205,7 +211,7 @@ int tracepoint__kmem_cache_alloc(struct trace_event_raw_kmem_alloc *ctx)
 	return gen_alloc_exit2(ctx, (u64)(ctx->ptr));
 }
 
-SEC("tracepoint/kmem/kmem_cache_alloc_node")
+SEC("?tracepoint/kmem/kmem_cache_alloc_node")
 int tracepoint__kmem_cache_alloc_node(struct trace_event_raw_kmem_alloc_node *ctx)
 {
 	if (wa_missing_free)
@@ -236,7 +242,7 @@ int tracepoint__mm_page_free(struct trace_event_raw_mm_page_free *ctx)
 	return gen_free_enter((void *)ctx->pfn);
 }
 
-SEC("tracepoint/percpu/percpu_alloc_percpu")
+SEC("?tracepoint/percpu/percpu_alloc_percpu")
 int tracepoint__percpu_alloc_percpu(struct trace_event_raw_percpu_alloc_percpu *ctx)
 {
 	gen_alloc_enter(ctx->bytes_alloc);
@@ -244,7 +250,7 @@ int tracepoint__percpu_alloc_percpu(struct trace_event_raw_percpu_alloc_percpu *
 	return gen_alloc_exit2(ctx, (u64)(ctx->ptr));
 }
 
-SEC("tracepoint/percpu/percpu_free_percpu")
+SEC("?tracepoint/percpu/percpu_free_percpu")
 int tracepoint__percpu_free_percpu(struct trace_event_raw_percpu_free_percpu *ctx)
 {
 	return gen_free_enter(ctx->ptr);

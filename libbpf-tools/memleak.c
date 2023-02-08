@@ -93,15 +93,17 @@ static struct env {
 #define ATTACH_UPROBE(skel, sym_name, prog_name) __ATTACH_UPROBE(skel, sym_name, prog_name, false)
 #define ATTACH_URETPROBE(skel, sym_name, prog_name) __ATTACH_UPROBE(skel, sym_name, prog_name, true)
 
-#define DISABLE_TRACEPOINT(skel, prog_name) \
+#define __SET_AUTOLOAD_TRACEPOINT(program, enable) \
 	do { \
-		if (bpf_program__set_autoload(skel->progs.prog_name, false)) { \
-			fprintf(stderr, "failed to set autoload off for " #prog_name "\n"); \
+		if (bpf_program__set_autoload(program, enable)) { \
+			fprintf(stderr, "failed to set autoload " #enable " for " #program "\n"); \
 			return -errno; \
 		} \
-		printf("set autoload off for " #prog_name"\n"); \
+		printf("set autoload " #enable " for " #program "\n"); \
 	} while (false)
 
+#define ENABLE_TRACEPOINT(program) __SET_AUTOLOAD_TRACEPOINT(program, true)
+#define DISABLE_TRACEPOINT(program) __SET_AUTOLOAD_TRACEPOINT(program, false)
 
 static long argp_parse_long(int key, const char *arg, struct argp_state *state);
 static error_t argp_parse_arg(int key, char *arg, struct argp_state *state);
@@ -123,6 +125,8 @@ static int alloc_size_compare(const void *a, const void *b);
 
 static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd);
 
+static int enable_kernel_node_tracepoints(struct memleak_bpf *skel);
+static int enable_kernel_percpu_tracepoints(struct memleak_bpf *skel);
 static int disable_kernel_tracepoints(struct memleak_bpf *skel);
 
 static int attach_uprobes(struct memleak_bpf *skel);
@@ -273,7 +277,17 @@ int main(int argc, char *argv[])
 				env.perf_max_stack_depth * sizeof(unsigned long));
 	bpf_map__set_max_entries(skel->maps.stack_traces, env.stack_map_max_entries);
 
-	if (!env.kernel_trace && disable_kernel_tracepoints(skel)) {
+	if (env.kernel_trace) {
+		if (env.percpu && enable_kernel_percpu_tracepoints(skel)) {
+			fprintf(stderr, "failed to enable kernel percpu tracepoints\n");
+			ret = 1;
+
+			goto cleanup;
+		}
+
+		if (enable_kernel_node_tracepoints(skel))
+			fprintf(stderr, "warning - no node tracepoints available\n");
+	} else if (disable_kernel_tracepoints(skel)) {
 		fprintf(stderr, "failed to disable kernel tracepoints\n");
 		ret = 1;
 
@@ -431,6 +445,10 @@ error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'Z':
 		env.max_size = argp_parse_long(key, arg, state);
+		break;
+	case 'P':
+		env.percpu = true;
+		puts("arg percpu");
 		break;
 	case ARGP_KEY_ARG:
 		pos_args++;
@@ -765,18 +783,35 @@ int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 	return ret;
 }
 
+int enable_kernel_node_tracepoints(struct memleak_bpf *skel)
+{
+	//ENABLE_TRACEPOINT(skel->progs.tracepoint__dummy);
+	ENABLE_TRACEPOINT(skel->progs.tracepoint__kmalloc_node);
+	ENABLE_TRACEPOINT(skel->progs.tracepoint__kmem_cache_alloc_node);
+
+	return 0;
+}
+
+int enable_kernel_percpu_tracepoints(struct memleak_bpf *skel)
+{
+	ENABLE_TRACEPOINT(skel->progs.tracepoint__percpu_alloc_percpu);
+	ENABLE_TRACEPOINT(skel->progs.tracepoint__percpu_free_percpu);
+
+	return 0;
+}
+
 int disable_kernel_tracepoints(struct memleak_bpf *skel)
 {
-	DISABLE_TRACEPOINT(skel, tracepoint__kmalloc);
-	DISABLE_TRACEPOINT(skel, tracepoint__kmalloc_node);
-	DISABLE_TRACEPOINT(skel, tracepoint__kfree);
-	DISABLE_TRACEPOINT(skel, tracepoint__kmem_cache_alloc);
-	DISABLE_TRACEPOINT(skel, tracepoint__kmem_cache_alloc_node);
-	DISABLE_TRACEPOINT(skel, tracepoint__kmem_cache_free);
-	DISABLE_TRACEPOINT(skel, tracepoint__mm_page_alloc);
-	DISABLE_TRACEPOINT(skel, tracepoint__mm_page_free);
-	DISABLE_TRACEPOINT(skel, tracepoint__percpu_alloc_percpu);
-	DISABLE_TRACEPOINT(skel, tracepoint__percpu_free_percpu);
+	DISABLE_TRACEPOINT(skel->progs.tracepoint__kmalloc);
+	DISABLE_TRACEPOINT(skel->progs.tracepoint__kmalloc_node);
+	DISABLE_TRACEPOINT(skel->progs.tracepoint__kfree);
+	DISABLE_TRACEPOINT(skel->progs.tracepoint__kmem_cache_alloc);
+	DISABLE_TRACEPOINT(skel->progs.tracepoint__kmem_cache_alloc_node);
+	DISABLE_TRACEPOINT(skel->progs.tracepoint__kmem_cache_free);
+	DISABLE_TRACEPOINT(skel->progs.tracepoint__mm_page_alloc);
+	DISABLE_TRACEPOINT(skel->progs.tracepoint__mm_page_free);
+	DISABLE_TRACEPOINT(skel->progs.tracepoint__percpu_alloc_percpu);
+	DISABLE_TRACEPOINT(skel->progs.tracepoint__percpu_free_percpu);
 
 	return 0;
 }
