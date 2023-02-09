@@ -66,15 +66,15 @@ int BPF_PROG(sched_switch, bool preempt, struct task_struct *prev, struct task_s
 	u32 pid;
 
 	if (allow_record(prev)) {
-		pid = prev->pid;
+		pid = BPF_CORE_READ(prev, pid);
 		/* To distinguish idle threads of different cores */
 		if (!pid)
 			pid = bpf_get_smp_processor_id();
 		i_key.key.pid = pid;
-		i_key.key.tgid = prev->tgid;
+		i_key.key.tgid = BPF_CORE_READ(prev, tgid);
 		i_key.start_ts = bpf_ktime_get_ns();
 
-		if (prev->flags & PF_KTHREAD)
+		if (BPF_CORE_READ(prev, flags) & PF_KTHREAD)
 			i_key.key.user_stack_id = -1;
 		else
 			i_key.key.user_stack_id =
@@ -87,7 +87,7 @@ int BPF_PROG(sched_switch, bool preempt, struct task_struct *prev, struct task_s
 		bpf_map_update_elem(&info, &i_key.key, &val, BPF_NOEXIST);
 	}
 
-	pid = next->pid;
+	pid = BPF_CORE_READ(next, pid);
 	i_keyp = bpf_map_lookup_elem(&start, &pid);
 	if (!i_keyp)
 		return 0;
