@@ -549,8 +549,8 @@ static int (*bpf_probe_read_str)(void *dst, u64 size, const void *unsafe_ptr) =
   (void *) BPF_FUNC_probe_read_str;
 int bpf_trace_printk(const char *fmt, ...) asm("llvm.bpf.extra");
 static inline __attribute__((always_inline))
-void bpf_tail_call_(u64 map_fd, void *ctx, int index) {
-  ((void (*)(void *, u64, int))BPF_FUNC_tail_call)(ctx, map_fd, index);
+void bpf_tail_call_(void *map_fd, void *ctx, int index) {
+  ((void (*)(void *, u64, int))BPF_FUNC_tail_call)(ctx, (u64)map_fd, index);
 }
 static int (*bpf_clone_redirect)(void *ctx, int ifindex, u32 flags) =
   (void *) BPF_FUNC_clone_redirect;
