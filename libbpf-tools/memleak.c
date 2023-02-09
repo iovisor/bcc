@@ -707,7 +707,7 @@ int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 		return -ENOMEM;
 	}
 
-	uint64_t *prev_key = NULL;
+	uint64_t prev_key = 0;
 	uint64_t curr_key = 0;
 
 	size_t nr_allocs = 0;
@@ -716,7 +716,7 @@ int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 		alloc_info_t alloc_info = {};
 		memset(&alloc_info, 0, sizeof(alloc_info));
 
-		if (bpf_map_get_next_key(allocs_fd, prev_key, &curr_key)) {
+		if (bpf_map_get_next_key(allocs_fd, &prev_key, &curr_key)) {
 			if (errno == ENOENT)
 				break; // no more keys
 
@@ -725,7 +725,7 @@ int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 			break;
 		}
 
-		prev_key = &curr_key;
+		prev_key = curr_key;
 
 		if (bpf_map_lookup_elem(allocs_fd, &curr_key, &alloc_info)) {
 			if (errno == ENOENT)

@@ -109,7 +109,7 @@ static __always_inline int gen_alloc_exit2(void *ctx, u64 address) {
 	const pid_t pid = bpf_get_current_pid_tgid() >> 32;
 	alloc_info_t info;
 	__builtin_memset(&info, 0, sizeof(info));
-	int flags = 0;
+	int flags = BPF_F_REUSE_STACKID;
 
 	const u64* size64 = bpf_map_lookup_elem(&sizes, &pid);
 	if (!size64)
@@ -125,8 +125,16 @@ static __always_inline int gen_alloc_exit2(void *ctx, u64 address) {
 			flags |= BPF_F_USER_STACK;
 
 		info.stack_id = bpf_get_stackid(ctx, &stack_traces, flags);
+		if (info.stack_id < 0) {
+			bpf_printk("failed to get stackid, errno:%d\n", info.stack_id);
+		}
 
-		bpf_map_update_elem(&allocs, &address, &info, BPF_ANY); // todo - flags?
+		const int err = bpf_map_update_elem(&allocs, &address, &info, BPF_ANY);
+		if (err) {
+			bpf_printk("failed to update allocs map, errno:%d\n", err);
+			return 1;
+		}
+
 
 		update_statistics_add(info.stack_id, info.size);
 	}
