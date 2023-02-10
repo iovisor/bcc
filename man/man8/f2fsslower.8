@@ -2,7 +2,7 @@
 .SH NAME
 f2fsslower \- Trace slow f2fs file operations, with per-event details.
 .SH SYNOPSIS
-.B f2fsslower [\-h] [\-j] [\-p PID] [min_ms]
+.B f2fsslower [\-h] [\-s] [\-p PID] [min_ms]
 .SH DESCRIPTION
 This tool traces common f2fs file operations: reads, writes, opens, and
 syncs. It measures the time spent in these operations, and prints details
@@ -37,7 +37,7 @@ Trace slower than 1 ms:
 .TP
 Trace slower than 1 ms, and output just the fields in parsable format (csv):
 #
-.B f2fsslower \-j 1
+.B f2fsslower \-s 1
 .TP
 Trace all file reads and writes (warning: the output will be verbose):
 #
@@ -77,13 +77,13 @@ FILENAME
 A cached kernel file name (comes from dentry->d_name.name).
 .TP
 ENDTIME_us
-Completion timestamp, microseconds (\-j only).
+Completion timestamp, microseconds (\-s only).
 .TP
 OFFSET_b
-File offset, bytes (\-j only).
+File offset, bytes (\-s only).
 .TP
 LATENCY_us
-Latency (duration) of the I/O, in microseconds (\-j only).
+Latency (duration) of the I/O, in microseconds (\-s only).
 .SH OVERHEAD
 This adds low-overhead instrumentation to these f2fs operations,
 including reads and writes from the file system cache. Such reads and writes

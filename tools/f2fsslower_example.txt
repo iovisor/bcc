@@ -177,9 +177,9 @@ TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
 The output now includes open operations ("O"), and writes ("W").
 
 
-A -j option will print just the fields (parsable output, csv):
+A -s option will print just the fields (parsable output, csv):
 
-# ./f2fsslower -j 1
+# ./f2fsslower -s 1
 ENDTIME_us,TASK,PID,TYPE,BYTES,OFFSET_b,LATENCY_us,FILE
 32897720717,Thread-14,13086,S,0,0,85033,3
 32897838343,Thread-14,13086,S,0,0,91010,4
@@ -249,12 +249,12 @@ positional arguments:
 
 optional arguments:
   -h, --help         show this help message and exit
-  -j, --csv          just print fields: comma-separated values
+  -s, --csv          just print fields: comma-separated values
   -p PID, --pid PID  trace this PID only
 
 examples:
     ./f2fsslower             # trace operations slower than 10 ms (default)
     ./f2fsslower 1           # trace operations slower than 1 ms
-    ./f2fsslower -j 1        # ... 1 ms, parsable output (csv)
+    ./f2fsslower -s 1        # ... 1 ms, parsable output (csv)
     ./f2fsslower 0           # trace all operations (warning: verbose)
     ./f2fsslower -p 185      # trace PID 185 only

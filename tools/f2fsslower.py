@@ -38,7 +38,7 @@ kallsyms = "/proc/kallsyms"
 examples = """examples:
     ./f2fsslower             # trace operations slower than 10 ms (default)
     ./f2fsslower 1           # trace operations slower than 1 ms
-    ./f2fsslower -j 1        # ... 1 ms, parsable output (csv)
+    ./f2fsslower -s 1        # ... 1 ms, parsable output (csv)
     ./f2fsslower 0           # trace all operations (warning: verbose)
     ./f2fsslower -p 185      # trace PID 185 only
 """
@@ -46,7 +46,7 @@ parser = argparse.ArgumentParser(
     description="Trace common f2fs file operations slower than a threshold",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
-parser.add_argument("-j", "--csv", action="store_true",
+parser.add_argument("-s", "--csv", action="store_true",
                     help="just print fields: comma-separated values")
 parser.add_argument("-p", "--pid",
                     help="trace this PID only")
@@ -66,7 +66,6 @@ bpf_text = """
 #include <linux/fs.h>
 #include <linux/sched.h>
 #include <linux/dcache.h>
-// XXX: switch these to char's when supported
 #define TRACE_READ        0
 #define TRACE_WRITE        1
 #define TRACE_OPEN        2
@@ -77,7 +76,6 @@ struct val_t {
     struct file *fp;
 };
 struct data_t {
-    // XXX: switch some to u32's when supported
     u64 ts_us;
     u64 type;
     u32 size;
