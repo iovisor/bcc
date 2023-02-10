@@ -26,7 +26,6 @@
 #include "blazesym.h"
 #endif
 
-
 static struct env {
 	int interval;
 	int nr_intervals;
@@ -35,7 +34,7 @@ static struct env {
 	bool show_allocs;
 	bool combined_only;
 	int min_age_ns;
-	int sample_rate;
+	uint64_t sample_rate;
 	int top_stacks;
 	size_t min_size;
 	size_t max_size;
@@ -93,18 +92,6 @@ static struct env {
 #define ATTACH_UPROBE(skel, sym_name, prog_name) __ATTACH_UPROBE(skel, sym_name, prog_name, false)
 #define ATTACH_URETPROBE(skel, sym_name, prog_name) __ATTACH_UPROBE(skel, sym_name, prog_name, true)
 
-#define __SET_AUTOLOAD_TRACEPOINT(program, enable) \
-	do { \
-		if (bpf_program__set_autoload(program, enable)) { \
-			fprintf(stderr, "failed to set autoload " #enable " for " #program "\n"); \
-			return -errno; \
-		} \
-		printf("set autoload " #enable " for " #program "\n"); \
-	} while (false)
-
-#define ENABLE_TRACEPOINT(program) __SET_AUTOLOAD_TRACEPOINT(program, true)
-#define DISABLE_TRACEPOINT(program) __SET_AUTOLOAD_TRACEPOINT(program, false)
-
 static long argp_parse_long(int key, const char *arg, struct argp_state *state);
 static error_t argp_parse_arg(int key, char *arg, struct argp_state *state);
 
@@ -125,8 +112,9 @@ static int alloc_size_compare(const void *a, const void *b);
 
 static int print_outstanding_allocs(int allocs_fd, int stack_traces_fd);
 
-static int enable_kernel_node_tracepoints(struct memleak_bpf *skel);
-static int enable_kernel_percpu_tracepoints(struct memleak_bpf *skel);
+static bool has_kernel_node_tracepoints();
+static int disable_kernel_node_tracepoints(struct memleak_bpf *skel);
+static int disable_kernel_percpu_tracepoints(struct memleak_bpf *skel);
 static int disable_kernel_tracepoints(struct memleak_bpf *skel);
 
 static int attach_uprobes(struct memleak_bpf *skel);
@@ -165,7 +153,6 @@ static const struct argp_option argp_options[] = {
 	// name/longopt:str, key/shortopt:int, arg:str, flags:int, doc:str
 	{"pid", 'p', "PID", 0, "Process ID to trace. if not specified, trace kernel allocs"},
 	{"trace", 't', 0, 0, "print trace messages for each alloc/free call" },
-	{"count", 'n', "COUNT", 0, "number of times to print the report before exiting"},
 	{"show-allocs", 'a', 0, 0, "show allocation addresses and sizes as well as call stacks"},
 	{"older", 'o', "AGE_MS", 0, "prune allocations younger than this age in milliseconds"},
 	{"command", 'c', "COMMAND", 0, "execute and trace the specified command"},
@@ -278,20 +265,30 @@ int main(int argc, char *argv[])
 	bpf_map__set_max_entries(skel->maps.stack_traces, env.stack_map_max_entries);
 
 	if (env.kernel_trace) {
-		if (env.percpu && enable_kernel_percpu_tracepoints(skel)) {
-			fprintf(stderr, "failed to enable kernel percpu tracepoints\n");
-			ret = 1;
+		if (!has_kernel_node_tracepoints()) {
+			ret = disable_kernel_node_tracepoints(skel);
+			if (ret) {
+				fprintf(stderr, "failed to disable kernel node tracepoints\n");
+
+				goto cleanup;
+			}
+		}
+
+		if (!env.percpu) {
+			ret = disable_kernel_percpu_tracepoints(skel);
+			if (ret) {
+				fprintf(stderr, "failed to disable kernel percpu tracepoints\n");
+
+				goto cleanup;
+			}
+		}
+	} else {
+		ret = disable_kernel_tracepoints(skel);
+		if (ret) {
+			fprintf(stderr, "failed to disable kernel tracepoints\n");
 
 			goto cleanup;
 		}
-
-		if (enable_kernel_node_tracepoints(skel))
-			fprintf(stderr, "warning - no node tracepoints available\n");
-	} else if (disable_kernel_tracepoints(skel)) {
-		fprintf(stderr, "failed to disable kernel tracepoints\n");
-		ret = 1;
-
-		goto cleanup;
 	}
 
 	if (memleak_bpf__load(skel)) {
@@ -301,26 +298,26 @@ int main(int argc, char *argv[])
 		goto cleanup;
 	}
 
-	int allocs_fd = bpf_map__fd(skel->maps.allocs);
+	const int allocs_fd = bpf_map__fd(skel->maps.allocs);
 	if (allocs_fd < 0) {
 		fprintf(stderr, "failed to get fd for allocs map\n");
-		ret = 1;
+		ret = allocs_fd;
 
 		goto cleanup;
 	}
 
-	int stack_traces_fd = bpf_map__fd(skel->maps.stack_traces);
+	const int stack_traces_fd = bpf_map__fd(skel->maps.stack_traces);
 	if (stack_traces_fd < 0) {
 		fprintf(stderr, "failed to get fd for stack_traces map\n");
-		ret = 1;
+		ret = stack_traces_fd;
 
 		goto cleanup;
 	}
 
 	if (!env.kernel_trace) {
-		if (attach_uprobes(skel)) {
+		ret = attach_uprobes(skel);
+		if (ret) {
 			fprintf(stderr, "failed to attach uprobes\n");
-			ret = 1;
 
 			goto cleanup;
 		}
@@ -333,8 +330,6 @@ int main(int argc, char *argv[])
 		goto cleanup;
 	}
 
-	puts("bpf program attached");
-
 	if (env.command) {
 		ret = event_notify(child_exec_event_fd, 1);
 		if (ret) {
@@ -344,7 +339,9 @@ int main(int argc, char *argv[])
 		}
 	}
 
+#ifdef USE_BLAZESYM
 	symbolizer = blazesym_new();
+#endif
 
 	printf("Tracing outstanding memory allocs...  Hit Ctrl-C to end\n");
 	int i = 0;
@@ -353,18 +350,14 @@ int main(int argc, char *argv[])
 		if (env.nr_intervals && i++ >= env.nr_intervals)
 			break;
 
-		puts("begin sleep");
 		sleep(env.interval);
-		puts("end sleep");
 
 		print_outstanding_allocs(allocs_fd, stack_traces_fd);
 	}
 	printf("loop end - intervals:%d\n", i);
 
 	if (env.pid > 0) {
-		puts("deciding how to clean up child process");
 		if (!child_exited) {
-			puts("sending SIGTERM");
 			if (kill(env.pid, SIGTERM)) {
 				perror("failed to signal child process");
 				ret = -errno;
@@ -373,7 +366,6 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		puts("waiting on child");
 		int wstatus = 0;
 		const pid_t pid = wait(&wstatus);
 
@@ -388,7 +380,9 @@ int main(int argc, char *argv[])
 	}
 
 cleanup:
+#ifdef USE_BLAZESYM
 	blazesym_free(symbolizer);
+#endif
 	memleak_bpf__destroy(skel);
 	printf("done\n");
 
@@ -420,21 +414,28 @@ error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 		env.trace_all = true;
 		puts("arg trace_all");
 		break;
-	case 'i':
-		env.interval = atoi(arg);
-		printf("parsed interval: %d\n", env.interval);
-		break;
 	case 'a':
 		env.show_allocs = true;
 		puts("arg show_allocs");
 		break;
-	case 'O':
-		env.object = strdup(arg);
-		printf("parsed object: %s\n", env.object);
+	case 'o':
+		env.min_age_ns = 1e6 * atoi(arg);
+		printf("parsed min_age_ns %d\n", env.min_age_ns);
 		break;
 	case 'c':
 		env.command = strdup(arg);
 		printf("parsed command: %s\n", env.command);
+		break;
+	case 'C':
+		env.combined_only = true;
+		puts("arg combined_only");
+		break;
+	case 'F':
+		env.wa_missing_free = true;
+		puts("arg wa_missing_free");
+		break;
+	case 's':
+		env.sample_rate = argp_parse_long(key, arg, state);
 		break;
 	case 'T':
 		env.top_stacks = atoi(arg);
@@ -445,6 +446,10 @@ error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'Z':
 		env.max_size = argp_parse_long(key, arg, state);
+		break;
+	case 'O':
+		env.object = strdup(arg);
+		printf("parsed object: %s\n", env.object);
 		break;
 	case 'P':
 		env.percpu = true;
@@ -772,7 +777,6 @@ int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 
 	nr_allocs = nr_allocs < env.top_stacks ? nr_allocs : env.top_stacks;
 
-	printf("print nr_allocs: %zu\n", nr_allocs);
 	printf("[%d:%d:%d] Top %zu stacks with outstanding allocations:\n",
 			tm->tm_hour, tm->tm_min, tm->tm_sec, nr_allocs);
 
@@ -780,38 +784,57 @@ int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 
 	free(allocs);
 
+	printf("loops:%d\n", loops);
+
 	return ret;
 }
 
-int enable_kernel_node_tracepoints(struct memleak_bpf *skel)
+bool has_kernel_node_tracepoints()
 {
-	//ENABLE_TRACEPOINT(skel->progs.tracepoint__dummy);
-	ENABLE_TRACEPOINT(skel->progs.tracepoint__kmalloc_node);
-	ENABLE_TRACEPOINT(skel->progs.tracepoint__kmem_cache_alloc_node);
+	return tracepoint_exists("kmem", "kmalloc_node") &&
+		tracepoint_exists("kmem", "kmem_cache_alloc_node");
+}
+
+int disable_kernel_node_tracepoints(struct memleak_bpf *skel)
+{
+	if (bpf_program__set_autoload(skel->progs.tracepoint__kmalloc_node, false) ||
+			bpf_program__set_autoload(skel->progs.tracepoint__kmem_cache_alloc_node, false)) {
+		perror("failed to set autoload");
+
+		return -errno;
+	}
 
 	return 0;
 }
 
-int enable_kernel_percpu_tracepoints(struct memleak_bpf *skel)
+int disable_kernel_percpu_tracepoints(struct memleak_bpf *skel)
 {
-	ENABLE_TRACEPOINT(skel->progs.tracepoint__percpu_alloc_percpu);
-	ENABLE_TRACEPOINT(skel->progs.tracepoint__percpu_free_percpu);
+	if (bpf_program__set_autoload(skel->progs.tracepoint__percpu_alloc_percpu, false) ||
+			bpf_program__set_autoload(skel->progs.tracepoint__percpu_free_percpu, false)) {
+		perror("failed to set autoload");
+
+		return -errno;
+	}
 
 	return 0;
 }
 
 int disable_kernel_tracepoints(struct memleak_bpf *skel)
 {
-	DISABLE_TRACEPOINT(skel->progs.tracepoint__kmalloc);
-	DISABLE_TRACEPOINT(skel->progs.tracepoint__kmalloc_node);
-	DISABLE_TRACEPOINT(skel->progs.tracepoint__kfree);
-	DISABLE_TRACEPOINT(skel->progs.tracepoint__kmem_cache_alloc);
-	DISABLE_TRACEPOINT(skel->progs.tracepoint__kmem_cache_alloc_node);
-	DISABLE_TRACEPOINT(skel->progs.tracepoint__kmem_cache_free);
-	DISABLE_TRACEPOINT(skel->progs.tracepoint__mm_page_alloc);
-	DISABLE_TRACEPOINT(skel->progs.tracepoint__mm_page_free);
-	DISABLE_TRACEPOINT(skel->progs.tracepoint__percpu_alloc_percpu);
-	DISABLE_TRACEPOINT(skel->progs.tracepoint__percpu_free_percpu);
+	if (bpf_program__set_autoload(skel->progs.tracepoint__kmalloc, false) ||
+			bpf_program__set_autoload(skel->progs.tracepoint__kmalloc_node, false) ||
+			bpf_program__set_autoload(skel->progs.tracepoint__kfree, false) ||
+			bpf_program__set_autoload(skel->progs.tracepoint__kmem_cache_alloc, false) ||
+			bpf_program__set_autoload(skel->progs.tracepoint__kmem_cache_alloc_node, false) ||
+			bpf_program__set_autoload(skel->progs.tracepoint__kmem_cache_free, false) ||
+			bpf_program__set_autoload(skel->progs.tracepoint__mm_page_alloc, false) ||
+			bpf_program__set_autoload(skel->progs.tracepoint__mm_page_free, false) ||
+			bpf_program__set_autoload(skel->progs.tracepoint__percpu_alloc_percpu, false) ||
+			bpf_program__set_autoload(skel->progs.tracepoint__percpu_free_percpu, false)) {
+		perror("failed to set autoload");
+
+		return -errno;
+	}
 
 	return 0;
 }
