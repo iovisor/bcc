@@ -744,12 +744,10 @@ int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 		}
 
 		if (get_ktime_ns() - env.min_age_ns < alloc_info.timestamp_ns) {
-			puts("< min_age");
 			continue;
 		}
 
 		if (alloc_info.stack_id < 0) {
-			puts("stack_id < 0");
 			continue;
 		}
 

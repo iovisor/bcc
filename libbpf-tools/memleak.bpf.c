@@ -57,7 +57,7 @@ static __always_inline void update_statistics_add(u64 stack_id, u64 sz) {
 
 	cinfo.total_size += sz;
 	cinfo.number_of_allocs += 1;
-	bpf_map_update_elem(&combined_allocs, &stack_id, &cinfo, BPF_ANY); // todo - flags?
+	bpf_map_update_elem(&combined_allocs, &stack_id, &cinfo, BPF_ANY);
 }
 
 static __always_inline void update_statistics_del(u64 stack_id, u64 sz) {
@@ -76,7 +76,7 @@ static __always_inline void update_statistics_del(u64 stack_id, u64 sz) {
 	if (cinfo.number_of_allocs > 0)
 		cinfo.number_of_allocs -= 1;
 
-	bpf_map_update_elem(&combined_allocs, &stack_id, &cinfo, BPF_ANY); // todo - flags?
+	bpf_map_update_elem(&combined_allocs, &stack_id, &cinfo, BPF_ANY);
 }
 
 static __always_inline int gen_alloc_enter(size_t size)
@@ -95,12 +95,10 @@ static __always_inline int gen_alloc_enter(size_t size)
 	u64 size64;
 	__builtin_memset(&size64, 0, sizeof(size64));
 	size64 = size;
-	bpf_map_update_elem(&sizes, &pid, &size64, BPF_ANY); // todo - flags?
+	bpf_map_update_elem(&sizes, &pid, &size64, BPF_ANY);
 
-	//if (trace_all)
-		//bpf_trace_printk("alloc entered, size = %lu\\n", size64);
-
-	bpf_printk("gen_alloc_enter, pid:%llu\n", pid);
+	if (trace_all)
+		bpf_printk("alloc entered, size = %lu\\n", size64);
 
 	return 0;
 }
@@ -139,12 +137,11 @@ static __always_inline int gen_alloc_exit2(void *ctx, u64 address) {
 		update_statistics_add(info.stack_id, info.size);
 	}
 
-	//if (trace_all) {
-	//	bpf_trace_printk("alloc exited, size = %lu, result = %lx\\n",
-	//			info.size, address);
-	//}
+	if (trace_all) {
+		bpf_printk("alloc exited, size = %lu, result = %lx\\n",
+				info.size, address);
+	}
 
-	bpf_printk("gen_alloc_exit2, pid:%llu\n", pid);
 	return 0;
 }
 
@@ -166,10 +163,10 @@ static __always_inline int gen_free_enter(const void *address) {
 	bpf_map_delete_elem(&allocs, &addr);
 	update_statistics_del(stack_id, size);
 
-	//if (trace_all) {
-	//	bpf_trace_printk("free entered, address = %lx, size = %lu\\n",
-	//			address, size); // todo - integer conversion?
-	//}
+	if (trace_all) {
+		bpf_printk("free entered, address = %lx, size = %lu\\n",
+				address, size);
+	}
 
 	return 0;
 }
@@ -338,7 +335,7 @@ int BPF_KPROBE(posix_memalign_enter, void **memptr, size_t alignment, size_t siz
 {
 	const u64 memptr64 = (u64)(size_t)memptr;
 	const u64 pid = bpf_get_current_pid_tgid() >> 32;
-	bpf_map_update_elem(&memptrs, &pid, &memptr64, BPF_ANY); // todo - flags?
+	bpf_map_update_elem(&memptrs, &pid, &memptr64, BPF_ANY);
 
 	bpf_printk("posix_memalign_enter, pid:%llu\n", pid);
 
