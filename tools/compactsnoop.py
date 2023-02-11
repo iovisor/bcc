@@ -237,11 +237,9 @@ RAW_TRACEPOINT_PROBE(mm_compaction_suitable)
     return 0;
 }
 
-RAW_TRACEPOINT_PROBE(mm_compaction_begin)
+TRACEPOINT_PROBE(compaction, mm_compaction_begin)
 {
-    // TP_PROTO(unsigned long zone_start, unsigned long migrate_pfn,
-    //          unsigned long free_pfn, unsigned long zone_end, bool sync)
-    bool sync = (bool)ctx->args[4];
+    bool sync = args->sync;
 
     u64 id = bpf_get_current_pid_tgid();
     struct val_t *valp = start.lookup(&id);
@@ -255,12 +253,9 @@ RAW_TRACEPOINT_PROBE(mm_compaction_begin)
     return 0;
 }
 
-RAW_TRACEPOINT_PROBE(mm_compaction_end)
+TRACEPOINT_PROBE(compaction, mm_compaction_end)
 {
-    // TP_PROTO(unsigned long zone_start, unsigned long migrate_pfn,
-    //          unsigned long free_pfn, unsigned long zone_end, bool sync,
-    //          int status)
-    submit_event(ctx, ctx->args[5]);
+    submit_event(args, args->status);
     return 0;
 }
 """
