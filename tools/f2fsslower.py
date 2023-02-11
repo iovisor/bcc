@@ -86,7 +86,7 @@ struct data_t {
     char file[DNAME_INLINE_LEN];
 };
 BPF_HASH(entryinfo, u64, struct val_t);
-BPF_PERF_OUTPUT(events);
+PERF_TABLE
 //
 // Store timestamp and size on entry
 //
@@ -202,7 +202,7 @@ static int trace_return(struct pt_regs *ctx, int type)
         return 0;
     bpf_probe_read_kernel(&data.file, sizeof(data.file), (void *)qs.name);
     // output
-    events.perf_submit(ctx, &data, sizeof(data));
+    PERF_OUTPUT_CTX
     return 0;
 }
 int trace_read_return(struct pt_regs *ctx)
@@ -246,6 +246,19 @@ if args.pid:
     bpf_text = bpf_text.replace('FILTER_PID', 'pid != %s' % pid)
 else:
     bpf_text = bpf_text.replace('FILTER_PID', '0')
+
+if BPF.kernel_struct_has_field(b'bpf_ringbuf', b'waitq') == 1:
+    PERF_MODE = "USE_BPF_RING_BUF"
+    bpf_text = bpf_text.replace('PERF_TABLE',
+                                'BPF_RINGBUF_OUTPUT(events, 64);')
+    bpf_text = bpf_text.replace('PERF_OUTPUT_CTX',
+                                'events.ringbuf_output(&data,sizeof(data),0);')
+else:
+    PERF_MODE = "USE_BPF_PERF_BUF"
+    bpf_text = bpf_text.replace('PERF_TABLE', 'BPF_PERF_OUTPUT(events);')
+    bpf_text = bpf_text.replace('PERF_OUTPUT_CTX',
+                                'events.perf_submit(ctx,&data,sizeof(data));')
+
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
@@ -308,9 +321,18 @@ else:
           "BYTES", "OFF_KB", "LAT(ms)", "FILENAME"))
 
 # read events
-b["events"].open_perf_buffer(print_event, page_cnt=64)
+
+# loop with callback to print_event
+if PERF_MODE == "USE_BPF_RING_BUF":
+    b["events"].open_ring_buffer(print_event)
+else:
+    b["events"].open_perf_buffer(print_event, page_cnt=64)
+
 while 1:
     try:
-        b.perf_buffer_poll()
+        if PERF_MODE == "USE_BPF_RING_BUF":
+            b.ring_buffer_poll()
+        else:
+            b.perf_buffer_poll()
     except KeyboardInterrupt:
         exit()
