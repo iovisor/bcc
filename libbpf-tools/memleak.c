@@ -64,7 +64,7 @@ static struct env {
 	.object = "libc.so.6", // -O --obj
 	.percpu = false, // --percpu
 	.perf_max_stack_depth = 127,
-	.stack_map_max_entries = 1024,
+	.stack_map_max_entries = 10240,
 	.page_size = 1,
 	.kernel_trace = true,
 	.verbose = false,
@@ -717,7 +717,9 @@ int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 
 	size_t nr_allocs = 0;
 
+	int loops = 0;
 	for (;;) {
+		loops++;
 		alloc_info_t alloc_info = {};
 		memset(&alloc_info, 0, sizeof(alloc_info));
 
@@ -747,6 +749,7 @@ int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 		}
 
 		if (alloc_info.stack_id < 0) {
+			puts("stack_id < 0");
 			continue;
 		}
 
