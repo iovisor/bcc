@@ -20,7 +20,6 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   set(CMAKE_INSTALL_PREFIX "/usr" CACHE PATH "path to install" FORCE)
 endif()
 
-enable_testing()
 
 execute_process(COMMAND git config --global --add safe.directory ${CMAKE_CURRENT_SOURCE_DIR}
                 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -114,10 +113,6 @@ option(ENABLE_LIBDEBUGINFOD "Use libdebuginfod as a source of debug symbols" ON)
 CMAKE_DEPENDENT_OPTION(ENABLE_CPP_API "Enable C++ API" ON "ENABLE_USDT" OFF)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-
-if(ENABLE_TESTS)
-  find_package(KernelHeaders)
-endif()
 
 if(CMAKE_USE_LIBBPF_PACKAGE)
   find_package(LibBpf)
@@ -219,6 +214,8 @@ if(ENABLE_CLANG_JIT)
   endif(ENABLE_MAN)
 
   if(ENABLE_TESTS)
+    enable_testing()
+    find_package(KernelHeaders)
     add_subdirectory(tests)
   endif(ENABLE_TESTS)
 

@@ -21,7 +21,7 @@
 
 #include "catch.hpp"
 #include "usdt.h"
-#include "api/BPF.h"
+#include "BPF.h"
 
 /* required to insert USDT probes on this very executable --
  * we're gonna be testing them live! */

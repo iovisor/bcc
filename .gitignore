@@ -4,6 +4,7 @@
 *.pyc
 .idea
 *~
+*.user
 
 # Build artifacts
 /build/
