@@ -16,6 +16,7 @@
 # 06-Nov-2015   Allan McAleavy
 # 13-Jan-2016   Allan McAleavy  run pep8 against program
 # 02-Feb-2019   Brendan Gregg   Column shuffle, bring back %ratio
+# 15-Feb-2023   Rong Tao        Add writeback_dirty_{folio,page} tracepoints
 
 from __future__ import print_function
 from bcc import BPF
@@ -71,20 +72,43 @@ interval = int(args.interval)
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 struct key_t {
-    u64 ip;
+    // NF_{APCL,MPA,MBD,APD}
+    u32 nf;
+};
+
+enum {
+    NF_APCL,
+    NF_MPA,
+    NF_MBD,
+    NF_APD,
 };
 
 BPF_HASH(counts, struct key_t);
 
-int do_count(struct pt_regs *ctx) {
+static int __do_count(void *ctx, u32 nf) {
     struct key_t key = {};
     u64 ip;
 
-    key.ip = PT_REGS_IP(ctx);
+    key.nf = nf;
     counts.atomic_increment(key); // update counter
     return 0;
 }
 
+int do_count_apcl(struct pt_regs *ctx) {
+    return __do_count(ctx, NF_APCL);
+}
+int do_count_mpa(struct pt_regs *ctx) {
+    return __do_count(ctx, NF_MPA);
+}
+int do_count_mbd(struct pt_regs *ctx) {
+    return __do_count(ctx, NF_MBD);
+}
+int do_count_apd(struct pt_regs *ctx) {
+    return __do_count(ctx, NF_APD);
+}
+int do_count_apd_tp(void *ctx) {
+    return __do_count(ctx, NF_APD);
+}
 """
 
 if debug or args.ebpf:
@@ -94,18 +118,27 @@ if debug or args.ebpf:
 
 # load BPF program
 b = BPF(text=bpf_text)
-b.attach_kprobe(event="add_to_page_cache_lru", fn_name="do_count")
-b.attach_kprobe(event="mark_page_accessed", fn_name="do_count")
+b.attach_kprobe(event="add_to_page_cache_lru", fn_name="do_count_apcl")
+b.attach_kprobe(event="mark_page_accessed", fn_name="do_count_mpa")
 
 # Function account_page_dirtied() is changed to folio_account_dirtied() in 5.15.
-# FIXME: Both folio_account_dirtied() and account_page_dirtied() are
+# Both folio_account_dirtied() and account_page_dirtied() are
 # static functions and they may be gone during compilation and this may
-# introduce some inaccuracy.
+# introduce some inaccuracy, use tracepoint writeback_dirty_{page,folio},
+# instead when attaching kprobe fails, and report the running
+# error in time.
 if BPF.get_kprobe_functions(b'folio_account_dirtied'):
-    b.attach_kprobe(event="folio_account_dirtied", fn_name="do_count")
+    b.attach_kprobe(event="folio_account_dirtied", fn_name="do_count_apd")
 elif BPF.get_kprobe_functions(b'account_page_dirtied'):
-    b.attach_kprobe(event="account_page_dirtied", fn_name="do_count")
-b.attach_kprobe(event="mark_buffer_dirty", fn_name="do_count")
+    b.attach_kprobe(event="account_page_dirtied", fn_name="do_count_apd")
+elif BPF.tracepoint_exists("writeback", "writeback_dirty_folio"):
+    b.attach_tracepoint(tp="writeback:writeback_dirty_folio", fn_name="do_count_apd_tp")
+elif BPF.tracepoint_exists("writeback", "writeback_dirty_page"):
+    b.attach_tracepoint(tp="writeback:writeback_dirty_page", fn_name="do_count_apd_tp")
+else:
+    raise Exception("Failed to attach kprobe %s or %s or any tracepoint" %
+                    ("folio_account_dirtied", "account_page_dirtied"))
+b.attach_kprobe(event="mark_buffer_dirty", fn_name="do_count_mbd")
 
 # header
 if tstamp:
@@ -130,15 +163,14 @@ while 1:
 
     counts = b["counts"]
     for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
-        func = b.ksym(k.ip)
         # partial string matches in case of .isra (necessary?)
-        if func.find(b"mark_page_accessed") == 0:
-            mpa = max(0, v.value)
-        if func.find(b"mark_buffer_dirty") == 0:
-            mbd = max(0, v.value)
-        if func.find(b"add_to_page_cache_lru") == 0:
+        if k.nf == 0: # NF_APCL
             apcl = max(0, v.value)
-        if func.find(b"account_page_dirtied") == 0:
+        if k.nf == 1: # NF_MPA
+            mpa = max(0, v.value)
+        if k.nf == 2: # NF_MBD
+            mbd = max(0, v.value)
+        if k.nf == 3: # NF_APD
             apd = max(0, v.value)
 
     # total = total cache accesses without counting dirties

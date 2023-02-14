@@ -12,6 +12,7 @@
 #
 # 13-Jul-2016   Emmanuel Bretelle first version
 # 17-Mar-2022   Rocky Xing        Added PID filter support.
+# 15-Feb-2023   Rong Tao          Add writeback_dirty_{folio,page} tracepoints
 
 from __future__ import absolute_import
 from __future__ import division
@@ -73,7 +74,7 @@ def get_processes_stats(
     counts = bpf.get_table("counts")
     stats = defaultdict(lambda: defaultdict(int))
     for k, v in counts.items():
-        stats["%d-%d-%s" % (k.pid, k.uid, k.comm.decode('utf-8', 'replace'))][k.ip] = v.value
+        stats["%d-%d-%s" % (k.pid, k.uid, k.comm.decode('utf-8', 'replace'))][k.nf] = v.value
     stats_list = []
 
     for pid, count in sorted(stats.items(), key=lambda stat: stat[0]):
@@ -89,16 +90,16 @@ def get_processes_stats(
         whits = 0
 
         for k, v in count.items():
-            if re.match(b'mark_page_accessed', bpf.ksym(k)) is not None:
-                mpa = max(0, v)
-
-            if re.match(b'mark_buffer_dirty', bpf.ksym(k)) is not None:
-                mbd = max(0, v)
-
-            if re.match(b'add_to_page_cache_lru', bpf.ksym(k)) is not None:
+            if k == 0: # NF_APCL
                 apcl = max(0, v)
 
-            if re.match(b'account_page_dirtied', bpf.ksym(k)) is not None:
+            if k == 1: # NF_MPA
+                mpa = max(0, v)
+
+            if k == 2: # NF_MBD
+                mbd = max(0, v)
+
+            if k == 3: # NF_APD
                 apd = max(0, v)
 
             # access = total cache access incl. reads(mpa) and writes(mbd)
@@ -144,15 +145,22 @@ def handle_loop(stdscr, args):
 
     #include <uapi/linux/ptrace.h>
     struct key_t {
-        u64 ip;
+        // NF_{APCL,MPA,MBD,APD}
+        u64 nf;
         u32 pid;
         u32 uid;
         char comm[16];
     };
+    enum {
+        NF_APCL,
+        NF_MPA,
+        NF_MBD,
+        NF_APD,
+    };
 
     BPF_HASH(counts, struct key_t);
 
-    int do_count(struct pt_regs *ctx) {
+    static int __do_count(void *ctx, u64 nf) {
         u32 pid = bpf_get_current_pid_tgid() >> 32;
         if (FILTER_PID)
             return 0;
@@ -160,13 +168,28 @@ def handle_loop(stdscr, args):
         struct key_t key = {};
         u32 uid = bpf_get_current_uid_gid();
 
-        key.ip = PT_REGS_IP(ctx);
+        key.nf = nf;
         key.pid = pid;
         key.uid = uid;
         bpf_get_current_comm(&(key.comm), 16);
 
         counts.increment(key);
         return 0;
+    }
+    int do_count_apcl(struct pt_regs *ctx) {
+        return __do_count(ctx, NF_APCL);
+    }
+    int do_count_mpa(struct pt_regs *ctx) {
+        return __do_count(ctx, NF_MPA);
+    }
+    int do_count_mbd(struct pt_regs *ctx) {
+        return __do_count(ctx, NF_MBD);
+    }
+    int do_count_apd(struct pt_regs *ctx) {
+        return __do_count(ctx, NF_APD);
+    }
+    int do_count_apd_tp(void *ctx) {
+        return __do_count(ctx, NF_APD);
     }
 
     """
@@ -177,15 +200,23 @@ def handle_loop(stdscr, args):
         bpf_text = bpf_text.replace('FILTER_PID', '0')
 
     b = BPF(text=bpf_text)
-    b.attach_kprobe(event="add_to_page_cache_lru", fn_name="do_count")
-    b.attach_kprobe(event="mark_page_accessed", fn_name="do_count")
-    b.attach_kprobe(event="mark_buffer_dirty", fn_name="do_count")
+    b.attach_kprobe(event="add_to_page_cache_lru", fn_name="do_count_apcl")
+    b.attach_kprobe(event="mark_page_accessed", fn_name="do_count_mpa")
+    b.attach_kprobe(event="mark_buffer_dirty", fn_name="do_count_mbd")
 
     # Function account_page_dirtied() is changed to folio_account_dirtied() in 5.15.
+    # Introduce tracepoint writeback_dirty_{page,folio}
     if BPF.get_kprobe_functions(b'folio_account_dirtied'):
-        b.attach_kprobe(event="folio_account_dirtied", fn_name="do_count")
+        b.attach_kprobe(event="folio_account_dirtied", fn_name="do_count_apd")
     elif BPF.get_kprobe_functions(b'account_page_dirtied'):
-        b.attach_kprobe(event="account_page_dirtied", fn_name="do_count")
+        b.attach_kprobe(event="account_page_dirtied", fn_name="do_count_apd")
+    elif BPF.tracepoint_exists("writeback", "writeback_dirty_folio"):
+        b.attach_tracepoint(tp="writeback:writeback_dirty_folio", fn_name="do_count_apd_tp")
+    elif BPF.tracepoint_exists("writeback", "writeback_dirty_page"):
+        b.attach_tracepoint(tp="writeback:writeback_dirty_page", fn_name="do_count_apd_tp")
+    else:
+        raise Exception("Failed to attach kprobe %s or %s and any tracepoint" %
+                        ("folio_account_dirtied", "account_page_dirtied"))
 
     exiting = 0
 
