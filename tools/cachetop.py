@@ -182,10 +182,17 @@ def handle_loop(stdscr, args):
     b.attach_kprobe(event="mark_buffer_dirty", fn_name="do_count")
 
     # Function account_page_dirtied() is changed to folio_account_dirtied() in 5.15.
+    # FIXME: Both folio_account_dirtied() and account_page_dirtied() are
+    # static functions and they may be gone during compilation and this may
+    # introduce some inaccuracy, when attaching kprobe fails, report the running
+    # error in time.
     if BPF.get_kprobe_functions(b'folio_account_dirtied'):
         b.attach_kprobe(event="folio_account_dirtied", fn_name="do_count")
     elif BPF.get_kprobe_functions(b'account_page_dirtied'):
         b.attach_kprobe(event="account_page_dirtied", fn_name="do_count")
+    else:
+        raise Exception("Failed to attach kprobe %s or %s" %
+                        ("folio_account_dirtied", "account_page_dirtied"))
 
     exiting = 0
 
