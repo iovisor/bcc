@@ -73,4 +73,18 @@ int BPF_KPROBE(kprobe_mark_buffer_dirty)
 	return 0;
 }
 
+SEC("tracepoint/writeback/writeback_dirty_folio")
+int tracepoint__writeback_dirty_folio(struct trace_event_raw_sys_enter* ctx)
+{
+	__sync_fetch_and_add(&misses, -1);
+	return 0;
+}
+
+SEC("tracepoint/writeback/writeback_dirty_page")
+int tracepoint__writeback_dirty_page(struct trace_event_raw_sys_enter* ctx)
+{
+	__sync_fetch_and_add(&misses, -1);
+	return 0;
+}
+
 char LICENSE[] SEC("license") = "GPL";

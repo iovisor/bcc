@@ -5,6 +5,7 @@
 //  8-Mar-2021   Wenbo Zhang   Created this.
 // 30-Jan-2023   Rong Tao      Add kprobe and use fentry_can_attach() decide
 //                             use fentry/kprobe
+// 15-Feb-2023   Rong Tao      Add tracepoint writeback_dirty_{page,folio}
 #include <argp.h>
 #include <signal.h>
 #include <stdio.h>
@@ -164,8 +165,20 @@ int main(int argc, char **argv)
 	}
 	if (kprobe_exists("folio_account_dirtied")) {
 		bpf_program__set_autoload(obj->progs.kprobe_account_page_dirtied, false);
-	} else {
+		bpf_program__set_autoload(obj->progs.tracepoint__writeback_dirty_folio, false);
+		bpf_program__set_autoload(obj->progs.tracepoint__writeback_dirty_page, false);
+	} else if (kprobe_exists("account_page_dirtied")) {
 		bpf_program__set_autoload(obj->progs.kprobe_folio_account_dirtied, false);
+		bpf_program__set_autoload(obj->progs.tracepoint__writeback_dirty_folio, false);
+		bpf_program__set_autoload(obj->progs.tracepoint__writeback_dirty_page, false);
+	} else if (tracepoint_exists("writeback", "writeback_dirty_folio")) {
+		bpf_program__set_autoload(obj->progs.kprobe_account_page_dirtied, false);
+		bpf_program__set_autoload(obj->progs.kprobe_folio_account_dirtied, false);
+		bpf_program__set_autoload(obj->progs.tracepoint__writeback_dirty_page, false);
+	} else if (tracepoint_exists("writeback", "writeback_dirty_page")) {
+		bpf_program__set_autoload(obj->progs.kprobe_account_page_dirtied, false);
+		bpf_program__set_autoload(obj->progs.kprobe_folio_account_dirtied, false);
+		bpf_program__set_autoload(obj->progs.tracepoint__writeback_dirty_folio, false);
 	}
 
 	/* It fallbacks to kprobes when kernel does not support fentry. */
