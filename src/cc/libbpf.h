@@ -162,6 +162,7 @@ int bpf_add_ringbuf(struct ring_buffer *rb, int map_fd,
                     ring_buffer_sample_fn sample_cb, void *ctx);
 int bpf_poll_ringbuf(struct ring_buffer *rb, int timeout_ms);
 int bpf_consume_ringbuf(struct ring_buffer *rb);
+int bpf_epoll_fd_ringbuf(struct ring_buffer *rb);
 
 int bpf_obj_pin(int fd, const char *pathname);
 int bpf_obj_get(const char *pathname);

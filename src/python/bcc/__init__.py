@@ -1727,6 +1727,16 @@ class BPF(object):
             raise Exception("No ring buffers to poll")
         lib.bpf_consume_ringbuf(self._ringbuf_manager)
 
+    def ring_buffer_epoll_fd(self):
+        """ring_buffer_epoll_fd(self)
+
+        Get an fd that can be used to sleep until data is available
+        in the ring(s).
+        """
+        if not self._ringbuf_manager:
+            raise Exception("No ring buffers to poll")
+        return lib.bpf_epoll_fd_ringbuf(self._ringbuf_manager)
+
     def free_bcc_memory(self):
         return lib.bcc_free_memory()
 

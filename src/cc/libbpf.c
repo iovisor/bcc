@@ -1696,6 +1696,12 @@ int bpf_consume_ringbuf(struct ring_buffer *rb) {
     return ring_buffer__consume(rb);
 }
 
+/* Get an fd that can be used to sleep until data is available in the
+ * ring(s). */
+int bpf_epoll_fd_ringbuf(struct ring_buffer *rb) {
+    return ring_buffer__epoll_fd(rb);
+}
+
 int bcc_iter_attach(int prog_fd, union bpf_iter_link_info *link_info,
                     uint32_t link_info_len)
 {
