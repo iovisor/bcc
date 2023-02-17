@@ -10,7 +10,7 @@ static __always_inline void *
 bpf_map_lookup_or_try_init(void *map, const void *key, const void *init)
 {
 	void *val;
-	long err;
+	int err;
 
 	val = bpf_map_lookup_elem(map, key);
 	if (val)
