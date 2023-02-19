@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include "bcc_proc.h"
+
 #include <ctype.h>
 #include <dirent.h>
 #include <fcntl.h>
@@ -29,9 +31,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "bcc_perf_map.h"
-#include "bcc_proc.h"
 #include "bcc_elf.h"
+#include "bcc_perf_map.h"
+#include "bcc_zip.h"
 
 #ifdef __x86_64__
 // https://www.kernel.org/doc/Documentation/x86/x86_64/mm.txt
@@ -121,12 +123,49 @@ static char *_procutils_memfd_path(const int pid, const uint64_t inum) {
   return path;
 }
 
+static int _procfs_might_be_zip_path(const char *path) {
+  return strstr(path, ".zip") || strstr(path, ".apk");
+}
+
+static char *_procfs_find_zip_entry(const char *path, int pid,
+                                    uint32_t *offset) {
+  char ns_relative_path[PATH_MAX];
+  int rc = snprintf(ns_relative_path, sizeof(ns_relative_path),
+                    "/proc/%d/root%s", pid, path);
+  if (rc < 0 || rc >= sizeof(ns_relative_path)) {
+    return NULL;
+  }
+
+  struct bcc_zip_archive *archive = bcc_zip_archive_open(ns_relative_path);
+  if (archive == NULL) {
+    return NULL;
+  }
+
+  struct bcc_zip_entry entry;
+  if (bcc_zip_archive_find_entry_at_offset(archive, *offset, &entry) ||
+      entry.compression) {
+    bcc_zip_archive_close(archive);
+    return NULL;
+  }
+
+  char *result = malloc(strlen(path) + entry.name_length + 3);
+  if (result == NULL) {
+    bcc_zip_archive_close(archive);
+    return NULL;
+  }
+
+  sprintf(result, "%s!/%.*s", path, entry.name_length, entry.name);
+  *offset -= entry.data_offset;
+  bcc_zip_archive_close(archive);
+  return result;
+}
+
 // return: 0 -> callback returned < 0, stopped iterating
 //        -1 -> callback never indicated to stop
 int _procfs_maps_each_module(FILE *procmap, int pid,
                              bcc_procutils_modulecb callback, void *payload) {
   char buf[PATH_MAX + 1], perm[5];
-  char *name;
+  char *name, *resolved_name;
   mod_info mod;
   uint8_t enter_ns;
   while (true) {
@@ -148,14 +187,25 @@ int _procfs_maps_each_module(FILE *procmap, int pid,
     if (!bcc_mapping_is_file_backed(name))
       continue;
 
+    resolved_name = NULL;
     if (strstr(name, "/memfd:")) {
-      char *memfd_name = _procutils_memfd_path(pid, mod.inode);
-      if (memfd_name != NULL) {
-        strcpy(buf, memfd_name);
-        free(memfd_name);
-        mod.name = buf;
+      resolved_name = _procutils_memfd_path(pid, mod.inode);
+      if (resolved_name != NULL) {
         enter_ns = 0;
       }
+    } else if (_procfs_might_be_zip_path(mod.name)) {
+      uint32_t zip_entry_offset = mod.file_offset;
+      resolved_name = _procfs_find_zip_entry(mod.name, pid, &zip_entry_offset);
+      if (resolved_name != NULL) {
+        mod.file_offset = zip_entry_offset;
+      }
+    }
+
+    if (resolved_name != NULL) {
+      strncpy(buf, resolved_name, PATH_MAX);
+      buf[PATH_MAX] = 0;
+      free(resolved_name);
+      mod.name = buf;
     }
 
     if (callback(&mod, enter_ns, payload) < 0)

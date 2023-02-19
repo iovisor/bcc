@@ -42,7 +42,8 @@ set(TEST_LIBBCC_SOURCES
 	test_usdt_args.cc
 	test_usdt_probes.cc
 	utils.cc
-	test_parse_tracepoint.cc)
+	test_parse_tracepoint.cc
+	test_zip.cc)
 
 file(COPY dummy_proc_map.txt DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 add_library(usdt_test_lib SHARED usdt_test_lib.cc)
@@ -82,9 +83,17 @@ if(LIBLZMA_FOUND)
   list(APPEND DEBUGINFO_TARGETS with_gnu_debugdata)
 endif(LIBLZMA_FOUND)
 
+add_custom_command(OUTPUT archive.zip
+                   COMMAND mkdir -p zip_subdir
+                   COMMAND echo "This is a text file" > zip_subdir/file.txt
+                   COMMAND zip -0 archive.zip libdebuginfo_test_lib.so zip_subdir/file.txt
+                   DEPENDS debuginfo_test_lib
+                   BYPRODUCTS zip_subdir/file.txt)
+add_custom_target(zip_archive DEPENDS archive.zip)
+
 if(NOT CMAKE_USE_LIBBPF_PACKAGE)
   add_executable(test_libbcc ${TEST_LIBBCC_SOURCES})
-  add_dependencies(test_libbcc bcc-shared ${DEBUGINFO_TARGETS})
+  add_dependencies(test_libbcc bcc-shared zip_archive ${DEBUGINFO_TARGETS})
 
   target_link_libraries(test_libbcc ${PROJECT_BINARY_DIR}/src/cc/libbcc.so dl usdt_test_lib)
   set_target_properties(test_libbcc PROPERTIES INSTALL_RPATH ${PROJECT_BINARY_DIR}/src/cc)
@@ -95,7 +104,7 @@ endif()
 
 if(LIBBPF_FOUND)
   add_executable(test_libbcc_no_libbpf ${TEST_LIBBCC_SOURCES})
-  add_dependencies(test_libbcc_no_libbpf bcc-shared ${DEBUGINFO_TARGETS})
+  add_dependencies(test_libbcc_no_libbpf bcc-shared zip_archive ${DEBUGINFO_TARGETS})
 
   target_link_libraries(test_libbcc_no_libbpf ${PROJECT_BINARY_DIR}/src/cc/libbcc.so dl usdt_test_lib ${LIBBPF_LIBRARIES})
   set_target_properties(test_libbcc_no_libbpf PROPERTIES INSTALL_RPATH ${PROJECT_BINARY_DIR}/src/cc)

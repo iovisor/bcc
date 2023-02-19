@@ -114,6 +114,23 @@ TEST_CASE("resolve symbol name in external library using loaded libraries", "[c_
 
 namespace {
 
+static std::string zipped_lib_path() {
+  return CMAKE_CURRENT_BINARY_DIR "/archive.zip!/libdebuginfo_test_lib.so";
+}
+
+}  // namespace
+
+TEST_CASE("resolve symbol name in external zipped library", "[c_api]") {
+  struct bcc_symbol sym;
+  REQUIRE(bcc_resolve_symname(zipped_lib_path().c_str(), "symbol", 0x0, 0,
+                              nullptr, &sym) == 0);
+  REQUIRE(sym.module == zipped_lib_path());
+  REQUIRE(sym.offset != 0);
+  bcc_procutils_free(sym.module);
+}
+
+namespace {
+
 void system(const std::string &command) {
   if (::system(command.c_str())) {
     abort();
@@ -769,6 +786,27 @@ TEST_CASE("searching for modules in /proc/[pid]/maps", "[c_api][!mayfail]") {
   }
 
   fclose(dummy_maps);
+
+  SECTION("seach for lib in zip") {
+    std::string line =
+        "7f151476e000-7f1514779000 r-xp 00001000 00:1b "
+        "72809479 " CMAKE_CURRENT_BINARY_DIR "/archive.zip\n";
+    dummy_maps = fmemopen(nullptr, line.size(), "w+");
+    REQUIRE(fwrite(line.c_str(), line.size(), 1, dummy_maps) == 1);
+    fseek(dummy_maps, 0, SEEK_SET);
+
+    struct mod_search search;
+    memset(&search, 0, sizeof(struct mod_search));
+    std::string zip_entry_path = zipped_lib_path();
+    search.name = zip_entry_path.c_str();
+    int res = _procfs_maps_each_module(dummy_maps, getpid(),
+                                       _bcc_syms_find_module, &search);
+    REQUIRE(res == 0);
+    REQUIRE(search.start == 0x7f151476e000);
+    REQUIRE(search.file_offset < 0x1000);
+
+    fclose(dummy_maps);
+  }
 }
 
 TEST_CASE("resolve global addr in libc in this process", "[c_api][!mayfail]") {

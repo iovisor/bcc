@@ -17,19 +17,23 @@
 #define _GNU_SOURCE
 #endif
 
+#include "libbpf.h"
+
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <libgen.h>
 #include <limits.h>
 #include <linux/bpf.h>
 #include <linux/bpf_common.h>
+#include <linux/if_alg.h>
 #include <linux/if_packet.h>
-#include <linux/types.h>
 #include <linux/perf_event.h>
 #include <linux/pkt_cls.h>
 #include <linux/rtnetlink.h>
 #include <linux/sched.h>
+#include <linux/types.h>
 #include <linux/unistd.h>
 #include <linux/version.h>
 #include <net/ethernet.h>
@@ -38,7 +42,6 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <libgen.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/resource.h>
@@ -46,9 +49,8 @@
 #include <sys/types.h>
 #include <sys/vfs.h>
 #include <unistd.h>
-#include <linux/if_alg.h>
 
-#include "libbpf.h"
+#include "bcc_zip.h"
 #include "perf_reader.h"
 
 // TODO: Remove this when CentOS 6 support is not needed anymore
@@ -1261,10 +1263,42 @@ int bpf_attach_kprobe(int progfd, enum bpf_probe_attach_type attach_type,
                           fn_offset, -1, maxactive, 0);
 }
 
+static int _find_archive_path_and_offset(const char *entry_path,
+                                         char out_path[PATH_MAX],
+                                         uint64_t *offset) {
+  const char *separator = strstr(entry_path, "!/");
+  if (separator == NULL || (separator - entry_path) >= PATH_MAX) {
+    return -1;
+  }
+
+  struct bcc_zip_entry entry;
+  struct bcc_zip_archive *archive =
+      bcc_zip_archive_open_and_find(entry_path, &entry);
+  if (archive == NULL) {
+    return -1;
+  }
+  if (entry.compression) {
+    bcc_zip_archive_close(archive);
+    return -1;
+  }
+
+  strncpy(out_path, entry_path, separator - entry_path);
+  out_path[separator - entry_path] = 0;
+  *offset += entry.data_offset;
+
+  bcc_zip_archive_close(archive);
+  return 0;
+}
+
 int bpf_attach_uprobe(int progfd, enum bpf_probe_attach_type attach_type,
                       const char *ev_name, const char *binary_path,
                       uint64_t offset, pid_t pid, uint32_t ref_ctr_offset)
 {
+  char archive_path[PATH_MAX];
+  if (access(binary_path, F_OK) != 0 &&
+      _find_archive_path_and_offset(binary_path, archive_path, &offset) == 0) {
+    binary_path = archive_path;
+  }
 
   return bpf_attach_probe(progfd, attach_type,
                           ev_name, binary_path, "uprobe",
