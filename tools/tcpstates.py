@@ -295,9 +295,9 @@ header_string = "%-16s %-5s %-10.10s %s%-15s %-5s %-15s %-5s %-11s -> %-11s %s"
 format_string = ("%-16x %-5d %-10.10s %s%-15s %-5d %-15s %-5d %-11s " +
     "-> %-11s %.3f")
 if args.wide:
-    header_string = ("%-16s %-5s %-16.16s %-2s %-26s %-5s %-26s %-5s %-11s " +
+    header_string = ("%-16s %-5s %-16.16s %-2s %-39s %-5s %-39s %-5s %-11s " +
         "-> %-11s %s")
-    format_string = ("%-16x %-5d %-16.16s %-2s %-26s %-5s %-26s %-5d %-11s " +
+    format_string = ("%-16x %-5d %-16.16s %-2s %-39s %-5s %-39s %-5d %-11s " +
         "-> %-11s %.3f")
 if args.csv:
     header_string = "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s"

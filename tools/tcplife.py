@@ -419,8 +419,8 @@ if debug or args.ebpf:
 header_string = "%-5s %-10.10s %s%-15s %-5s %-15s %-5s %5s %5s %s"
 format_string = "%-5d %-10.10s %s%-15s %-5d %-15s %-5d %5d %5d %.2f"
 if args.wide:
-    header_string = "%-5s %-16.16s %-2s %-26s %-5s %-26s %-5s %6s %6s %s"
-    format_string = "%-5d %-16.16s %-2s %-26s %-5s %-26s %-5d %6d %6d %.2f"
+    header_string = "%-5s %-16.16s %-2s %-39s %-5s %-39s %-5s %6s %6s %s"
+    format_string = "%-5d %-16.16s %-2s %-39s %-5s %-39s %-5d %6d %6d %.2f"
 if args.csv:
     header_string = "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s"
     format_string = "%d,%s,%s,%s,%s,%s,%d,%d,%d,%.2f"
