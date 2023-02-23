@@ -172,17 +172,38 @@ int main(int argc, char **argv)
 
 	obj->rodata->targ_ms = env.milliseconds;
 
-	if (fentry_can_attach("blk_account_io_start", NULL)) {
-		bpf_program__set_attach_target(obj->progs.blk_account_io_start, 0,
-					       "blk_account_io_start");
-		bpf_program__set_attach_target(obj->progs.blk_account_io_done, 0,
-					       "blk_account_io_done");
+	if (kprobe_exists("blk_account_io_start")) {
+		if (fentry_can_attach("blk_account_io_start", NULL)) {
+			bpf_program__set_attach_target(obj->progs.blk_account_io_start, 0,
+						       "blk_account_io_start");
+			bpf_program__set_attach_target(obj->progs.blk_account_io_done, 0,
+						       "blk_account_io_done");
+			bpf_program__set_autoload(obj->progs.kprobe_blk_account_io_start, false);
+			bpf_program__set_autoload(obj->progs.kprobe_blk_account_io_done, false);
+		} else {
+			bpf_program__set_autoload(obj->progs.blk_account_io_start, false);
+			bpf_program__set_autoload(obj->progs.blk_account_io_done, false);
+		}
+		bpf_program__set_autoload(obj->progs.kprobe___blk_account_io_start, false);
+		bpf_program__set_autoload(obj->progs.kprobe___blk_account_io_done, false);
 	} else {
-		bpf_program__set_attach_target(obj->progs.blk_account_io_start, 0,
-					       "__blk_account_io_start");
-		bpf_program__set_attach_target(obj->progs.blk_account_io_done, 0,
-					       "__blk_account_io_done");
+		if (fentry_can_attach("__blk_account_io_start", NULL)) {
+			bpf_program__set_attach_target(obj->progs.blk_account_io_start, 0,
+						       "__blk_account_io_start");
+			bpf_program__set_attach_target(obj->progs.blk_account_io_done, 0,
+						       "__blk_account_io_done");
+			bpf_program__set_autoload(obj->progs.kprobe___blk_account_io_start, false);
+			bpf_program__set_autoload(obj->progs.kprobe___blk_account_io_done, false);
+		} else {
+			bpf_program__set_autoload(obj->progs.blk_account_io_start, false);
+			bpf_program__set_autoload(obj->progs.blk_account_io_done, false);
+		}
+		bpf_program__set_autoload(obj->progs.kprobe_blk_account_io_start, false);
+		bpf_program__set_autoload(obj->progs.kprobe_blk_account_io_done, false);
 	}
+
+	if (!kprobe_exists("blk_account_io_merge_bio"))
+		bpf_program__set_autoload(obj->progs.blk_account_io_merge_bio, false);
 
 	err = biostacks_bpf__load(obj);
 	if (err) {
@@ -190,32 +211,15 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	obj->links.blk_account_io_start = bpf_program__attach(obj->progs.blk_account_io_start);
-	if (!obj->links.blk_account_io_start) {
-		err = -errno;
-		fprintf(stderr, "failed to attach blk_account_io_start: %s\n", strerror(-err));
+	err = biostacks_bpf__attach(obj);
+	if (err) {
+		fprintf(stderr, "failed to attach BPF programs\n");
 		goto cleanup;
 	}
+
 	ksyms = ksyms__load();
 	if (!ksyms) {
 		fprintf(stderr, "failed to load kallsyms\n");
-		goto cleanup;
-	}
-	if (ksyms__get_symbol(ksyms, "blk_account_io_merge_bio")) {
-		obj->links.blk_account_io_merge_bio =
-			bpf_program__attach(obj->progs.blk_account_io_merge_bio);
-		if (!obj->links.blk_account_io_merge_bio) {
-			err = -errno;
-			fprintf(stderr, "failed to attach blk_account_io_merge_bio: %s\n",
-				strerror(-err));
-			goto cleanup;
-		}
-	}
-	obj->links.blk_account_io_done = bpf_program__attach(obj->progs.blk_account_io_done);
-	if (!obj->links.blk_account_io_done) {
-		err = -errno;
-		fprintf(stderr, "failed to attach blk_account_io_done: %s\n",
-			strerror(-err));
 		goto cleanup;
 	}
 

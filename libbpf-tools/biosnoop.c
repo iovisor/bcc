@@ -197,6 +197,8 @@ int main(int argc, char **argv)
 	int err;
 	int idx, cg_map_fd;
 	int cgfd = -1;
+	bool blk_account_io_start_symbol;
+	bool blk_account_io_start_fentry;
 
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
 	if (err)
@@ -229,12 +231,32 @@ int main(int argc, char **argv)
 	obj->rodata->targ_queued = env.queued;
 	obj->rodata->filter_cg = env.cg;
 
-	if (fentry_can_attach("blk_account_io_start", NULL))
-		bpf_program__set_attach_target(obj->progs.blk_account_io_start, 0,
-					       "blk_account_io_start");
-	else
-		bpf_program__set_attach_target(obj->progs.blk_account_io_start, 0,
-					       "__blk_account_io_start");
+
+	if (kprobe_exists("blk_account_io_start")) {
+		if (fentry_can_attach("blk_account_io_start", NULL)) {
+			bpf_program__set_attach_target(obj->progs.blk_account_io_start, 0,
+						       "blk_account_io_start");
+			bpf_program__set_autoload(obj->progs.kprobe_blk_account_io_start, false);
+			blk_account_io_start_fentry = true;
+		} else {
+			bpf_program__set_autoload(obj->progs.blk_account_io_start, false);
+			blk_account_io_start_fentry = false;
+		}
+		bpf_program__set_autoload(obj->progs.kprobe___blk_account_io_start, false);
+		blk_account_io_start_symbol = true;
+	} else {
+		if (fentry_can_attach("__blk_account_io_start", NULL)) {
+			bpf_program__set_attach_target(obj->progs.blk_account_io_start, 0,
+						       "__blk_account_io_start");
+			bpf_program__set_autoload(obj->progs.kprobe___blk_account_io_start, false);
+			blk_account_io_start_fentry = true;
+		} else {
+			bpf_program__set_autoload(obj->progs.blk_account_io_start, false);
+			blk_account_io_start_fentry = false;
+		}
+		bpf_program__set_autoload(obj->progs.kprobe_blk_account_io_start, false);
+		blk_account_io_start_symbol = false;
+	}
 
 	err = biosnoop_bpf__load(obj);
 	if (err) {
@@ -257,12 +279,24 @@ int main(int argc, char **argv)
 		}
 	}
 
-	obj->links.blk_account_io_start = bpf_program__attach(obj->progs.blk_account_io_start);
-	if (!obj->links.blk_account_io_start) {
-		err = -errno;
-		fprintf(stderr, "failed to attach blk_account_io_start: %s\n",
-			strerror(-err));
-		goto cleanup;
+
+	if (blk_account_io_start_fentry)
+		obj->links.blk_account_io_start = bpf_program__attach(
+			obj->progs.blk_account_io_start);
+	else
+		if (blk_account_io_start_symbol)
+			obj->links.kprobe_blk_account_io_start = bpf_program__attach(
+				obj->progs.kprobe_blk_account_io_start);
+		else
+			obj->links.kprobe___blk_account_io_start = bpf_program__attach(
+				obj->progs.kprobe___blk_account_io_start);
+	if (!obj->links.blk_account_io_start &&
+	    !obj->links.kprobe_blk_account_io_start &&
+	    !obj->links.kprobe___blk_account_io_start) {
+			err = -errno;
+			fprintf(stderr, "failed to attach blk_account_io_start: %s\n",
+				strerror(-err));
+			goto cleanup;
 	}
 	ksyms = ksyms__load();
 	if (!ksyms) {
