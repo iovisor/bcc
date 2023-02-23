@@ -81,8 +81,6 @@ typedef struct pidns_key {
     u64 slot;
 } pidns_key_t;
 BPF_HASH(start, u32);
-
-// additional array to calculate avg and total
 BPF_ARRAY(avg, u64, 2);
 STORAGE
 // record enqueue timestamp
@@ -211,7 +209,7 @@ RAW_TRACEPOINT_PROBE(sched_switch)
     }
     delta = bpf_ktime_get_ns() - *tsp;
     
-    // code for avg and total calculation
+    // avg time and total calls 
     u32 lat = 0;
     u32 cnt = 1;
     avg.atomic_increment(lat, delta);
