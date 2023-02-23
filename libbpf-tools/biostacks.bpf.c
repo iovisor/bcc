@@ -67,20 +67,7 @@ int trace_start(void *ctx, struct request *rq, bool merge_bio)
 	return 0;
 }
 
-SEC("fentry/blk_account_io_start")
-int BPF_PROG(blk_account_io_start, struct request *rq)
-{
-	return trace_start(ctx, rq, false);
-}
-
-SEC("kprobe/blk_account_io_merge_bio")
-int BPF_KPROBE(blk_account_io_merge_bio, struct request *rq)
-{
-	return trace_start(ctx, rq, true);
-}
-
-SEC("fentry/blk_account_io_done")
-int BPF_PROG(blk_account_io_done, struct request *rq)
+static int trace_done(void *ctx, struct request *rq)
 {
 	u64 slot, ts = bpf_ktime_get_ns();
 	struct internal_rqinfo *i_rqinfop;
@@ -108,6 +95,54 @@ int BPF_PROG(blk_account_io_done, struct request *rq)
 cleanup:
 	bpf_map_delete_elem(&rqinfos, &rq);
 	return 0;
+}
+
+SEC("fentry/blk_account_io_start")
+int BPF_PROG(blk_account_io_start, struct request *rq)
+{
+	return trace_start(ctx, rq, false);
+}
+
+SEC("fentry/blk_account_io_done")
+int BPF_PROG(blk_account_io_done, struct request *rq)
+{
+	return trace_done(ctx, rq);
+}
+
+SEC("fentry/blk_account_io_merge_bio")
+int BPF_PROG(blk_account_io_merge_bio, struct request *rq)
+{
+	return trace_start(ctx, rq, true);
+}
+
+SEC("kprobe/blk_account_io_start")
+int BPF_KPROBE(kprobe_blk_account_io_start, struct request *rq)
+{
+	return trace_start(ctx, rq, false);
+}
+
+SEC("kprobe/blk_account_io_done")
+int BPF_KPROBE(kprobe_blk_account_io_done, struct request *rq)
+{
+	return trace_done(ctx, rq);
+}
+
+SEC("kprobe/__blk_account_io_start")
+int BPF_KPROBE(kprobe___blk_account_io_start, struct request *rq)
+{
+	return trace_start(ctx, rq, false);
+}
+
+SEC("kprobe/__blk_account_io_done")
+int BPF_KPROBE(kprobe___blk_account_io_done, struct request *rq)
+{
+	return trace_done(ctx, rq);
+}
+
+SEC("kprobe/blk_account_io_merge_bio")
+int BPF_KPROBE(kprobe_blk_account_io_merge_bio, struct request *rq)
+{
+	return trace_start(ctx, rq, true);
 }
 
 char LICENSE[] SEC("license") = "GPL";
