@@ -648,6 +648,8 @@ argdist -I 'kernel/sched/sched.h' \\
                        "as either full path, "
                        "or relative to relative to current working directory, "
                        "or relative to default kernel header search path")
+                parser.add_argument("--ebpf", action="store_true",
+                  help=argparse.SUPPRESS)
                 self.args = parser.parse_args()
                 self.usdt_ctx = None
 
@@ -683,7 +685,10 @@ struct __string_t { char s[%d]; };
                                      for probe in self.probes
                                      if probe.usdt_ctx]:
                             print(text)
-                        print(bpf_source)
+                if self.args.verbose or self.args.ebpf:
+                    print(bpf_source)
+                    if self.args.ebpf:
+                        exit()
                 usdt_contexts = [probe.usdt_ctx
                                  for probe in self.probes if probe.usdt_ctx]
                 self.bpf = BPF(text=bpf_source, usdt_contexts=usdt_contexts)
