@@ -294,6 +294,7 @@ def print_count_stats_json():
 def print_latency_stats_json():
     data = bpf["data"]
     time = strftime("%H:%M:%S")
+    time_colname = "time (ms)" if args.milliseconds else "time (us)"
     for k, v in sorted(data.items(),
                        key=lambda kv: -kv[1].total_ns)[:args.top]:
         if k.value == 0xFFFFFFFF:
@@ -301,10 +302,10 @@ def print_latency_stats_json():
         if args.process:
             print("%s" % { "time": time, "pid": k.value, "comm": comm_for_pid(k.value).decode(),
                           "count": v.count,
-                          "time (us)": v.total_ns / (1e6 if args.milliseconds else 1e3) })
+                          time_colname: v.total_ns / (1e6 if args.milliseconds else 1e3) })
         else:
             print("%s" % { "time": time, "syscall": syscall_name(k.value).decode(), "count": v.count,
-                      "time (us)": v.total_ns / (1e6 if args.milliseconds else 1e3) })
+                      time_colname: v.total_ns / (1e6 if args.milliseconds else 1e3) })
     data.clear()
 
 if not args.json:
