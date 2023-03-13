@@ -1,0 +1,786 @@
+Demonstrations of udstop, the Linux eBPF/bcc version.
+
+This tool traces linux kernel's uds send/receive functions, then summarizes
+the throughput by host. 
+
+For example:
+
+./udstop 
+Tracing... Output every 1 secs. Hit Ctrl-C to end
+PID     COMM             INO          PEERINO      RX_KB   TX_KB   SUN_PATH
+6822    kubelet          162853       133686       364     0       
+38779   runc:[2:INIT]    371304637    371304638    30      0       
+50958   containerd-shim  3364965      3297143      23      5       /run/containerd/s/85a93640b5e864443ff6c6296db7f1ecdf2a9f28b404e8daa1eec9e13fcc13d0
+71487   nvmf-worker-8    4062240      4056555      8       6       /uds/server_backend_remote.socket
+71487   nvmf-worker-7    4062242      3846068      8       5       /uds/server_backend_remote.socket
+71487   nvmf-worker-8    4062244      3942804      8       5       /uds/server_backend_remote.socket
+71487   nvmf-worker-7    4062235      3783275      8       2       /uds/server_backend_remote.socket
+71487   nvmf-worker-7    4062238      4051050      8       3       /uds/server_backend_remote.socket
+84698   nvmf-worker-1    3902346      4053378      8       0       /uds/server_backend.socket
+84698   nvmf-worker-2    3900400      3907178      8       0       /uds/server_backend.socket
+64659   epollEventLoopG  3867236      4062237      6       4       
+64659   epollEventLoopG  4056555      4062240      6       8       
+5620    containerd       3297143      3364965      5       23      
+64659   epollEventLoopG  3846068      4062242      5       8       
+64659   epollEventLoopG  3942804      4062244      5       8       
+64659   epollEventLoopG  43536279     43222856     4       4       
+71487   nvmf-worker-7    43222856     43536279     4       4       /uds/server_backend_remote.socket
+71487   nvmf-worker-8    4062237      3867236      4       6       /uds/server_backend_remote.socket
+71487   nvmf-worker-0    3806936      3771790      4       0       /uds/server_frontend_remote.socket
+84698   nvmf-worker-2    8853771      8822184      4       0       /uds/server_backend.socket
+84698   nvmf-worker-2    3792111      3791046      4       0       /uds/server_backend.socket
+71487   nvmf-worker-1    3806938      3771791      4       0       /uds/server_frontend_remote.socket
+84698   nvmf-worker-1    3855322      4068816      4       0       /uds/server_backend.socket
+64659   epollEventLoopG  4051050      4062238      3       8       
+64659   epollEventLoopG  3783275      4062235      2       8       
+64659   epollEventLoopG  5772714      5738771      2       0       
+5620    containerd       3291521      3274459      0       0       /run/k3s/containerd/containerd.sock.ttrpc
+5620    containerd       133686       162853       0       364     /run/k3s/containerd/containerd.sock
+84698   nvmf-worker-2    5738771      5772714      0       2       /uds/server_backend.socket
+64659   epollEventLoopG  4053378      3902346      0       8       
+64659   epollEventLoopG  3907178      3900400      0       8       
+38774   5                371304637    371304638    0       0       
+21538   nvme-netty-1     3791046      3792111      0       4       
+21538   nvme-netty-2     3771791      3806938      0       4       
+21538   nvme-netty-1     3771790      3806936      0       4       
+64659   epollEventLoopG  8822184      8853771      0       4       
+64659   epollEventLoopG  4068816      3855322      0       4       
+38767   runc             371304638    371304637    0       31      
+50958   containerd-shim  3274459      3291521      0       0       
+38774   runc:[0:PARENT]  371269258    371269257    0       0       
+38774   runc:[0:PARENT]  371269260    371269259    0       0       
+38777   runc:[1:CHILD]   371269257    371269258    0       0       
+38779   runc:[2:INIT]    371269259    371269260    0       0       
+38774   runc:[0:PARENT]  371304637    371304638    0       0       
+PID     COMM             INO          PEERINO      RX_KB   TX_KB   SUN_PATH
+6822    kubelet          162853       133686       204     1       
+38830   runc:[2:INIT]    371201750    371201751    30      0       
+38804   runc:[2:INIT]    371304641    371304642    30      0       
+38889   runc:[2:INIT]    371299703    371299704    28      0       
+51691   containerd-shim  3332031      3265170      23      5       /run/containerd/s/fc6d5fa3c1969a99383af956cee986a8087545105cbabfc048622dc139b257c7
+51623   containerd-shim  3257126      3325848      23      5       /run/containerd/s/d608723fc5d77d88621fad046b197941b3066aecf0955e5d30e910dc59af11a4
+53342   containerd-shim  3433200      3337912      23      5       /run/containerd/s/d425578b540508c71390e8fa53a354e59da192760022507cdaf12e22a0e5d873
+38849   runc:[2:INIT]    371305650    371305651    16      0       
+6968    containerd-shim  926292       1033091      6       5       /run/containerd/s/8a40d1d734a5773a50d8bbe67a5ce820c13276b71292d53d6f37d0582aa7f129
+5620    containerd       3325848      3257126      5       23      
+5620    containerd       1033091      926292       5       6       
+5620    containerd       3337912      3433200      5       23      
+5620    containerd       3265170      3332031      5       23      
+84698   nvmf-worker-2    3792119      3791050      4       0       /uds/server_backend.socket
+71487   nvmf-worker-4    3806944      3771794      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-0    3658949      3690344      4       0       /uds/server_frontend_remote.socket
+84698   nvmf-worker-1    3792121      3791051      4       0       /uds/server_backend.socket
+84698   nvmf-worker-1    3792113      3791047      4       0       /uds/server_backend.socket
+71487   nvmf-worker-1    3806896      3771770      4       0       /uds/server_frontend_remote.socket
+84698   nvmf-worker-2    3947848      3943765      4       0       /uds/server_backend.socket
+71487   nvmf-worker-7    3613578      3613575      4       0       /uds/server_backend_remote.socket
+71487   nvmf-worker-2    3806884      3771764      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-8    3726440      3671644      4       0       /uds/server_backend_remote.socket
+71487   nvmf-worker-0    3806894      3771769      4       0       /uds/server_frontend_remote.socket
+84698   nvmf-worker-2    3792115      3791048      4       0       /uds/server_backend.socket
+71487   nvmf-worker-2    3806898      3771771      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-2    3806940      3771792      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-6    3806892      3771768      4       0       /uds/server_frontend_remote.socket
+84698   nvmf-worker-1    3792117      3791049      4       0       /uds/server_backend.socket
+71487   nvmf-worker-3    3806886      3771765      4       0       /uds/server_frontend_remote.socket
+84698   nvmf-worker-0    3721650      3609477      4       0       /uds/server_frontend.socket
+71487   nvmf-worker-3    3806942      3771793      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-3    3806900      3771772      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-4    3806888      3771766      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-5    3806946      3771795      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-3    3658942      3777658      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-5    3806890      3771767      4       0       /uds/server_frontend_remote.socket
+5620    containerd       133686       162853       1       204     /run/k3s/containerd/containerd.sock
+5620    containerd       3307824      3293738      0       0       /run/k3s/containerd/containerd.sock.ttrpc
+5620    containerd       3264433      3328066      0       0       /run/k3s/containerd/containerd.sock.ttrpc
+5620    containerd       3325653      3301695      0       0       /run/k3s/containerd/containerd.sock.ttrpc
+5620    containerd       146157       92449        0       0       /run/k3s/containerd/containerd.sock.ttrpc
+38847   5                371305650    371305651    0       0       
+38827   5                371201750    371201751    0       0       
+38887   5                371299703    371299704    0       0       
+38802   5                371304641    371304642    0       0       
+21538   nvme-netty-2     3771765      3806886      0       4       
+21538   nvme-netty-2     3771795      3806946      0       4       
+21538   nvme-netty-1     3771770      3806896      0       4       
+21538   nvme-netty-1     3791048      3792115      0       4       
+67292   epollEventLoopG  3690344      3658949      0       4       
+21538   nvme-netty-1     3791050      3792119      0       4       
+74713   epollEventLoopG  3943765      3947848      0       4       
+21538   nvme-netty-2     3771771      3806898      0       4       
+67292   epollEventLoopG  3777658      3658942      0       4       
+21538   nvme-netty-1     3771794      3806944      0       4       
+67292   epollEventLoopG  3609477      3721650      0       4       
+21538   nvme-netty-2     3791047      3792113      0       4       
+21538   nvme-netty-1     3771792      3806940      0       4       
+74713   epollEventLoopG  3613575      3613578      0       4       
+21538   nvme-netty-1     3771766      3806888      0       4       
+21538   nvme-netty-2     3771767      3806890      0       4       
+21538   nvme-netty-1     3771772      3806900      0       4       
+21538   nvme-netty-1     3771764      3806884      0       4       
+21538   nvme-netty-2     3771769      3806894      0       4       
+21538   nvme-netty-2     3771793      3806942      0       4       
+21538   nvme-netty-2     3791049      3792117      0       4       
+74713   epollEventLoopG  3671644      3726440      0       4       
+21538   nvme-netty-1     3771768      3806892      0       4       
+21538   nvme-netty-2     3791051      3792121      0       4       
+38851   runc             371299704    371299703    0       28      
+38838   runc             371305651    371305650    0       16      
+38795   runc             371304642    371304641    0       30      
+38814   runc             371201751    371201750    0       30      
+53342   containerd-shim  3301695      3325653      0       0       
+51691   containerd-shim  3328066      3264433      0       0       
+51623   containerd-shim  3293738      3307824      0       0       
+6968    containerd-shim  92449        146157       0       0       
+38887   runc:[0:PARENT]  371276342    371276341    0       0       
+38802   runc:[0:PARENT]  371269266    371269265    0       0       
+38827   runc:[0:PARENT]  371312242    371312241    0       0       
+38847   runc:[0:PARENT]  371304650    371304649    0       0       
+38803   runc:[1:CHILD]   371269265    371269266    0       0       
+38889   runc:[2:INIT]    371276343    371276344    0       0       
+38848   runc:[1:CHILD]   371304649    371304650    0       0       
+38804   runc:[2:INIT]    371269267    371269268    0       0       
+38830   runc:[2:INIT]    371312243    371312244    0       0       
+38827   runc:[0:PARENT]  371312244    371312243    0       0       
+38849   runc:[2:INIT]    371304651    371304652    0       0       
+38887   runc:[0:PARENT]  371276344    371276343    0       0       
+38888   runc:[1:CHILD]   371276341    371276342    0       0       
+38828   runc:[1:CHILD]   371312241    371312242    0       0       
+38847   runc:[0:PARENT]  371304652    371304651    0       0       
+38802   runc:[0:PARENT]  371269268    371269267    0       0       
+38827   runc:[0:PARENT]  371201750    371201751    0       0       
+38887   runc:[0:PARENT]  371299703    371299704    0       0       
+38802   runc:[0:PARENT]  371304641    371304642    0       0       
+38847   runc:[0:PARENT]  371305650    371305651    0       0  
+
+The example shows all active unix domain socket's rx/tx throughput(Kbytes).
+PID column is process's ID of UDS; COMM coloum is process name of UDS.
+INO is inode number of UDS; PEERINO is inode number of UDS's peer socket.
+RX_KB is receive throughput of UDS; TX_KB is send throughtput of UDS.
+SUN_PATH is socket file's path of UDS.
+
+We can also specify the no clear screen option (-C), along with interval
+and count parameters. Eg, printing out every 1 second, and including 
+timestamps(-T):
+./udstop -T -C 1 2
+Tracing... Output every 1 secs. Hit Ctrl-C to end
+
+05:33:11
+PID     COMM             INO          PEERINO      RX_KB   TX_KB   SUN_PATH
+6822    kubelet          162853       133686       525     1       
+76632   runc:[2:INIT]    370833165    370833166    47      0       
+76604   runc:[2:INIT]    370838529    370838530    31      0       
+76582   runc:[2:INIT]    370719654    370719655    30      0       
+54333   containerd-shim  102063898    101988330    24      5       /run/containerd/s/10f44d25d061f2f41eeb8fe37d854afebdf9d3b22eac2a6e9c5c5e5ab4261559
+54275   containerd-shim  3300040      3332370      23      5       /run/containerd/s/2fa0e17f64e1f1c0fe31feb9c2ebffc46bea493011816fe971346444d9d6008e
+76678   runc:[2:INIT]    370755575    370755576    16      0       
+76643   runc:[2:INIT]    370825470    370825471    10      0       
+6968    containerd-shim  926292       1033091      6       5       /run/containerd/s/8a40d1d734a5773a50d8bbe67a5ce820c13276b71292d53d6f37d0582aa7f129
+89884   containerd-shim  2994805      2959038      6       5       /run/containerd/s/abb0675dfc32c6b3aba5629ec945c6058a97ee2bb10e40adaf5aa4412f238352
+5620    containerd       3332370      3300040      5       23      
+5620    containerd       1033091      926292       5       6       
+5620    containerd       2927605      2981189      5       5       
+5620    containerd       2959038      2994805      5       6       
+5620    containerd       101988330    102063898    5       24      
+89693   containerd-shim  2981189      2927605      5       5       /run/containerd/s/2b3774ac8014458944995365466f4fa694442f88c94efe8030f21cb5bb9792a3
+71487   nvmf-worker-5    3806932      3771788      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-7    3613578      3613575      4       0       /uds/server_backend_remote.socket
+71487   nvmf-worker-7    4062242      3846068      4       0       /uds/server_backend_remote.socket
+71487   nvmf-worker-8    4062237      3867236      4       0       /uds/server_backend_remote.socket
+71487   nvmf-worker-6    3806934      3771789      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-0    3806936      3771790      4       0       /uds/server_frontend_remote.socket
+84698   nvmf-worker-2    8853771      8822184      4       0       /uds/server_backend.socket
+5620    containerd       133686       162853       1       525     /run/k3s/containerd/containerd.sock
+5620    containerd       3304894      3310589      0       0       /run/k3s/containerd/containerd.sock.ttrpc
+5620    containerd       3320963      3333156      0       0       /run/k3s/containerd/containerd.sock.ttrpc
+5620    containerd       146157       92449        0       0       /run/k3s/containerd/containerd.sock.ttrpc
+5620    containerd       2947037      2980184      0       0       /run/k3s/containerd/containerd.sock.ttrpc
+5620    containerd       2927606      2978114      0       0       /run/k3s/containerd/containerd.sock.ttrpc
+90172   node             370691824    370761169    0       0       /csi/csi.sock
+76641   5                370825470    370825471    0       0       
+76630   5                370833165    370833166    0       0       
+76577   5                370719654    370719655    0       0       
+76676   5                370755575    370755576    0       0       
+76602   5                370838529    370838530    0       0       
+90090   livenessprobe    370761169    370691824    0       0       
+64659   epollEventLoopG  3846068      4062242      0       4       
+74713   epollEventLoopG  3613575      3613578      0       4       
+64659   epollEventLoopG  3867236      4062237      0       4       
+21538   nvme-netty-1     3771788      3806932      0       4       
+21538   nvme-netty-1     3771790      3806936      0       4       
+64659   epollEventLoopG  8822184      8853771      0       4       
+21538   nvme-netty-2     3771789      3806934      0       4       
+76615   runc             370833166    370833165    0       47      
+76595   runc             370838530    370838529    0       31      
+76569   runc             370719655    370719654    0       30      
+76668   runc             370755576    370755575    0       16      
+76621   runc             370825471    370825470    0       10      
+89884   containerd-shim  2978114      2927606      0       0       
+54275   containerd-shim  3333156      3320963      0       0       
+54333   containerd-shim  3310589      3304894      0       0       
+89693   containerd-shim  2980184      2947037      0       0       
+6968    containerd-shim  92449        146157       0       0       
+76676   runc:[0:PARENT]  370838550    370838549    0       0       
+76641   runc:[0:PARENT]  370824678    370824677    0       0       
+76602   runc:[0:PARENT]  370799292    370799291    0       0       
+76630   runc:[0:PARENT]  370823399    370823398    0       0       
+76577   runc:[0:PARENT]  370654173    370654172    0       0       
+76631   runc:[1:CHILD]   370823398    370823399    0       0       
+76581   runc:[1:CHILD]   370654172    370654173    0       0       
+76582   runc:[2:INIT]    370654174    370654175    0       0       
+76641   runc:[0:PARENT]  370824680    370824679    0       0       
+76678   runc:[2:INIT]    370838551    370838552    0       0       
+76577   runc:[0:PARENT]  370654175    0            0       0       
+76602   runc:[0:PARENT]  370799294    370799293    0       0       
+76630   runc:[0:PARENT]  370823401    370823400    0       0       
+76677   runc:[1:CHILD]   370838549    370838550    0       0       
+76643   runc:[2:INIT]    370824679    370824680    0       0       
+76632   runc:[2:INIT]    370823400    370823401    0       0       
+76603   runc:[1:CHILD]   370799291    370799292    0       0       
+76676   runc:[0:PARENT]  370838552    370838551    0       0       
+76604   runc:[2:INIT]    370799293    370799294    0       0       
+76642   runc:[1:CHILD]   370824677    370824678    0       0       
+76630   runc:[0:PARENT]  370833165    370833166    0       0       
+76577   runc:[0:PARENT]  370719654    370719655    0       0       
+76676   runc:[0:PARENT]  370755575    370755576    0       0       
+76641   runc:[0:PARENT]  370825470    370825471    0       0       
+76577   runc:[0:PARENT]  370654175    370654174    0       0       
+76602   runc:[0:PARENT]  370838529    370838530    0       0       
+
+05:33:12
+PID     COMM             INO          PEERINO      RX_KB   TX_KB   SUN_PATH
+6822    kubelet          162853       133686       204     0       
+19275   containerd-shim  3785479      3634151      25      1       /run/containerd/s/1d098de55abb5a734b89f8c789081172243c08d1094b35b134738a7dac26e36c
+71487   nvmf-worker-7    43222856     43536279     4       0       /uds/server_backend_remote.socket
+71487   nvmf-worker-1    3806938      3771791      4       0       /uds/server_frontend_remote.socket
+84698   nvmf-worker-2    3900400      3907178      4       0       /uds/server_backend.socket
+84698   nvmf-worker-2    3792163      3791072      4       0       /uds/server_backend.socket
+71487   nvmf-worker-4    3806944      3771794      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-3    3806942      3771793      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-2    3806940      3771792      4       0       /uds/server_frontend_remote.socket
+84698   nvmf-worker-1    3792161      3791071      4       0       /uds/server_backend.socket
+71487   nvmf-worker-8    4062244      3942804      4       0       /uds/server_backend_remote.socket
+56448   epollEventLoopG  101974536    102062958    3       0       
+56448   epollEventLoopG  102009504    102056329    3       0       
+56448   epollEventLoopG  102062956    102056319    2       0       
+56448   epollEventLoopG  101963582    102081642    2       0       
+56448   epollEventLoopG  101962564    102056309    2       0       
+56448   epollEventLoopG  102081641    102056334    2       0       
+56448   epollEventLoopG  102003280    102049998    2       0       
+5620    containerd       3634151      3785479      1       25      
+56448   epollEventLoopG  102094852    102049994    1       0       
+56448   epollEventLoopG  102049182    101974537    1       0       
+56448   epollEventLoopG  102066559    102056325    1       0       
+56448   epollEventLoopG  102088840    102056307    1       0       
+56448   epollEventLoopG  102030136    102056320    1       0       
+56448   epollEventLoopG  102036123    102056332    1       0       
+56448   epollEventLoopG  102056300    102056313    1       0       
+56448   epollEventLoopG  101892625    102056328    1       0       
+56448   epollEventLoopG  102073622    102056303    1       0       
+56448   epollEventLoopG  101980948    102056336    1       0       
+56448   epollEventLoopG  101917109    102056331    1       0       
+56448   epollEventLoopG  102074830    102056308    1       0       
+56448   epollEventLoopG  101915033    102056318    1       0       
+56448   epollEventLoopG  102054378    102056327    1       0       
+56448   epollEventLoopG  101276474    102056323    1       0       
+56448   epollEventLoopG  101934518    102056301    1       0       
+56448   epollEventLoopG  102010385    102056302    1       0       
+56448   epollEventLoopG  101983903    102056322    1       0       
+56448   epollEventLoopG  102075558    102081644    1       0       
+56448   epollEventLoopG  102031009    102056314    1       0       
+56448   epollEventLoopG  102049990    102049996    1       0       
+56448   epollEventLoopG  102080031    102049993    1       0       
+56448   epollEventLoopG  101863906    102056306    1       0       
+56448   epollEventLoopG  101975850    102049995    1       0       
+56448   epollEventLoopG  102061338    102049991    1       0       
+56448   epollEventLoopG  101927884    102056315    1       0       
+56448   epollEventLoopG  102022720    102056326    1       0       
+56448   epollEventLoopG  102068949    102056330    1       0       
+56448   epollEventLoopG  102002341    102056321    1       0       
+56448   epollEventLoopG  102092903    102056310    1       0       
+56448   epollEventLoopG  102032622    102056311    1       0       
+56448   epollEventLoopG  102036846    102056317    1       0       
+56448   epollEventLoopG  102086778    102062957    1       0       
+56448   epollEventLoopG  101957008    102056324    1       0       
+56448   epollEventLoopG  102090773    102049997    1       0       
+56448   epollEventLoopG  101992143    102056305    1       0       
+56448   epollEventLoopG  101915034    102056316    1       0       
+56448   epollEventLoopG  102077458    102049992    1       0       
+56448   epollEventLoopG  102073623    102056312    1       0       
+56448   epollEventLoopG  102057084    102056304    1       0       
+5620    containerd       133686       162853       0       204     /run/k3s/containerd/containerd.sock
+84698   nvmf-worker-2    102081642    101963582    0       2       /uds/server_backend.socket
+71487   nvmf-worker-7    102056319    102062956    0       2       /uds/server_backend_remote.socket
+71487   nvmf-worker-7    102056309    101962564    0       2       /uds/server_backend_remote.socket
+71487   nvmf-worker-7    102056329    102009504    0       3       /uds/server_backend_remote.socket
+71487   nvmf-worker-7    102056334    102081641    0       2       /uds/server_backend_remote.socket
+71487   nvmf-worker-8    102062958    101974536    0       3       /uds/server_backend_remote.socket
+5620    containerd       3794000      3612632      0       0       /run/k3s/containerd/containerd.sock.ttrpc
+71487   nvmf-worker-8    102056314    102031009    0       1       /uds/server_backend_remote.socket
+71487   nvmf-worker-7    102056311    102032622    0       1       /uds/server_backend_remote.socket
+71487   nvmf-worker-8    102056326    102022720    0       1       /uds/server_backend_remote.socket
+84698   nvmf-worker-1    102049994    102094852    0       1       /uds/server_backend.socket
+71487   nvmf-worker-7    102056321    102002341    0       1       /uds/server_backend_remote.socket
+71487   nvmf-worker-8    102056316    101915034    0       1       /uds/server_backend_remote.socket
+71487   nvmf-worker-7    102056305    101992143    0       1       /uds/server_backend_remote.socket
+71487   nvmf-worker-8    102056336    101980948    0       1       /uds/server_backend_remote.socket
+71487   nvmf-worker-8    102056310    102092903    0       1       /uds/server_backend_remote.socket
+71487   nvmf-worker-7    102056313    102056300    0       1       /uds/server_backend_remote.socket
+71487   nvmf-worker-8    102056324    101957008    0       1       /uds/server_backend_remote.socket
+71487   nvmf-worker-7    102056325    102066559    0       1       /uds/server_backend_remote.socket
+71487   nvmf-worker-8    102056332    102036123    0       1       /uds/server_backend_remote.socket
+71487   nvmf-worker-8    102056322    101983903    0       1       /uds/server_backend_remote.socket
+71487   nvmf-worker-7    102062957    102086778    0       1       /uds/server_backend_remote.socket
+84698   nvmf-worker-2    102049995    101975850    0       1       /uds/server_backend.socket
+84698   nvmf-worker-1    101974537    102049182    0       1       /uds/server_backend.socket
+71487   nvmf-worker-8    102056318    101915033    0       1       /uds/server_backend_remote.socket
+71487   nvmf-worker-8    102056320    102030136    0       1       /uds/server_backend_remote.socket
+71487   nvmf-worker-7    102056323    101276474    0       1       /uds/server_backend_remote.socket
+71487   nvmf-worker-7    102056317    102036846    0       1       /uds/server_backend_remote.socket
+84698   nvmf-worker-1    102081644    102075558    0       1       /uds/server_backend.socket
+71487   nvmf-worker-8    102056330    102068949    0       1       /uds/server_backend_remote.socket
+71487   nvmf-worker-7    102056327    102054378    0       1       /uds/server_backend_remote.socket
+71487   nvmf-worker-7    102056301    101934518    0       1       /uds/server_backend_remote.socket
+71487   nvmf-worker-8    102056306    101863906    0       1       /uds/server_backend_remote.socket
+71487   nvmf-worker-8    102056328    101892625    0       1       /uds/server_backend_remote.socket
+84698   nvmf-worker-1    102049998    102003280    0       2       /uds/server_backend.socket
+71487   nvmf-worker-7    102056315    101927884    0       1       /uds/server_backend_remote.socket
+71487   nvmf-worker-7    102056331    101917109    0       1       /uds/server_backend_remote.socket
+71487   nvmf-worker-7    102056303    102073622    0       1       /uds/server_backend_remote.socket
+84698   nvmf-worker-2    102049993    102080031    0       1       /uds/server_backend.socket
+71487   nvmf-worker-8    102056302    102010385    0       1       /uds/server_backend_remote.socket
+71487   nvmf-worker-8    102056312    102073623    0       1       /uds/server_backend_remote.socket
+84698   nvmf-worker-2    102049991    102061338    0       1       /uds/server_backend.socket
+71487   nvmf-worker-7    102056307    102088840    0       1       /uds/server_backend_remote.socket
+71487   nvmf-worker-8    102056308    102074830    0       1       /uds/server_backend_remote.socket
+71487   nvmf-worker-8    102056304    102057084    0       1       /uds/server_backend_remote.socket
+84698   nvmf-worker-2    102049997    102090773    0       1       /uds/server_backend.socket
+84698   nvmf-worker-1    102049992    102077458    0       1       /uds/server_backend.socket
+84698   nvmf-worker-1    102049996    102049990    0       1       /uds/server_backend.socket
+76775   5                370755579    370755580    0       0       
+21538   nvme-netty-1     3771792      3806940      0       4       
+21538   nvme-netty-2     3791071      3792161      0       4       
+64659   epollEventLoopG  3942804      4062244      0       4       
+64659   epollEventLoopG  43536279     43222856     0       4       
+21538   nvme-netty-1     3791072      3792163      0       4       
+21538   nvme-netty-2     3771793      3806942      0       4       
+21538   nvme-netty-1     3771794      3806944      0       4       
+64659   epollEventLoopG  3907178      3900400      0       4       
+21538   nvme-netty-2     3771791      3806938      0       4       
+3896    in:imuxsock      17276        0            0       0       /run/systemd/journal/syslog
+2056    systemd-journal  56434        167842       0       0       /run/systemd/journal/stdout
+76749   runc             370755580    370755579    0       0       
+76775   runc:[0:PARENT]  370783128    370783127    0       0       
+19275   containerd-shim  3612632      3794000      0       0       
+76775   runc:[0:PARENT]  370783130    370783129    0       0       
+76779   runc:[1:CHILD]   370783127    370783128    0       0       
+76780   runc:[2:INIT]    370783129    370783130    0       0       
+2056    systemd-journal  23062        0            0       0       /run/systemd/journal/dev-log
+76775   runc:[0:PARENT]  370755579    370755580    0       0       
+4126    rke2             167842       56434        0       0   
+
+An tracing stream UDS only option(-S) can be specified, along with interval
+and count. Eg, printing output every 1 second, and including Timestamps(-T)
+and no clear screen(-C):
+./udstop -C -T -S 1 2
+Tracing... Output every 1 secs. Hit Ctrl-C to end
+
+05:36:48
+PID     COMM             INO          PEERINO      RX_KB   TX_KB   SUN_PATH
+74713   epollEventLoopG  3943765      3947848      2048    0       
+74713   epollEventLoopG  3895638      3947846      2048    0       
+74713   epollEventLoopG  3728800      3654198      1363    4       
+64659   epollEventLoopG  3942804      4062244      240     0       
+6822    kubelet          162853       133686       205     2       
+51623   containerd-shim  3257126      3325848      46      11      /run/containerd/s/d608723fc5d77d88621fad046b197941b3066aecf0955e5d30e910dc59af11a4
+51691   containerd-shim  3332031      3265170      43      4       /run/containerd/s/fc6d5fa3c1969a99383af956cee986a8087545105cbabfc048622dc139b257c7
+3663    runc:[2:INIT]    370933780    370933781    30      0       
+3822    runc:[2:INIT]    370905614    370905615    30      0       
+3813    runc:[2:INIT]    370931876    370931877    30      0       
+3744    runc:[2:INIT]    370905610    370905611    30      0       
+3680    runc:[2:INIT]    370938915    370938916    28      0       
+3602    runc:[2:INIT]    370905598    370905599    28      0       
+3753    runc:[2:INIT]    370883286    370883287    28      0       
+3622    runc:[2:INIT]    370921659    370921660    28      0       
+3642    runc:[2:INIT]    370937029    370937030    28      0       
+3707    runc:[2:INIT]    370917016    370917017    28      0       
+3765    runc:[2:INIT]    370931872    370931873    28      0       
+50958   containerd-shim  3364965      3297143      23      5       /run/containerd/s/85a93640b5e864443ff6c6296db7f1ecdf2a9f28b404e8daa1eec9e13fcc13d0
+51691   containerd-shim  3332398      3308127      23      5       /run/containerd/s/fc6d5fa3c1969a99383af956cee986a8087545105cbabfc048622dc139b257c7
+50857   containerd-shim  3379998      3392350      23      5       /run/containerd/s/a46576037c20bf21247b530d04c03c3084ce9d948d824774c4f8425dd5de343d
+50958   containerd-shim  3332502      3335379      23      5       /run/containerd/s/85a93640b5e864443ff6c6296db7f1ecdf2a9f28b404e8daa1eec9e13fcc13d0
+51623   containerd-shim  3283495      3261919      23      5       /run/containerd/s/d608723fc5d77d88621fad046b197941b3066aecf0955e5d30e910dc59af11a4
+84462   containerd-shim  3638792      3556235      23      5       /run/containerd/s/a6d1c75ecac61fbb99386b0d16898735002356a8735b001eda0a86bdd8e900b8
+51363   containerd-shim  3292733      3310198      22      5       /run/containerd/s/aab221c1e92e71fa692953f9f532927e20dc8cf3f482fa6c4b1bd5dddadf2639
+4758    epollEventLoopG  278555446    278607372    13      0       
+5620    containerd       3325848      3257126      11      46      
+4758    epollEventLoopG  300776695    300752877    8       0       
+4758    epollEventLoopG  278603310    278552029    7       0       
+4758    epollEventLoopG  278591650    278607370    6       0       
+4758    epollEventLoopG  278616087    278576048    6       0       
+5620    containerd       3261919      3283495      5       23      
+5620    containerd       3310198      3292733      5       22      
+5620    containerd       3556235      3638792      5       23      
+5620    containerd       3308127      3332398      5       23      
+5620    containerd       3297143      3364965      5       23      
+5620    containerd       3392350      3379998      5       23      
+5620    containerd       3335379      3332502      5       23      
+4758    epollEventLoopG  300754555    300727865    4       0       
+84698   nvmf-worker-2    3654198      3728800      4       1363    /uds/server_backend.socket
+5620    containerd       3265170      3332031      4       43      
+71487   nvmf-worker-1    3806896      3771770      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-8    3726438      3724479      4       0       /uds/server_backend_remote.socket
+71487   nvmf-worker-3    3806914      3771779      4       0       /uds/server_frontend_remote.socket
+84698   nvmf-worker-2    3792159      3791070      4       0       /uds/server_backend.socket
+71487   nvmf-worker-2    3806898      3771771      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-6    3806906      3771775      4       0       /uds/server_frontend_remote.socket
+84698   nvmf-worker-1    3792157      3791069      4       0       /uds/server_backend.socket
+71487   nvmf-worker-7    3613578      3613575      4       0       /uds/server_backend_remote.socket
+71487   nvmf-worker-5    3806904      3771774      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-3    3806900      3771772      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-0    3806908      3771776      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-7    4062235      3783275      4       0       /uds/server_backend_remote.socket
+71487   nvmf-worker-8    3654062      3631636      4       0       /uds/server_backend_remote.socket
+71487   nvmf-worker-2    3806912      3771778      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-1    3806910      3771777      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-4    3806902      3771773      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-7    43222856     43536279     4       0       /uds/server_backend_remote.socket
+84698   nvmf-worker-1    3855322      4068816      4       0       /uds/server_backend.socket
+5620    containerd       3343420      3268246      3       1       
+5620    containerd       3307824      3293738      2       0       /run/k3s/containerd/containerd.sock.ttrpc
+74713   epollEventLoopG  5693232      5666658      2       0       
+5620    containerd       133686       162853       2       205     /run/k3s/containerd/containerd.sock
+50598   containerd-shim  3268246      3343420      1       3       /run/containerd/s/c7cd34f0c112c09df31f757ca5c122bcd5bbe0d52342029cbdac9d8b701e7a27
+5620    containerd       3264433      3328066      1       0       /run/k3s/containerd/containerd.sock.ttrpc
+5620    containerd       3291521      3274459      1       0       /run/k3s/containerd/containerd.sock.ttrpc
+5620    containerd       3654033      3700661      0       0       /run/k3s/containerd/containerd.sock.ttrpc
+5620    containerd       3327061      3256966      0       0       /run/k3s/containerd/containerd.sock.ttrpc
+5620    containerd       3307804      3256932      0       0       /run/k3s/containerd/containerd.sock.ttrpc
+71487   nvmf-worker-2    278607372    278555446    0       13      /uds/server_frontend_remote.socket
+71487   nvmf-worker-3    278552029    278603310    0       7       /uds/server_frontend_remote.socket
+71487   nvmf-worker-3    300752877    300776695    0       8       /uds/server_frontend_remote.socket
+71487   nvmf-worker-1    278607370    278591650    0       6       /uds/server_frontend_remote.socket
+5620    containerd       3285659      3256921      0       0       /run/k3s/containerd/containerd.sock.ttrpc
+84698   nvmf-worker-0    278576048    278616087    0       6       /uds/server_frontend.socket
+84698   nvmf-worker-0    300727865    300754555    0       4       /uds/server_frontend.socket
+84698   nvmf-worker-1    3947846      3895638      0       2048    /uds/server_backend.socket
+84698   nvmf-worker-2    5666658      5693232      0       2       /uds/server_backend.socket
+71487   nvmf-worker-8    4062244      3942804      0       240     /uds/server_backend_remote.socket
+84698   nvmf-worker-2    3947848      3943765      0       2048    /uds/server_backend.socket
+3661    5                370933780    370933781    0       0       
+3762    5                370931872    370931873    0       0       
+3820    5                370905614    370905615    0       0       
+3810    5                370931876    370931877    0       0       
+3640    5                370937029    370937030    0       0       
+3620    5                370921659    370921660    0       0       
+3705    5                370917016    370917017    0       0       
+3678    5                370938915    370938916    0       0       
+3738    5                370905610    370905611    0       0       
+3845    5                370921664    370921665    0       0       
+3751    5                370883286    370883287    0       0       
+51623   containerd-shim  3293738      3307824      0       2       
+21538   nvme-netty-2     3771779      3806914      0       4       
+64659   epollEventLoopG  3783275      4062235      0       4       
+21538   nvme-netty-1     3771774      3806904      0       4       
+74713   epollEventLoopG  3631636      3654062      0       4       
+21538   nvme-netty-2     3771771      3806898      0       4       
+21538   nvme-netty-1     3771778      3806912      0       4       
+64659   epollEventLoopG  43536279     43222856     0       4       
+21538   nvme-netty-1     3771776      3806908      0       4       
+21538   nvme-netty-1     3771770      3806896      0       4       
+21538   nvme-netty-2     3771777      3806910      0       4       
+21538   nvme-netty-2     3791069      3792157      0       4       
+21538   nvme-netty-1     3771772      3806900      0       4       
+74713   epollEventLoopG  3613575      3613578      0       4       
+74713   epollEventLoopG  3724479      3726438      0       4       
+21538   nvme-netty-2     3771773      3806902      0       4       
+64659   epollEventLoopG  4068816      3855322      0       4       
+21538   nvme-netty-1     3791070      3792159      0       4       
+21538   nvme-netty-2     3771775      3806906      0       4       
+51691   containerd-shim  3328066      3264433      0       1       
+50958   containerd-shim  3274459      3291521      0       1       
+3623    runc             370937030    370937029    0       28      
+3792    runc             370905615    370905614    0       30      
+3714    runc             370931873    370931872    0       28      
+3730    runc             370905611    370905610    0       30      
+3709    runc             370883287    370883286    0       28      
+3694    runc             370917017    370917016    0       28      
+3652    runc             370933781    370933780    0       31      
+3763    runc             370931877    370931876    0       30      
+3671    runc             370938916    370938915    0       29      
+3613    runc             370921660    370921659    0       28      
+84462   containerd-shim  3700661      3654033      0       0       
+50857   containerd-shim  3256932      3307804      0       0       
+51363   containerd-shim  3256966      3327061      0       0       
+50598   containerd-shim  3256921      3285659      0       0       
+3678    runc:[0:PARENT]  370883275    370883274    0       0       
+3762    runc:[0:PARENT]  370937060    370937059    0       0       
+3810    runc:[0:PARENT]  370933751    370933750    0       0       
+3661    runc:[0:PARENT]  370918040    370918039    0       0       
+3705    runc:[0:PARENT]  370905607    370905606    0       0       
+3820    runc:[0:PARENT]  370883295    370883294    0       0       
+3751    runc:[0:PARENT]  370886262    370886261    0       0       
+3620    runc:[0:PARENT]  370931857    370931856    0       0       
+3640    runc:[0:PARENT]  370892454    370892453    0       0       
+3738    runc:[0:PARENT]  370883283    370883282    0       0       
+3813    runc:[2:INIT]    370933752    370933753    0       0       
+3620    runc:[0:PARENT]  370931859    370931858    0       0       
+3678    runc:[0:PARENT]  370883277    370883276    0       0       
+3642    runc:[2:INIT]    370892455    370892456    0       0       
+3821    runc:[1:CHILD]   370883294    370883295    0       0       
+3622    runc:[2:INIT]    370931858    370931859    0       0       
+3743    runc:[1:CHILD]   370883282    370883283    0       0       
+3706    runc:[1:CHILD]   370905606    370905607    0       0       
+3662    runc:[1:CHILD]   370918039    370918040    0       0       
+3744    runc:[2:INIT]    370883284    370883285    0       0       
+3641    runc:[1:CHILD]   370892453    370892454    0       0       
+3752    runc:[1:CHILD]   370886261    370886262    0       0       
+3810    runc:[0:PARENT]  370933753    370933752    0       0       
+3707    runc:[2:INIT]    370905608    370905609    0       0       
+3663    runc:[2:INIT]    370918041    370918042    0       0       
+3738    runc:[0:PARENT]  370883285    370883284    0       0       
+3640    runc:[0:PARENT]  370892456    370892455    0       0       
+3762    runc:[0:PARENT]  370937062    370937061    0       0       
+3661    runc:[0:PARENT]  370918042    370918041    0       0       
+3764    runc:[1:CHILD]   370937059    370937060    0       0       
+3820    runc:[0:PARENT]  370883297    370883296    0       0       
+3822    runc:[2:INIT]    370883296    370883297    0       0       
+3679    runc:[1:CHILD]   370883274    370883275    0       0       
+3753    runc:[2:INIT]    370886263    370886264    0       0       
+3705    runc:[0:PARENT]  370905609    370905608    0       0       
+3812    runc:[1:CHILD]   370933750    370933751    0       0       
+3621    runc:[1:CHILD]   370931856    370931857    0       0       
+3751    runc:[0:PARENT]  370886264    370886263    0       0       
+3680    runc:[2:INIT]    370883276    370883277    0       0       
+3765    runc:[2:INIT]    370937061    370937062    0       0       
+3831    runc             370921665    370921664    0       0       
+3640    runc:[0:PARENT]  370937029    370937030    0       0       
+3820    runc:[0:PARENT]  370905614    370905615    0       0       
+3661    runc:[0:PARENT]  370933780    370933781    0       0       
+3751    runc:[0:PARENT]  370883286    370883287    0       0       
+3705    runc:[0:PARENT]  370917016    370917017    0       0       
+3620    runc:[0:PARENT]  370921659    370921660    0       0       
+3738    runc:[0:PARENT]  370905610    370905611    0       0       
+3589    runc             370905599    370905598    0       28      
+3810    runc:[0:PARENT]  370931876    370931877    0       0       
+3678    runc:[0:PARENT]  370938915    370938916    0       0       
+3762    runc:[0:PARENT]  370931872    370931873    0       0       
+
+05:36:49
+PID     COMM             INO          PEERINO      RX_KB   TX_KB   SUN_PATH
+6822    kubelet          162853       133686       524     1       
+64659   epollEventLoopG  8822184      8853771      348     0       
+71487   nvmf-worker-5    3658945      3755248      112     0       /uds/server_frontend_remote.socket
+84698   nvmf-worker-0    3721650      3609477      108     0       /uds/server_frontend.socket
+84698   nvmf-worker-0    3721645      3768465      108     0       /uds/server_frontend.socket
+71487   nvmf-worker-0    3658949      3690344      108     0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-6    3658947      3707263      108     0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-3    3658942      3777658      108     0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-4    3752879      3810854      108     0       /uds/server_frontend_remote.socket
+84698   nvmf-worker-0    3721641      3784476      108     0       /uds/server_frontend.socket
+71487   nvmf-worker-0    3658939      3766420      108     0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-8    5173031      5220051      62      1       /uds/server_backend_remote.socket
+71487   nvmf-worker-3    278552029    278603310    60      0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-8    277950672    277935555    58      1       /uds/server_backend_remote.socket
+71487   nvmf-worker-7    5278434      4930385      54      1       /uds/server_backend_remote.socket
+71487   nvmf-worker-7    5173033      5220052      54      1       /uds/server_backend_remote.socket
+71487   nvmf-worker-7    4963305      5098563      54      1       /uds/server_backend_remote.socket
+84698   nvmf-worker-2    5082382      5098562      50      0       /uds/server_backend.socket
+84698   nvmf-worker-2    222136352    222088640    50      0       /uds/server_backend.socket
+84698   nvmf-worker-2    5298597      5200675      42      0       /uds/server_backend.socket
+71487   nvmf-worker-1    278607370    278591650    40      0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-2    278607372    278555446    36      0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-4    3658943      3745347      32      0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-1    3658950      3756949      32      0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-2    3658951      3784477      32      0       /uds/server_frontend_remote.socket
+3937    runc:[2:INIT]    370886276    370886277    31      0       
+3847    runc:[2:INIT]    370921664    370921665    30      0       
+3901    runc:[2:INIT]    370921668    370921669    28      0       
+84698   nvmf-worker-0    278576048    278616087    28      0       /uds/server_frontend.socket
+51958   containerd-shim  5569991      5578780      24      5       /run/containerd/s/ff2f835e9f69487b28c4cd41a208790542aac3ace8b516e02f535488f3c3520e
+84698   nvmf-worker-0    300727865    300754555    24      0       /uds/server_frontend.socket
+51958   containerd-shim  5510829      5487325      24      5       /run/containerd/s/ff2f835e9f69487b28c4cd41a208790542aac3ace8b516e02f535488f3c3520e
+71487   nvmf-worker-3    300752877    300776695    16      2       /uds/server_frontend_remote.socket
+3883    runc:[2:INIT]    370905618    370905619    10      0       
+71487   nvmf-worker-6    3806920      3771782      8       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-5    3806918      3771781      8       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-4    3806916      3771780      8       0       /uds/server_frontend_remote.socket
+5620    containerd       3265170      3332031      7       3       
+67292   epollEventLoopG  3726779      3658940      7       0       
+5620    containerd       5578780      5569991      5       24      
+5620    containerd       5487325      5510829      5       24      
+5620    containerd       156610       147888       5       4       
+13389   containerd-shim  147888       156610       4       5       /run/containerd/s/a8ef0e7c81b224dafc207030d66240bd8938608e61226662d872114f5ef3cd7c
+71487   nvmf-worker-7    4062238      4051050      4       0       /uds/server_backend_remote.socket
+84698   nvmf-worker-2    3900400      3907178      4       0       /uds/server_backend.socket
+84698   nvmf-worker-0    3721642      3779637      4       0       /uds/server_frontend.socket
+71487   nvmf-worker-8    4062240      4056555      4       0       /uds/server_backend_remote.socket
+71487   nvmf-worker-2    3658941      3786814      4       0       /uds/server_frontend_remote.socket
+75897   epollEventLoopG  3763572      3782132      4       0       
+75897   epollEventLoopG  3703651      3677020      4       0       
+51691   containerd-shim  3332031      3265170      3       7       /run/containerd/s/fc6d5fa3c1969a99383af956cee986a8087545105cbabfc048622dc139b257c7
+4758    epollEventLoopG  300776695    300752877    2       16      
+5620    containerd       5481463      5570649      1       0       /run/k3s/containerd/containerd.sock.ttrpc
+5620    containerd       133686       162853       1       524     /run/k3s/containerd/containerd.sock
+81032   epollEventLoopG  5220051      5173031      1       62      
+81032   epollEventLoopG  5220052      5173033      1       54      
+81032   epollEventLoopG  4930385      5278434      1       54      
+81032   epollEventLoopG  5098563      4963305      1       54      
+81032   epollEventLoopG  277935555    277950672    1       58      
+5620    containerd       3264433      3328066      0       0       /run/k3s/containerd/containerd.sock.ttrpc
+5620    containerd       184758       45329        0       0       /run/k3s/containerd/containerd.sock.ttrpc
+81032   epollEventLoopG  5098562      5082382      0       50      
+81032   epollEventLoopG  222088640    222136352    0       50      
+81032   epollEventLoopG  5200675      5298597      0       42      
+4758    epollEventLoopG  278591650    278607370    0       40      
+4758    epollEventLoopG  278603310    278552029    0       60      
+71487   nvmf-worker-7    3782132      3763572      0       4       /uds/server_backend_remote.socket
+71487   nvmf-worker-1    3658940      3726779      0       7       /uds/server_frontend_remote.socket
+84698   nvmf-worker-2    8853771      8822184      0       348     /uds/server_backend.socket
+71487   nvmf-worker-7    3677020      3703651      0       4       /uds/server_backend_remote.socket
+4758    epollEventLoopG  300754555    300727865    0       24      
+67292   epollEventLoopG  3755248      3658945      0       112     
+4758    epollEventLoopG  278555446    278607372    0       36      
+3932    5                370886276    370886277    0       0       
+3881    5                370905618    370905619    0       0       
+3899    5                370921668    370921669    0       0       
+64659   epollEventLoopG  3907178      3900400      0       4       
+21538   nvme-netty-2     3771781      3806918      0       8       
+67292   epollEventLoopG  3745347      3658943      0       32      
+67292   epollEventLoopG  3690344      3658949      0       108     
+67292   epollEventLoopG  3766420      3658939      0       108     
+21538   nvme-netty-1     3771780      3806916      0       8       
+67292   epollEventLoopG  3609477      3721650      0       108     
+67292   epollEventLoopG  3810854      3752879      0       108     
+67292   epollEventLoopG  3784476      3721641      0       108     
+67292   epollEventLoopG  3786814      3658941      0       4       
+64659   epollEventLoopG  4056555      4062240      0       4       
+67292   epollEventLoopG  3707263      3658947      0       108     
+21538   nvme-netty-1     3771782      3806920      0       8       
+64659   epollEventLoopG  4051050      4062238      0       4       
+67292   epollEventLoopG  3784477      3658951      0       32      
+67292   epollEventLoopG  3756949      3658950      0       32      
+67292   epollEventLoopG  3777658      3658942      0       108     
+67292   epollEventLoopG  3768465      3721645      0       108     
+4758    epollEventLoopG  278616087    278576048    0       28      
+67292   epollEventLoopG  3779637      3721642      0       4       
+51958   containerd-shim  5570649      5481463      0       1       
+2056    systemd-journal  56434        167842       0       0       /run/systemd/journal/stdout
+3924    runc             370886277    370886276    0       32      
+3889    runc             370921669    370921668    0       29      
+3861    runc             370905619    370905618    0       10      
+13389   containerd-shim  45329        184758       0       0       
+51691   containerd-shim  3328066      3264433      0       0       
+3899    runc:[0:PARENT]  370909679    370909678    0       0       
+3881    runc:[0:PARENT]  370886273    370886272    0       0       
+3932    runc:[0:PARENT]  370929858    370929857    0       0       
+3883    runc:[2:INIT]    370886274    370886275    0       0       
+3881    runc:[0:PARENT]  370886275    370886274    0       0       
+3937    runc:[2:INIT]    370929859    370929860    0       0       
+3882    runc:[1:CHILD]   370886272    370886273    0       0       
+3900    runc:[1:CHILD]   370909678    370909679    0       0       
+3932    runc:[0:PARENT]  370929860    370929859    0       0       
+3899    runc:[0:PARENT]  370909681    370909680    0       0       
+3933    runc:[1:CHILD]   370929857    370929858    0       0       
+3901    runc:[2:INIT]    370909680    370909681    0       0       
+4126    rke2             167842       56434        0       0       
+3950    curl             370912244    370912243    0       0       
+3932    runc:[0:PARENT]  370886276    370886277    0       0       
+3899    runc:[0:PARENT]  370921668    370921669    0       0       
+3881    runc:[0:PARENT]  370905618    370905619    0       0
+
+An tracing sequenced UDS only option(-s) can be provided, and also optionally
+a count. Eg, printing output every 1 second, and including timestamps(-T) and
+no clear screen(-C):
+./udstop -C -T -s 1 2 
+Tracing... Output every 1 secs. Hit Ctrl-C to end
+
+03:56:29
+PID     COMM             INO          PEERINO      RX_KB   TX_KB   SUN_PATH
+24116   uds_seq_client   368337185    368306489    50      50      
+21533   uds_seq_server   368306489    368337185    50      50      /tmp/seq_server.sock
+
+03:56:30
+PID     COMM             INO          PEERINO      RX_KB   TX_KB   SUN_PATH
+21533   uds_seq_server   368306489    368337185    49      49      /tmp/seq_server.sock
+24116   uds_seq_client   368337185    368306489    49      49      
+
+An tracing dgram UDS only option(-D) can be specified and also optinally
+a count. Eg, printing output every 1 second, and including timestamps(-T) and 
+no clear screen(-C):
+./udstop -C -T -D 1 2
+Tracing... Output every 1 secs. Hit Ctrl-C to end
+
+03:41:17
+PID     COMM             INO          PEERINO      RX_KB   TX_KB   PATH
+87487   uds_dgram_clien  367945758    367797148    50      50      /tmp/dgram_client.sock
+86910   uds_dgram_serve  367797148    0            50      50      /tmp/dgram_server.sock
+
+03:41:18
+PID     COMM             INO          PEERINO      RX_KB   TX_KB   PATH
+86910   uds_dgram_serve  367797148    0            49      49      /tmp/dgram_server.sock
+87487   uds_dgram_clien  367945758    367797148    49      49      /tmp/dgram_client.sock
+
+An PID option(-p) can be used for filter the UDS socket owned by it. Eg,
+printing output every 1 second, and including timestamps(-T), no clear 
+screen(-C), and PID 71487:
+./udstop -C -T -p 71487 1 2
+Tracing... Output every 1 secs. Hit Ctrl-C to end
+
+05:39:23
+PID     COMM             INO          PEERINO      RX_KB   TX_KB   SUN_PATH
+71487   nvmf-worker-3    5608639      5528255      8       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-5    5608634      5575928      8       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-6    3806892      3771768      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-1    3806896      3771770      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-3    3806900      3771772      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-8    3726440      3671644      4       0       /uds/server_backend_remote.socket
+71487   nvmf-worker-0    3806894      3771769      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-2    3806898      3771771      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-7    3613578      3613575      4       0       /uds/server_backend_remote.socket
+71487   nvmf-worker-6    5620760      5547489      0       67      /uds/server_frontend_remote.socket
+71487   nvmf-worker-7    3677020      3703651      0       3       /uds/server_backend_remote.socket
+71487   nvmf-worker-8    3782130      3782128      0       4       /uds/server_backend_remote.socket
+71487   nvmf-worker-7    3782132      3763572      0       3       /uds/server_backend_remote.socket
+71487   nvmf-worker-8    3950640      3707864      0       4       /uds/server_backend_remote.socket
+71487   nvmf-worker-5    5608628      5598666      0       67      /uds/server_frontend_remote.socket
+71487   nvmf-worker-7    3677017      3718009      0       3       /uds/server_backend_remote.socket
+71487   nvmf-worker-8    3677018      3609561      0       4       /uds/server_backend_remote.socket
+
+05:39:24
+PID     COMM             INO          PEERINO      RX_KB   TX_KB   SUN_PATH
+71487   nvmf-worker-7    3726439      3726437      4       0       /uds/server_backend_remote.socket
+71487   nvmf-worker-4    3806902      3771773      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-5    3806904      3771774      4       0       /uds/server_frontend_remote.socket
+71487   nvmf-worker-8    3654062      3631636      0       2048    /uds/server_backend_remote.socket
+71487   nvmf-worker-8    3613576      3664261      0       2       /uds/server_backend_remote.socket
+71487   nvmf-worker-8    3726438      3724479      0       2048    /uds/server_backend_remote.socket
+71487   nvmf-worker-7    3613578      3613575      0       1362    /uds/server_backend_remote.socket
+
+USAGE:
+./udstop -h
+usage: udstop [-h] [-C] [-S] [-s] [-D] [-p PID] [-T]
+                        [interval] [count]
+
+Summarize UDS send/recv throughput by host
+
+positional arguments:
+  interval            output interval, in seconds (default 1)
+  count               number of outputs
+
+optional arguments:
+  -h, --help          show this help message and exit
+  -C, --noclear       don't clear the screen
+  -S, --streamonly    only trace stream uds socket
+  -s, --sequenceonly  only trace sequence uds socket
+  -D, --dgramonly     only trace dgram uds socket
+  -p PID, --pid PID   trace this PID only
+  -T, --timestamp     include timestamp on output
+
+examples:
+    ./udstop               # trace UDS send/recv by host
+    ./udstop -C            # don't clear the screen
+    ./udstop -S            # only trace stream uds socket
+    ./udstop -s            # only trace sequence uds socket
+    ./udstop -D            # only trace dgram uds socket
+    ./udstop -p 181        # only trace PID 181
+    ./udstop -T 1          # trace and add timestamp

@@ -1,0 +1,118 @@
+.TH udstop 8  "2023-01-29" "USER COMMANDS"
+.SH NAME
+udstop \- Measure UDS recv/send throughtput by host. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B udstop [\-h] [\-T] [\-S] [\-s] [\-D] [\-p PID] [\-C] [interval] [count]
+.SH DESCRIPTION
+This tool measures unix domain socket receive/send Kbytes by host, and 
+prints a summary that refreshes, along socket's info.
+ 
+It uses dynamic tracing of kernel uds send/receive functions, and will
+need to be updated to match kernel changes.
+
+The traced functions are only called when user process calls send/receive
+systemcall, and therefore have low overhead. we also use BPF map to store
+traced data to reduce overhead. See the OVERHEAD section for more details.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-T
+Include a timestamp column.
+.TP
+\-C
+Don't clear the screen.
+.TP
+\-S
+Trace stream socket only.
+.TP
+\-s
+Trace sequenced socket only.
+.TP
+\-D
+Trace dgram socket only.
+\-p PID
+Trace this PID only.
+.SH EXAMPLES
+.TP
+Show all active UDS session's throughput until Ctrl-C:
+#
+.B udstop
+.TP
+Show all active UDS session's throughput per second and don't clear screen:
+#
+.B udstop \-C 1
+.TP
+Show stream sessions only:
+#
+.B udstop \-S
+.TP
+Show sequenced sessions only:
+#
+.B udstop \-s
+.TP
+Show dgram sessions only:
+#
+.B udstop \-D
+.TP
+Show PID 181 only:
+#
+.B udstop \-p 181
+.TP
+Show 1 second summaries, 10 times and timestamps:
+#
+.B udstop \-T 1 10
+.SH FIELDS
+.TP
+PID
+Process ID.
+.TP
+COMM
+Process name.
+.TP
+INO
+inode number of UDS.
+.TP
+PEERINO
+inode number of UDS peer socket.
+.TP
+RX_KB
+Received Kbytes
+.TP
+TX_KB
+Transmitted Kbytes
+.TP
+SUN_PATH
+UDS's path
+.TP
+interval
+Interval between updates, seconds(default 1).
+.TP
+count
+Number of interval summaries (default is many).
+.SH OVERHEAD
+This traces the kernel unix domain socket recv/send functions. 
+As called rate per second of these functions per socket is low(<1000), the 
+overhead is also expected to be negligible. If you have an application that 
+will create thousands of uds socket pairs, then test and understand overhead 
+before use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+ping gan
+.SH SEE ALSO
+tcptop(8)
