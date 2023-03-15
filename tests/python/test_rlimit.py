@@ -9,7 +9,6 @@ from __future__ import print_function
 from bcc import BPF
 from unittest import main, skipUnless, TestCase
 from utils import kernel_version_ge
-import distutils.version
 import os, resource
 
 @skipUnless(not kernel_version_ge(5, 11), "Since d5299b67dd59 \"bpf: Memcg-based memory accounting for bpf maps\""\

@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-# sudo apt-get install linux-headers-$(uname -r) "llvm-13*" libclang-13-dev luajit luajit-5.1-dev libelf-dev python3-distutils libdebuginfod-dev arping netperf iperf
+# sudo apt-get install linux-headers-$(uname -r) "llvm-13*" libclang-13-dev luajit luajit-5.1-dev libelf-dev python3-setuptools libdebuginfod-dev arping netperf iperf
 # mkdir -p build && cd build
 # cmake .. -DPYTHON_CMD=python3
 # make -j4

@@ -2,7 +2,6 @@
 # Copyright (c) Sasha Goldshtein, 2017
 # Licensed under the Apache License, Version 2.0 (the "License")
 
-import distutils.version
 import subprocess
 import os
 import re

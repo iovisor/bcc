@@ -4,7 +4,7 @@
 ## Ubuntu 21.10 prerequisites
 
 ```bash
-$ sudo apt-get install linux-headers-$(uname -r) "llvm-13*" libclang-13-dev luajit luajit-5.1-dev libelf-dev python3-distutils libdebuginfod-dev arping netperf iperf
+$ sudo apt-get install linux-headers-$(uname -r) "llvm-13*" libclang-13-dev luajit luajit-5.1-dev libelf-dev python3-setutools libdebuginfod-dev arping netperf iperf
 ```
 
 ## Building bcc tools
