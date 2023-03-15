@@ -289,10 +289,9 @@ apt-get install flex bison libssl-dev libelf-dev dwarves
 
 First, you will need to checkout the WSL2 Linux kernel git repository:
 ```
-git clone git@github.com:microsoft/WSL2-Linux-Kernel.git
-cd WSL2-Linux-Kernel
 KERNEL_VERSION=$(uname -r | cut -d '-' -f 1)
-git checkout linux-msft-wsl-$KERNEL_VERSION
+git clone --depth 1 git@github.com:microsoft/WSL2-Linux-Kernel.git -b linux-msft-wsl-$KERNEL_VERSION
+cd WSL2-Linux-Kernel
 ```
 
 Then compile and install:
