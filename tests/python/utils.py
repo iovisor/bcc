@@ -1,10 +1,8 @@
 from pyroute2 import NSPopen
-from distutils.spawn import find_executable
 import traceback
-import distutils.version
 import shutil
 
-import logging, os, sys
+import logging, os, sys, re
 
 if 'PYTHON_TEST_LOGFILE' in os.environ:
     logfile=os.environ['PYTHON_TEST_LOGFILE']
@@ -15,7 +13,7 @@ else:
 logger = logging.getLogger()
 
 def has_executable(name):
-    path = find_executable(name)
+    path = shutil.which(name)
     if path is None:
         raise Exception(name + ": command not found")
     return path
@@ -82,13 +80,17 @@ class NSPopenWithCheck(NSPopen):
         has_executable(name)
         super(NSPopenWithCheck, self).__init__(nsname, *argv, **kwarg)
 
+KERNEL_VERSION_PATTERN = r"v?(?P<major>[0-9]+)\.(?P<minor>[0-9]+).*"
+
 def kernel_version_ge(major, minor):
     # True if running kernel is >= X.Y
-    version = distutils.version.LooseVersion(os.uname()[2]).version
-    if version[0] > major:
+    match = re.match(KERNEL_VERSION_PATTERN, os.uname()[2])
+    x = int(match.group("major"))
+    y = int(match.group("minor"))
+    if x > major:
         return True
-    if version[0] < major:
+    if x < major:
         return False
-    if minor and version[1] < minor:
+    if minor and y < minor:
         return False
     return True

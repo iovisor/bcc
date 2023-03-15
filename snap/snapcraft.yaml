@@ -85,8 +85,7 @@ parts:
             - libtinfo5
             - libzzip-0-13
             - python3
-            - python3-distutils
-            - python3-distutils-extra
+            - python3-packaging
             - python3-pip
             - python3-setuptools
         prime:

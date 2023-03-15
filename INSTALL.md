@@ -349,7 +349,7 @@ sudo apt-get install arping bison clang-format cmake dh-python \
   dpkg-dev pkg-kde-tools ethtool flex inetutils-ping iperf \
   libbpf-dev libclang-dev libclang-cpp-dev libedit-dev libelf-dev \
   libfl-dev libzip-dev linux-libc-dev llvm-dev libluajit-5.1-dev \
-  luajit python3-netaddr python3-pyroute2 python3-distutils python3
+  luajit python3-netaddr python3-pyroute2 python3-setuptools python3
 ```
 
 #### Install and compile BCC
@@ -381,23 +381,23 @@ sudo apt-get update
 
 # For Bionic (18.04 LTS)
 sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
-  libllvm6.0 llvm-6.0-dev libclang-6.0-dev python zlib1g-dev libelf-dev libfl-dev python3-distutils
+  libllvm6.0 llvm-6.0-dev libclang-6.0-dev python zlib1g-dev libelf-dev libfl-dev python3-setuptools
 
 # For Focal (20.04.1 LTS)
 sudo apt install -y bison build-essential cmake flex git libedit-dev \
-  libllvm12 llvm-12-dev libclang-12-dev python zlib1g-dev libelf-dev libfl-dev python3-distutils
+  libllvm12 llvm-12-dev libclang-12-dev python zlib1g-dev libelf-dev libfl-dev python3-setuptools
 
 # For Hirsute (21.04) or Impish (21.10)
 sudo apt install -y bison build-essential cmake flex git libedit-dev \
-libllvm11 llvm-11-dev libclang-11-dev python3 zlib1g-dev libelf-dev libfl-dev python3-distutils
+libllvm11 llvm-11-dev libclang-11-dev python3 zlib1g-dev libelf-dev libfl-dev python3-setuptools
 
 # For Jammy (22.04)
 sudo apt install -y bison build-essential cmake flex git libedit-dev \
-libllvm14 llvm-14-dev libclang-14-dev python3 zlib1g-dev libelf-dev libfl-dev python3-distutils
+libllvm14 llvm-14-dev libclang-14-dev python3 zlib1g-dev libelf-dev libfl-dev python3-setuptools
 
 # For other versions
 sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
-  libllvm3.7 llvm-3.7-dev libclang-3.7-dev python zlib1g-dev libelf-dev python3-distutils
+  libllvm3.7 llvm-3.7-dev libclang-3.7-dev python zlib1g-dev libelf-dev python3-setuptools
 
 # For Lua support
 sudo apt-get -y install luajit luajit-5.1-dev
