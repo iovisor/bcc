@@ -20,6 +20,7 @@ from ctypes import c_int
 from time import sleep, strftime
 from sys import argv
 import argparse
+import json
 
 # arguments
 examples = """examples:
@@ -39,6 +40,8 @@ parser.add_argument("count", nargs="?", default=99999999,
     help="number of outputs")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 
 args = parser.parse_args()
 countdown = int(args.count)
@@ -120,11 +123,12 @@ stat_types = {
 }
 
 # header
-print("%-8s  " % "TIME", end="")
-for stype in stat_types.keys():
-    print(" %8s" % (stype + "/s"), end="")
-    idx = stat_types[stype]
-print("")
+if not args.json:
+    print("%-8s  " % "TIME", end="")
+    for stype in stat_types.keys():
+        print(" %8s" % (stype + "/s"), end="")
+        idx = stat_types[stype]
+    print("")
 
 # output
 exiting = 0 if args.interval else 1
@@ -134,17 +138,28 @@ while (1):
     except KeyboardInterrupt:
         exiting = 1
 
-    print("%-8s: " % strftime("%H:%M:%S"), end="")
-    # print each statistic as a column
-    for stype in stat_types.keys():
-        idx = stat_types[stype]
-        try:
-            val = b["stats"][c_int(idx)].value / int(args.interval)
-            print(" %8d" % val, end="")
-        except:
-            print(" %8d" % 0, end="")
-    b["stats"].clear()
-    print("")
+    if not args.json:
+        print("%-8s: " % strftime("%H:%M:%S"), end="")
+        # print each statistic as a column
+        for stype in stat_types.keys():
+            idx = stat_types[stype]
+            try:
+                val = b["stats"][c_int(idx)].value / int(args.interval)
+                print(" %8d" % val, end="")
+            except:
+                print(" %8d" % 0, end="")
+        b["stats"].clear()
+        print("")
+    else:
+        json_dict = {}
+        for stype in stat_types.keys():
+            idx = stat_types[stype]
+            try:
+                val = b["stats"][c_int(idx)].value / int(args.interval)
+                json_dict[stype] = val
+            except:
+                json_dict[stype] = 0
+        print(json.dumps(json_dict))
 
     countdown -= 1
     if exiting or countdown == 0:

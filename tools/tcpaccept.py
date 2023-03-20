@@ -58,6 +58,8 @@ parser.add_argument("--mntnsmap",
     help="trace mount namespaces in this BPF map only")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 debug = 0
 
@@ -258,22 +260,46 @@ def print_ipv6_event(cpu, data, size):
         inet_ntop(AF_INET6, event.saddr).encode(),
         event.lport))
 
+def print_ipv4_event_json(cpu, data, size):
+    event = b["ipv4_events"].event(data)
+    global start_ts
+
+    if start_ts == 0:
+        start_ts = event.ts_us
+    print("%s" % { "timestamp": (float(event.ts_us) - start_ts) / 1000000, "pid": event.pid, "task": event.task.decode('utf8'), "ip": event.ip, 
+        "daddr": inet_ntop(AF_INET, pack("I", event.daddr)), "dport": event.dport, 
+        "saddr": inet_ntop(AF_INET, pack("I", event.saddr)), "lport": event.lport })
+
+def print_ipv6_event_json(cpu, data, size):
+    event = b["ipv6_events"].event(data)
+    global start_ts
+    if start_ts == 0:
+        start_ts = event.ts_us
+    event = b["ipv6_events"].event(data)
+    print("%s" % { "timestamp": (float(event.ts_us) - start_ts) / 1000000, "pid": event.pid, "task": event.task.decode('utf8'), "ip": event.ip, 
+        "daddr": inet_ntop(AF_INET6, event.daddr), "dport": event.dport, 
+        "saddr": inet_ntop(AF_INET6, event.saddr), "lport": event.lport })
 # initialize BPF
 b = BPF(text=bpf_text)
 
 # header
-if args.time:
-    print("%-9s" % ("TIME"), end="")
-if args.timestamp:
-    print("%-9s" % ("TIME(s)"), end="")
-print("%-7s %-12s %-2s %-16s %-5s %-16s %-5s" % ("PID", "COMM", "IP", "RADDR",
-    "RPORT", "LADDR", "LPORT"))
+if not args.json:
+    if args.time:
+        print("%-9s" % ("TIME"), end="")
+    if args.timestamp:
+        print("%-9s" % ("TIME(s)"), end="")
+    print("%-7s %-12s %-2s %-16s %-5s %-16s %-5s" % ("PID", "COMM", "IP", "RADDR",
+        "RPORT", "LADDR", "LPORT"))
 
 start_ts = 0
 
 # read events
-b["ipv4_events"].open_perf_buffer(print_ipv4_event)
-b["ipv6_events"].open_perf_buffer(print_ipv6_event)
+if args.json:
+    b["ipv4_events"].open_perf_buffer(print_ipv4_event_json)
+    b["ipv6_events"].open_perf_buffer(print_ipv6_event_json)
+else:
+    b["ipv4_events"].open_perf_buffer(print_ipv4_event)
+    b["ipv6_events"].open_perf_buffer(print_ipv6_event)
 while 1:
     try:
         b.perf_buffer_poll()

@@ -239,6 +239,8 @@ u64 __time = bpf_ktime_get_ns();
                 self.filter = "" if len(parts) != 6 else parts[5]
                 self._substitute_exprs()
 
+                self.json = tool.args.json or False
+
                 # Do we need to attach an entry probe so that we can collect an
                 # argument that is required for an exit (return) probe?
                 def check(expr):
@@ -514,7 +516,10 @@ DATA_DECL
                 elif self.type == "hist":
                         label = self.label or (self._display_expr(0)
                                 if not self.is_default_expr else "retval")
-                        data.print_log2_hist(val_type=label)
+                        if self.json:
+                                data.print_json_hist(label)
+                        else:
+                                data.print_log2_hist(val_type=label)
                 if not self.cumulative:
                         data.clear()
 
@@ -648,6 +653,8 @@ argdist -I 'kernel/sched/sched.h' \\
                        "as either full path, "
                        "or relative to relative to current working directory, "
                        "or relative to default kernel header search path")
+                parser.add_argument("-j", "--json", action="store_true",
+                  help="json output")
                 self.args = parser.parse_args()
                 self.usdt_ctx = None
 

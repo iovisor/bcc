@@ -14,6 +14,20 @@
 
 from __future__ import print_function
 from bcc import BPF
+import json
+import argparse
+
+examples = """examples:
+    ./threadsnoop           # trace all TCP state changes
+    ./threadsnoop -j        # print output in json format
+"""
+parser = argparse.ArgumentParser(
+    description="Trace new threads via phtread_create()",
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    epilog=examples)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
+args = parser.parse_args()
 
 # load BPF program
 b = BPF(text="""
@@ -45,7 +59,8 @@ try:
 except Exception:
     b.attach_uprobe(name="c", sym="pthread_create", fn_name="do_entry")
 
-print("%-10s %-7s %-16s %s" % ("TIME(ms)", "PID", "COMM", "FUNC"))
+if not args.json:
+    print("%-10s %-7s %-16s %s" % ("TIME(ms)", "PID", "COMM", "FUNC"))
 
 start_ts = 0
 
@@ -58,8 +73,17 @@ def print_event(cpu, data, size):
     func = b.sym(event.start, event.pid)
     if (func == "[unknown]"):
         func = hex(event.start)
-    print("%-10d %-7d %-16s %s" % ((event.ts - start_ts) / 1000000,
-        event.pid, event.comm, func))
+    
+    if not args.json:
+        print("%-10d %-7d %-16s %s" % ((event.ts - start_ts) / 1000000,
+            event.pid, event.comm, func))
+    else:
+        print(json.dumps({
+            "time": (event.ts - start_ts) / 1000000,
+            "pid": event.pid,
+            "comm": event.comm.decode(),
+            "func": func.decode()
+        }))
 
 b["events"].open_perf_buffer(print_event)
 while 1:

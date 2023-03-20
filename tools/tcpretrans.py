@@ -22,6 +22,7 @@ from time import strftime
 from socket import inet_ntop, AF_INET, AF_INET6
 from struct import pack
 from time import sleep
+import json
 
 # arguments
 examples = """examples:
@@ -47,6 +48,8 @@ group.add_argument("-6", "--ipv6", action="store_true",
     help="trace IPv6 family only")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 debug = 0
 
@@ -379,6 +382,36 @@ def print_ipv6_event(cpu, data, size):
     else:
         print(" %s" % (tcpstate[event.state]))
 
+def print_ipv4_event_json(cpu, data, size):
+    event = b["ipv4_events"].event(data)
+    print(json.dumps({
+        "time": strftime("%H:%M:%S"),
+        "pid": event.pid,
+        "ip": event.ip,
+        "saddr": inet_ntop(AF_INET, pack('I', event.saddr)),
+        "lport": event.lport,
+        "daddr": inet_ntop(AF_INET, pack('I', event.daddr)),
+        "dport": event.dport,
+        "type": type[event.type],
+        "state": tcpstate[event.state],
+        "seq": event.seq,
+    }))
+
+def print_ipv6_event_json(cpu, data, size):
+    event = b["ipv6_events"].event(data)
+    print(json.dumps({
+        "time": strftime("%H:%M:%S"),
+        "pid": event.pid,
+        "ip": event.ip,
+        "saddr": inet_ntop(AF_INET6, event.saddr),
+        "lport": event.lport,
+        "daddr": inet_ntop(AF_INET6, event.daddr),
+        "dport": event.dport,
+        "type": type[event.type],
+        "state": tcpstate[event.state],
+        "seq": event.seq,
+    }))
+    
 def depict_cnt(counts_tab, l3prot='ipv4'):
     for k, v in sorted(counts_tab.items(), key=lambda counts: counts[1].value):
         depict_key = ""
@@ -392,6 +425,29 @@ def depict_cnt(counts_tab, l3prot='ipv4'):
 
         print ("%s %10d" % (depict_key, v.value))
 
+def depict_cnt_json(counts_tab, l3prot='ipv4'):
+    time = strftime("%H:%M:%S")
+    for k, v in sorted(counts_tab.items(), key=lambda counts: counts[1].value):
+        ep_fmt = "[%s]#%d"
+        if l3prot == 'ipv4':
+            print(json.dumps({
+                "time": time,
+                "saddr": inet_ntop(AF_INET, pack('I', k.saddr)),
+                "lport": k.lport,
+                "daddr": inet_ntop(AF_INET, pack('I', k.daddr)),
+                "dport": k.dport,
+                "retransmits": v.value,
+            }))
+        else:
+            print(json.dumps({
+                "time": time,
+                "saddr": inet_ntop(AF_INET6, k.saddr),
+                "lport": k.lport,
+                "daddr": inet_ntop(AF_INET6, k.daddr),
+                "dport": k.dport,
+                "retransmits": v.value,
+            }))
+
 # initialize BPF
 b = BPF(text=bpf_text)
 if not BPF.tracepoint_exists("tcp", "tcp_retransmit_skb"):
@@ -399,7 +455,8 @@ if not BPF.tracepoint_exists("tcp", "tcp_retransmit_skb"):
 if args.lossprobe:
     b.attach_kprobe(event="tcp_send_loss_probe", fn_name="trace_tlp")
 
-print("Tracing retransmits ... Hit Ctrl-C to end")
+if not args.json:
+    print("Tracing retransmits ... Hit Ctrl-C to end")
 if args.count:
     try:
         while 1:
@@ -408,21 +465,29 @@ if args.count:
         pass
 
     # header
-    print("\n%-25s %-25s %-10s" % (
-        "LADDR:LPORT", "RADDR:RPORT", "RETRANSMITS"))
-    depict_cnt(b.get_table("ipv4_count"))
-    depict_cnt(b.get_table("ipv6_count"), l3prot='ipv6')
+    if not args.json:
+        print("\n%-25s %-25s %-10s" % (
+            "LADDR:LPORT", "RADDR:RPORT", "RETRANSMITS"))
+        depict_cnt(b.get_table("ipv4_count"))
+        depict_cnt(b.get_table("ipv6_count"), l3prot='ipv6')
+    else:
+        depict_cnt_json(b.get_table("ipv4_count"))
+        depict_cnt_json(b.get_table("ipv6_count"), l3prot='ipv6')
 # read events
 else:
     # header
-    print("%-8s %-7s %-2s %-20s %1s> %-20s" % ("TIME", "PID", "IP",
-        "LADDR:LPORT", "T", "RADDR:RPORT"), end='')
-    if args.sequence:
-        print(" %-12s %-10s" % ("STATE", "SEQ"))
+    if not args.json:
+        print("%-8s %-7s %-2s %-20s %1s> %-20s" % ("TIME", "PID", "IP",
+            "LADDR:LPORT", "T", "RADDR:RPORT"), end='')
+        if args.sequence:
+            print(" %-12s %-10s" % ("STATE", "SEQ"))
+        else:
+            print(" %-4s" % ("STATE"))
+        b["ipv4_events"].open_perf_buffer(print_ipv4_event)
+        b["ipv6_events"].open_perf_buffer(print_ipv6_event)
     else:
-        print(" %-4s" % ("STATE"))
-    b["ipv4_events"].open_perf_buffer(print_ipv4_event)
-    b["ipv6_events"].open_perf_buffer(print_ipv6_event)
+        b["ipv4_events"].open_perf_buffer(print_ipv4_event_json)
+        b["ipv6_events"].open_perf_buffer(print_ipv6_event_json)
     while 1:
         try:
             b.perf_buffer_poll()

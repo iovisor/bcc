@@ -252,6 +252,8 @@ class Tool(object):
         parser.add_argument("pattern",
             type=ArgString,
             help="search expression for events")
+        parser.add_argument("-j", "--json", action="store_true",
+            help="json output")
         self.args = parser.parse_args()
         global debug
         debug = self.args.debug
@@ -269,8 +271,9 @@ class Tool(object):
     def run(self):
         self.probe.load()
         self.probe.attach()
-        print("Tracing %d functions for \"%s\"... Hit Ctrl-C to end." %
-              (self.probe.matched, bytes(self.args.pattern)))
+        if not self.args.json:
+            print("Tracing %d functions for \"%s\"... Hit Ctrl-C to end." %
+                (self.probe.matched, bytes(self.args.pattern)))
         exiting = 0 if self.args.interval else 1
         seconds = 0
         while True:
@@ -284,21 +287,27 @@ class Tool(object):
             if self.args.duration and seconds >= int(self.args.duration):
                 exiting = 1
 
-            print()
-            if self.args.timestamp:
-                print("%-8s\n" % strftime("%H:%M:%S"), end="")
+            if not self.args.json:
+                print()
+                if self.args.timestamp:
+                    print("%-8s\n" % strftime("%H:%M:%S"), end="")
 
-            print("%-36s %8s" % ("FUNC", "COUNT"))
-            counts = self.probe.counts()
-            for k, v in sorted(counts.items(),
-                               key=lambda counts: counts[1].value):
-                if v.value == 0:
-                    continue
-                print("%-36s %8d" %
-                      (self.probe.trace_functions[k.value].decode('utf-8', 'replace'), v.value))
+                print("%-36s %8s" % ("FUNC", "COUNT"))
+                counts = self.probe.counts()
+                for k, v in sorted(counts.items(),
+                                key=lambda counts: counts[1].value):
+                    if v.value == 0:
+                        continue
+                    print("%-36s %8d" %
+                        (self.probe.trace_functions[k.value].decode('utf-8', 'replace'), v.value))
+            else:
+                counts = self.probe.counts()
+                print({self.probe.trace_functions[k.value].decode('utf-8', 'replace'): v.value
+                                  for k, v in counts.items() if v.value != 0})
 
             if exiting:
-                print("Detaching...")
+                if not self.args.json:
+                    print("Detaching...")
                 exit()
             else:
                 self.probe.clear()

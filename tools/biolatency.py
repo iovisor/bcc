@@ -286,7 +286,6 @@ while (1):
     except KeyboardInterrupt:
         exiting = 1
 
-    print()
     if args.json:
         if args.timestamp:
             print("%-8s\n" % strftime("%H:%M:%S"), end="")
@@ -297,6 +296,7 @@ while (1):
             dist.print_json_hist(label, "disk", disk_print)
 
     else:
+        print()
         if args.timestamp:
             print("%-8s\n" % strftime("%H:%M:%S"), end="")
 

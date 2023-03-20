@@ -48,6 +48,8 @@ parser.add_argument("count", nargs="?", default=99999999,
     help="number of outputs")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 interval = int(args.interval)
 countdown = int(args.count)
@@ -169,7 +171,8 @@ b.attach_kprobe(event="vfs_write", fn_name="trace_write_entry")
 
 DNAME_INLINE_LEN = 32  # linux/dcache.h
 
-print('Tracing... Output every %d secs. Hit Ctrl-C to end' % interval)
+if not args.json:
+    print('Tracing... Output every %d secs. Hit Ctrl-C to end' % interval)
 
 def sort_fn(counts):
     if args.sort == "all":
@@ -186,14 +189,15 @@ while 1:
         exiting = 1
 
     # header
-    if clear:
-        call("clear")
-    else:
-        print()
-    with open(loadavg) as stats:
-        print("%-8s loadavg: %s" % (strftime("%H:%M:%S"), stats.read()))
-    print("%-7s %-16s %-6s %-6s %-7s %-7s %1s %s" % ("TID", "COMM",
-        "READS", "WRITES", "R_Kb", "W_Kb", "T", "FILE"))
+    if not args.json:
+        if clear:
+            call("clear")
+        else:
+            print()
+        with open(loadavg) as stats:
+            print("%-8s loadavg: %s" % (strftime("%H:%M:%S"), stats.read()))
+        print("%-7s %-16s %-6s %-6s %-7s %-7s %1s %s" % ("TID", "COMM",
+            "READS", "WRITES", "R_Kb", "W_Kb", "T", "FILE"))
 
     # by-TID output
     counts = b.get_table("counts")
@@ -205,10 +209,22 @@ while 1:
             name = name[:-3] + "..."
 
         # print line
-        print("%-7d %-16s %-6d %-6d %-7d %-7d %1s %s" % (k.pid,
-            k.comm.decode('utf-8', 'replace'), v.reads, v.writes,
-            v.rbytes / 1024, v.wbytes / 1024,
-            k.type.decode('utf-8', 'replace'), name))
+        if args.json:
+            print("%s" % {
+                "pid": k.pid,
+                "comm": k.comm.decode('utf-8', 'replace'),
+                "reads": v.reads,
+                "writes": v.writes,
+                "rbytes": v.rbytes / 1024,
+                "wbytes": v.wbytes / 1024,
+                "type": k.type.decode('utf-8', 'replace'),
+                "file": name,
+            })
+        else:
+            print("%-7d %-16s %-6d %-6d %-7d %-7d %1s %s" % (k.pid,
+                k.comm.decode('utf-8', 'replace'), v.reads, v.writes,
+                v.rbytes / 1024, v.wbytes / 1024,
+                k.type.decode('utf-8', 'replace'), name))
 
         line += 1
         if line >= maxrows:
@@ -217,5 +233,6 @@ while 1:
 
     countdown -= 1
     if exiting or countdown == 0:
-        print("Detaching...")
+        if not args.json:
+            print("Detaching...")
         exit()

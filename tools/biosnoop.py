@@ -19,6 +19,7 @@ from __future__ import print_function
 from bcc import BPF
 import argparse
 import os
+import json
 
 # arguments
 examples = """examples:
@@ -39,6 +40,8 @@ parser.add_argument("-P", "--pattern", action="store_true",
     help="display block I/O pattern (sequential or random)")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 debug = 0
 
@@ -265,13 +268,14 @@ else:
     b.attach_kprobe(event="blk_account_io_done", fn_name="trace_req_completion")
 
 # header
-print("%-11s %-14s %-7s %-9s %-1s %-10s %-7s" % ("TIME(s)", "COMM", "PID",
-    "DISK", "T", "SECTOR", "BYTES"), end="")
-if args.pattern:
-    print("%-1s " % ("P"), end="")
-if args.queue:
-    print("%7s " % ("QUE(ms)"), end="")
-print("%7s" % "LAT(ms)")
+if not args.json:
+    print("%-11s %-14s %-7s %-9s %-1s %-10s %-7s" % ("TIME(s)", "COMM", "PID",
+        "DISK", "T", "SECTOR", "BYTES"), end="")
+    if args.pattern:
+        print("%-1s " % ("P"), end="")
+    if args.queue:
+        print("%7s " % ("QUE(ms)"), end="")
+    print("%7s" % "LAT(ms)")
 
 rwflg = ""
 pattern = ""
@@ -316,8 +320,49 @@ def print_event(cpu, data, size):
         print("%7.2f " % (float(event.qdelta) / 1000000), end="")
     print("%7.2f" % (float(event.delta) / 1000000))
 
+def print_event_json(cpu, data, size):
+    json_dict = {}
+    event = b["events"].event(data)
+
+    global start_ts
+    if start_ts == 0:
+        start_ts = event.ts
+
+    if event.rwflag == 1:
+        rwflg = "W"
+    else:
+        rwflg = "R"
+
+    delta = float(event.ts) - start_ts
+
+    disk_name = event.disk_name.decode('utf-8', 'replace')
+    if not disk_name:
+        disk_name = '<unknown>'
+    json_dict["time"] = delta / 1000000
+    json_dict["comm"] = event.name.decode('utf-8', 'replace')
+    json_dict["pid"] = event.pid
+    json_dict["disk"] = disk_name
+    json_dict["rwflag"] = rwflg
+    json_dict["sector"] = event.sector
+    json_dict["len"] = event.len
+    if args.pattern:
+        if event.pattern == P_SEQUENTIAL:
+            pattern = "S"
+        elif event.pattern == P_RANDOM:
+            pattern = "R"
+        else:
+            pattern = "?"
+        json_dict["pattern"] = pattern
+    if args.queue:
+        json_dict["queued"] = float(event.qdelta) / 1000000
+    json_dict["latency"] = float(event.delta) / 1000000
+    print(json.dumps(json_dict))
+
 # loop with callback to print_event
-b["events"].open_perf_buffer(print_event, page_cnt=64)
+if args.json:
+    b["events"].open_perf_buffer(print_event_json, page_cnt=64)
+else:
+    b["events"].open_perf_buffer(print_event, page_cnt=64)
 while 1:
     try:
         b.perf_buffer_poll()

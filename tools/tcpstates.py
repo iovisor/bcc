@@ -22,6 +22,7 @@ from socket import inet_ntop, AF_INET, AF_INET6
 from struct import pack
 from time import strftime, time
 from os import getuid
+import json
 
 # arguments
 examples = """examples:
@@ -57,6 +58,8 @@ parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 parser.add_argument("-Y", "--journal", action="store_true",
     help="log session state changes to the systemd journal")
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 group = parser.add_mutually_exclusive_group()
 group.add_argument("-4", "--ipv4", action="store_true",
     help="trace IPv4 family only")
@@ -418,30 +421,77 @@ def print_ipv6_event(cpu, data, size):
     if args.journal:
         journal.send(**journal_fields(event, AF_INET6))
 
+def print_ipv4_event_json(cpu, data, size):
+    event = b["ipv4_events"].event(data)
+    global start_ts
+
+    if start_ts == 0:
+        start_ts = event.ts_us
+
+    print(json.dumps({
+        "timestamp": (float(event.ts_us) - start_ts) / 1000000,
+        "skaddr": event.skaddr,
+        "pid": event.pid,
+        "task": event.task.decode('utf-8', 'replace'),
+        "family": 4,
+        "saddr": inet_ntop(AF_INET, pack("I", event.saddr)),
+        "daddr": inet_ntop(AF_INET, pack("I", event.daddr)),
+        "ports": event.ports,
+        "oldstate": tcpstate2str(event.oldstate),
+        "newstate": tcpstate2str(event.newstate),
+        "ms": float(event.span_us) / 1000  
+    }))
+
+def print_ipv6_event_json(cpu, data, size):
+    event = b["ipv6_events"].event(data)
+    global start_ts
+
+    if start_ts == 0:
+        start_ts = event.ts_us
+        
+    print(json.dumps({
+        "timestamp": (float(event.ts_us) - start_ts) / 1000000,
+        "skaddr": event.skaddr,
+        "pid": event.pid,
+        "task": event.task.decode('utf-8', 'replace'),
+        "family": 6,
+        "saddr": inet_ntop(AF_INET6, event.saddr),
+        "daddr": inet_ntop(AF_INET6, event.daddr),
+        "ports": event.ports,
+        "oldstate": tcpstate2str(event.oldstate),
+        "newstate": tcpstate2str(event.newstate),
+        "ms": float(event.span_us) / 1000  
+    }))
+
 # initialize BPF
 b = BPF(text=bpf_text)
 
 # header
-if args.time:
-    if args.csv:
-        print("%s," % ("TIME"), end="")
-    else:
-        print("%-8s " % ("TIME"), end="")
-if args.timestamp:
-    if args.csv:
-        print("%s," % ("TIME(s)"), end="")
-    else:
-        print("%-9s " % ("TIME(s)"), end="")
-print(header_string % ("SKADDR", "C-PID", "C-COMM",
-    "IP" if args.wide or args.csv else "",
-    "LADDR", "LPORT", "RADDR", "RPORT",
-    "OLDSTATE", "NEWSTATE", "MS"))
+if not args.json:
+    if args.time:
+        if args.csv:
+            print("%s," % ("TIME"), end="")
+        else:
+            print("%-8s " % ("TIME"), end="")
+    if args.timestamp:
+        if args.csv:
+            print("%s," % ("TIME(s)"), end="")
+        else:
+            print("%-9s " % ("TIME(s)"), end="")
+    print(header_string % ("SKADDR", "C-PID", "C-COMM",
+        "IP" if args.wide or args.csv else "",
+        "LADDR", "LPORT", "RADDR", "RPORT",
+        "OLDSTATE", "NEWSTATE", "MS"))
 
 start_ts = 0
 
 # read events
-b["ipv4_events"].open_perf_buffer(print_ipv4_event, page_cnt=64)
-b["ipv6_events"].open_perf_buffer(print_ipv6_event, page_cnt=64)
+if args.json:
+    b["ipv4_events"].open_perf_buffer(print_ipv4_event_json, page_cnt=64)
+    b["ipv6_events"].open_perf_buffer(print_ipv6_event_json, page_cnt=64)
+else:
+    b["ipv4_events"].open_perf_buffer(print_ipv4_event, page_cnt=64)
+    b["ipv6_events"].open_perf_buffer(print_ipv6_event, page_cnt=64)
 while 1:
     try:
         b.perf_buffer_poll()

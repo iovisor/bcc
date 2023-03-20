@@ -50,6 +50,8 @@ parser = argparse.ArgumentParser(
     description="Show TCP SYN backlog.",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 group = parser.add_mutually_exclusive_group()
 group.add_argument("-4", "--ipv4", action="store_true",
     help="trace IPv4 family only")
@@ -67,12 +69,17 @@ else:
     b.attach_kprobe(event="tcp_v4_syn_recv_sock", fn_name="do_entry")
     b.attach_kprobe(event="tcp_v6_syn_recv_sock", fn_name="do_entry")
 
-print("Tracing SYN backlog size. Ctrl-C to end.")
+if not args.json:
+    print("Tracing SYN backlog size. Ctrl-C to end.");
 
 try:
     sleep(99999999)
 except KeyboardInterrupt:
-    print()
+    if not args.json:
+        print()
 
 dist = b.get_table("dist")
-dist.print_log2_hist("backlog", "backlog_max")
+if args.json:
+    dist.print_json_hist("backlog", "backlog_max")
+else:
+    dist.print_log2_hist("backlog", "backlog_max")

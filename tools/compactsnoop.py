@@ -44,6 +44,8 @@ parser.add_argument("-K", "--kernel-stack", action="store_true",
 parser.add_argument("-e", "--extended_fields", action="store_true",
         help="show system memory state")
 parser.add_argument("--ebpf", action="store_true", help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+        help="json output")
 args = parser.parse_args()
 debug = 0
 if args.duration:
@@ -344,14 +346,15 @@ def compact_result_to_str(status):
         return str(status)
 
 # header
-if args.timestamp:
-    print("%-14s" % ("TIME(s)"), end=" ")
-print("%-14s %-6s %-4s %-12s %-5s %-7s" %
-      ("COMM", "PID", "NODE", "ZONE", "ORDER", "MODE"), end=" ")
-if args.extended_fields:
-    print("%-8s %-8s %-8s %-8s %-8s" %
-          ("FRAGIDX", "MIN", "LOW", "HIGH", "FREE"), end=" ")
-print("%9s %16s" % ("LAT(ms)", "STATUS"))
+if not args.json:
+    if args.timestamp:
+        print("%-14s" % ("TIME(s)"), end=" ")
+    print("%-14s %-6s %-4s %-12s %-5s %-7s" %
+        ("COMM", "PID", "NODE", "ZONE", "ORDER", "MODE"), end=" ")
+    if args.extended_fields:
+        print("%-8s %-8s %-8s %-8s %-8s" %
+            ("FRAGIDX", "MIN", "LOW", "HIGH", "FREE"), end=" ")
+    print("%9s %16s" % ("LAT(ms)", "STATUS"))
 
 # process event
 def print_event(cpu, data, size):
@@ -388,8 +391,39 @@ def print_event(cpu, data, size):
 
     sys.stdout.flush()
 
+def print_event_json(cpu, data, size):
+    event = b["events"].event(data)
+
+    global initial_ts
+
+    if not initial_ts:
+        initial_ts = event.ts
+
+    json_dict = {
+        "comm": event.comm.decode("utf-8", "replace"),
+        "pid": event.pid,
+        "nid": event.nid,
+        "zone": zone_idx_to_str(event.idx),
+        "order": event.order,
+        "mode": "SYNC" if event.sync else "ASYNC",
+        "delta": float(event.delta) / 1000000,
+    }
+    if args.timestamp:
+        delta = event.ts - initial_ts
+        json_dict["timestamp"] = float(delta) / 1000000
+
+    if args.extended_fields:
+        json_dict["fragindex"] = (float(event.fragindex) / 1000)
+        json_dict["min"] = event.min
+        json_dict["low"] = event.low
+        json_dict["high"] = event.high
+        json_dict["free"] = event.free
+
 # loop with callback to print_event
-b["events"].open_perf_buffer(print_event, page_cnt=64)
+if args.json:
+    b["events"].open_perf_buffer(print_event_json, page_cnt=64)
+else:
+    b["events"].open_perf_buffer(print_event, page_cnt=64)
 start_time = datetime.now()
 while not args.duration or datetime.now() - start_time < args.duration:
     try:

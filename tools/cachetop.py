@@ -29,6 +29,7 @@ import pwd
 import re
 import signal
 from time import sleep
+import json
 
 FIELDS = (
     "PID",
@@ -133,8 +134,9 @@ def get_processes_stats(
 
 
 def handle_loop(stdscr, args):
-    # don't wait on key press
-    stdscr.nodelay(1)
+    if stdscr:
+        # don't wait on key press
+        stdscr.nodelay(1)
     # set default sorting field
     sort_field = FIELDS.index(DEFAULT_FIELD)
     sort_reverse = True
@@ -188,8 +190,13 @@ def handle_loop(stdscr, args):
         b.attach_kprobe(event="account_page_dirtied", fn_name="do_count")
 
     exiting = 0
+    countdown = int(args.count)
 
-    while 1:
+    def print_event_stdscr():
+        nonlocal sort_reverse
+        nonlocal sort_field
+        nonlocal exiting
+        nonlocal b
         s = stdscr.getch()
         if s == ord('q'):
             exiting = 1
@@ -254,8 +261,57 @@ def handle_loop(stdscr, args):
             if i > height - 4:
                 break
         stdscr.refresh()
-        if exiting:
-            print("Detaching...")
+    
+    def print_event_json():
+        nonlocal sort_reverse
+        nonlocal sort_field
+        nonlocal exiting
+        nonlocal b
+
+        process_stats = get_processes_stats(
+            b,
+            sort_field=sort_field,
+            sort_reverse=sort_reverse)
+        
+        try:
+            sleep(args.interval)
+        except KeyboardInterrupt:
+            exiting = 1
+        for i, stat in enumerate(process_stats):
+            uid = int(stat[1])
+            try:
+                username = pwd.getpwuid(uid)[0]
+            except KeyError:
+                # `pwd` throws a KeyError if the user cannot be found. This can
+                # happen e.g. when the process is running in a cgroup that has
+                # different users from the host.
+                username = 'UNKNOWN({})'.format(uid)
+            # (int(_pid), uid, comm,
+            #  access, misses, mbd,
+            #  rhits, whits))
+            print(json.dumps({
+                "time": strftime("%H:%M:%S"),
+                "pid": stat[0],
+                "uid": stat[1],
+                "username": username,
+                "comm": stat[2],
+                "hits": stat[3],
+                "misses": stat[4],
+                "dirties": stat[5],
+                "read_hit_percent": stat[6],
+                "write_hit_percent": stat[7]
+            }))
+
+    while 1:
+        if args.json:
+            print_event_json()
+        else:
+            print_event_stdscr()
+
+        countdown -= 1
+        if exiting or countdown == 0:
+            if not args.json:
+                print("Detaching...")
             return
 
 
@@ -270,9 +326,16 @@ def parse_arguments():
         'interval', type=int, default=5, nargs='?',
         help='Interval between probes.'
     )
+    parser.add_argument("count", nargs="?", default=99999999,
+        help="number of outputs")
+    parser.add_argument("-j", "--json", action="store_true",
+        help="json output")
 
     args = parser.parse_args()
     return args
 
 args = parse_arguments()
-curses.wrapper(handle_loop, args)
+if args.json:
+    handle_loop(None, args)
+else:
+    curses.wrapper(handle_loop, args)

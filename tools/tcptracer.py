@@ -21,6 +21,7 @@ from bcc.containers import filter_by_containers
 import argparse as ap
 from socket import inet_ntop, AF_INET, AF_INET6
 from struct import pack
+import json
 
 parser = ap.ArgumentParser(description="Trace TCP connections",
                            formatter_class=ap.RawDescriptionHelpFormatter)
@@ -34,6 +35,8 @@ parser.add_argument("--cgroupmap",
                     help="trace cgroups in this BPF map only")
 parser.add_argument("--mntnsmap",
                     help="trace mount namespaces in this BPF map only")
+parser.add_argument("-j", "--json", action="store_true",
+                    help="json output")
 group = parser.add_mutually_exclusive_group()
 group.add_argument("-4", "--ipv4", action="store_true",
                     help="trace IPv4 family only")
@@ -610,6 +613,63 @@ def print_ipv6_event(cpu, data, size):
     else:
         print()
 
+def print_ipv4_event_json(cpu, data, size):
+    event = b["tcp_ipv4_event"].event(data)
+    global start_ts
+
+    if start_ts == 0:
+        start_ts = event.ts_ns
+
+    if event.type == 1:
+        type_str = "C"
+    elif event.type == 2:
+        type_str = "A"
+    elif event.type == 3:
+        type_str = "X"
+    else:
+        type_str = "U"
+
+    print(json.dumps({
+        "timestamp": ((event.ts_ns - start_ts) / 1000000000.0),
+        "type": verbose_types[type_str],
+        "pid": event.pid,
+        "comm": event.comm.decode('utf-8', 'replace'),
+        "ip": event.ip,
+        "saddr": inet_ntop(AF_INET, pack("I", event.saddr)),
+        "daddr": inet_ntop(AF_INET, pack("I", event.daddr)),
+        "sport": event.sport,
+        "dport": event.dport,
+        "netns": event.netns
+    }))
+
+def print_ipv6_event_json(cpu, data, size):
+    event = b["tcp_ipv6_event"].event(data)
+    global start_ts
+
+    if start_ts == 0:
+        start_ts = event.ts_ns
+
+    if event.type == 1:
+        type_str = "C"
+    elif event.type == 2:
+        type_str = "A"
+    elif event.type == 3:
+        type_str = "X"
+    else:
+        type_str = "U"
+
+    print(json.dumps({
+        "timestamp": ((event.ts_ns - start_ts) / 1000000000.0),
+        "type": verbose_types[type_str],
+        "pid": event.pid,
+        "comm": event.comm.decode('utf-8', 'replace'),
+        "ip": event.ip,
+        "saddr": inet_ntop(AF_INET6, event.saddr),
+        "daddr": inet_ntop(AF_INET6, event.daddr),
+        "sport": event.sport,
+        "dport": event.dport,
+        "netns": event.netns
+    }))
 
 pid_filter = ""
 netns_filter = ""
@@ -650,22 +710,24 @@ b.attach_kprobe(event="tcp_set_state", fn_name="trace_tcp_set_state_entry")
 b.attach_kprobe(event="tcp_close", fn_name="trace_close_entry")
 b.attach_kretprobe(event="inet_csk_accept", fn_name="trace_accept_return")
 
-print("Tracing TCP established connections. Ctrl-C to end.")
+if not args.json:
+    print("Tracing TCP established connections. Ctrl-C to end.")
 
 # header
-if args.verbose:
-    if args.timestamp:
-        print("%-14s" % ("TIME(ns)"), end="")
-    print("%-12s %-6s %-16s %-2s %-16s %-16s %-6s %-7s" % ("TYPE",
-          "PID", "COMM", "IP", "SADDR", "DADDR", "SPORT", "DPORT"), end="")
-    if not args.netns:
-        print("%-8s" % "NETNS", end="")
-    print()
-else:
-    if args.timestamp:
-        print("%-9s" % ("TIME(s)"), end="")
-    print("%-2s %-6s %-16s %-2s %-16s %-16s %-6s %-6s" %
-          ("T", "PID", "COMM", "IP", "SADDR", "DADDR", "SPORT", "DPORT"))
+if not args.json:
+    if args.verbose:
+        if args.timestamp:
+            print("%-14s" % ("TIME(ns)"), end="")
+        print("%-12s %-6s %-16s %-2s %-16s %-16s %-6s %-7s" % ("TYPE",
+            "PID", "COMM", "IP", "SADDR", "DADDR", "SPORT", "DPORT"), end="")
+        if not args.netns:
+            print("%-8s" % "NETNS", end="")
+        print()
+    else:
+        if args.timestamp:
+            print("%-9s" % ("TIME(s)"), end="")
+        print("%-2s %-6s %-16s %-2s %-16s %-16s %-6s %-6s" %
+            ("T", "PID", "COMM", "IP", "SADDR", "DADDR", "SPORT", "DPORT"))
 
 start_ts = 0
 
@@ -678,9 +740,12 @@ def inet_ntoa(addr):
         addr = addr >> 8
     return dq
 
-
-b["tcp_ipv4_event"].open_perf_buffer(print_ipv4_event)
-b["tcp_ipv6_event"].open_perf_buffer(print_ipv6_event)
+if args.json:
+    b["tcp_ipv4_event"].open_perf_buffer(print_ipv4_event_json)
+    b["tcp_ipv6_event"].open_perf_buffer(print_ipv6_event_json)
+else:
+    b["tcp_ipv4_event"].open_perf_buffer(print_ipv4_event)
+    b["tcp_ipv6_event"].open_perf_buffer(print_ipv6_event)
 while True:
     try:
         b.perf_buffer_poll()

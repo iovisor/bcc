@@ -71,6 +71,8 @@ group.add_argument("-6", "--ipv6", action="store_true",
     help="trace IPv6 family only")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 if not args.interval:
     args.interval = args.duration
@@ -228,7 +230,8 @@ if args.debug or args.ebpf:
 b = BPF(text=bpf_text)
 b.attach_kprobe(event="tcp_rcv_established", fn_name="trace_tcp_rcv")
 
-print("Tracing TCP RTT... Hit Ctrl-C to end.")
+if not args.json:
+    print("Tracing TCP RTT... Hit Ctrl-C to end.")
 
 def print_section(addr):
     addrstr = "*******"
@@ -255,11 +258,14 @@ while (1):
     except KeyboardInterrupt:
         exiting = 1
 
-    print()
-    if args.timestamp:
-        print("%-8s\n" % strftime("%H:%M:%S"), end="")
+    if not args.json:
+        print()
+        if args.timestamp:
+            print("%-8s\n" % strftime("%H:%M:%S"), end="")
 
-    dist.print_log2_hist(label, section_header=print_header, section_print_fn=print_section)
+        dist.print_log2_hist(label, section_header=print_header, section_print_fn=print_section)
+    else:
+        dist.print_json_hist(label, section_header=print_header, section_print_fn=print_section)
     dist.clear()
     lathash.clear()
 

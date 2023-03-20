@@ -49,6 +49,8 @@ parser.add_argument("outputs", nargs="?", default=99999999,
     help="number of outputs")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 countdown = int(args.outputs)
 if args.count and (args.dist or args.nanoseconds):
@@ -223,10 +225,11 @@ if debug or args.ebpf:
 # load BPF program
 b = BPF(text=bpf_text)
 
-if args.count:
-    print("Tracing hard irq events... Hit Ctrl-C to end.")
-else:
-    print("Tracing hard irq event time... Hit Ctrl-C to end.")
+if not args.json:
+    if args.count:
+        print("Tracing hard irq events... Hit Ctrl-C to end.")
+    else:
+        print("Tracing hard irq event time... Hit Ctrl-C to end.")
 
 # output
 exiting = 0 if args.interval else 1
@@ -237,16 +240,23 @@ while (1):
     except KeyboardInterrupt:
         exiting = 1
 
-    print()
-    if args.timestamp:
-        print("%-8s\n" % strftime("%H:%M:%S"), end="")
+    if not args.json:
+        print()
+        if args.timestamp:
+            print("%-8s\n" % strftime("%H:%M:%S"), end="")
 
-    if args.dist:
-        dist.print_log2_hist(label, "hardirq", section_print_fn=bytes.decode)
+        if args.dist:
+            dist.print_log2_hist(label, "hardirq", section_print_fn=bytes.decode)
+        else:
+            print("%-26s %11s" % ("HARDIRQ", "TOTAL_" + label))
+            for k, v in sorted(dist.items(), key=lambda dist: dist[1].value):
+                print("%-26s %11d" % (k.name.decode('utf-8', 'replace'), v.value / factor))
     else:
-        print("%-26s %11s" % ("HARDIRQ", "TOTAL_" + label))
-        for k, v in sorted(dist.items(), key=lambda dist: dist[1].value):
-            print("%-26s %11d" % (k.name.decode('utf-8', 'replace'), v.value / factor))
+        if args.dist:
+            dist.print_json_hist(label, "hardirq", section_print_fn=bytes.decode)
+        else:
+            for k, v in sorted(dist.items(), key=lambda dist: dist[1].value):
+                print("%s" % { "hardirq": k.name.decode('utf-8', 'replace'), "total_usecs": v.value / factor })
     dist.clear()
 
     sys.stdout.flush()

@@ -22,7 +22,7 @@ from bcc import BPF
 from time import sleep, strftime
 import argparse
 import signal
-import re
+import json
 from sys import argv
 
 # signal handler
@@ -62,6 +62,8 @@ parser.add_argument("count", nargs="?", default=-1,
     help="number of outputs")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 count = int(args.count)
 tstamp = args.timestamp
@@ -108,10 +110,11 @@ elif BPF.get_kprobe_functions(b'account_page_dirtied'):
 b.attach_kprobe(event="mark_buffer_dirty", fn_name="do_count")
 
 # header
-if tstamp:
-    print("%-8s " % "TIME", end="")
-print("%8s %8s %8s %8s %12s %10s" %
-     ("HITS", "MISSES", "DIRTIES", "HITRATIO", "BUFFERS_MB", "CACHED_MB"))
+if not args.json:
+    if tstamp:
+        print("%-8s " % "TIME", end="")
+    print("%8s %8s %8s %8s %12s %10s" %
+        ("HITS", "MISSES", "DIRTIES", "HITRATIO", "BUFFERS_MB", "CACHED_MB"))
 
 loop = 0
 exiting = 0
@@ -172,13 +175,24 @@ while 1:
     cached = int(mem["Cached"]) / 1024
     buff = int(mem["Buffers"]) / 1024
 
-    if tstamp:
-        print("%-8s " % strftime("%H:%M:%S"), end="")
-    print("%8d %8d %8d %7.2f%% %12.0f %10.0f" %
-        (hits, misses, mbd, 100 * ratio, buff, cached))
+    if args.json:
+        if tstamp:
+            print(json.dumps({"time": strftime("%H:%M:%S"),
+                "hits": hits, "misses": misses, "dirties": mbd,
+                "hitratio": ratio, "buffers_mb": buff, "cached_mb": cached}))
+        else:
+            print(json.dumps({"hits": hits, "misses": misses,
+                "dirties": mbd, "hitratio": ratio, "buffers_mb": buff,
+                "cached_mb": cached}))
+    else:
+        if tstamp:
+            print("%-8s " % strftime("%H:%M:%S"), end="")
+        print("%8d %8d %8d %7.2f%% %12.0f %10.0f" %
+            (hits, misses, mbd, 100 * ratio, buff, cached))
 
     mpa = mbd = apcl = apd = total = misses = hits = cached = buff = 0
 
     if exiting:
-        print("Detaching...")
+        if not args.json:
+            print("Detaching...")
         exit()

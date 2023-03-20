@@ -82,6 +82,8 @@ parser.add_argument("-F", "--full-path", action="store_true",
 parser.add_argument("-b", "--buffer-pages", type=int, default=64,
     help="size of the perf ring buffer "
         "(must be a power of two number of pages and defaults to 64)")
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 debug = 0
 if args.duration:
@@ -399,15 +401,16 @@ if not is_support_kfunc:
 initial_ts = 0
 
 # header
-if args.timestamp:
-    print("%-14s" % ("TIME(s)"), end="")
-if args.print_uid:
-    print("%-6s" % ("UID"), end="")
-print("%-6s %-16s %4s %3s " %
-      ("TID" if args.tid else "PID", "COMM", "FD", "ERR"), end="")
-if args.extended_fields:
-    print("%-9s" % ("FLAGS"), end="")
-print("PATH")
+if not args.json:
+    if args.timestamp:
+        print("%-14s" % ("TIME(s)"), end="")
+    if args.print_uid:
+        print("%-6s" % ("UID"), end="")
+    print("%-6s %-16s %4s %3s " %
+        ("TID" if args.tid else "PID", "COMM", "FD", "ERR"), end="")
+    if args.extended_fields:
+        print("%-9s" % ("FLAGS"), end="")
+    print("PATH")
 
 class EventType(object):
     EVENT_ENTRY = 0
@@ -470,8 +473,68 @@ def print_event(cpu, data, size):
     elif event.type == EventType.EVENT_ENTRY:
         entries[event.id].append(event.name)
 
+def print_event_json(cpu, data, size):
+    event = b["events"].event(data)
+    global initial_ts
+    json_dict = {}
+
+    if not args.full_path or event.type == EventType.EVENT_END:
+        skip = False
+
+        # split return value into FD and errno columns
+        if event.ret >= 0:
+            fd_s = event.ret
+            err = 0
+        else:
+            fd_s = -1
+            err = - event.ret
+
+        if not initial_ts:
+            initial_ts = event.ts
+
+        if args.failed and (event.ret >= 0):
+            skip = True
+
+        if args.name and bytes(args.name) not in event.comm:
+            skip = True
+
+        if not skip:
+            if args.timestamp:
+                delta = event.ts - initial_ts
+                json_dict["TIME(s)"] = float(delta) / 1000000
+
+            if args.print_uid:
+                json_dict["UID"] = event.uid
+
+            json_dict["TID" if args.tid else "PID"] = event.id & 0xffffffff if args.tid else event.id >> 32
+            json_dict["COMM"] = event.comm.decode()
+            json_dict["FD"] = fd_s
+            json_dict["ERR"] = err
+
+            if args.extended_fields:
+                json_dict["FLAGS"] = event.flags
+
+            if not args.full_path:
+                json_dict["PATH"] = event.name.decode()
+            else:
+                paths = entries[event.id]
+                paths.reverse()
+                json_dict["PATH"] = os.path.join(*paths)
+
+        if args.full_path:
+            try:
+                del(entries[event.id])
+            except Exception:
+                pass
+        print("%s" % json_dict)
+    elif event.type == EventType.EVENT_ENTRY:
+        entries[event.id].append(event.name)
+
 # loop with callback to print_event
-b["events"].open_perf_buffer(print_event, page_cnt=args.buffer_pages)
+if args.json:
+    b["events"].open_perf_buffer(print_event_json, page_cnt=args.buffer_pages)
+else:
+    b["events"].open_perf_buffer(print_event, page_cnt=args.buffer_pages)
 start_time = datetime.now()
 while not args.duration or datetime.now() - start_time < args.duration:
     try:

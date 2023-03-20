@@ -28,6 +28,8 @@ parser.add_argument("-s", "--shared", nargs="?",
         const="/lib/libreadline.so", type=str,
         help="specify the location of libreadline.so library.\
               Default is /lib/libreadline.so")
+parser.add_argument("-j", "--json", action="store_true",
+        help="json output")
 args = parser.parse_args()
 
 name = args.shared if args.shared else "/bin/bash"
@@ -66,14 +68,22 @@ b = BPF(text=bpf_text)
 b.attach_uretprobe(name=name, sym="readline", fn_name="printret")
 
 # header
-print("%-9s %-7s %s" % ("TIME", "PID", "COMMAND"))
+if not args.json:
+    print("%-9s %-7s %s" % ("TIME", "PID", "COMMAND"))
 
 def print_event(cpu, data, size):
     event = b["events"].event(data)
     print("%-9s %-7d %s" % (strftime("%H:%M:%S"), event.pid,
                             event.str.decode('utf-8', 'replace')))
 
-b["events"].open_perf_buffer(print_event)
+def print_event_json(cpu, data, size):
+    event = b["events"].event(data)
+    print('{"time": "%s", "pid": %d, "cmd": "%s"}' % (strftime("%H:%M:%S"), event.pid, event.str.decode('utf-8', 'replace')))                       
+
+if args.json:
+    b["events"].open_perf_buffer(print_event_json)
+else:
+    b["events"].open_perf_buffer(print_event)
 while 1:
     try:
         b.perf_buffer_poll()

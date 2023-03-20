@@ -30,6 +30,7 @@ import time
 import pwd
 from collections import defaultdict
 from time import strftime
+import json
 
 
 def parse_uid(user):
@@ -97,6 +98,8 @@ parser.add_argument("-P", "--ppid",
     help="trace this parent PID only")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 
 # define BPF program
@@ -246,13 +249,14 @@ b.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
 b.attach_kretprobe(event=execve_fnname, fn_name="do_ret_sys_execve")
 
 # header
-if args.time:
-    print("%-9s" % ("TIME"), end="")
-if args.timestamp:
-    print("%-8s" % ("TIME(s)"), end="")
-if args.print_uid:
-    print("%-6s" % ("UID"), end="")
-print("%-16s %-7s %-7s %3s %s" % ("PCOMM", "PID", "PPID", "RET", "ARGS"))
+if not args.json:
+    if args.time:
+        print("%-9s" % ("TIME"), end="")
+    if args.timestamp:
+        print("%-8s" % ("TIME(s)"), end="")
+    if args.print_uid:
+        print("%-6s" % ("UID"), end="")
+    print("%-16s %-7s %-7s %3s %s" % ("PCOMM", "PID", "PPID", "RET", "ARGS"))
 
 class EventType(object):
     EVENT_ARG = 0
@@ -313,9 +317,43 @@ def print_event(cpu, data, size):
         except Exception:
             pass
 
+def print_event_json(cpu, data, size):
+    event = b["events"].event(data)
+    if event.type == EventType.EVENT_ARG:
+        argv[event.pid].append(event.argv)
+    elif event.type == EventType.EVENT_RET:
+        if event.retval != 0 and not args.fails:
+            return
+        if args.name and not re.search(bytes(args.name), event.comm):
+            return
+        if args.line and not re.search(bytes(args.line),
+                                       b' '.join(argv[event.pid])):
+            return
+        if args.quote:
+            argv[event.pid] = [
+                b"\"" + arg.replace(b"\"", b"\\\"") + b"\""
+                for arg in argv[event.pid]
+            ]
+
+        json_dict = {}
+        json_dict["comm"] = event.comm.decode('utf-8', 'replace')
+        json_dict["pid"] = event.pid
+        json_dict["ppid"] = event.ppid if event.ppid > 0 else get_ppid(event.pid)
+        json_dict["retval"] = event.retval
+        json_dict["args"] = [arg.decode('utf-8', 'replace') for arg in argv[event.pid]]
+        json_dict["uid"] = event.uid
+        json_dict["timestamp"] = time.time() - start_ts
+        printb(json.dumps(json_dict).encode('ascii'))
+        try:
+            del(argv[event.pid])
+        except Exception:
+            pass
 
 # loop with callback to print_event
-b["events"].open_perf_buffer(print_event)
+if args.json:
+    b["events"].open_perf_buffer(print_event_json)
+else:
+    b["events"].open_perf_buffer(print_event)
 while 1:
     try:
         b.perf_buffer_poll()

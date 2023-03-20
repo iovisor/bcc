@@ -25,6 +25,7 @@ from bcc import BPF
 import argparse
 import re
 import time
+import json
 
 # arguments
 examples = """examples:
@@ -39,6 +40,8 @@ parser.add_argument("-a", "--all", action="store_true",
     help="trace all lookups (default is fails only)")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 
 # define BPF program
@@ -153,10 +156,20 @@ def print_event(cpu, data, size):
             event.comm.decode('utf-8', 'replace'), mode_s[event.type],
             event.filename.decode('utf-8', 'replace')))
 
-# header
-print("%-11s %-7s %-16s %1s %s" % ("TIME(s)", "PID", "COMM", "T", "FILE"))
+def print_event_json(cpu, data, size):
+    event = b["events"].event(data)
+    print(json.dumps({"time": time.time() - start_ts,
+        "pid": event.pid, "comm": event.comm.decode('utf-8', 'replace'),
+        "type": mode_s[event.type], "filename": event.filename.decode('utf-8', 'replace')}))
 
-b["events"].open_perf_buffer(print_event, page_cnt=64)
+# header
+if args.json:
+    b["events"].open_perf_buffer(print_event_json, page_cnt=64)
+else:
+    print("%-11s %-7s %-16s %1s %s" % ("TIME(s)", "PID", "COMM", "T", "FILE"))
+
+    b["events"].open_perf_buffer(print_event, page_cnt=64)
+
 while 1:
     try:
         b.perf_buffer_poll()

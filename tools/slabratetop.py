@@ -46,6 +46,8 @@ parser.add_argument("count", nargs="?", default=99999999,
     help="number of outputs")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 interval = int(args.interval)
 countdown = int(args.count)
@@ -183,10 +185,19 @@ if debug or args.ebpf:
     if args.ebpf:
         exit()
 
+def print_json(b):
+    counts = b.get_table("counts")
+    time = strftime("%H:%M:%S")
+    for k, v in sorted(counts.items(), key=lambda counts: counts[1].size):
+       print("{{\"time\": \"{}\", \"cache\": \"{}\", \"allocs\": {}, \"bytes\": {}}}".format(
+           time, k.name.decode(), v.count, v.size))
+    counts.clear()
+
 # initialize BPF
 b = BPF(text=bpf_text)
 
-print('Tracing... Output every %d secs. Hit Ctrl-C to end' % interval)
+if not args.json:
+    print('Tracing... Output every %d secs. Hit Ctrl-C to end' % interval)
 
 # output
 exiting = 0
@@ -196,28 +207,32 @@ while 1:
     except KeyboardInterrupt:
         exiting = 1
 
-    # header
-    if clear:
-        call("clear")
+    if not args.json:
+        # header
+        if clear:
+            call("clear")
+        else:
+            print()
+        with open(loadavg) as stats:
+            print("%-8s loadavg: %s" % (strftime("%H:%M:%S"), stats.read()))
+        print("%-32s %6s %10s" % ("CACHE", "ALLOCS", "BYTES"))
+
+        # by-TID output
+        counts = b.get_table("counts")
+        line = 0
+        for k, v in reversed(sorted(counts.items(),
+                                    key=lambda counts: counts[1].size)):
+            printb(b"%-32s %6d %10d" % (k.name, v.count, v.size))
+
+            line += 1
+            if line >= maxrows:
+                break
+        counts.clear()
     else:
-        print()
-    with open(loadavg) as stats:
-        print("%-8s loadavg: %s" % (strftime("%H:%M:%S"), stats.read()))
-    print("%-32s %6s %10s" % ("CACHE", "ALLOCS", "BYTES"))
-
-    # by-TID output
-    counts = b.get_table("counts")
-    line = 0
-    for k, v in reversed(sorted(counts.items(),
-                                key=lambda counts: counts[1].size)):
-        printb(b"%-32s %6d %10d" % (k.name, v.count, v.size))
-
-        line += 1
-        if line >= maxrows:
-            break
-    counts.clear()
+        print_json(b)
 
     countdown -= 1
     if exiting or countdown == 0:
-        print("Detaching...")
+        if not args.json:
+            print("Detaching...")
         exit()

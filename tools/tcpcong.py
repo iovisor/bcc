@@ -47,6 +47,8 @@ parser.add_argument("outputs", nargs="?", default=99999999,
     help="number of outputs")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 countdown = int(args.outputs)
 debug = 0
@@ -548,7 +550,8 @@ if not is_support_tp_ca and not is_support_kfunc:
     b.attach_kprobe(event="tcp_enter_recovery", fn_name="entry_func")
     b.attach_kretprobe(event="tcp_enter_recovery", fn_name="ret_func")
 
-print("Tracing tcp congestion control status duration... Hit Ctrl-C to end.")
+if not args.json:
+    print("Tracing tcp congestion control status duration... Hit Ctrl-C to end.")
 
 
 def cong_state_to_name(state):
@@ -570,25 +573,35 @@ while (1):
         sleep(int(args.interval))
     except KeyboardInterrupt:
         exiting = 1
-
-    print()
-    if args.timestamp:
-        print("%-8s\n" % strftime("%H:%M:%S"), end="")
+    if not args.json:
+        print()
+        if args.timestamp:
+            print("%-8s\n" % strftime("%H:%M:%S"), end="")
     if args.dist:
         if args.microseconds:
-            dist.print_log2_hist("usecs", "tcp_congest_state",
-                section_print_fn=cong_state_to_name)
+            if not args.json:
+                dist.print_log2_hist("usecs", "tcp_congest_state",
+                    section_print_fn=cong_state_to_name)
+            else:
+                dist.print_json_hist("usecs", "tcp_congest_state",
+                    section_print_fn=cong_state_to_name)
         else:
-            dist.print_log2_hist("msecs", "tcp_congest_state",
-                section_print_fn=cong_state_to_name)
+            if not args.json:
+                dist.print_log2_hist("msecs", "tcp_congest_state",
+                    section_print_fn=cong_state_to_name)
+            else:
+                dist.print_json_hist("msecs", "tcp_congest_state",
+                    section_print_fn=cong_state_to_name)
         dist.clear()
     else:
         if ipv4_stat:
-            print("%-21s% -21s %-7s %-6s %-7s %-7s %-6s %-5s" % ("LAddrPort",
-                "RAddrPort", "Open_" + label, "Dod_" + label,
-                "Rcov_" + label, "Cwr_" + label, "Los_" + label, "Chgs"))
+            if not args.json:
+                print("%-21s% -21s %-7s %-6s %-7s %-7s %-6s %-5s" % ("LAddrPort",
+                    "RAddrPort", "Open_" + label, "Dod_" + label,
+                    "Rcov_" + label, "Cwr_" + label, "Los_" + label, "Chgs"))
         laddr = ""
         raddr = ""
+        time = strftime("%H:%M:%S")
         for k, v in sorted(ipv4_stat.items(), key=lambda ipv4_stat: ipv4_stat[0].lport):
             laddr = inet_ntop(AF_INET, pack("I", k.saddr))
             raddr = inet_ntop(AF_INET, pack("I", k.daddr))
@@ -604,14 +617,23 @@ while (1):
                 cwr_dura /= 1000
                 loss_dura /= 1000
             if v.total_changes != 0:
-                print("%-21s %-21s %-7d %-6d %-7d %-7d %-6d %-5d" % (laddr +
-                    "/" + str(k.lport), raddr + "/" + str(k.dport), open_dura,
-                    disorder_dura, recover_dura, cwr_dura, loss_dura,
-                    v.total_changes))
+                if not args.json:
+                    print("%-21s %-21s %-7d %-6d %-7d %-7d %-6d %-5d" % (laddr +
+                        "/" + str(k.lport), raddr + "/" + str(k.dport), open_dura,
+                        disorder_dura, recover_dura, cwr_dura, loss_dura,
+                        v.total_changes))
+                else:
+                    print("%s" % {
+                        "time": time,
+                        "LAddrPort": laddr + "/" + str(k.lport), "RAddrPort": raddr + "/" + str(k.dport),
+                        "Open_" + label: open_dura, "Dod_" + label: disorder_dura, "Rcov_" + label: recover_dura,
+                        "Cwr_" + label: cwr_dura, "Los_" + label: loss_dura, "Chgs": v.total_changes
+                    })
         if ipv6_stat:
-            print("%-32s %-32s %-7s %-6s %-7s %-7s %-6s %-5s" % ("LAddrPort6",
-                "RAddrPort6", "Open_" + label, "Dod_" + label, "Rcov_" + label,
-                "Cwr_" + label, "Los_" + label, "Chgs"))
+            if not args.json:
+                print("%-32s %-32s %-7s %-6s %-7s %-7s %-6s %-5s" % ("LAddrPort6",
+                    "RAddrPort6", "Open_" + label, "Dod_" + label, "Rcov_" + label,
+                    "Cwr_" + label, "Los_" + label, "Chgs"))
         for k, v in sorted(ipv6_stat.items(), key=lambda ipv6_stat: ipv6_stat[0].lport):
             laddr = inet_ntop(AF_INET6, bytes(k.saddr))
             raddr = inet_ntop(AF_INET6, bytes(k.daddr))
@@ -627,10 +649,18 @@ while (1):
                 cwr_dura /= 1000
                 loss_dura /= 1000
             if v.total_changes != 0:
-                print("%-32s %-32s %-7d %-7d %-7d %-6d %-6d %-5d" % (laddr +
-                    "/" + str(k.lport), raddr + "/" + str(k.dport), open_dura,
-                    disorder_dura, recover_dura, cwr_dura, loss_dura,
-                    v.total_changes))
+                if not args.json:
+                    print("%-32s %-32s %-7d %-7d %-7d %-6d %-6d %-5d" % (laddr +
+                        "/" + str(k.lport), raddr + "/" + str(k.dport), open_dura,
+                        disorder_dura, recover_dura, cwr_dura, loss_dura,
+                        v.total_changes))
+                else:
+                    print("%s" % {
+                        "time": time,
+                        "LAddrPort6": laddr + "/" + str(k.lport), "RAddrPort6": raddr + "/" + str(k.dport),
+                        "Open_" + label: open_dura, "Dod_" + label: disorder_dura, "Rcov_" + label: recover_dura,
+                        "Cwr_" + label: cwr_dura, "Los_" + label: loss_dura, "Chgs": v.total_changes
+                    })
     ipv4_stat.clear()
     ipv6_stat.clear()
     countdown -= 1

@@ -38,6 +38,7 @@ from socket import (
 )
 from struct import pack
 from time import sleep
+import json
 
 # arguments
 examples = """examples:
@@ -92,6 +93,8 @@ parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 parser.add_argument("--debug-source", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 
 # define BPF program
@@ -427,6 +430,27 @@ def print_ipv4_bind_event(cpu, data, size):
         inet_ntop(AF_INET, pack("I", event.saddr)).encode(),
         event.sport, opts2str(event.socket_options), event.bound_dev_if))
 
+def print_ipv4_bind_event_json(cpu, data, size):
+    # print ipv4 bind event in json format
+    event = b["ipv4_bind_events"].event(data)
+    global start_ts
+    json_dict = {}
+    if args.timestamp:
+        if start_ts == 0:
+            start_ts = event.ts_us
+        json_dict["timestamp"] = float(event.ts_us) - start_ts / 1000000
+    if args.print_uid:
+        json_dict["uid"] = event.uid
+    if args.errors:
+        json_dict["error"] = error_value_fmt(event.return_code)
+    json_dict["pid"] = event.pid
+    json_dict["task"] = event.task.decode()
+    json_dict["protocol"] = l4.proto2str(event.protocol)
+    json_dict["saddr"] = inet_ntop(AF_INET, pack("I", event.saddr))
+    json_dict["sport"] = event.sport
+    json_dict["socket_options"] = opts2str(event.socket_options).decode()
+    json_dict["bound_dev_if"] = event.bound_dev_if
+    printb(b"%s" % json.dumps(json_dict).encode())
 
 def print_ipv6_bind_event(cpu, data, size):
     event = b["ipv6_bind_events"].event(data)
@@ -447,6 +471,27 @@ def print_ipv6_bind_event(cpu, data, size):
         inet_ntop(AF_INET6, event.saddr).encode(),
         event.sport, opts2str(event.socket_options), event.bound_dev_if))
 
+def print_ipv6_bind_event_json(cpu, data, size):
+    # print ipv6 bind event in json format
+    event = b["ipv6_bind_events"].event(data)
+    global start_ts
+    json_dict = {}
+    if args.timestamp:
+        if start_ts == 0:
+            start_ts = event.ts_us
+        json_dict["timestamp"] = float(event.ts_us) - start_ts / 1000000
+    if args.print_uid:
+        json_dict["uid"] = event.uid
+    if args.errors:
+        json_dict["error"] = error_value_fmt(event.return_code)
+    json_dict["pid"] = event.pid
+    json_dict["task"] = event.task.decode()
+    json_dict["protocol"] = l4.proto2str(event.protocol)
+    json_dict["saddr"] = inet_ntop(AF_INET6, event.saddr)
+    json_dict["sport"] = event.sport
+    json_dict["socket_options"] = opts2str(event.socket_options).decode()
+    json_dict["bound_dev_if"] = event.bound_dev_if
+    printb(b"%s" % json.dumps(json_dict).encode())
 
 def depict_cnt(counts_tab, l3prot='ipv4'):
     for k, v in sorted(
@@ -463,6 +508,20 @@ def depict_cnt(counts_tab, l3prot='ipv4'):
             )
         print("%s     %-10d" % (depict_key, v.value))
 
+def depict_cnt_json(counts_tab, l3prot='ipv4'):
+    json_dict = {}
+    for k, v in sorted(
+        counts_tab.items(), key=lambda counts: counts[1].value, reverse=True
+    ):
+        depict_key = ""
+        if l3prot == 'ipv4':
+            json_dict["laddr"] = inet_ntop(AF_INET, pack('I', k.saddr))
+            json_dict["lport"] = k.sport
+        else:
+            json_dict["laddr"] = inet_ntop(AF_INET6, k.saddr)
+            json_dict["lport"] = k.sport
+        json_dict["binds"] = v.value
+        printb(b"%s" % json.dumps(json_dict).encode())
 
 # initialize BPF
 b = BPF(text=bpf_text)
@@ -480,26 +539,36 @@ if args.count:
         pass
 
     # header
-    print("\n%-32s %20s     %-10s" % (
-        "LADDR", "LPORT", "BINDS"))
-    depict_cnt(b["ipv4_count"])
-    depict_cnt(b["ipv6_count"], l3prot='ipv6')
+    if not args.json:
+        print("\n%-32s %20s     %-10s" % (
+            "LADDR", "LPORT", "BINDS"))
+        depict_cnt(b["ipv4_count"])
+        depict_cnt(b["ipv6_count"], l3prot='ipv6')
+    else:
+        depict_cnt_json(b["ipv4_count"])
+        depict_cnt_json(b["ipv6_count"], l3prot='ipv6')
+        
 # read events
 else:
     # header
-    if args.timestamp:
-        print("%-9s " % ("TIME(s)"), end="")
-    if args.print_uid:
-        print("%6s " % ("UID"), end="")
-    if args.errors:
-        print(error_header_fmt % ("RC"), end="")
-    print(header_fmt % ("PID", "COMM", "PROT", "ADDR", "PORT", "OPTS", "IF"))
+    if not args.json:
+        if args.timestamp:
+            print("%-9s " % ("TIME(s)"), end="")
+        if args.print_uid:
+            print("%6s " % ("UID"), end="")
+        if args.errors:
+            print(error_header_fmt % ("RC"), end="")
+        print(header_fmt % ("PID", "COMM", "PROT", "ADDR", "PORT", "OPTS", "IF"))
 
     start_ts = 0
 
     # read events
-    b["ipv4_bind_events"].open_perf_buffer(print_ipv4_bind_event)
-    b["ipv6_bind_events"].open_perf_buffer(print_ipv6_bind_event)
+    if args.json:
+        b["ipv4_bind_events"].open_perf_buffer(print_ipv4_bind_event_json)
+        b["ipv6_bind_events"].open_perf_buffer(print_ipv6_bind_event_json)
+    else:
+        b["ipv4_bind_events"].open_perf_buffer(print_ipv4_bind_event)
+        b["ipv6_bind_events"].open_perf_buffer(print_ipv6_bind_event)
     while 1:
         try:
             b.perf_buffer_poll()

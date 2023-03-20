@@ -73,6 +73,8 @@ parser.add_argument("--syscall", type=str,
     help="trace this syscall only (use option -l to get all recognized syscalls)")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-j", "--json", action="store_true",
+    help="json output")
 args = parser.parse_args()
 if args.duration and not args.interval:
     args.interval = args.duration
@@ -233,9 +235,9 @@ bpf = BPF(text=text)
 
 def print_stats():
     if args.latency:
-        print_latency_stats()
+        print_latency_stats_json() if args.json else print_latency_stats()
     else:
-        print_count_stats()
+        print_count_stats_json() if args.json else print_count_stats()
 
 agg_colname = "PID    COMM" if args.process else "SYSCALL"
 time_colname = "TIME (ms)" if args.milliseconds else "TIME (us)"
@@ -277,12 +279,42 @@ def print_latency_stats():
     print("")
     data.clear()
 
-if args.syscall is not None:
-    print("Tracing %ssyscall '%s'... Ctrl+C to quit." %
-        ("failed " if args.failures else "", args.syscall))
-else:
-    print("Tracing %ssyscalls, printing top %d... Ctrl+C to quit." %
-        ("failed " if args.failures else "", args.top))
+def print_count_stats_json():
+    data = bpf["data"]
+    time = strftime("%H:%M:%S")
+    for k, v in sorted(data.items(), key=lambda kv: -kv[1].value)[:args.top]:
+        if k.value == 0xFFFFFFFF:
+            continue    # happens occasionally, we don't need it
+        if args.process:
+            print("%s" % {"time": time, "pid": k.value, "comm": comm_for_pid(k.value).decode(), "count": v.value})
+        else:
+            print("%s" % {"time": time, "syscall": syscall_name(k.value).decode(), "count": v.value})
+    data.clear()
+
+def print_latency_stats_json():
+    data = bpf["data"]
+    time = strftime("%H:%M:%S")
+    time_colname = "time (ms)" if args.milliseconds else "time (us)"
+    for k, v in sorted(data.items(),
+                       key=lambda kv: -kv[1].total_ns)[:args.top]:
+        if k.value == 0xFFFFFFFF:
+            continue    # happens occasionally, we don't need it
+        if args.process:
+            print("%s" % { "time": time, "pid": k.value, "comm": comm_for_pid(k.value).decode(),
+                          "count": v.count,
+                          time_colname: v.total_ns / (1e6 if args.milliseconds else 1e3) })
+        else:
+            print("%s" % { "time": time, "syscall": syscall_name(k.value).decode(), "count": v.count,
+                      time_colname: v.total_ns / (1e6 if args.milliseconds else 1e3) })
+    data.clear()
+
+if not args.json:
+    if args.syscall is not None:
+        print("Tracing %ssyscall '%s'... Ctrl+C to quit." %
+            ("failed " if args.failures else "", args.syscall))
+    else:
+        print("Tracing %ssyscalls, printing top %d... Ctrl+C to quit." %
+            ("failed " if args.failures else "", args.top))
 exiting = 0 if args.interval else 1
 seconds = 0
 while True:
@@ -298,5 +330,6 @@ while True:
     print_stats()
 
     if exiting:
-        print("Detaching...")
+        if not args.json:
+            print("Detaching...")
         exit()
