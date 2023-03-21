@@ -38,11 +38,11 @@ int BPF_PROG(tcp_rcv, struct sock *sk)
 	u64 key, slot;
 	u32 srtt;
 
-	if (targ_sport && targ_sport != inet->inet_sport)
+	if (targ_sport && targ_sport != BPF_CORE_READ(inet, inet_sport))
 		return 0;
 	if (targ_dport && targ_dport != sk->__sk_common.skc_dport)
 		return 0;
-	if (targ_saddr && targ_saddr != inet->inet_saddr)
+	if (targ_saddr && targ_saddr != BPF_CORE_READ(inet, inet_saddr))
 		return 0;
 	if (targ_daddr && targ_daddr != sk->__sk_common.skc_daddr)
 		return 0;
