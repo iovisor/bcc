@@ -29,4 +29,6 @@ RUN \
     pip install dnslib cachetools ; \
   fi ; \
   pip3 install dnslib cachetools  && \
+  pip3 install -U pip setuptools wheel && \
+  apt-get -y remove python3-pip python3-wheel python3-setuptools && \
   dpkg -i /root/bcc/*.deb
