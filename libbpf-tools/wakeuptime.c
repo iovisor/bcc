@@ -221,7 +221,6 @@ int main(int argc, char **argv)
 		fprintf(stderr, "use either -u or -p");
 	}
 
-	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
 
 	obj = wakeuptime_bpf__open();
@@ -272,4 +271,3 @@ cleanup:
 	ksyms__free(ksyms);
 	return err != 0;
 }
-
