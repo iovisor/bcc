@@ -151,7 +151,7 @@ static int print_count(struct softirqs_bpf__bss *bss)
 	__u64 count, time;
 	__u32 vec;
 
-	printf("%-16s %-6s%-5s  %-11s\n", "SOFTIRQ", "TOTAL_", 
+	printf("%-16s %-6s%-5s  %-11s\n", "SOFTIRQ", "TOTAL_",
 			units, env.count?"TOTAL_count":"");
 
 	for (vec = 0; vec < NR_SOFTIRQS; vec++) {
@@ -209,7 +209,6 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
-	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
 
 	obj = softirqs_bpf__open();
