@@ -96,7 +96,7 @@ static inline void store_start(u32 tgid, u32 pid, u32 cpu, u64 ts)
     if (IDLE_FILTER)
         return;
 
-    entry_key_t entry_key = { .pid = pid, .cpu = cpu };
+    entry_key_t entry_key = { .pid = pid, .cpu = (pid == 0 ? cpu : 0xFFFFFFFF) };
     start.update(&entry_key, &ts);
 }
 
@@ -108,7 +108,7 @@ static inline void update_hist(u32 tgid, u32 pid, u32 cpu, u64 ts)
     if (IDLE_FILTER)
         return;
 
-    entry_key_t entry_key = { .pid = pid, .cpu = cpu };
+    entry_key_t entry_key = { .pid = pid, .cpu = (pid == 0 ? cpu : 0xFFFFFFFF) };
     u64 *tsp = start.lookup(&entry_key);
     if (tsp == 0)
         return;
