@@ -405,7 +405,7 @@ int main(int argc, char *argv[])
 	}
 
 	// after loop ends, check for child process and cleanup accordingly
-	if (env.pid > 0) {
+	if (env.pid > 0 && strlen(env.command)) {
 		if (!child_exited) {
 			if (kill(env.pid, SIGTERM)) {
 				perror("failed to signal child process");
