@@ -42,7 +42,7 @@ jobs:
 
     - name: Build container image and publish to registry
       id: publish-registry
-      uses: elgohr/Publish-Docker-Github-Action@2.8
+      uses: elgohr/Publish-Docker-Github-Action@v5
       if: ${{ steps.vars.outputs.DOCKER_PUBLISH }}
       with:
         name: ${{ secrets.DOCKER_IMAGE }}
