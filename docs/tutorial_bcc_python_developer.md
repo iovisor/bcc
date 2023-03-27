@@ -63,6 +63,7 @@ Code:
 
 ```Python
 from bcc import BPF
+from bcc.utils import printb
 
 # define BPF program
 prog = """
@@ -85,7 +86,9 @@ while 1:
         (task, pid, cpu, flags, ts, msg) = b.trace_fields()
     except ValueError:
         continue
-    print("%-18.9f %-16s %-6d %s" % (ts, task, pid, msg))
+    except KeyboardInterrupt:
+        exit()
+    printb("%-18.9f %-16s %-6d %s" % (ts, task, pid, msg))
 ```
 
 This is similar to hello_world.py, and traces new processes via sys_clone() again, but has a few more things to learn:
