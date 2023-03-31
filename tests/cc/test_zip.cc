@@ -21,6 +21,7 @@
 
 #define LIB_ENTRY_NAME "libdebuginfo_test_lib.so"
 #define ENTRY_IN_SUBDIR_NAME "zip_subdir/file.txt"
+#define NOT_AN_ARCHIVE_PATH CMAKE_CURRENT_BINARY_DIR "/dummy_proc_map.txt"
 #define TEST_ARCHIVE_PATH CMAKE_CURRENT_BINARY_DIR "/archive.zip"
 
 namespace {
@@ -46,6 +47,11 @@ const void* get_uncompressed_data(const bcc_zip_entry& entry) {
 }
 
 }  // namespace
+
+TEST_CASE("returns error for non-zip files", "[zip]") {
+  bcc_zip_archive* archive = bcc_zip_archive_open(NOT_AN_ARCHIVE_PATH);
+  REQUIRE(archive == nullptr);
+}
 
 TEST_CASE("finds entries in a zip archive by name", "[zip]") {
   bcc_zip_archive* archive = bcc_zip_archive_open(TEST_ARCHIVE_PATH);
