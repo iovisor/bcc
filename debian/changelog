@@ -1,3 +1,17 @@
+bcc (0.27.0-1) unstable; urgency=low
+
+  * Support for kernel up to 6.2
+  * bcc tool updates for ttysnoop, slabratetop, readahead, nfsslower, cpudist, cachetop, cachestat, etc.
+  * libbpf-tools updates for mdflush, drsnoop, statsnoop, ttysnoop, softirqs, wakeuptime, cachestat, numamove, etc.
+  * fix for incomplete static libraries
+  * implement zip archive support
+  * upgrade to use c++14 standard
+  * new libbpf-tools: memleak
+  * add loongarch support in libbpft-tools
+  * doc update, bug fixes and other tools improvement
+
+ -- Yonghong Song <ys114321@gmail.com>  Wed, 02 Apr 2023 17:00:00 +0000
+
 bcc (0.26.0-1) unstable; urgency=low
 
   * Support for kernel up to 6.1
