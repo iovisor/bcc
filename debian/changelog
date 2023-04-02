@@ -1,4 +1,4 @@
-bcc (0.25.0-1) unstable; urgency=low
+bcc (0.26.0-1) unstable; urgency=low
 
   * Support for kernel up to 6.1
   * bcc tool updates for biosnoop, opensnoop, biopattern, killsnoop, runqslower, offcputime, wakeuptime, etc.
