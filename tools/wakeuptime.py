@@ -9,6 +9,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 14-Jan-2016	Brendan Gregg	Created this.
+# 03-Apr-2023	Rocky Xing   	Modified the order of stack output.
 
 from __future__ import print_function
 from bcc import BPF
@@ -242,14 +243,14 @@ while (1):
             continue
 
         waker_kernel_stack = [] if k.w_k_stack_id < 1 else \
-            reversed(list(stack_traces.walk(k.w_k_stack_id))[1:])
+            list(stack_traces.walk(k.w_k_stack_id))[1:]
 
         if folded:
             # print folded stack output
             line = \
                 [k.waker] + \
                 [b.ksym(addr)
-                    for addr in reversed(list(waker_kernel_stack))] + \
+                    for addr in reversed(waker_kernel_stack)] + \
                 [k.target]
             printb(b"%s %d" % (b";".join(line), v.value))
         else:
