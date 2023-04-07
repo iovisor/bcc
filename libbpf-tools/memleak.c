@@ -187,7 +187,7 @@ static const struct argp_option argp_options[] = {
 	{"min-size", 'z', "MIN_SIZE", 0, "capture only allocations larger than this size"},
 	{"max-size", 'Z', "MAX_SIZE", 0, "capture only allocations smaller than this size"},
 	{"obj", 'O', "OBJECT", 0, "attach to allocator functions in the specified object"},
-	{"percpu", 'P', "PERCPU", 0, "trace percpu allocations"},
+	{"percpu", 'P', NULL, 0, "trace percpu allocations"},
 	{},
 };
 
