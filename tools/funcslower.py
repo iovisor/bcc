@@ -317,17 +317,17 @@ def print_stack(event):
         # print folded stack output
         user_stack = list(user_stack)
         kernel_stack = list(kernel_stack)
-        line = [event.comm.decode('utf-8', 'replace')] + \
+        line = [event.comm] + \
             [b.sym(addr, event.tgid_pid) for addr in reversed(user_stack)] + \
             (do_delimiter and ["-"] or []) + \
             [b.ksym(addr) for addr in reversed(kernel_stack)]
-        print("%s %d" % (";".join(line), 1))
+        print("%s %d" % (b';'.join(line).decode('utf-8', 'replace'), 1))
     else:
         # print default multi-line stack output.
         for addr in kernel_stack:
-            print("    %s" % b.ksym(addr))
+            print("    %s" % b.ksym(addr).decode('utf-8', 'replace'))
         for addr in user_stack:
-            print("    %s" % b.sym(addr, event.tgid_pid))
+            print("    %s" % b.sym(addr, event.tgid_pid).decode('utf-8', 'replace'))
 
 def print_event(cpu, data, size):
     event = b["events"].event(data)
