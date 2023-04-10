@@ -744,7 +744,7 @@ USAGE message:
 
 # ./profile -h
 usage: profile.py [-h] [-p PID | -L TID] [-U | -K] [-F FREQUENCY | -c COUNT]
-                  [-d] [-a] [-I] [-f]
+                  [-d] [-a] [-I] [-f] [--hash-storage-size HASH_STORAGE_SIZE]
                   [--stack-storage-size STACK_STORAGE_SIZE] [-C CPU]
                   [--cgroupmap CGROUPMAP] [--mntnsmap MNTNSMAP]
                   [duration]
@@ -756,8 +756,10 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -p PID, --pid PID     profile process with this PID only
-  -L TID, --tid TID     profile thread with this TID only
+  -p PID, --pid PID     profile process with one or more comma separated PIDs
+                        only
+  -L TID, --tid TID     profile thread with one or more comma separated TIDs
+                        only
   -U, --user-stacks-only
                         show stacks from user space only (no kernel space
                         stacks)
@@ -773,6 +775,9 @@ optional arguments:
   -I, --include-idle    include CPU idle stacks
   -f, --folded          output folded format, one line per stack (for flame
                         graphs)
+  --hash-storage-size HASH_STORAGE_SIZE
+                        the number of hash keys that can be stored and
+                        (default 40960)
   --stack-storage-size STACK_STORAGE_SIZE
                         the number of unique stack traces that can be stored
                         and displayed (default 16384)

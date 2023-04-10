@@ -25,6 +25,7 @@
 # 15-Jul-2016   Brendan Gregg   Created this.
 # 20-Oct-2016      "      "     Switched to use the new 4.9 support.
 # 26-Jan-2019      "      "     Changed to exclude CPU idle by default.
+# 11-Apr-2023   Rocky Xing      Added option to increase hash storage size.
 
 from __future__ import print_function
 from bcc import BPF, PerfType, PerfSWConfig
@@ -111,6 +112,9 @@ parser.add_argument("-I", "--include-idle", action="store_true",
     help="include CPU idle stacks")
 parser.add_argument("-f", "--folded", action="store_true",
     help="output folded format, one line per stack (for flame graphs)")
+parser.add_argument("--hash-storage-size", default=40960,
+    type=positive_nonzero_int,
+    help="the number of hash keys that can be stored and (default %(default)s)")
 parser.add_argument("--stack-storage-size", default=16384,
     type=positive_nonzero_int,
     help="the number of unique stack traces that can be stored and "
@@ -152,7 +156,7 @@ struct key_t {
     int kernel_stack_id;
     char name[TASK_COMM_LEN];
 };
-BPF_HASH(counts, struct key_t);
+BPF_HASH(counts, struct key_t, u64, HASH_STORAGE_SIZE);
 BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE);
 
 // This code gets a bit complex. Probably not suitable for casual hacking.
@@ -233,6 +237,7 @@ else:
 bpf_text = bpf_text.replace('THREAD_FILTER', thread_filter)
 
 # set stack storage size
+bpf_text = bpf_text.replace('HASH_STORAGE_SIZE', str(args.hash_storage_size))
 bpf_text = bpf_text.replace('STACK_STORAGE_SIZE', str(args.stack_storage_size))
 
 # handle stack args
@@ -313,6 +318,7 @@ def aksym(addr):
 missing_stacks = 0
 has_collision = False
 counts = b.get_table("counts")
+htab_full = args.hash_storage_size == len(counts)
 stack_traces = b.get_table("stack_traces")
 for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
     # handle get_stackid errors
@@ -382,4 +388,9 @@ if missing_stacks > 0:
         " Consider increasing --stack-storage-size."
     print("WARNING: %d stack traces could not be displayed.%s" %
         (missing_stacks, enomem_str),
+        file=stderr)
+
+# check whether hash table is full
+if htab_full:
+    print("WARNING: hash table full. Consider increasing --hash-storage-size.",
         file=stderr)
