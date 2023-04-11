@@ -15,6 +15,7 @@
 #
 # 09-Sep-2015   Brendan Gregg       Created this.
 # 18-Oct-2016   Sasha Goldshtein    Generalized for uprobes, tracepoints, USDT.
+# 11-Apr-2023   Rong Tao            Allow skip untraceable functions
 
 from __future__ import print_function
 from bcc import ArgString, BPF, USDT
@@ -26,6 +27,7 @@ import sys
 import traceback
 
 debug = False
+skip_probe = []
 
 def verify_limit(num):
     probe_limit = BPF.get_probe_limit()
@@ -108,6 +110,8 @@ class Probe(object):
             pass    # Nothing to do -- attach already happened in `load`
 
     def _add_function(self, template, probe_name):
+        if skip_probe and probe_name.decode('utf-8') in skip_probe:
+            return ''.encode('utf-8')
         new_func = b"trace_count_%d" % self.matched
         text = template.replace(b"PROBE_FUNCTION", new_func)
         text = text.replace(b"LOCATION", b"%d" % self.matched)
@@ -249,6 +253,8 @@ class Tool(object):
             help="print BPF program before starting (for debugging purposes)")
         parser.add_argument("-c", "--cpu",
             help="trace this CPU only")
+        parser.add_argument("-s", "--skip", type=str, nargs='+',
+            help="skip one function (may be listed multiple functions)")
         parser.add_argument("pattern",
             type=ArgString,
             help="search expression for events")
@@ -261,6 +267,8 @@ class Tool(object):
             self.args.interval = self.args.duration
         if not self.args.interval:
             self.args.interval = 99999999
+        global skip_probe
+        skip_probe = self.args.skip
 
     @staticmethod
     def _signal_ignore(signal, frame):
