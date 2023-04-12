@@ -48,6 +48,7 @@ APPS = \
 	softirqs \
 	solisten \
 	statsnoop \
+	swapin \
 	syscount \
 	tcpconnect \
 	tcpconnlat \
