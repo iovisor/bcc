@@ -10,7 +10,6 @@
 #include <signal.h>
 #include <unistd.h>
 #include <time.h>
-#include <arpa/inet.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 #include "tcprtt.h"
@@ -131,14 +130,14 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			fprintf(stderr, "invalid local address: %s\n", arg);
 			argp_usage(state);
 		}
-		env.laddr = htonl(addr.s_addr);
+		env.laddr = addr.s_addr;
 		break;
 	case 'A':
 		if (inet_aton(arg, &addr) < 0) {
 			fprintf(stderr, "invalid remote address: %s\n", arg);
 			argp_usage(state);
 		}
-		env.raddr = htonl(addr.s_addr);
+		env.raddr = addr.s_addr;
 		break;
 	case 'b':
 		env.laddr_hist = true;
@@ -155,8 +154,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	return 0;
 }
 
-static int libbpf_print_fn(enum libbpf_print_level level,
-			   const char *format, va_list args)
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
 	if (level == LIBBPF_DEBUG && !env.verbose)
 		return 0;
@@ -186,7 +184,7 @@ static int print_map(struct bpf_map *map)
 		if (env.laddr_hist)
 			printf("Local Address = %s ", inet_ntoa(addr));
 		else if (env.raddr_hist)
-			printf("Remote Addres = %s ", inet_ntoa(addr));
+			printf("Remote Address = %s ", inet_ntoa(addr));
 		else
 			printf("All Addresses = ****** ");
 		if (env.extended)
@@ -229,12 +227,6 @@ int main(int argc, char **argv)
 
 	libbpf_set_print(libbpf_print_fn);
 
-	err = bump_memlock_rlimit();
-	if (err) {
-		fprintf(stderr, "failed to increase rlimit: %d\n", err);
-		return 1;
-	}
-
 	obj = tcprtt_bpf__open();
 	if (!obj) {
 		fprintf(stderr, "failed to open BPF object\n");
@@ -250,7 +242,7 @@ int main(int argc, char **argv)
 	obj->rodata->targ_daddr = env.raddr;
 	obj->rodata->targ_ms = env.milliseconds;
 
-	if (!fentry_exists("tcp_rcv_established", NULL))
+	if (fentry_can_attach("tcp_rcv_established", NULL))
 		bpf_program__set_autoload(obj->progs.tcp_rcv_kprobe, false);
 	else
 		bpf_program__set_autoload(obj->progs.tcp_rcv, false);

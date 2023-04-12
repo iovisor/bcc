@@ -14,15 +14,16 @@
 #include <signal.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 #include "mountsnoop.h"
 #include "mountsnoop.skel.h"
+#include "compat.h"
+#include "btf_helpers.h"
 #include "trace_helpers.h"
 
-#define PERF_BUFFER_PAGES	64
-#define PERF_POLL_TIMEOUT_MS	100
 #define warn(...) fprintf(stderr, __VA_ARGS__)
 
 /* https://www.gnu.org/software/gnulib/manual/html_node/strerrorname_005fnp.html */
@@ -38,6 +39,7 @@ static volatile sig_atomic_t exiting = 0;
 static pid_t target_pid = 0;
 static bool emit_timestamp = false;
 static bool output_vertically = false;
+static bool verbose = false;
 static const char *flag_names[] = {
 	[0] = "MS_RDONLY",
 	[1] = "MS_NOSUID",
@@ -84,13 +86,14 @@ const char argp_program_doc[] =
 "\n"
 "EXAMPLES:\n"
 "    mountsnoop         # trace mount and umount syscalls\n"
-"    mountsnoop -v      # output vertically(one line per column value)\n"
+"    mountsnoop -d      # detailed output (one line per column value)\n"
 "    mountsnoop -p 1216 # only trace PID 1216\n";
 
 static const struct argp_option opts[] = {
 	{ "pid", 'p', "PID", 0, "Process ID to trace" },
 	{ "timestamp", 't', NULL, 0, "Include timestamp on output" },
 	{ "detailed", 'd', NULL, 0, "Output result in detail mode" },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
@@ -115,6 +118,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	case 'd':
 		output_vertically = true;
 		break;
+	case 'v':
+		verbose = true;
+		break;
 	case 'h':
 		argp_state_help(state, stderr, ARGP_HELP_STD_HELP);
 		break;
@@ -122,6 +128,13 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		return ARGP_ERR_UNKNOWN;
 	}
 	return 0;
+}
+
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
+{
+	if (level == LIBBPF_DEBUG && !verbose)
+		return 0;
+	return vfprintf(stderr, format, args);
 }
 
 static void sig_int(int signo)
@@ -182,7 +195,7 @@ static const char *gen_call(const struct event *e)
 	return call;
 }
 
-static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
+static int handle_event(void *ctx, void *data, size_t len)
 {
 	const struct event *e = data;
 	struct tm *tm;
@@ -206,7 +219,7 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	if (!output_vertically) {
 		printf("%-16s %-7d %-7d %-11u %s\n",
 		       e->comm, e->pid, e->tid, e->mnt_ns, gen_call(e));
-		return;
+		return 0;
 	}
 	if (emit_timestamp)
 		printf("\n");
@@ -223,6 +236,8 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	printf("%sDATA:   %s\n", indent, e->data);
 	printf("%sFLAGS:  %s\n", indent, strflags(e->flags));
 	printf("\n");
+
+	return 0;
 }
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
@@ -232,13 +247,13 @@ static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 
 int main(int argc, char **argv)
 {
+	LIBBPF_OPTS(bpf_object_open_opts, open_opts);
 	static const struct argp argp = {
 		.options = opts,
 		.parser = parse_arg,
 		.doc = argp_program_doc,
 	};
-	struct perf_buffer_opts pb_opts;
-	struct perf_buffer *pb = NULL;
+	struct bpf_buffer *buf = NULL;
 	struct mountsnoop_bpf *obj;
 	int err;
 
@@ -246,19 +261,28 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
-	err = bump_memlock_rlimit();
+	libbpf_set_print(libbpf_print_fn);
+
+	err = ensure_core_btf(&open_opts);
 	if (err) {
-		warn("failed to increase rlimit: %d\n", err);
+		fprintf(stderr, "failed to fetch necessary BTF for CO-RE: %s\n", strerror(-err));
 		return 1;
 	}
 
-	obj = mountsnoop_bpf__open();
+	obj = mountsnoop_bpf__open_opts(&open_opts);
 	if (!obj) {
 		warn("failed to open BPF object\n");
 		return 1;
 	}
 
 	obj->rodata->target_pid = target_pid;
+
+	buf = bpf_buffer__new(obj->maps.events, obj->maps.heap);
+	if (!buf) {
+		err = -errno;
+		warn("failed to create ring/perf buffer: %d\n", err);
+		goto cleanup;
+	}
 
 	err = mountsnoop_bpf__load(obj);
 	if (err) {
@@ -272,17 +296,15 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	pb_opts.sample_cb = handle_event;
-	pb_opts.lost_cb = handle_lost_events;
-	pb = perf_buffer__new(bpf_map__fd(obj->maps.events), PERF_BUFFER_PAGES, &pb_opts);
-	err = libbpf_get_error(pb);
+	err = bpf_buffer__open(buf, handle_event, handle_lost_events, NULL);
 	if (err) {
-		warn("failed to open perf buffer: %d\n", err);
+		warn("failed to open ring/perf buffer: %d\n", err);
 		goto cleanup;
 	}
 
 	if (signal(SIGINT, sig_int) == SIG_ERR) {
-		warn("can't set signal handler: %s\n", strerror(-errno));
+		warn("can't set signal handler: %s\n", strerror(errno));
+		err = 1;
 		goto cleanup;
 	}
 
@@ -292,17 +314,20 @@ int main(int argc, char **argv)
 		printf("%-16s %-7s %-7s %-11s %s\n", "COMM", "PID", "TID", "MNT_NS", "CALL");
 	}
 
-	while (1) {
-		if ((err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS)) < 0)
-			break;
-		if (exiting)
+	while (!exiting) {
+		err = bpf_buffer__poll(buf, POLL_TIMEOUT_MS);
+		if (err < 0 && err != -EINTR) {
+			fprintf(stderr, "error polling ring/perf buffer: %s\n", strerror(-err));
 			goto cleanup;
+		}
+		/* reset err to return 0 if exiting */
+		err = 0;
 	}
-	warn("error polling perf buffer: %d\n", err);
 
 cleanup:
-	perf_buffer__free(pb);
+	bpf_buffer__free(buf);
 	mountsnoop_bpf__destroy(obj);
+	cleanup_core_btf(&open_opts);
 
 	return err != 0;
 }

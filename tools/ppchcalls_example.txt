@@ -1,0 +1,159 @@
+Demonstrations of ppchcalls, the Linux/eBPF version.
+
+
+ppchcalls summarizes hcall counts across the system or a specific process,
+with optional latency information. It is very useful for general workload
+characterization, for example:
+
+# ./ppchcalls.py
+Tracing ppc hcalls, printing top 10... Ctrl+C to quit.
+^C[04:59:47]
+PPC HCALL                                        COUNT
+H_IPI                                               26
+H_EOI                                               22
+H_XIRR                                              22
+H_VIO_SIGNAL                                         4
+H_REMOVE                                             3
+H_PUT_TCE                                            2
+H_SEND_CRQ                                           2
+H_STUFF_TCE                                          2
+H_ENTER                                              1
+H_PROTECT                                            1
+
+Detaching...
+#
+
+These are the top 10 entries; you can get more by using the -T switch. Here,
+the output indicates that the H_IPI, H_EOI and H_XIRR hcalls were very common,
+followed immediately by H_VIO_SIGNAL, H_REMOVE and so on. By default, ppchcalls
+counts across the entire system, but we can point it to a specific process of
+interest:
+
+# ./ppchcalls.py -p $(pidof vim)
+Tracing ppc hcalls, printing top 10... Ctrl+C to quit.
+^C[06:23:12]
+PPC HCALL                                        COUNT
+H_PUT_TERM_CHAR                                     62
+H_ENTER                                              2
+
+Detaching...
+#
+
+
+Occasionally, the count of hcalls is not enough, and you'd also want to know
+the minimum, maximum and aggregate latency for each of the hcalls:
+
+# ./ppchcalls.py -L
+Tracing ppc hcalls, printing top 10... Ctrl+C to quit.
+[00:53:59]
+PPC HCALL                                        COUNT          MIN (us)          MAX (us)          AVG (us)
+H_IPI                                               32             0.808             7.730             2.329
+H_EOI                                               25             0.697             1.984             1.081
+H_PUT_TERM_CHAR                                     25            10.315            47.184            14.667
+H_XIRR                                              25             0.868             6.223             2.397
+H_VIO_SIGNAL                                         6             1.418            22.053             7.507
+H_STUFF_TCE                                          3             0.865             2.349             1.384
+H_SEND_CRQ                                           3            18.015            21.137            19.673
+H_REMOVE                                             3             1.838             7.407             3.735
+H_PUT_TCE                                            3             1.473             4.808             2.698
+H_GET_TERM_CHAR                                      2             8.379            26.729            17.554
+
+Detaching...
+#
+
+Another direction would be to understand which processes are making a lot of
+hcalls, thus responsible for a lot of activity. This is what the -P switch
+does:
+
+# ./ppchcalls.py -P
+Tracing ppc hcalls, printing top 10... Ctrl+C to quit.
+^C[04:07:39]
+PID    COMM                                      COUNT
+14118  top                                        1073
+0      [unknown]                                   286
+1679   bash                                         67
+14111  kworker/12:0-events_freezable_power_         12
+2      kthreadd                                      4
+11753  kworker/0:0-events                            4
+141    kworker/21:0H-xfs-log/dm-0                    3
+847    systemd-udevd                                 3
+14116  ppchcalls.py                                  3
+13368  kworker/u64:1-events_unbound                  3
+
+Detaching...
+#
+
+Sometimes, you'd want both, the process making the most hcalls and respective
+process-wide latencies. All you need to do is combine both options:
+
+# ./ppchcalls.py -P -L
+Tracing ppc hcalls, printing top 10... Ctrl+C to quit.
+^C[04:35:27]
+PID    COMM                                      COUNT          MIN (us)          MAX (us)          AVG (us)
+0      [unknown]                                    69             0.666            13.059             2.834
+14151  kworker/12:1-events_freezable_power_          8             6.489            84.470            34.354
+11753  kworker/0:0-events                            4             1.415             2.059             1.784
+14152  kworker/u64:0-events_unbound                  2             2.402             2.935             2.668
+14154  ppchcalls.py                                  2             3.139            11.934             7.537
+1751   sshd                                          1             7.227             7.227             7.227
+3413   kworker/6:2-mm_percpu_wq                      1             6.775             6.775             6.775
+
+Detaching...
+#
+
+Sometimes, you'd only care about a single hcall rather than all hcalls.
+Use the --hcall option for this; the following example also demonstrates
+the --hcall option, for printing at predefined intervals:
+
+# ./ppchcalls.py --hcall H_VIO_SIGNAL -i 5
+hcall H_VIO_SIGNAL , hcall_nr =260
+Tracing ppc hcall 'H_VIO_SIGNAL'... Ctrl+C to quit.
+[04:29:56]
+PPC HCALL                                        COUNT
+H_VIO_SIGNAL                                         6
+
+[04:30:01]
+PPC HCALL                                        COUNT
+H_VIO_SIGNAL                                         4
+
+[04:30:06]
+PPC HCALL                                        COUNT
+H_VIO_SIGNAL                                         6
+
+[04:30:07]
+PPC HCALL                                        COUNT
+
+Detaching...
+#
+
+USAGE:
+# ./ppchcalls.py -h
+usage: ppchcalls.py [-h] [-p PID] [-t TID] [-i INTERVAL] [-d DURATION]
+                    [-T TOP] [-x] [-e ERRNO] [-L] [-m] [-P] [-l]
+                    [--hcall HCALL]
+
+Summarize ppc hcall counts and latencies.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -p PID, --pid PID     trace only this pid
+  -t TID, --tid TID     trace only this tid
+  -i INTERVAL, --interval INTERVAL
+                        print summary at this interval (seconds)
+  -d DURATION, --duration DURATION
+                        total duration of trace, in seconds
+  -T TOP, --top TOP     print only the top hcalls by count or latency
+  -x, --failures        trace only failed hcalls (return < 0)
+  -e ERRNO, --errno ERRNO
+                        trace only hcalls that return this error (numeric or
+                        EPERM, etc.)
+  -L, --latency         collect hcall latency
+  -m, --milliseconds    display latency in milliseconds (default:
+                        microseconds)
+  -P, --process         count by process and not by hcall
+  -l, --list            print list of recognized hcalls and exit
+  --hcall HCALL         trace this hcall only (use option -l to get all
+                        recognized hcalls)
+#
+
+Ref: https://docs.kernel.org/powerpc/papr_hcalls.html

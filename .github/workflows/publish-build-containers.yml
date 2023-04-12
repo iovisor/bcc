@@ -1,0 +1,44 @@
+name: Publish Build Containers
+
+on:
+  # We want to update this image regularly and when updating master
+  schedule:
+    - cron: '00 18 * * *'
+  push:
+    branches:
+      - master
+  pull_request:
+    paths:
+      - 'docker/build/**'
+
+permissions: {}
+
+jobs:
+
+  publish_ghcr:
+    permissions:
+      contents: read # to fetch code (actions/checkout)
+      packages: write # to push container
+    name: Publish To GitHub Container Registry
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [
+          {distro: "ubuntu", version: "18.04", nick: bionic},
+          {distro: "ubuntu", version: "20.04", nick: focal},
+          {distro: "fedora", version: "34", nick: "f34"},
+          {distro: "fedora", version: "36", nick: "f36"}
+        ]
+
+    steps:
+
+    - uses: actions/checkout@v2
+
+    - name: Build and push
+      uses: ./.github/actions/build-container
+      with:
+        os_distro: ${{ matrix.os.distro }}
+        os_version: ${{ matrix.os.version }}
+        os_nick: ${{ matrix.os.nick }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        push: true

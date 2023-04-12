@@ -21,44 +21,44 @@
 #include "BPF.h"
 #include "catch.hpp"
 
-TEST_CASE("test bpf table", "[bpf_table]") {
+TEST_CASE("test bpf table", ebpf::bpf_module_rw_engine_enabled() ? "[bpf_table]" : "[bpf_table][!mayfail]") {
   const std::string BPF_PROGRAM = R"(
     BPF_TABLE("hash", int, int, myhash, 128);
   )";
 
-  ebpf::BPF *bpf(new ebpf::BPF);
+  auto bpf = std::make_unique<ebpf::BPF>();
   ebpf::StatusTuple res(0);
   std::vector<std::pair<std::string, std::string>> elements;
   res = bpf->init(BPF_PROGRAM);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
 
   ebpf::BPFTable t = bpf->get_table("myhash");
 
   // update element
   std::string value;
   res = t.update_value("0x07", "0x42");
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   res = t.get_value("0x7", value);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   REQUIRE(value == "0x42");
 
   // update another element
   res = t.update_value("0x11", "0x777");
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   res = t.get_value("0x11", value);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   REQUIRE(value == "0x777");
 
   // remove value
   res = t.remove_value("0x11");
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   res = t.get_value("0x11", value);
-  REQUIRE(res.code() != 0);
+  REQUIRE(!res.ok());
 
   res = t.update_value("0x15", "0x888");
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   res = t.get_table_offline(elements);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   REQUIRE(elements.size() == 2);
 
   // check that elements match what is in the  table
@@ -73,26 +73,26 @@ TEST_CASE("test bpf table", "[bpf_table]") {
   }
 
   res = t.clear_table_non_atomic();
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   res = t.get_table_offline(elements);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   REQUIRE(elements.size() == 0);
 
   // delete bpf_module, call to key/leaf printf/scanf must fail
-  delete bpf;
+  bpf.reset();
 
   res = t.update_value("0x07", "0x42");
-  REQUIRE(res.code() != 0);
+  REQUIRE(!res.ok());
 
   res = t.get_value("0x07", value);
-  REQUIRE(res.code() != 0);
+  REQUIRE(!res.ok());
 
   res = t.remove_value("0x07");
-  REQUIRE(res.code() != 0);
+  REQUIRE(!res.ok());
 }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0)
-TEST_CASE("test bpf percpu tables", "[bpf_percpu_table]") {
+TEST_CASE("test bpf percpu tables", ebpf::bpf_module_rw_engine_enabled() ? "[bpf_percpu_table]" : "[bpf_percpu_table][!mayfail]") {
   const std::string BPF_PROGRAM = R"(
     BPF_PERCPU_HASH(myhash, int, u64, 128);
   )";
@@ -100,7 +100,7 @@ TEST_CASE("test bpf percpu tables", "[bpf_percpu_table]") {
   ebpf::BPF bpf;
   ebpf::StatusTuple res(0);
   res = bpf.init(BPF_PROGRAM);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
 
   ebpf::BPFTable t = bpf.get_table("myhash");
   size_t ncpus = ebpf::BPFTable::get_possible_cpu_count();
@@ -113,9 +113,9 @@ TEST_CASE("test bpf percpu tables", "[bpf_percpu_table]") {
   // update element
   std::vector<std::string> value;
   res = t.update_value("0x07", v1);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   res = t.get_value("0x07", value);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   for (size_t i = 0; i < ncpus; i++) {
     REQUIRE(42 * i == std::stoul(value.at(i), nullptr, 16));
   }
@@ -130,7 +130,7 @@ TEST_CASE("test bpf hash table", "[bpf_hash_table]") {
   ebpf::BPF bpf;
   ebpf::StatusTuple res(0);
   res = bpf.init(BPF_PROGRAM);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
 
   auto t = bpf.get_hash_table<int, int>("myhash");
 
@@ -140,34 +140,34 @@ TEST_CASE("test bpf hash table", "[bpf_hash_table]") {
   key = 0x08;
   value = 0x43;
   res = t.update_value(key, value);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   REQUIRE(t[key] == value);
 
   // update another element
   key = 0x12;
   value = 0x778;
   res = t.update_value(key, value);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   key = 0x31;
   value = 0x123;
   res = t.update_value(key, value);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   key = 0x12;
   value = 0;
   res = t.get_value(key, value);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   REQUIRE(value == 0x778);
 
   // remove value and dump table
   key = 0x12;
   res = t.remove_value(key);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   auto values = t.get_table_offline();
   REQUIRE(values.size() == 2);
 
   // clear table
   res = t.clear_table_non_atomic();
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   values = t.get_table_offline();
   REQUIRE(values.size() == 0);
 }
@@ -193,13 +193,13 @@ TEST_CASE("test bpf stack table", "[bpf_stack_table]") {
   ebpf::BPF bpf;
   ebpf::StatusTuple res(0);
   res = bpf.init(BPF_PROGRAM);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   std::string getuid_fnname = bpf.get_syscall_fnname("getuid");
   res = bpf.attach_kprobe(getuid_fnname, "on_sys_getuid");
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   REQUIRE(getuid() >= 0);
   res = bpf.detach_kprobe(getuid_fnname);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
 
   auto id = bpf.get_hash_table<int, int>("id");
   auto stack_traces = bpf.get_stack_table("stack_traces");
@@ -246,13 +246,13 @@ TEST_CASE("test bpf stack_id table", "[bpf_stack_table]") {
   ebpf::BPF bpf;
   ebpf::StatusTuple res(0);
   res = bpf.init(BPF_PROGRAM);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   std::string getuid_fnname = bpf.get_syscall_fnname("getuid");
   res = bpf.attach_kprobe(getuid_fnname, "on_sys_getuid");
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
   REQUIRE(getuid() >= 0);
   res = bpf.detach_kprobe(getuid_fnname);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
 
   auto id = bpf.get_hash_table<int, int>("id");
   auto stack_traces = bpf.get_stackbuildid_table("stack_traces");

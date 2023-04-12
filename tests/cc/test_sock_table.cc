@@ -25,6 +25,14 @@
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 18, 0)
 
+// Prior to 5.15, the socket must be TCP established socket to be updatable.
+// https://git.kernel.org/pub/scm/linux/kernel/git/bpf/bpf-next.git/commit/?id=0c48eefae712c2fd91480346a07a1a9cd0f9470b
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0)
+  bool expected_update_result = false;
+#else
+  bool expected_update_result = true;
+#endif
+
 TEST_CASE("test sock map", "[sockmap]") {
   {
     const std::string BPF_PROGRAM = R"(
@@ -46,7 +54,7 @@ int test(struct bpf_sock_ops *skops)
     ebpf::BPF bpf;
     ebpf::StatusTuple res(0);
     res = bpf.init(BPF_PROGRAM);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     // create a udp socket so we can do some map operations.
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -56,11 +64,10 @@ int test(struct bpf_sock_ops *skops)
     int key = 0, val = sockfd;
 
     res = sk_map.remove_value(key);
-    REQUIRE(res.code() != 0);
+    REQUIRE(!res.ok());
 
-    // the socket must be TCP established socket.
     res = sk_map.update_value(key, val);
-    REQUIRE(res.code() != 0);
+    REQUIRE(res.ok() == expected_update_result);
   }
 }
 
@@ -89,7 +96,7 @@ int test(struct bpf_sock_ops *skops)
     ebpf::BPF bpf;
     ebpf::StatusTuple res(0);
     res = bpf.init(BPF_PROGRAM);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     // create a udp socket so we can do some map operations.
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -99,11 +106,10 @@ int test(struct bpf_sock_ops *skops)
     int key = 0, val = sockfd;
 
     res = sk_hash.remove_value(key);
-    REQUIRE(res.code() != 0);
+    REQUIRE(!res.ok());
 
-    // the socket must be TCP established socket.
     res = sk_hash.update_value(key, val);
-    REQUIRE(res.code() != 0);
+    REQUIRE(res.ok() == expected_update_result);
   }
 }
 

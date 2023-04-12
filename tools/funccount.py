@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # funccount Count functions, tracepoints, and USDT probes.
@@ -28,7 +28,7 @@ import traceback
 debug = False
 
 def verify_limit(num):
-    probe_limit = 1000
+    probe_limit = BPF.get_probe_limit()
     if num > probe_limit:
         raise Exception("maximum of %d probes allowed, attempted %d" %
                         (probe_limit, num))
@@ -295,7 +295,7 @@ class Tool(object):
                 if v.value == 0:
                     continue
                 print("%-36s %8d" %
-                      (self.probe.trace_functions[k.value], v.value))
+                      (self.probe.trace_functions[k.value].decode('utf-8', 'replace'), v.value))
 
             if exiting:
                 print("Detaching...")

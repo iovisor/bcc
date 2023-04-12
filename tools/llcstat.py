@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # llcstat.py Summarize cache references and cache misses by PID.
 #            Cache reference and cache miss are corresponding events defined in
@@ -15,6 +15,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 19-Oct-2016   Teng Qin   Created this.
+# 20-Jun-2022   YeZhengMao Added tid info.
 
 from __future__ import print_function
 import argparse
@@ -30,6 +31,10 @@ parser.add_argument(
     help="Sample one in this many number of cache reference / miss events")
 parser.add_argument(
     "duration", nargs="?", default=10, help="Duration, in seconds, to run")
+parser.add_argument(
+    "-t", "--tid", action="store_true",
+    help="Summarize cache references and misses by PID/TID"
+)
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
@@ -41,7 +46,8 @@ bpf_text="""
 
 struct key_t {
     int cpu;
-    int pid;
+    u32 pid;
+    u32 tid;
     char name[TASK_COMM_LEN];
 };
 
@@ -49,8 +55,10 @@ BPF_HASH(ref_count, struct key_t);
 BPF_HASH(miss_count, struct key_t);
 
 static inline __attribute__((always_inline)) void get_key(struct key_t* key) {
+    u64 pid_tgid = bpf_get_current_pid_tgid();
     key->cpu = bpf_get_smp_processor_id();
-    key->pid = bpf_get_current_pid_tgid() >> 32;
+    key->pid = pid_tgid >> 32;
+    key->tid = GET_TID ? (u32)pid_tgid : key->pid;
     bpf_get_current_comm(&(key->name), sizeof(key->name));
 }
 
@@ -72,6 +80,8 @@ int on_cache_ref(struct bpf_perf_event_data *ctx) {
     return 0;
 }
 """
+
+bpf_text = bpf_text.replace("GET_TID", "1" if args.tid else "0")
 
 if args.ebpf:
     print(bpf_text)
@@ -98,22 +108,42 @@ except KeyboardInterrupt:
 
 miss_count = {}
 for (k, v) in b.get_table('miss_count').items():
-    miss_count[(k.pid, k.cpu, k.name)] = v.value
+    if args.tid:
+        miss_count[(k.pid, k.tid, k.cpu, k.name)] = v.value
+    else:
+        miss_count[(k.pid, k.cpu, k.name)] = v.value
 
-print('PID      NAME             CPU     REFERENCE         MISS    HIT%')
+header_text = 'PID      '
+format_text = '{:<8d} '
+if args.tid:
+    header_text += 'TID      '
+    format_text += '{:<8d} '
+
+header_text += 'NAME             CPU     REFERENCE         MISS    HIT%'
+format_text += '{:<16s} {:<4d} {:>12d} {:>12d} {:>6.2f}%'
+
+print(header_text)
 tot_ref = 0
 tot_miss = 0
 for (k, v) in b.get_table('ref_count').items():
     try:
-        miss = miss_count[(k.pid, k.cpu, k.name)]
+        if args.tid:
+            miss = miss_count[(k.pid, k.tid, k.cpu, k.name)]
+        else:
+            miss = miss_count[(k.pid, k.cpu, k.name)]
     except KeyError:
         miss = 0
     tot_ref += v.value
     tot_miss += miss
     # This happens on some PIDs due to missed counts caused by sampling
     hit = (v.value - miss) if (v.value >= miss) else 0
-    print('{:<8d} {:<16s} {:<4d} {:>12d} {:>12d} {:>6.2f}%'.format(
-        k.pid, k.name.decode('utf-8', 'replace'), k.cpu, v.value, miss,
-        (float(hit) / float(v.value)) * 100.0))
+    if args.tid:
+        print(format_text.format(
+            k.pid, k.tid, k.name.decode('utf-8', 'replace'), k.cpu, v.value, miss,
+            (float(hit) / float(v.value)) * 100.0))
+    else:
+        print(format_text.format(
+            k.pid, k.name.decode('utf-8', 'replace'), k.cpu, v.value, miss,
+            (float(hit) / float(v.value)) * 100.0))
 print('Total References: {} Total Misses: {} Hit Rate: {:.2f}%'.format(
     tot_ref, tot_miss, (float(tot_ref - tot_miss) / float(tot_ref)) * 100.0))

@@ -9,6 +9,7 @@
 #include "syscount.h"
 #include "maps.bpf.h"
 
+const volatile bool filter_cg = false;
 const volatile bool count_by_process = false;
 const volatile bool measure_latency = false;
 const volatile bool filter_failed = false;
@@ -16,11 +17,17 @@ const volatile int filter_errno = false;
 const volatile pid_t filter_pid = 0;
 
 struct {
+	__uint(type, BPF_MAP_TYPE_CGROUP_ARRAY);
+	__type(key, u32);
+	__type(value, u32);
+	__uint(max_entries, 1);
+} cgroup_map SEC(".maps");
+
+struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, MAX_ENTRIES);
 	__type(key, u32);
 	__type(value, u64);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } start SEC(".maps");
 
 struct {
@@ -28,7 +35,6 @@ struct {
 	__uint(max_entries, MAX_ENTRIES);
 	__type(key, u32);
 	__type(value, struct data_t);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } data SEC(".maps");
 
 static __always_inline
@@ -51,6 +57,9 @@ int sys_enter(struct trace_event_raw_sys_enter *args)
 	u32 tid = id;
 	u64 ts;
 
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
+
 	if (filter_pid && pid != filter_pid)
 		return 0;
 
@@ -62,12 +71,14 @@ int sys_enter(struct trace_event_raw_sys_enter *args)
 SEC("tracepoint/raw_syscalls/sys_exit")
 int sys_exit(struct trace_event_raw_sys_exit *args)
 {
-	struct task_struct *current;
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
+
 	u64 id = bpf_get_current_pid_tgid();
 	static const struct data_t zero;
 	pid_t pid = id >> 32;
 	struct data_t *val;
-	u64 *start_ts;
+	u64 *start_ts, lat = 0;
 	u32 tid = id;
 	u32 key;
 
@@ -86,6 +97,7 @@ int sys_exit(struct trace_event_raw_sys_exit *args)
 		start_ts = bpf_map_lookup_elem(&start, &tid);
 		if (!start_ts)
 			return 0;
+		lat = bpf_ktime_get_ns() - *start_ts;
 	}
 
 	key = (count_by_process) ? pid : args->id;
@@ -95,7 +107,7 @@ int sys_exit(struct trace_event_raw_sys_exit *args)
 		if (count_by_process)
 			save_proc_name(val);
 		if (measure_latency)
-			__sync_fetch_and_add(&val->total_ns, bpf_ktime_get_ns() - *start_ts);
+			__sync_fetch_and_add(&val->total_ns, lat);
 	}
 	return 0;
 }

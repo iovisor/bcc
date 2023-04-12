@@ -6,6 +6,8 @@ that can indicate oversubscription (too many tasks for too few processors),
 overhead due to excessive context switching (e.g. a common shared lock for
 multiple threads), uneven workload distribution, too-granular tasks, and more.
 
+By default CPU idle time are excluded by simply excluding PID 0.
+
 Alternatively, the same options are available for summarizing task off-CPU
 time, which helps understand how often threads are being descheduled and how
 long they spend waiting for I/O, locks, timers, and other causes of suspension.
@@ -280,9 +282,10 @@ USAGE message:
 
 # ./cpudist.py -h
 
-usage: cpudist.py [-h] [-O] [-T] [-m] [-P] [-L] [-p PID] [interval] [count]
+usage: cpudist.py [-h] [-O] [-T] [-m] [-P] [-L] [-p PID] [-I] [-e]
+                  [interval] [count]
 
-Summarize on-CPU time per task as a histogram.
+Summarize on- and off-CPU time per task as a histogram.
 
 positional arguments:
   interval            output interval, in seconds
@@ -296,6 +299,8 @@ optional arguments:
   -P, --pids          print a histogram per process ID
   -L, --tids          print a histogram per thread ID
   -p PID, --pid PID   trace this PID only
+  -I, --include-idle  include CPU idle time
+  -e, --extension     show extension summary (average/total/count)
 
 examples:
     cpudist              # summarize on-CPU time as a histogram
@@ -304,3 +309,6 @@ examples:
     cpudist -mT 1        # 1s summaries, milliseconds, and timestamps
     cpudist -P           # show each PID separately
     cpudist -p 185       # trace PID 185 only
+    cpudist -I           # include CPU idle time
+    cpudist -e           # show extension summary (average/total/count)
+

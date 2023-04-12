@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # klockstat traces lock events and display locks statistics.
 #
@@ -20,7 +20,7 @@ examples = """
     klockstat -d 5                      # trace for 5 seconds only
     klockstat -i 5                      # display stats every 5 seconds
     klockstat -p 123                    # trace locks for PID 123
-    klockstat -t 321                    # trace locks for PID 321
+    klockstat -t 321                    # trace locks for TID 321
     klockstat -c pipe_                  # display stats only for lock callers with 'pipe_' substring
     klockstat -S acq_count              # sort lock acquired results on acquired count
     klockstat -S hld_total              # sort lock held results on total held time
@@ -367,9 +367,30 @@ KFUNC_PROBE(mutex_lock, void *lock)
 
 """
 
+program_kfunc_nested = """
+KFUNC_PROBE(mutex_unlock, void *lock)
+{
+    return do_mutex_unlock_enter();
+}
+
+KRETFUNC_PROBE(mutex_lock_nested, void *lock, int ret)
+{
+    return do_mutex_lock_return();
+}
+
+KFUNC_PROBE(mutex_lock_nested, void *lock)
+{
+    return do_mutex_lock_enter(ctx, 3);
+}
+
+"""
+
 is_support_kfunc = BPF.support_kfunc()
 if is_support_kfunc:
-    program += program_kfunc
+    if BPF.get_kprobe_functions(b"mutex_lock_nested"):
+        program += program_kfunc_nested
+    else:
+        program += program_kfunc
 else:
     program += program_kprobe
 
@@ -428,9 +449,14 @@ program = program.replace('STACK_STORAGE_SIZE', str(args.stack_storage_size))
 b = BPF(text=program)
 
 if not is_support_kfunc:
-    b.attach_kprobe(event="mutex_unlock",  fn_name="mutex_unlock_enter")
-    b.attach_kretprobe(event="mutex_lock", fn_name="mutex_lock_return")
-    b.attach_kprobe(event="mutex_lock",    fn_name="mutex_lock_enter")
+    b.attach_kprobe(event="mutex_unlock", fn_name="mutex_unlock_enter")
+    # Depending on whether DEBUG_LOCK_ALLOC is set, the proper kprobe may be either mutex_lock or mutex_lock_nested
+    if BPF.get_kprobe_functions(b"mutex_lock_nested"):
+        b.attach_kretprobe(event="mutex_lock_nested", fn_name="mutex_lock_return")
+        b.attach_kprobe(event="mutex_lock_nested", fn_name="mutex_lock_enter")
+    else:
+        b.attach_kretprobe(event="mutex_lock", fn_name="mutex_lock_return")
+        b.attach_kprobe(event="mutex_lock", fn_name="mutex_lock_enter")
 
 enabled = b.get_table("enabled");
 

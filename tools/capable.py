@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # capable   Trace security capabilitiy checks (cap_capable()).
@@ -182,7 +182,15 @@ int kprobe__cap_capable(struct pt_regs *ctx, const struct cred *cred,
     }
 
     u32 uid = bpf_get_current_uid_gid();
-    struct data_t data = {.tgid = tgid, .pid = pid, .uid = uid, .cap = cap, .audit = audit, .insetid = insetid};
+
+    struct data_t data = {};
+
+    data.tgid = tgid;
+    data.pid = pid;
+    data.uid = uid;
+    data.cap = cap;
+    data.audit = audit;
+    data.insetid = insetid;
 #ifdef KERNEL_STACKS
     data.kernel_stack_id = stacks.get_stackid(ctx, 0);
 #endif

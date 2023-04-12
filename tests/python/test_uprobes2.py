@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # USAGE: test_uprobe2.py
 #
@@ -18,7 +18,7 @@ __attribute__((__visibility__("default"))) void fun()
 {
 }
 """
-        self.bpf_text = """
+        self.bpf_text = b"""
 int trace_fun_call(void *ctx) {{
     return 1;
 }}
@@ -40,7 +40,7 @@ int trace_fun_call(void *ctx) {{
 
     def test_attach1(self):
         b = BPF(text=self.bpf_text)
-        b.attach_uprobe(name=self.ftemp.name, sym="fun", fn_name="trace_fun_call")
+        b.attach_uprobe(name=self.ftemp.name.encode(), sym=b"fun", fn_name=b"trace_fun_call")
 
 
 if __name__ == "__main__":

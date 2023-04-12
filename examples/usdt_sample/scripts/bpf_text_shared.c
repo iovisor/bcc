@@ -4,15 +4,27 @@
 /**
  * @brief Helper method to filter based on the specified inputString.
  * @param inputString The operation input string to check against the filter.
- * @return True if the specified inputString starts with the hard-coded FILTER_STRING; otherwise, false.
+ * @return True if the specified inputString starts with the hard-coded filter string; otherwise, false.
  */
 static inline bool filter(char const* inputString)
 {
-    char needle[] = "FILTER_STRING"; ///< The FILTER STRING is replaced by python code.
-    char haystack[sizeof(needle)] = {};
-    bpf_probe_read_user(&haystack, sizeof(haystack), (void*)inputString);
-    for (int i = 0; i < sizeof(needle) - 1; ++i) {
-        if (needle[i] != haystack[i]) {
+    static const char* null_ptr = 0x0;
+    static const char null_terminator = '\0';
+
+    static const char filter_string[] = "FILTER_STRING"; ///< The filter string is replaced by python code.
+    if (null_ptr == inputString) {
+        return false;
+    }
+
+    // Compare until (not including) the null-terminator for filter_string
+    for (int i = 0; i < sizeof(filter_string) - 1; ++i) {
+        char c1 = *inputString++;
+        if (null_terminator == c1) {
+            return false;  // If the null-terminator for inputString was reached, it can not be equal to filter_string.
+        }
+
+        char c2 = filter_string[i];
+        if (c1 != c2) {
             return false;
         }
     }
@@ -45,7 +57,7 @@ int trace_operation_start(struct pt_regs* ctx)
     struct start_data_t start_data = {};
     bpf_usdt_readarg_p(2, ctx, &start_data.input, sizeof(start_data.input));
 
-    FILTER ///< Replaced by python code.
+    FILTER_STATEMENT ///< Replaced by python code.
 
     bpf_usdt_readarg(1, ctx, &start_data.operation_id);
 

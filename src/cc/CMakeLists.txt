@@ -9,12 +9,21 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/frontends/b)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/frontends/clang)
 include_directories(${LLVM_INCLUDE_DIRS})
 include_directories(${LIBELF_INCLUDE_DIRS})
-if (LIBDEBUGINFOD_FOUND)
+if (LIBLZMA_FOUND)
+  include_directories(${LIBLZMA_INCLUDE_DIRS})
+endif(LIBLZMA_FOUND)
+if (LIBDEBUGINFOD_FOUND AND ENABLE_LIBDEBUGINFOD)
   include_directories(${LIBDEBUGINFOD_INCLUDE_DIRS})
-endif (LIBDEBUGINFOD_FOUND)
+endif (LIBDEBUGINFOD_FOUND AND ENABLE_LIBDEBUGINFOD)
 # todo: if check for kernel version
 if (CMAKE_USE_LIBBPF_PACKAGE AND LIBBPF_FOUND)
   include_directories(${LIBBPF_INCLUDE_DIRS})
+  # create up-to-date linux/bpf.h from virtual_bpf.h (remove string wrapper);
+  # when libbpf is built as a submodule we use its version of linux/bpf.h
+  # so this does similar for the libbpf package, removing reliance on the
+  # system uapi header which can be out of date.
+  execute_process(COMMAND sh -c "cd ${CMAKE_CURRENT_SOURCE_DIR}/compat/linux && grep -ve '\\*\\*\\*\\*' virtual_bpf.h > bpf.h")
+  include_directories(${CMAKE_CURRENT_SOURCE_DIR}/compat)
 else()
   include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libbpf/include)
   include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libbpf/include/uapi)
@@ -73,7 +82,7 @@ endif()
 
 set(bcc_table_sources table_storage.cc shared_table.cc bpffs_table.cc json_map_decl_visitor.cc)
 set(bcc_util_sources common.cc)
-set(bcc_sym_sources bcc_syms.cc bcc_elf.c bcc_perf_map.c bcc_proc.c)
+set(bcc_sym_sources bcc_syms.cc bcc_elf.c bcc_perf_map.c bcc_proc.c bcc_zip.c)
 set(bcc_common_headers libbpf.h perf_reader.h "${CMAKE_CURRENT_BINARY_DIR}/bcc_version.h")
 set(bcc_table_headers file_desc.h table_desc.h table_storage.h)
 set(bcc_api_headers bcc_common.h bpf_module.h bcc_exception.h bcc_syms.h bcc_proc.h bcc_elf.h)
@@ -89,6 +98,7 @@ set_target_properties(bcc-shared PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0
 set_target_properties(bcc-shared PROPERTIES OUTPUT_NAME bcc)
 
 if(ENABLE_USDT)
+  add_definitions(-DEXPORT_USDT)
   set(bcc_usdt_sources usdt/usdt.cc usdt/usdt_args.cc)
   # else undefined
 endif()
@@ -109,6 +119,9 @@ add_library(bpf-shared SHARED ${bpf_sources})
 set_target_properties(bpf-shared PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0)
 set_target_properties(bpf-shared PROPERTIES OUTPUT_NAME bcc_bpf)
 target_link_libraries(bpf-shared elf z)
+if(LIBLZMA_FOUND)
+  target_link_libraries(bpf-shared ${LIBLZMA_LIBRARIES})
+endif(LIBLZMA_FOUND)
 if(LIBDEBUGINFOD_FOUND)
   target_link_libraries(bpf-shared ${LIBDEBUGINFOD_LIBRARIES})
 endif(LIBDEBUGINFOD_FOUND)
@@ -122,15 +135,18 @@ set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${llvm_lib_exclude_f
 
 # bcc_common_libs_for_a for archive libraries
 # bcc_common_libs_for_s for shared libraries
-set(bcc_common_libs b_frontend clang_frontend
+set(bcc_common_libs clang_frontend
   -Wl,--whole-archive ${clang_libs} ${llvm_libs} -Wl,--no-whole-archive
   ${LIBELF_LIBRARIES})
+if (LIBLZMA_FOUND)
+  list(APPEND bcc_common_libs ${LIBLZMA_LIBRARIES})
+endif (LIBLZMA_FOUND)
 if (LIBDEBUGINFOD_FOUND)
   list(APPEND bcc_common_libs ${LIBDEBUGINFOD_LIBRARIES})
 endif (LIBDEBUGINFOD_FOUND)
 set(bcc_common_libs_for_a ${bcc_common_libs})
 set(bcc_common_libs_for_s ${bcc_common_libs})
-set(bcc_common_libs_for_lua b_frontend clang_frontend
+set(bcc_common_libs_for_lua clang_frontend
   ${clang_libs} ${llvm_libs} ${LIBELF_LIBRARIES})
 if(LIBBPF_FOUND)
   list(APPEND bcc_common_libs_for_a ${LIBBPF_LIBRARIES})
@@ -144,7 +160,7 @@ endif()
 
 if(ENABLE_CPP_API)
   add_subdirectory(api)
-  list(APPEND bcc_common_libs_for_a api-static)
+  target_sources(bcc-static PRIVATE $<TARGET_OBJECTS:api-objects>)
   # Keep all API functions
   list(APPEND bcc_common_libs_for_s -Wl,--whole-archive api-static -Wl,--no-whole-archive)
 endif()
@@ -158,6 +174,8 @@ if(ENABLE_USDT)
 endif()
 
 add_subdirectory(frontends)
+
+target_sources(bcc-static PRIVATE $<TARGET_OBJECTS:clang_frontend-objects>)
 
 # Link against LLVM libraries
 target_link_libraries(bcc-shared ${bcc_common_libs_for_s})

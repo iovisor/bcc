@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
@@ -11,17 +11,17 @@ import sys
 from time import sleep
 from unittest import main, TestCase
 
-arg1 = sys.argv.pop(1)
-arg2 = ""
+arg1 = sys.argv.pop(1).encode()
+arg2 = "".encode()
 if len(sys.argv) > 1:
   arg2 = sys.argv.pop(1)
 
 class TestBPFFilter(TestCase):
     def setUp(self):
         b = BPF(arg1, arg2, debug=0)
-        fn = b.load_func("on_packet", BPF.SCHED_ACT)
+        fn = b.load_func(b"on_packet", BPF.SCHED_ACT)
         ip = IPRoute()
-        ifindex = ip.link_lookup(ifname="eth0")[0]
+        ifindex = ip.link_lookup(ifname=b"eth0")[0]
         # set up a network to change the flow:
         #             outside      |       inside
         # 172.16.1.1 - 172.16.1.2  |  192.168.1.1 - 192.16.1.2
@@ -36,7 +36,7 @@ class TestBPFFilter(TestCase):
                 protocol=protocols.ETH_P_ALL, classid=1, target=0x10002, keys=['0x0/0x0+0'])
         ip.tc("add-filter", "u32", ifindex, ":2", parent="1:", action=[action],
                 protocol=protocols.ETH_P_ALL, classid=1, target=0x10002, keys=['0x0/0x0+0'])
-        self.xlate = b.get_table("xlate")
+        self.xlate = b.get_table(b"xlate")
 
     def test_xlate(self):
         key1 = self.xlate.Key(IPAddress("172.16.1.2").value, IPAddress("172.16.1.1").value)

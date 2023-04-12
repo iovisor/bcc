@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
@@ -9,21 +9,23 @@ import sys
 from unittest import main, TestCase
 from utils import mayFail
 
-arg1 = sys.argv.pop(1)
-arg2 = ""
+arg1 = sys.argv.pop(1).encode()
+arg2 = b""
 if len(sys.argv) > 1:
   arg2 = sys.argv.pop(1)
 
 
 class TestBlkRequest(TestCase):
-    @mayFail("This fails on github actions environment, and needs to be fixed")
     def setUp(self):
         b = BPF(arg1, arg2, debug=0)
-        self.latency = b.get_table("latency", c_uint, c_ulong)
-        b.attach_kprobe(event="blk_start_request",
-                fn_name="probe_blk_start_request")
-        b.attach_kprobe(event="blk_update_request",
-                fn_name="probe_blk_update_request")
+        self.latency = b.get_table(b"latency", c_uint, c_ulong)
+        if BPF.get_kprobe_functions(b"blk_start_request"):
+            b.attach_kprobe(event=b"blk_start_request",
+                    fn_name=b"probe_blk_start_request")
+        b.attach_kprobe(event=b"blk_mq_start_request",
+                fn_name=b"probe_blk_start_request")
+        b.attach_kprobe(event=b"blk_update_request",
+                fn_name=b"probe_blk_update_request")
 
     def test_blk1(self):
         import subprocess

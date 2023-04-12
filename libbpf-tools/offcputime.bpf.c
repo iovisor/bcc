@@ -5,6 +5,7 @@
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_tracing.h>
 #include "offcputime.h"
+#include "core_fixes.bpf.h"
 
 #define PF_KTHREAD		0x00200000	/* I am a kernel thread */
 #define MAX_ENTRIES		10240
@@ -51,14 +52,13 @@ static bool allow_record(struct task_struct *t)
 		return false;
 	else if (kernel_threads_only && !(t->flags & PF_KTHREAD))
 		return false;
-	if (state != -1 && t->state != state)
+	if (state != -1 && get_task_state(t) != state)
 		return false;
 	return true;
 }
 
 SEC("tp_btf/sched_switch")
-int BPF_PROG(sched_switch, bool preempt, struct task_struct *prev,
-	     struct task_struct *next)
+int BPF_PROG(sched_switch, bool preempt, struct task_struct *prev, struct task_struct *next)
 {
 	struct internal_key *i_keyp, i_key;
 	struct val_t *valp, val;
@@ -82,7 +82,7 @@ int BPF_PROG(sched_switch, bool preempt, struct task_struct *prev,
 						BPF_F_USER_STACK);
 		i_key.key.kern_stack_id = bpf_get_stackid(ctx, &stackmap, 0);
 		bpf_map_update_elem(&start, &pid, &i_key, 0);
-		bpf_probe_read_str(&val.comm, sizeof(prev->comm), prev->comm);
+		bpf_probe_read_kernel_str(&val.comm, sizeof(prev->comm), prev->comm);
 		val.delta = 0;
 		bpf_map_update_elem(&info, &i_key.key, &val, BPF_NOEXIST);
 	}

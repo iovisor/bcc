@@ -8,6 +8,7 @@
 #include <bpf/bpf.h>
 #include "vfsstat.h"
 #include "vfsstat.skel.h"
+#include "btf_helpers.h"
 #include "trace_helpers.h"
 
 const char *argp_program_version = "vfsstat 0.1";
@@ -78,8 +79,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	return 0;
 }
 
-static int libbpf_print_fn(enum libbpf_print_level level,
-			   const char *format, va_list args)
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
 	if (level == LIBBPF_DEBUG && !env.verbose)
 		return 0;
@@ -138,6 +138,7 @@ static void print_and_reset_stats(__u64 stats[S_MAXSTAT])
 
 int main(int argc, char **argv)
 {
+	LIBBPF_OPTS(bpf_object_open_opts, open_opts);
 	static const struct argp argp = {
 		.options = opts,
 		.parser = parse_arg,
@@ -153,10 +154,10 @@ int main(int argc, char **argv)
 
 	libbpf_set_print(libbpf_print_fn);
 
-	err = bump_memlock_rlimit();
+
+	err = ensure_core_btf(&open_opts);
 	if (err) {
-		fprintf(stderr, "failed to increase rlimit: %s\n",
-				strerror(errno));
+		fprintf(stderr, "failed to fetch necessary BTF for CO-RE: %s\n", strerror(-err));
 		return 1;
 	}
 
@@ -167,7 +168,7 @@ int main(int argc, char **argv)
 	}
 
 	/* It fallbacks to kprobes when kernel does not support fentry. */
-	if (vmlinux_btf_exists() && fentry_exists("vfs_read", NULL)) {
+	if (fentry_can_attach("vfs_read", NULL)) {
 		bpf_program__set_autoload(skel->progs.kprobe_vfs_read, false);
 		bpf_program__set_autoload(skel->progs.kprobe_vfs_write, false);
 		bpf_program__set_autoload(skel->progs.kprobe_vfs_fsync, false);
@@ -207,6 +208,7 @@ int main(int argc, char **argv)
 
 cleanup:
 	vfsstat_bpf__destroy(skel);
+	cleanup_core_btf(&open_opts);
 
 	return err != 0;
 }

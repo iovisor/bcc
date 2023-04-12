@@ -3,7 +3,7 @@
 profile \- Profile CPU usage by sampling stack traces. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
 .B profile [\-adfh] [\-p PID | \-L TID] [\-U | \-K] [\-F FREQUENCY | \-c COUNT]
-.B [\-\-stack\-storage\-size COUNT] [\-\-cgroupmap CGROUPMAP] [\-\-mntnsmap MAPPATH] [duration]
+.B [\-\-stack\-storage\-size COUNT] [\-C CPU] [\-\-cgroupmap CGROUPMAP] [\-\-mntnsmap MAPPATH] [duration]
 .SH DESCRIPTION
 This is a CPU profiler. It works by taking samples of stack traces at timed
 intervals. It will help you understand and quantify CPU usage: which code is
@@ -28,10 +28,10 @@ for an older version that may work on Linux 4.6 - 4.8.
 Print usage message.
 .TP
 \-p PID
-Trace this process ID only (filtered in-kernel).
+Trace process with one or more comma separated PIDs only (filtered in-kernel).
 .TP
 \-L TID
-Trace this thread ID only (filtered in-kernel).
+Trace thread with one or more comma separated TIDs only (filtered in-kernel).
 .TP
 \-F frequency
 Frequency to sample stacks.

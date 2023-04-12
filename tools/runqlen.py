@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # runqlen    Summarize scheduler run queue length as a histogram.
@@ -20,7 +20,7 @@
 # 12-Dec-2016   Brendan Gregg   Created this.
 
 from __future__ import print_function
-from bcc import BPF, PerfType, PerfSWConfig
+from bcc import BPF, PerfType, PerfSWConfig, utils
 from time import sleep, strftime
 from tempfile import NamedTemporaryFile
 from os import open, close, dup, unlink, O_WRONLY
@@ -163,7 +163,7 @@ int do_perf_event()
 # code substitutions
 if args.cpus:
     bpf_text = bpf_text.replace('STORAGE',
-        'BPF_HISTOGRAM(dist, cpu_key_t);')
+        'BPF_HISTOGRAM(dist, cpu_key_t, MAX_CPUS);')
     bpf_text = bpf_text.replace('STORE', 'cpu_key_t key = {.slot = len}; ' +
         'key.cpu = bpf_get_smp_processor_id(); ' +
         'dist.increment(key);')
@@ -182,8 +182,10 @@ if debug or args.ebpf:
     if args.ebpf:
         exit()
 
+num_cpus = len(utils.get_online_cpus())
+
 # initialize BPF & perf_events
-b = BPF(text=bpf_text)
+b = BPF(text=bpf_text, cflags=['-DMAX_CPUS=%s' % str(num_cpus)])
 b.attach_perf_event(ev_type=PerfType.SOFTWARE,
     ev_config=PerfSWConfig.CPU_CLOCK, fn_name="do_perf_event",
     sample_period=0, sample_freq=frequency)

@@ -15,11 +15,13 @@ only exception is resulting tool binaries, which are put in a current
 directory. `make clean` will clean up all the build artifacts, including
 generated binaries.
 
-Given libbpf package might not be available across wide variety of
-distributions, all libbpf-based tools are linked statically against version of
-libbpf that BCC links against (from submodule under src/cc/libbpf). This
+Given that the libbpf package might not be available across wide variety of
+distributions, all libbpf-based tools are linked statically against a version
+of libbpf that BCC links against (from submodule under src/cc/libbpf). This
 results in binaries with minimal amount of dependencies (libc, libelf, and
 libz are linked dynamically, though, given their widespread availability).
+If your build fails because the libbpf submodule is outdated, try running `git
+submodule update --init --recursive`.
 
 Tools are expected to follow a simple naming convention:
   - <tool>.c contains userspace C code of a tool.
@@ -90,3 +92,30 @@ CONFIG_DEBUG_INFO=y
 kernel build (it comes from dwarves package). Without it, BTF won't be
 generated, and on older kernels you'd get only warning, but still would
 build kernel successfully
+
+Running in kernels without CONFIG_DEBUG_INFO_BTF=y
+--------------------------------------------------
+
+It's possible to run some tools in kernels that don't expose
+`/sys/kernel/btf/vmlinux`. For those cases,
+[BTFGen](https://lore.kernel.org/bpf/20220215225856.671072-1-mauricio@kinvolk.io)
+and [BTFHub](https://github.com/aquasecurity/btfhub) can be used to
+generate small BTF files for the most popular Linux distributions that
+are shipped with the tools in order to provide the needed information to
+perform the CO-RE relocations when loading the eBPF programs.
+
+If you haven't cloned the
+[btfhub-archive](https://github.com/aquasecurity/btfhub) repository, you
+can run make and it'll clone it for you into the `$HOME/.local/share`
+directory:
+
+```bash
+make ENABLE_MIN_CORE_BTFS=1 -j$(nproc)
+```
+
+If you have a local copy of such repository, you can pass it's location
+to avoid cloning it again:
+
+```bash
+make ENABLE_MIN_CORE_BTFS=1 BTF_HUB_ARCHIVE=<path_to_btfhub-archive> -j$(nproc)
+```

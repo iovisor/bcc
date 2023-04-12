@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # tcpconnect    Trace TCP connect()s.
@@ -178,7 +178,7 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
     u16 dport = skp->__sk_common.skc_dport;
 
     FILTER_PORT
-    
+
     FILTER_FAMILY
 
     if (ipver == 4) {
@@ -295,7 +295,7 @@ int trace_udp_ret_recvmsg(struct pt_regs *ctx)
         return 0;
 
     struct msghdr *msghdr = (struct msghdr *)*msgpp;
-    if (msghdr->msg_iter.type != ITER_IOVEC)
+    if (msghdr->msg_iter.TYPE_FIELD != ITER_IOVEC)
         goto delete_and_return;
 
     int copied = (int)PT_REGS_RC(ctx);
@@ -322,6 +322,31 @@ delete_and_return:
     return 0;
 }
 
+#include <uapi/linux/udp.h>
+
+int trace_udpv6_recvmsg(struct pt_regs *ctx)
+{
+    struct sk_buff *skb = (struct sk_buff *)PT_REGS_PARM2(ctx);
+    struct udphdr *hdr = (void*)skb->head + skb->transport_header;
+    struct dns_data_t *event;
+    int zero = 0;
+    void *data;
+
+    /* hex(53) = 0x0035, htons(0x0035) = 0x3500 */
+    if (hdr->source != 0x3500)
+        return 0;
+
+    /* skip UDP header */
+    data = skb->data + 8;
+
+    event = dns_data.lookup(&zero);
+    if (!event)
+        return 0;
+
+    bpf_probe_read(event->pkt, sizeof(event->pkt), data);
+    dns_events.perf_submit(ctx, event, sizeof(*event));
+    return 0;
+}
 """
 
 if args.count and args.dns:
@@ -361,6 +386,10 @@ bpf_text = bpf_text.replace('FILTER_FAMILY', '')
 bpf_text = bpf_text.replace('FILTER_UID', '')
 
 if args.dns:
+    if BPF.kernel_struct_has_field(b'iov_iter', b'iter_type') == 1:
+        dns_bpf_text = dns_bpf_text.replace('TYPE_FIELD', 'iter_type')
+    else:
+        dns_bpf_text = dns_bpf_text.replace('TYPE_FIELD', 'type')
     bpf_text += dns_bpf_text
 
 if debug or args.ebpf:
@@ -380,12 +409,12 @@ def print_ipv4_event(cpu, data, size):
         printb(b"%-6d" % event.uid, nl="")
     dest_ip = inet_ntop(AF_INET, pack("I", event.daddr)).encode()
     if args.lport:
-        printb(b"%-6d %-12.12s %-2d %-16s %-6d %-16s %-6d %s" % (event.pid,
+        printb(b"%-7d %-12.12s %-2d %-16s %-6d %-16s %-6d %s" % (event.pid,
             event.task, event.ip,
             inet_ntop(AF_INET, pack("I", event.saddr)).encode(), event.lport,
             dest_ip, event.dport, print_dns(dest_ip)))
     else:
-        printb(b"%-6d %-12.12s %-2d %-16s %-16s %-6d %s" % (event.pid,
+        printb(b"%-7d %-12.12s %-2d %-16s %-16s %-6d %s" % (event.pid,
             event.task, event.ip,
             inet_ntop(AF_INET, pack("I", event.saddr)).encode(),
             dest_ip, event.dport, print_dns(dest_ip)))
@@ -401,12 +430,12 @@ def print_ipv6_event(cpu, data, size):
         printb(b"%-6d" % event.uid, nl="")
     dest_ip = inet_ntop(AF_INET6, event.daddr).encode()
     if args.lport:
-        printb(b"%-6d %-12.12s %-2d %-16s %-6d %-16s %-6d %s" % (event.pid,
+        printb(b"%-7d %-12.12s %-2d %-16s %-6d %-16s %-6d %s" % (event.pid,
             event.task, event.ip,
             inet_ntop(AF_INET6, event.saddr).encode(), event.lport,
             dest_ip, event.dport, print_dns(dest_ip)))
     else:
-        printb(b"%-6d %-12.12s %-2d %-16s %-16s %-6d %s" % (event.pid,
+        printb(b"%-7d %-12.12s %-2d %-16s %-16s %-6d %s" % (event.pid,
             event.task, event.ip,
             inet_ntop(AF_INET6, event.saddr).encode(),
             dest_ip, event.dport, print_dns(dest_ip)))
@@ -506,6 +535,7 @@ b.attach_kretprobe(event="tcp_v6_connect", fn_name="trace_connect_v6_return")
 if args.dns:
     b.attach_kprobe(event="udp_recvmsg", fn_name="trace_udp_recvmsg")
     b.attach_kretprobe(event="udp_recvmsg", fn_name="trace_udp_ret_recvmsg")
+    b.attach_kprobe(event="udpv6_queue_rcv_one_skb", fn_name="trace_udpv6_recvmsg")
 
 print("Tracing connect ... Hit Ctrl-C to end")
 if args.count:
@@ -528,10 +558,10 @@ else:
     if args.print_uid:
         print("%-6s" % ("UID"), end="")
     if args.lport:
-        print("%-6s %-12s %-2s %-16s %-6s %-16s %-6s" % ("PID", "COMM", "IP", "SADDR",
+        print("%-7s %-12s %-2s %-16s %-6s %-16s %-6s" % ("PID", "COMM", "IP", "SADDR",
             "LPORT", "DADDR", "DPORT"), end="")
     else:
-        print("%-6s %-12s %-2s %-16s %-16s %-6s" % ("PID", "COMM", "IP", "SADDR",
+        print("%-7s %-12s %-2s %-16s %-16s %-6s" % ("PID", "COMM", "IP", "SADDR",
             "DADDR", "DPORT"), end="")
     if args.dns:
         print(" QUERY")

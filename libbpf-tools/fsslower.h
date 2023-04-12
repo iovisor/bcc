@@ -6,11 +6,11 @@
 #define TASK_COMM_LEN	16
 
 enum fs_file_op {
-	READ,
-	WRITE,
-	OPEN,
-	FSYNC,
-	MAX_OP,
+	F_READ,
+	F_WRITE,
+	F_OPEN,
+	F_FSYNC,
+	F_MAX_OP,
 };
 
 struct event {

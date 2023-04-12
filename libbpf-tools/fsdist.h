@@ -3,12 +3,12 @@
 #define __FSDIST_H
 
 enum fs_file_op {
-	READ,
-	WRITE,
-	OPEN,
-	FSYNC,
-	GETATTR,
-	MAX_OP,
+	F_READ,
+	F_WRITE,
+	F_OPEN,
+	F_FSYNC,
+	F_GETATTR,
+	F_MAX_OP,
 };
 
 #define MAX_SLOTS	32

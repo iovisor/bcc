@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
@@ -10,7 +10,7 @@ from unittest import main, TestCase
 
 class TestHistogram(TestCase):
     def test_simple(self):
-        b = BPF(text="""
+        b = BPF(text=b"""
 #include <uapi/linux/ptrace.h>
 struct bpf_map;
 BPF_HISTOGRAM(hist1);
@@ -23,19 +23,19 @@ int kprobe__htab_map_delete_elem(struct pt_regs *ctx, struct bpf_map *map, u64 *
 """)
         for i in range(0, 32):
             for j in range(0, random.randint(1, 10)):
-                try: del b["stub"][c_ulonglong(1 << i)]
+                try: del b[b"stub"][c_ulonglong(1 << i)]
                 except: pass
-        b["hist1"].print_log2_hist()
+        b[b"hist1"].print_log2_hist()
 
         for i in range(32, 64):
             for j in range(0, random.randint(1, 10)):
-                try: del b["stub"][c_ulonglong(1 << i)]
+                try: del b[b"stub"][c_ulonglong(1 << i)]
                 except: pass
-        b["hist1"].print_log2_hist()
+        b[b"hist1"].print_log2_hist()
         b.cleanup()
 
     def test_struct(self):
-        b = BPF(text="""
+        b = BPF(text=b"""
 #include <uapi/linux/ptrace.h>
 struct bpf_map;
 typedef struct { void *map; u64 slot; } Key;
@@ -50,15 +50,15 @@ int kprobe__htab_map_delete_elem(struct pt_regs *ctx, struct bpf_map *map, u64 *
 """)
         for i in range(0, 64):
             for j in range(0, random.randint(1, 10)):
-                try: del b["stub1"][c_ulonglong(1 << i)]
+                try: del b[b"stub1"][c_ulonglong(1 << i)]
                 except: pass
-                try: del b["stub2"][c_ulonglong(1 << i)]
+                try: del b[b"stub2"][c_ulonglong(1 << i)]
                 except: pass
-        b["hist1"].print_log2_hist()
+        b[b"hist1"].print_log2_hist()
         b.cleanup()
 
     def test_chars(self):
-        b = BPF(text="""
+        b = BPF(text=b"""
 #include <uapi/linux/ptrace.h>
 #include <linux/sched.h>
 #include <linux/version.h>
@@ -78,11 +78,11 @@ int kprobe__finish_task_switch(struct pt_regs *ctx, struct task_struct *prev) {
 }
 """)
         for i in range(0, 100): time.sleep(0.01)
-        b["hist1"].print_log2_hist()
+        b[b"hist1"].print_log2_hist()
         b.cleanup()
 
     def test_multiple_key(self):
-        b = BPF(text="""
+        b = BPF(text=b"""
 #include <uapi/linux/ptrace.h>
 #include <uapi/linux/fs.h>
 struct hist_s_key {
@@ -108,7 +108,7 @@ int kprobe__vfs_read(struct pt_regs *ctx, struct file *file,
             return buckets
 
         for i in range(0, 100): time.sleep(0.01)
-        b["mk_hist"].print_log2_hist("size", "k_1 & k_2",
+        b[b"mk_hist"].print_log2_hist("size", "k_1 & k_2",
                 section_print_fn=lambda bucket: "%3d %d" % (bucket[0], bucket[1]),
                 bucket_fn=lambda bucket: (bucket.key_1, bucket.key_2),
                 strip_leading_zero=True,

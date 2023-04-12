@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # threadsnoop   List new thread creation.
@@ -45,7 +45,7 @@ try:
 except Exception:
     b.attach_uprobe(name="c", sym="pthread_create", fn_name="do_entry")
 
-print("%-10s %-6s %-16s %s" % ("TIME(ms)", "PID", "COMM", "FUNC"))
+print("%-10s %-7s %-16s %s" % ("TIME(ms)", "PID", "COMM", "FUNC"))
 
 start_ts = 0
 
@@ -58,7 +58,7 @@ def print_event(cpu, data, size):
     func = b.sym(event.start, event.pid)
     if (func == "[unknown]"):
         func = hex(event.start)
-    print("%-10d %-6d %-16s %s" % ((event.ts - start_ts) / 1000000,
+    print("%-10d %-7d %-16s %s" % ((event.ts - start_ts) / 1000000,
         event.pid, event.comm, func))
 
 b["events"].open_perf_buffer(print_event)

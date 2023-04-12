@@ -33,33 +33,33 @@ TEST_CASE("test prog table", "[prog_table]") {
 
   ebpf::BPF bpf;
   res = bpf.init(BPF_PROGRAM);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
 
   ebpf::BPFProgTable t = bpf.get_prog_table("myprog");
 
   ebpf::BPF bpf2;
   res = bpf2.init(BPF_PROGRAM2);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
 
   int fd;
   res = bpf2.load_func("hello", BPF_PROG_TYPE_SCHED_CLS, fd);
-  REQUIRE(res.code() == 0);
+  REQUIRE(res.ok());
 
   SECTION("update and remove") {
     // update element
     res = t.update_value(0, fd);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     // remove element
     res = t.remove_value(0);
-    REQUIRE(res.code() == 0);
+    REQUIRE(res.ok());
 
     // update out of range element
     res = t.update_value(17, fd);
-    REQUIRE(res.code() != 0);
+    REQUIRE(!res.ok());
 
     // remove out of range element
     res = t.remove_value(17);
-    REQUIRE(res.code() != 0);
+    REQUIRE(!res.ok());
   }
 }

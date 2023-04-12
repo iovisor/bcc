@@ -46,9 +46,7 @@ static int probe_entry(struct pt_regs *ctx)
 
 static int probe_return(struct pt_regs *ctx)
 {
-	__u64 pid_tgid = bpf_get_current_pid_tgid();
-	__u32 pid = pid_tgid >> 32;
-	__u32 tid = (__u32)pid_tgid;
+	__u32 tid = (__u32)bpf_get_current_pid_tgid();
 	struct event *eventp;
 
 	eventp = bpf_map_lookup_elem(&starts, &tid);
@@ -63,13 +61,13 @@ static int probe_return(struct pt_regs *ctx)
 }
 
 SEC("kprobe/handle_entry")
-int handle_entry(struct pt_regs *ctx)
+int BPF_KPROBE(handle_entry)
 {
 	return probe_entry(ctx);
 }
 
 SEC("kretprobe/handle_return")
-int handle_return(struct pt_regs *ctx)
+int BPF_KRETPROBE(handle_return)
 {
 	return probe_return(ctx);
 }

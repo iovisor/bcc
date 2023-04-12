@@ -19,17 +19,22 @@ The second line showed the same signal sent, this time resulting in a -3
 USAGE message:
 
 # ./killsnoop -h
-usage: killsnoop [-h] [-x] [-p PID]
+usage: killsnoop [-h] [-x] [-p PID] [-T PID] [-s SIGNAL]
 
 Trace signals issued by the kill() syscall
 
 optional arguments:
-  -h, --help         show this help message and exit
-  -x, --failed       only show failed kill syscalls
-  -p PID, --pid PID  trace this PID only
+  -h, --help            show this help message and exit
+  -x, --failed          only show failed kill syscalls
+  -p PID, --pid PID     trace this PID only which is the sender of signal
+  -T TPID, --tpid TPID  trace this target PID only which is the receiver of
+                        signal
+  -s SIGNAL, --signal SIGNAL
+                        trace this signal only
 
 examples:
     ./killsnoop           # trace all kill() signals
     ./killsnoop -x        # only show failed kills
     ./killsnoop -p 181    # only trace PID 181
+    ./killsnoop -T 189    # only trace target PID 189
     ./killsnoop -s 9      # only trace signal 9

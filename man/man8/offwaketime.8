@@ -2,7 +2,7 @@
 .SH NAME
 offwaketime \- Summarize blocked time by off-CPU stack + waker stack. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B offwaketime [\-h] [\-p PID | \-t TID | \-u | \-k] [\-U | \-K] [\-f] [\-\-stack-storage-size STACK_STORAGE_SIZE] [\-m MIN_BLOCK_TIME] [\-M MAX_BLOCK_TIME] [\-\-state STATE] [duration]
+.B offwaketime [\-h] [\-p PID | \-t TID | \-u | \-k] [\-U | \-K] [\-d] [\-f] [\-\-stack-storage-size STACK_STORAGE_SIZE] [\-m MIN_BLOCK_TIME] [\-M MAX_BLOCK_TIME] [\-\-state STATE] [duration]
 .SH DESCRIPTION
 This program shows kernel stack traces and task names that were blocked and
 "off-CPU", along with the stack traces and task names for the threads that woke
@@ -54,6 +54,9 @@ Show stacks from user space only (no kernel space stacks).
 .TP
 \-K
 Show stacks from kernel space only (no user space stacks).
+.TP
+\-d, --delimited
+insert delimiter between kernel/user stacks
 .TP
 \-\-stack-storage-size STACK_STORAGE_SIZE
 Change the number of unique stack traces that can be stored and displayed.

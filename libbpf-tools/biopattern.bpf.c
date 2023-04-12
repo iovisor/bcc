@@ -5,26 +5,39 @@
 #include <bpf/bpf_tracing.h>
 #include "biopattern.h"
 #include "maps.bpf.h"
+#include "core_fixes.bpf.h"
 
-const volatile dev_t targ_dev = -1;
+const volatile bool filter_dev = false;
+const volatile __u32 targ_dev = 0;
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, 64);
-	__type(key, dev_t);
+	__type(key, u32);
 	__type(value, struct counter);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } counters SEC(".maps");
 
 SEC("tracepoint/block/block_rq_complete")
-int handle__block_rq_complete(struct trace_event_raw_block_rq_complete *ctx)
+int handle__block_rq_complete(void *args)
 {
-	sector_t *last_sectorp,  sector = ctx->sector;
 	struct counter *counterp, zero = {};
-	u32 nr_sector = ctx->nr_sector;
-	dev_t dev = ctx->dev;
+	sector_t sector;
+	u32 nr_sector;
+	u32 dev;
 
-	if (targ_dev != -1 && targ_dev != dev)
+	if (has_block_rq_completion()) {
+		struct trace_event_raw_block_rq_completion___x *ctx = args;
+		sector = BPF_CORE_READ(ctx, sector);
+		nr_sector = BPF_CORE_READ(ctx, nr_sector);
+		dev = BPF_CORE_READ(ctx, dev);
+	} else {
+		struct trace_event_raw_block_rq_complete___x *ctx = args;
+		sector = BPF_CORE_READ(ctx, sector);
+		nr_sector = BPF_CORE_READ(ctx, nr_sector);
+		dev = BPF_CORE_READ(ctx, dev);
+	}
+
+	if (filter_dev && targ_dev != dev)
 		return 0;
 
 	counterp = bpf_map_lookup_or_try_init(&counters, &dev, &zero);

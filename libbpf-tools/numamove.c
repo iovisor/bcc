@@ -2,7 +2,8 @@
 // Copyright (c) 2020 Wenbo Zhang
 //
 // Based on numamove(8) from BPF-Perf-Tools-Book by Brendan Gregg.
-// 8-Jun-2020   Wenbo Zhang   Created this.
+//  8-Jun-2020   Wenbo Zhang   Created this.
+// 30-Jan-2023   Rong Tao      Use fentry_can_attach() to decide use fentry/kprobe.
 #include <argp.h>
 #include <signal.h>
 #include <stdio.h>
@@ -51,8 +52,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	return 0;
 }
 
-int libbpf_print_fn(enum libbpf_print_level level,
-		    const char *format, va_list args)
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
 	if (level == LIBBPF_DEBUG && !env.verbose)
 		return 0;
@@ -83,20 +83,29 @@ int main(int argc, char **argv)
 
 	libbpf_set_print(libbpf_print_fn);
 
-	err = bump_memlock_rlimit();
-	if (err) {
-		fprintf(stderr, "failed to increase rlimit: %d\n", err);
-		return 1;
-	}
-
-	obj = numamove_bpf__open_and_load();
+	obj = numamove_bpf__open();
 	if (!obj) {
 		fprintf(stderr, "failed to open and/or load BPF object\n");
 		return 1;
 	}
-	
+
 	if (!obj->bss) {
 		fprintf(stderr, "Memory-mapping BPF maps is supported starting from Linux 5.7, please upgrade.\n");
+		goto cleanup;
+	}
+
+	/* It fallbacks to kprobes when kernel does not support fentry. */
+	if (fentry_can_attach("migrate_misplaced_page", NULL)) {
+		bpf_program__set_autoload(obj->progs.kprobe_migrate_misplaced_page, false);
+		bpf_program__set_autoload(obj->progs.kretprobe_migrate_misplaced_page_exit, false);
+	} else {
+		bpf_program__set_autoload(obj->progs.fentry_migrate_misplaced_page, false);
+		bpf_program__set_autoload(obj->progs.fexit_migrate_misplaced_page_exit, false);
+	}
+
+	err = numamove_bpf__load(obj);
+	if (err) {
+		fprintf(stderr, "failed to load BPF skelect: %d\n", err);
 		goto cleanup;
 	}
 
@@ -108,18 +117,15 @@ int main(int argc, char **argv)
 
 	signal(SIGINT, sig_handler);
 
-	printf("%-10s %18s %18s\n", "TIME", "NUMA_migrations",
-		"NUMA_migrations_ms");
+	printf("%-10s %18s %18s\n", "TIME", "NUMA_migrations", "NUMA_migrations_ms");
 	while (!exiting) {
 		sleep(1);
 		time(&t);
 		tm = localtime(&t);
 		strftime(ts, sizeof(ts), "%H:%M:%S", tm);
 		printf("%-10s %18lld %18lld\n", ts,
-			__atomic_exchange_n(&obj->bss->num, 0,
-					__ATOMIC_RELAXED),
-			__atomic_exchange_n(&obj->bss->latency, 0,
-					__ATOMIC_RELAXED));
+			__atomic_exchange_n(&obj->bss->num, 0, __ATOMIC_RELAXED),
+			__atomic_exchange_n(&obj->bss->latency, 0, __ATOMIC_RELAXED));
 	}
 
 cleanup:

@@ -4,7 +4,11 @@
 include_directories(${PROJECT_BINARY_DIR}/src/cc)
 include_directories(${PROJECT_SOURCE_DIR}/src/cc)
 include_directories(${PROJECT_SOURCE_DIR}/src/cc/api)
+if (CMAKE_USE_LIBBPF_PACKAGE AND LIBBPF_FOUND)
+include_directories(${PROJECT_SOURCE_DIR}/src/cc/compat)
+else()
 include_directories(${PROJECT_SOURCE_DIR}/src/cc/libbpf/include/uapi)
+endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")

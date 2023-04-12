@@ -20,7 +20,7 @@ distro=${4:-ubuntu}
 
 # The main docker image build,
 echo "Building ${distro} ${os_tag} release docker image for ${docker_repo}:${docker_tag}"
-docker build -t ${docker_repo}:${docker_tag} --build-arg OS_TAG=${os_tag} -f Dockerfile.${distro} .
+docker build -t ${docker_repo}:${docker_tag} --build-arg OS_TAG=${os_tag} -f docker/Dockerfile.${distro} .
 
 echo "Copying build artifacts to $(pwd)/output"
 mkdir -p output

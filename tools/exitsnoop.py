@@ -1,9 +1,8 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 from __future__ import print_function
 
 import argparse
-import ctypes as ct
 import os
 import platform
 import re
@@ -78,28 +77,11 @@ class Global():
     SIGNUM_TO_SIGNAME = dict((v, re.sub("^SIG", "", k))
         for k,v in signal.__dict__.items() if re.match("^SIG[A-Z]+$", k))
 
-
-class Data(ct.Structure):
-    """Event data matching struct data_t in _embedded_c()."""
-    _TASK_COMM_LEN = 16      # linux/sched.h
-    _pack_ = 1
-    _fields_ = [
-        ("start_time", ct.c_ulonglong), # task->start_time, see --timespec arg
-        ("exit_time", ct.c_ulonglong),  # bpf_ktime_get_ns()
-        ("pid", ct.c_uint), # task->tgid, thread group id == sys_getpid()
-        ("tid", ct.c_uint), # task->pid, thread id == sys_gettid()
-        ("ppid", ct.c_uint),# task->parent->tgid, notified of exit
-        ("exit_code", ct.c_int),
-        ("sig_info", ct.c_uint),
-        ("task", ct.c_char * _TASK_COMM_LEN)
-    ]
-
 def _embedded_c(args):
     """Generate C program for sched_process_exit tracepoint in kernel/exit.c."""
     c = """
     EBPF_COMMENT
     #include <linux/sched.h>
-    BPF_STATIC_ASSERT_DEF
 
     struct data_t {
         u64 start_time;
@@ -110,9 +92,8 @@ def _embedded_c(args):
         int exit_code;
         u32 sig_info;
         char task[TASK_COMM_LEN];
-    } __attribute__((packed));
+    };
 
-    BPF_STATIC_ASSERT(sizeof(struct data_t) == CTYPES_SIZEOF_DATA);
     BPF_PERF_OUTPUT(events);
 
     TRACEPOINT_PROBE(sched, sched_process_exit)
@@ -120,27 +101,20 @@ def _embedded_c(args):
         struct task_struct *task = (typeof(task))bpf_get_current_task();
         if (FILTER_PID || FILTER_EXIT_CODE) { return 0; }
 
-        struct data_t data = {
-            .start_time = PROCESS_START_TIME_NS,
-            .exit_time = bpf_ktime_get_ns(),
-            .pid = task->tgid,
-            .tid = task->pid,
-            .ppid = task->parent->tgid,
-            .exit_code = task->exit_code >> 8,
-            .sig_info = task->exit_code & 0xFF,
-        };
+        struct data_t data = {};
+
+        data.start_time = PROCESS_START_TIME_NS,
+        data.exit_time = bpf_ktime_get_ns(),
+        data.pid = task->tgid,
+        data.tid = task->pid,
+        data.ppid = task->real_parent->tgid,
+        data.exit_code = task->exit_code >> 8,
+        data.sig_info = task->exit_code & 0xFF,
         bpf_get_current_comm(&data.task, sizeof(data.task));
 
         events.perf_submit(args, &data, sizeof(data));
         return 0;
     }
-    """
-    # TODO: this macro belongs in bcc/src/cc/export/helpers.h
-    bpf_static_assert_def = r"""
-    #ifndef BPF_STATIC_ASSERT
-    #define BPF_STATIC_ASSERT(condition) __attribute__((unused)) \
-    extern int bpf_static_assert[(condition) ? 1 : -1]
-    #endif
     """
 
     if Global.args.pid:
@@ -153,8 +127,6 @@ def _embedded_c(args):
 
     code_substitutions = [
         ('EBPF_COMMENT', '' if not Global.args.ebpf else _ebpf_comment()),
-        ("BPF_STATIC_ASSERT_DEF", bpf_static_assert_def),
-        ("CTYPES_SIZEOF_DATA", str(ct.sizeof(Data))),
         ('FILTER_PID', filter_pid),
         ('FILTER_EXIT_CODE', '0' if not Global.args.failed else 'task->exit_code == 0'),
         ('PROCESS_START_TIME_NS', 'task->start_time' if not Global.args.timespec else
@@ -179,12 +151,15 @@ def _print_header():
         print("%-13s" % title, end="")
     if Global.args.label is not None:
         print("%-6s" % "LABEL", end="")
-    print("%-16s %-6s %-6s %-6s %-7s %-10s" %
+    print("%-16s %-7s %-7s %-7s %-7s %-10s" %
               ("PCOMM", "PID", "PPID", "TID", "AGE(s)", "EXIT_CODE"))
+
+buffer = None
 
 def _print_event(cpu, data, size): # callback
     """Print the exit event."""
-    e = ct.cast(data, ct.POINTER(Data)).contents
+    global buffer
+    e = buffer["events"].event(data)
     if Global.args.timestamp:
         now = datetime.utcnow() if Global.args.utc else datetime.now()
         print("%-13s" % (now.strftime("%H:%M:%S.%f")[:-3]), end="")
@@ -192,7 +167,7 @@ def _print_event(cpu, data, size): # callback
         label = Global.args.label if len(Global.args.label) else 'exit'
         print("%-6s" % label, end="")
     age = (e.exit_time - e.start_time) / 1e9
-    print("%-16s %-6d %-6d %-6d %-7.2f " %
+    print("%-16s %-7d %-7d %-7d %-7.2f " %
               (e.task.decode(), e.pid, e.ppid, e.tid, age), end="")
     if e.sig_info == 0:
         print("0" if e.exit_code == 0 else "code %d" % e.exit_code)
@@ -271,6 +246,7 @@ def signum_to_signame(signum):
 # Script: invoked as a script
 # =============================
 def main():
+    global buffer
     try:
         rc, buffer = initialize()
         if rc:

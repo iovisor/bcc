@@ -88,7 +88,7 @@ struct info_t {
 int main() {
   ebpf::BPF bpf;
   auto res = bpf.init(BPF_PROGRAM);
-  if (res.code() != 0) {
+  if (!res.ok()) {
     std::cerr << res.msg() << std::endl;
     return 1;
   }
@@ -111,7 +111,7 @@ int main() {
   auto sk_table = bpf.get_sk_storage_table<unsigned long long>("sk_data_map");
 
   res = sk_table.update_value(sockfd1, v1);
-  if (res.code() != 0) {
+  if (!res.ok()) {
     std::cerr << "sk_data_map sockfd1 update failure: " << res.msg() << std::endl;
     close(sockfd2);
     close(sockfd1);
@@ -119,7 +119,7 @@ int main() {
   }
 
   res = sk_table.update_value(sockfd2, v2);
-  if (res.code() != 0) {
+  if (!res.ok()) {
     std::cerr << "sk_data_map sockfd2 update failure: " << res.msg() << std::endl;
     close(sockfd2);
     close(sockfd1);
@@ -128,7 +128,7 @@ int main() {
 
   int prog_fd;
   res = bpf.load_func("bpf_iter__bpf_sk_storage_map", BPF_PROG_TYPE_TRACING, prog_fd);
-  if (res.code() != 0) {
+  if (!res.ok()) {
     std::cerr << res.msg() << std::endl;
     return 1;
   }

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # stackcount    Count events and their stack traces.
 #               For Linux, uses BCC, eBPF.
@@ -292,18 +292,18 @@ class Tool(object):
         if self.args.verbose:
             print("%-16x " % addr, end="")
         if self.args.offset:
-            print("%s" % self.probe.bpf.ksym(addr, show_offset=True))
+            print("%s" % self.probe.bpf.ksym(addr, show_offset=True).decode())
         else:
-            print("%s" % self.probe.bpf.ksym(addr))
+            print("%s" % self.probe.bpf.ksym(addr).decode())
 
     def _print_uframe(self, addr, pid):
         print("  ", end="")
         if self.args.verbose:
             print("%-16x " % addr, end="")
         if self.args.offset:
-            print("%s" % self.probe.bpf.sym(addr, pid, show_offset=True))
+            print("%s" % self.probe.bpf.sym(addr, pid, show_offset=True).decode())
         else:
-            print("%s" % self.probe.bpf.sym(addr, pid))
+            print("%s" % self.probe.bpf.sym(addr, pid).decode())
 
     @staticmethod
     def _signal_ignore(signal, frame):

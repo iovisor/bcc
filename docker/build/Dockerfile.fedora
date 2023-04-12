@@ -1,0 +1,73 @@
+# Copyright (c) PLUMgrid, Inc.
+# Licensed under the Apache License, Version 2.0 (the "License")
+
+ARG VERSION="34"
+FROM fedora:${VERSION}
+
+ARG RUBY_INSTALL_VERSION="0.8.4"
+ENV RUBY_INSTALL_VERSION=$RUBY_INSTALL_VERSION
+
+ARG RUBY_VERSION="3.1.2"
+ENV RUBY_VERSION=$RUBY_VERSION
+
+MAINTAINER Dave Marchevsky <davemarchevsky@fb.com>
+
+RUN dnf -y install \
+	bison \
+	cmake \
+	flex \
+	gcc \
+	gcc-c++ \
+	git \
+	libxml2-devel \
+	make \
+	rpm-build \
+	wget \
+	zlib-devel \
+	llvm \
+	llvm-devel \
+	clang-devel \
+	elfutils-debuginfod-client-devel \
+#	elfutils-libelf-devel-static \
+	elfutils-libelf-devel \
+	luajit \
+	luajit-devel \
+	python3-devel \
+	libstdc++ \
+	libstdc++-devel \
+	systemtap-sdt-devel
+
+RUN dnf -y install \
+	python3 \
+	python3-pip
+
+RUN dnf -y install \
+       rust \
+       cargo
+
+RUN if [[ ! -e /usr/bin/python && -e /usr/bin/python3 ]]; then \
+        ln -s $(readlink /usr/bin/python3) /usr/bin/python; \
+    fi
+
+RUN dnf -y install \
+	procps \
+	iputils \
+	net-tools \
+	hostname \
+	iproute \
+	bpftool \
+	iperf \
+	netperf
+
+RUN pip3 install pyroute2==0.5.18 netaddr==0.8.0 dnslib==0.9.14 cachetools==3.1.1
+
+RUN wget -O ruby-install-${RUBY_INSTALL_VERSION}.tar.gz \
+         https://github.com/postmodern/ruby-install/archive/v${RUBY_INSTALL_VERSION}.tar.gz && \
+    tar -xzvf ruby-install-${RUBY_INSTALL_VERSION}.tar.gz && \
+    cd ruby-install-${RUBY_INSTALL_VERSION}/ && \
+    make install && \
+    cd .. && \
+    rm -rf ruby-install-${RUBY_INSTALL_VERSION}*
+
+RUN ruby-install --system ruby ${RUBY_VERSION} -c -- --enable-dtrace
+

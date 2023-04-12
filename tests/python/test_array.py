@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
@@ -12,8 +12,8 @@ from unittest import main, TestCase
 
 class TestArray(TestCase):
     def test_simple(self):
-        b = BPF(text="""BPF_ARRAY(table1, u64, 128);""")
-        t1 = b["table1"]
+        b = BPF(text=b"""BPF_ARRAY(table1, u64, 128);""")
+        t1 = b[b"table1"]
         t1[ct.c_int(0)] = ct.c_ulonglong(100)
         t1[ct.c_int(127)] = ct.c_ulonglong(1000)
         for i, v in t1.items():
@@ -24,8 +24,8 @@ class TestArray(TestCase):
         self.assertEqual(len(t1), 128)
 
     def test_native_type(self):
-        b = BPF(text="""BPF_ARRAY(table1, u64, 128);""")
-        t1 = b["table1"]
+        b = BPF(text=b"""BPF_ARRAY(table1, u64, 128);""")
+        t1 = b[b"table1"]
         t1[0] = ct.c_ulonglong(100)
         t1[-2] = ct.c_ulonglong(37)
         t1[127] = ct.c_ulonglong(1000)
@@ -52,7 +52,7 @@ class TestArray(TestCase):
         def lost_cb(lost):
             self.assertGreater(lost, 0)
 
-        text = """
+        text = b"""
 BPF_PERF_OUTPUT(events);
 int do_sys_nanosleep(void *ctx) {
     struct {
@@ -63,11 +63,11 @@ int do_sys_nanosleep(void *ctx) {
 }
 """
         b = BPF(text=text)
-        b.attach_kprobe(event=b.get_syscall_fnname("nanosleep"),
-                        fn_name="do_sys_nanosleep")
-        b.attach_kprobe(event=b.get_syscall_fnname("clock_nanosleep"),
-                        fn_name="do_sys_nanosleep")
-        b["events"].open_perf_buffer(cb, lost_cb=lost_cb)
+        b.attach_kprobe(event=b.get_syscall_fnname(b"nanosleep"),
+                        fn_name=b"do_sys_nanosleep")
+        b.attach_kprobe(event=b.get_syscall_fnname(b"clock_nanosleep"),
+                        fn_name=b"do_sys_nanosleep")
+        b[b"events"].open_perf_buffer(cb, lost_cb=lost_cb)
         subprocess.call(['sleep', '0.1'])
         b.perf_buffer_poll()
         self.assertGreater(self.counter, 0)
@@ -87,7 +87,7 @@ int do_sys_nanosleep(void *ctx) {
         def lost_cb(lost):
             self.assertGreater(lost, 0)
 
-        text = """
+        text = b"""
 BPF_PERF_OUTPUT(events);
 int do_sys_nanosleep(void *ctx) {
     struct {
@@ -98,11 +98,11 @@ int do_sys_nanosleep(void *ctx) {
 }
 """
         b = BPF(text=text)
-        b.attach_kprobe(event=b.get_syscall_fnname("nanosleep"),
-                        fn_name="do_sys_nanosleep")
-        b.attach_kprobe(event=b.get_syscall_fnname("clock_nanosleep"),
-                        fn_name="do_sys_nanosleep")
-        b["events"].open_perf_buffer(cb, lost_cb=lost_cb)
+        b.attach_kprobe(event=b.get_syscall_fnname(b"nanosleep"),
+                        fn_name=b"do_sys_nanosleep")
+        b.attach_kprobe(event=b.get_syscall_fnname(b"clock_nanosleep"),
+                        fn_name=b"do_sys_nanosleep")
+        b[b"events"].open_perf_buffer(cb, lost_cb=lost_cb)
         online_cpus = get_online_cpus()
         for cpu in online_cpus:
             subprocess.call(['taskset', '-c', str(cpu), 'sleep', '0.1'])

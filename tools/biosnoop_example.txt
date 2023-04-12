@@ -64,14 +64,18 @@ TIME(s)     COMM           PID    DISK    T SECTOR     BYTES  QUE(ms) LAT(ms)
 
 USAGE message:
 
-usage: biosnoop.py [-h] [-Q]
+usage: biosnoop.py [-h] [-Q] [-d DISK] [-P]
 
 Trace block I/O
 
 optional arguments:
-  -h, --help   show this help message and exit
-  -Q, --queue  include OS queued time
+  -h, --help            show this help message and exit
+  -Q, --queue           include OS queued time
+  -d DISK, --disk DISK  trace this disk only
+  -P, --pattern         display block I/O pattern (sequential or random)
 
 examples:
     ./biosnoop           # trace all block I/O
     ./biosnoop -Q        # include OS queued time
+    ./biosnoop -d sdc    # trace sdc only
+    ./biosnoop -P        # display block I/O pattern

@@ -31,7 +31,7 @@ const char argp_program_doc[] =
 "USAGE: readahead [--help] [-d DURATION]\n"
 "\n"
 "EXAMPLES:\n"
-"    readahead              # summarize on-CPU time as a histogram"
+"    readahead              # summarize on-CPU time as a histogram\n"
 "    readahead -d 10        # trace for 10 seconds only\n";
 
 static const struct argp_option opts[] = {
@@ -64,8 +64,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	return 0;
 }
 
-int libbpf_print_fn(enum libbpf_print_level level,
-		    const char *format, va_list args)
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
 	if (level == LIBBPF_DEBUG && !env.verbose)
 		return 0;
@@ -111,12 +110,6 @@ int main(int argc, char **argv)
 		return err;
 
 	libbpf_set_print(libbpf_print_fn);
-
-	err = bump_memlock_rlimit();
-	if (err) {
-		fprintf(stderr, "failed to increase rlimit: %d\n", err);
-		return 1;
-	}
 
 	obj = readahead_bpf__open();
 	if (!obj) {

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
@@ -10,8 +10,8 @@ import multiprocessing
 
 class TestLru(unittest.TestCase):
     def test_lru_hash(self):
-        b = BPF(text="""BPF_TABLE("lru_hash", int, u64, lru, 1024);""")
-        t = b["lru"]
+        b = BPF(text=b"""BPF_TABLE("lru_hash", int, u64, lru, 1024);""")
+        t = b[b"lru"]
         for i in range(1, 1032):
             t[ct.c_int(i)] = ct.c_ulonglong(i)
         for i, v in t.items():
@@ -21,7 +21,7 @@ class TestLru(unittest.TestCase):
         self.assertLess(len(t), 1024);
 
     def test_lru_percpu_hash(self):
-        test_prog1 = """
+        test_prog1 = b"""
         BPF_TABLE("lru_percpu_hash", u32, u32, stats, 1);
         int hello_world(void *ctx) {
             u32 key=0;
@@ -34,9 +34,9 @@ class TestLru(unittest.TestCase):
         }
         """
         b = BPF(text=test_prog1)
-        stats_map = b.get_table("stats")
-        event_name = b.get_syscall_fnname("clone")
-        b.attach_kprobe(event=event_name, fn_name="hello_world")
+        stats_map = b.get_table(b"stats")
+        event_name = b.get_syscall_fnname(b"clone")
+        b.attach_kprobe(event=event_name, fn_name=b"hello_world")
         ini = stats_map.Leaf()
         for i in range(0, multiprocessing.cpu_count()):
             ini[i] = 0

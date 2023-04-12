@@ -109,8 +109,9 @@ UID   PCOMM            PID    PPID   RET ARGS
 USAGE message:
 
 # ./execsnoop -h
-usage: execsnoop.py [-h] [-T] [-t] [-x] [--cgroupmap CGROUPMAP] [-u USER] [-q]
-                    [-n NAME] [-l LINE] [-U] [--max-args MAX_ARGS]
+usage: execsnoop.py [-h] [-T] [-t] [-x] [--cgroupmap CGROUPMAP]
+                    [--mntnsmap MNTNSMAP] [-u USER] [-q] [-n NAME] [-l LINE]
+                    [-U] [--max-args MAX_ARGS] [-P PPID]
 
 Trace exec() syscalls
 
@@ -131,17 +132,19 @@ optional arguments:
   -U, --print-uid       print UID column
   --max-args MAX_ARGS   maximum number of arguments parsed and displayed,
                         defaults to 20
+  -P PPID, --ppid PPID  trace this parent PID only
 
 examples:
-    ./execsnoop           # trace all exec() syscalls
-    ./execsnoop -x        # include failed exec()s
-    ./execsnoop -T        # include time (HH:MM:SS)
-    ./execsnoop -U        # include UID
-    ./execsnoop -u 1000   # only trace UID 1000
-    ./execsnoop -u root   # get root UID and trace only this
-    ./execsnoop -t        # include timestamps
-    ./execsnoop -q        # add "quotemarks" around arguments
-    ./execsnoop -n main   # only print command lines containing "main"
-    ./execsnoop -l tpkg   # only print command where arguments contains "tpkg"
+    ./execsnoop                      # trace all exec() syscalls
+    ./execsnoop -x                   # include failed exec()s
+    ./execsnoop -T                   # include time (HH:MM:SS)
+    ./execsnoop -P 181               # only trace new processes whose parent PID is 181
+    ./execsnoop -U                   # include UID
+    ./execsnoop -u 1000              # only trace UID 1000
+    ./execsnoop -u user              # get user UID and trace only them
+    ./execsnoop -t                   # include timestamps
+    ./execsnoop -q                   # add "quotemarks" around arguments
+    ./execsnoop -n main              # only print command lines containing "main"
+    ./execsnoop -l tpkg              # only print command where arguments contains "tpkg"
     ./execsnoop --cgroupmap mappath  # only trace cgroups in this BPF map
     ./execsnoop --mntnsmap mappath   # only trace mount namespaces in the map

@@ -40,7 +40,7 @@ class StringRef;
 namespace ebpf {
 
 class BFrontendAction;
-class FuncSource;
+class ProgFuncInfo;
 
 // Traces maps with external pointers as values.
 class MapVisitor : public clang::RecursiveASTVisitor<MapVisitor> {
@@ -90,7 +90,7 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
   std::vector<clang::ParmVarDecl *> fn_args_;
   std::set<clang::Expr *> visited_;
   std::string current_fn_;
-  bool has_overlap_kuaddr_;
+  bool cannot_fall_back_safely;
 };
 
 // Do a depth-first search to rewrite all pointers that need to be probed
@@ -130,7 +130,7 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   std::list<int> ptregs_returned_;
   const clang::Stmt *addrof_stmt_;
   bool is_addrof_;
-  bool has_overlap_kuaddr_;
+  bool cannot_fall_back_safely;
 };
 
 // A helper class to the frontend action, walks the decls
@@ -156,9 +156,8 @@ class BFrontendAction : public clang::ASTFrontendAction {
   // should be written.
   BFrontendAction(llvm::raw_ostream &os, unsigned flags, TableStorage &ts,
                   const std::string &id, const std::string &main_path,
-                  FuncSource &func_src, std::string &mod_src,
-                  const std::string &maps_ns,
-                  fake_fd_map_def &fake_fd_map,
+                  ProgFuncInfo &prog_func_info, std::string &mod_src,
+                  const std::string &maps_ns, fake_fd_map_def &fake_fd_map,
                   std::map<std::string, std::vector<std::string>> &perf_events);
 
   // Called by clang when the AST has been completed, here the output stream
@@ -192,7 +191,7 @@ class BFrontendAction : public clang::ASTFrontendAction {
   friend class BTypeVisitor;
   std::map<std::string, clang::SourceRange> func_range_;
   const std::string &main_path_;
-  FuncSource &func_src_;
+  ProgFuncInfo &prog_func_info_;
   std::string &mod_src_;
   std::set<clang::Decl *> m_;
   int next_fake_fd_;

@@ -7,15 +7,24 @@
 #include "runqlat.h"
 #include "bits.bpf.h"
 #include "maps.bpf.h"
+#include "core_fixes.bpf.h"
 
 #define MAX_ENTRIES	10240
 #define TASK_RUNNING 	0
 
+const volatile bool filter_cg = false;
 const volatile bool targ_per_process = false;
 const volatile bool targ_per_thread = false;
 const volatile bool targ_per_pidns = false;
 const volatile bool targ_ms = false;
 const volatile pid_t targ_tgid = 0;
+
+struct {
+	__uint(type, BPF_MAP_TYPE_CGROUP_ARRAY);
+	__type(key, u32);
+	__type(value, u32);
+	__uint(max_entries, 1);
+} cgroup_map SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
@@ -33,8 +42,7 @@ struct {
 	__type(value, struct hist);
 } hists SEC(".maps");
 
-static __always_inline
-int trace_enqueue(u32 tgid, u32 pid)
+static int trace_enqueue(u32 tgid, u32 pid)
 {
 	u64 ts;
 
@@ -44,35 +52,42 @@ int trace_enqueue(u32 tgid, u32 pid)
 		return 0;
 
 	ts = bpf_ktime_get_ns();
-	bpf_map_update_elem(&start, &pid, &ts, 0);
+	bpf_map_update_elem(&start, &pid, &ts, BPF_ANY);
 	return 0;
 }
 
-SEC("tp_btf/sched_wakeup")
-int BPF_PROG(sched_wakeup, struct task_struct *p)
+static unsigned int pid_namespace(struct task_struct *task)
 {
-	return trace_enqueue(p->tgid, p->pid);
+	struct pid *pid;
+	unsigned int level;
+	struct upid upid;
+	unsigned int inum;
+
+	/*  get the pid namespace by following task_active_pid_ns(),
+	 *  pid->numbers[pid->level].ns
+	 */
+	pid = BPF_CORE_READ(task, thread_pid);
+	level = BPF_CORE_READ(pid, level);
+	bpf_core_read(&upid, sizeof(upid), &pid->numbers[level]);
+	inum = BPF_CORE_READ(upid.ns, ns.inum);
+
+	return inum;
 }
 
-SEC("tp_btf/sched_wakeup_new")
-int BPF_PROG(sched_wakeup_new, struct task_struct *p)
-{
-	return trace_enqueue(p->tgid, p->pid);
-}
-
-SEC("tp_btf/sched_switch")
-int BPF_PROG(sched_swith, bool preempt, struct task_struct *prev,
-	struct task_struct *next)
+static int handle_switch(bool preempt, struct task_struct *prev, struct task_struct *next)
 {
 	struct hist *histp;
 	u64 *tsp, slot;
 	u32 pid, hkey;
 	s64 delta;
 
-	if (prev->state == TASK_RUNNING)
-		trace_enqueue(prev->tgid, prev->pid);
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
 
-	pid = next->pid;
+	if (get_task_state(prev) == TASK_RUNNING)
+		trace_enqueue(BPF_CORE_READ(prev, tgid), BPF_CORE_READ(prev, pid));
+
+	pid = BPF_CORE_READ(next, pid);
 
 	tsp = bpf_map_lookup_elem(&start, &pid);
 	if (!tsp)
@@ -82,11 +97,11 @@ int BPF_PROG(sched_swith, bool preempt, struct task_struct *prev,
 		goto cleanup;
 
 	if (targ_per_process)
-		hkey = next->tgid;
+		hkey = BPF_CORE_READ(next, tgid);
 	else if (targ_per_thread)
 		hkey = pid;
 	else if (targ_per_pidns)
-		hkey = next->nsproxy->pid_ns_for_children->ns.inum;
+		hkey = pid_namespace(next);
 	else
 		hkey = -1;
 	histp = bpf_map_lookup_or_try_init(&hists, &hkey, &zero);
@@ -107,6 +122,54 @@ int BPF_PROG(sched_swith, bool preempt, struct task_struct *prev,
 cleanup:
 	bpf_map_delete_elem(&start, &pid);
 	return 0;
+}
+
+SEC("tp_btf/sched_wakeup")
+int BPF_PROG(sched_wakeup, struct task_struct *p)
+{
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
+
+	return trace_enqueue(p->tgid, p->pid);
+}
+
+SEC("tp_btf/sched_wakeup_new")
+int BPF_PROG(sched_wakeup_new, struct task_struct *p)
+{
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
+
+	return trace_enqueue(p->tgid, p->pid);
+}
+
+SEC("tp_btf/sched_switch")
+int BPF_PROG(sched_switch, bool preempt, struct task_struct *prev, struct task_struct *next)
+{
+	return handle_switch(preempt, prev, next);
+}
+
+SEC("raw_tp/sched_wakeup")
+int BPF_PROG(handle_sched_wakeup, struct task_struct *p)
+{
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
+
+	return trace_enqueue(BPF_CORE_READ(p, tgid), BPF_CORE_READ(p, pid));
+}
+
+SEC("raw_tp/sched_wakeup_new")
+int BPF_PROG(handle_sched_wakeup_new, struct task_struct *p)
+{
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
+
+	return trace_enqueue(BPF_CORE_READ(p, tgid), BPF_CORE_READ(p, pid));
+}
+
+SEC("raw_tp/sched_switch")
+int BPF_PROG(handle_sched_switch, bool preempt, struct task_struct *prev, struct task_struct *next)
+{
+	return handle_switch(preempt, prev, next);
 }
 
 char LICENSE[] SEC("license") = "GPL";

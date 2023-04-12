@@ -24,6 +24,7 @@ struct sym {
 	const char *name;
 	unsigned long start;
 	unsigned long size;
+	unsigned long offset;
 };
 
 struct syms;
@@ -32,6 +33,8 @@ struct syms *syms__load_pid(int tgid);
 struct syms *syms__load_file(const char *fname);
 void syms__free(struct syms *syms);
 const struct sym *syms__map_addr(const struct syms *syms, unsigned long addr);
+const struct sym *syms__map_addr_dso(const struct syms *syms, unsigned long addr,
+				     char **dso_name, unsigned long *dso_offset);
 
 struct syms_cache;
 
@@ -58,7 +61,6 @@ void print_linear_hist(unsigned int *vals, int vals_size, unsigned int base,
 		unsigned int step, const char *val_type);
 
 unsigned long long get_ktime_ns(void);
-int bump_memlock_rlimit(void);
 
 bool is_kernel_module(const char *name);
 
@@ -78,7 +80,7 @@ bool is_kernel_module(const char *name);
  * *mod* is a hint that indicates the *name* may reside in module BTF,
  * if NULL, it means *name* belongs to vmlinux.
  */
-bool fentry_exists(const char *name, const char *mod);
+bool fentry_can_attach(const char *name, const char *mod);
 
 /*
  * The name of a kernel function to be attached to may be changed between
@@ -91,8 +93,12 @@ bool fentry_exists(const char *name, const char *mod);
  * which is slower.
  */
 bool kprobe_exists(const char *name);
+bool tracepoint_exists(const char *category, const char *event);
 
 bool vmlinux_btf_exists(void);
 bool module_btf_exists(const char *mod);
+
+bool probe_tp_btf(const char *name);
+bool probe_ringbuf();
 
 #endif /* __TRACE_HELPERS_H */

@@ -19,6 +19,8 @@
  * data should be collected.
  */
 #define FUNC_MAX_STACK_DEPTH	16
+/* used to convince verifier we do not stray outside of array bounds */
+#define FUNC_STACK_DEPTH_MASK	(FUNC_MAX_STACK_DEPTH - 1)
 
 #ifndef ENOSPC
 #define ENOSPC			28
@@ -99,7 +101,9 @@ static struct trace *get_trace(struct pt_regs *ctx, bool entry)
 		    last_stack_depth < FUNC_MAX_STACK_DEPTH)
 			last_ip = func_stack->ips[last_stack_depth];
 		/* push ip onto stack. return will pop it. */
-		func_stack->ips[stack_depth++] = ip;
+		func_stack->ips[stack_depth] = ip;
+		/* mask used in case bounds checks are optimized out */
+		stack_depth = (stack_depth + 1) & FUNC_STACK_DEPTH_MASK;
 		func_stack->stack_depth = stack_depth;
 		/* rather than zero stack entries on popping, we zero the
 		 * (stack_depth + 1)'th entry when pushing the current
@@ -118,8 +122,13 @@ static struct trace *get_trace(struct pt_regs *ctx, bool entry)
 		if (last_stack_depth >= 0 &&
 		    last_stack_depth < FUNC_MAX_STACK_DEPTH)
 			last_ip = func_stack->ips[last_stack_depth];
-		if (stack_depth > 0)
-			stack_depth = stack_depth - 1;
+		if (stack_depth > 0) {
+			/* logical OR convinces verifier that we don't
+			 * end up with a < 0 value, translating to 0xff
+			 * and an outside of map element access.
+			 */
+			stack_depth = (stack_depth - 1) & FUNC_STACK_DEPTH_MASK;
+		}
 		/* retrieve ip from stack as IP in pt_regs is
 		 * bpf kretprobe trampoline address.
 		 */
@@ -221,15 +230,13 @@ static void output_stashed_traces(struct pt_regs *ctx,
 {
 	struct func_stack *func_stack;
 	struct trace *trace = NULL;
-	__u8 stack_depth, i;
+	__u8 i;
 	__u64 task = 0;
 
 	task = bpf_get_current_task();
 	func_stack = bpf_map_lookup_elem(&ksnoop_func_stack, &task);
 	if (!func_stack)
 		return;
-
-	stack_depth = func_stack->stack_depth;
 
 	if (entry) {
 		/* iterate from bottom to top of stack, outputting stashed
@@ -294,9 +301,7 @@ static int ksnoop(struct pt_regs *ctx, bool entry)
 {
 	void *data_ptr = NULL;
 	struct trace *trace;
-	struct func *func;
-	__u16 trace_len;
-	__u64 data, pg;
+	__u64 data;
 	__u32 currpid;
 	int ret;
 	__u8 i;
@@ -304,8 +309,6 @@ static int ksnoop(struct pt_regs *ctx, bool entry)
 	trace = get_trace(ctx, entry);
 	if (!trace)
 		return 0;
-
-	func = &trace->func;
 
 	/* make sure we want events from this pid */
 	currpid = bpf_get_current_pid_tgid();
@@ -354,11 +357,9 @@ static int ksnoop(struct pt_regs *ctx, bool entry)
 			if (currtrace->flags & KSNOOP_F_PTR) {
 				void *dataptr = (void *)data;
 
-				ret = bpf_probe_read(&data, sizeof(data),
-						     dataptr);
+				ret = bpf_probe_read_kernel(&data, sizeof(data), dataptr);
 				if (ret) {
-					currdata->err_type_id =
-						currtrace->type_id;
+					currdata->err_type_id = currtrace->type_id;
 					currdata->err = ret;
 					continue;
 				}
@@ -366,9 +367,7 @@ static int ksnoop(struct pt_regs *ctx, bool entry)
 			} else if (currtrace->size <=
 				   sizeof(currdata->raw_value)) {
 				/* read member value for predicate comparison */
-				bpf_probe_read(&currdata->raw_value,
-					       currtrace->size,
-					       (void*)data);
+				bpf_probe_read_kernel(&currdata->raw_value, currtrace->size, (void*)data);
 			}
 		} else {
 			currdata->raw_value = data;
@@ -399,7 +398,7 @@ static int ksnoop(struct pt_regs *ctx, bool entry)
 			if (!ok) {
 				clear_trace(trace);
 				return 0;
-			}	
+			}
 		}
 
 		if (currtrace->flags & (KSNOOP_F_PTR | KSNOOP_F_MEMBER))
@@ -421,7 +420,7 @@ static int ksnoop(struct pt_regs *ctx, bool entry)
 		tracesize = currtrace->size;
 		if (tracesize > MAX_TRACE_DATA)
 			tracesize = MAX_TRACE_DATA;
-		ret = bpf_probe_read(buf_offset, tracesize, data_ptr);
+		ret = bpf_probe_read_kernel(buf_offset, tracesize, data_ptr);
 		if (ret < 0) {
 			currdata->err_type_id = currtrace->type_id;
 			currdata->err = ret;
@@ -443,13 +442,13 @@ static int ksnoop(struct pt_regs *ctx, bool entry)
 }
 
 SEC("kprobe/foo")
-int kprobe_entry(struct pt_regs *ctx)
+int BPF_KPROBE(kprobe_entry)
 {
 	return ksnoop(ctx, true);
 }
 
 SEC("kretprobe/foo")
-int kprobe_return(struct pt_regs *ctx)
+int BPF_KRETPROBE(kprobe_return)
 {
 	return ksnoop(ctx, false);
 }

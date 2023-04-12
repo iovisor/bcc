@@ -2,7 +2,7 @@
 .SH NAME
 cpudist \- On- and off-CPU task time as a histogram.
 .SH SYNOPSIS
-.B cpudist [\-h] [-O] [\-T] [\-m] [\-P] [\-L] [\-p PID] [interval] [count]
+.B cpudist [\-h] [-O] [\-T] [\-m] [\-P] [\-L] [\-p PID] [\-I] [\-e] [interval] [count]
 .SH DESCRIPTION
 This measures the time a task spends on the CPU before being descheduled, and
 shows the times as a histogram. Tasks that spend a very short time on the CPU
@@ -14,6 +14,8 @@ Similarly, the tool can also measure the time a task spends off-CPU before it
 is scheduled again. This can be helpful in identifying long blocking and I/O
 operations, or alternatively very short descheduling times due to short-lived
 locks or timers.
+
+By default CPU idle time are excluded by simply excluding PID 0.
 
 This tool uses in-kernel eBPF maps for storing timestamps and the histogram,
 for efficiency. Despite this, the overhead of this tool may become significant
@@ -45,6 +47,12 @@ Print a histogram for each TID (pid from the kernel's perspective).
 \-p PID
 Only show this PID (filtered in kernel for efficiency).
 .TP
+\-I
+Include CPU idle time (by default these are excluded).
+.TP
+\-e
+Show extension summary (average/total/count).
+.TP
 interval
 Output interval, in seconds.
 .TP
@@ -58,7 +66,7 @@ Summarize task on-CPU time as a histogram:
 .TP
 Summarize task off-CPU time as a histogram:
 #
-.B cpudist -O
+.B cpudist \-O
 .TP
 Print 1 second summaries, 10 times:
 #
@@ -68,9 +76,17 @@ Print 1 second summaries, using milliseconds as units for the histogram, and inc
 #
 .B cpudist \-mT 1
 .TP
-Trace PID 186 only, 1 second summaries:
+Trace PID 185 only, 1 second summaries:
 #
-.B cpudist -P 185 1
+.B cpudist \-p 185 1
+.TP
+Include CPU idle time:
+#
+.B cpudist \-I
+.TP
+Also show extension summary:
+#
+.B cpudist \-e
 .SH FIELDS
 .TP
 usecs
@@ -102,6 +118,6 @@ Linux
 .SH STABILITY
 Unstable - in development.
 .SH AUTHOR
-Sasha Goldshtein
+Sasha Goldshtein, Rocky Xing
 .SH SEE ALSO
 pidstat(1), runqlat(8)

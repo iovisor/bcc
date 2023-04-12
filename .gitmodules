@@ -1,3 +1,9 @@
 [submodule "src/cc/libbpf"]
 	path = src/cc/libbpf
 	url = https://github.com/libbpf/libbpf.git
+[submodule "libbpf-tools/bpftool"]
+	path = libbpf-tools/bpftool
+	url = https://github.com/libbpf/bpftool
+[submodule "libbpf-tools/blazesym"]
+	path = libbpf-tools/blazesym
+	url = https://github.com/libbpf/blazesym

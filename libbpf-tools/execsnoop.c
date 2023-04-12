@@ -1,21 +1,26 @@
 // Based on execsnoop(8) from BCC by Brendan Gregg and others.
 //
 #include <argp.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 #include "execsnoop.h"
 #include "execsnoop.skel.h"
+#include "btf_helpers.h"
 #include "trace_helpers.h"
 
 #define PERF_BUFFER_PAGES   64
-#define NSEC_PRECISION (NSEC_PER_SEC / 1000)
+#define PERF_POLL_TIMEOUT_MS	100
 #define MAX_ARGS_KEY 259
+
+static volatile sig_atomic_t exiting = 0;
 
 static struct env {
 	bool time;
@@ -28,6 +33,8 @@ static struct env {
 	bool print_uid;
 	bool verbose;
 	int max_args;
+	char *cgroupspath;
+	bool cg;
 } env = {
 	.max_args = DEFAULT_MAXARGS,
 	.uid = INVALID_UID
@@ -41,7 +48,7 @@ const char *argp_program_bug_address =
 const char argp_program_doc[] =
 "Trace exec syscalls\n"
 "\n"
-"USAGE: execsnoop [-h] [-T] [-t] [-x] [-u UID] [-q] [-n NAME] [-l LINE] [-U]\n"
+"USAGE: execsnoop [-h] [-T] [-t] [-x] [-u UID] [-q] [-n NAME] [-l LINE] [-U] [-c CG]\n"
 "                 [--max-args MAX_ARGS]\n"
 "\n"
 "EXAMPLES:\n"
@@ -53,7 +60,8 @@ const char argp_program_doc[] =
 "   ./execsnoop -t        # include timestamps\n"
 "   ./execsnoop -q        # add \"quotemarks\" around arguments\n"
 "   ./execsnoop -n main   # only print command lines containing \"main\"\n"
-"   ./execsnoop -l tpkg   # only print command where arguments contains \"tpkg\"";
+"   ./execsnoop -l tpkg   # only print command where arguments contains \"tpkg\""
+"   ./execsnoop -c CG     # Trace process under cgroupsPath CG\n";
 
 static const struct argp_option opts[] = {
 	{ "time", 'T', NULL, 0, "include time column on output (HH:MM:SS)" },
@@ -67,6 +75,7 @@ static const struct argp_option opts[] = {
 	{ "max-args", MAX_ARGS_KEY, "MAX_ARGS", 0,
 		"maximum number of arguments parsed and displayed, defaults to 20" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
+	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path"},
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
@@ -87,6 +96,10 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'x':
 		env.fails = true;
+		break;
+	case 'c':
+		env.cgroupspath = arg;
+		env.cg = true;
 		break;
 	case 'u':
 		errno = 0;
@@ -129,12 +142,16 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	return 0;
 }
 
-static int libbpf_print_fn(enum libbpf_print_level level,
-			   const char *format, va_list args)
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
 	if (level == LIBBPF_DEBUG && !env.verbose)
 		return 0;
 	return vfprintf(stderr, format, args);
+}
+
+static void sig_int(int signo)
+{
+	exiting = 1;
 }
 
 static void time_since_start()
@@ -250,15 +267,17 @@ static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 
 int main(int argc, char **argv)
 {
+	LIBBPF_OPTS(bpf_object_open_opts, open_opts);
 	static const struct argp argp = {
 		.options = opts,
 		.parser = parse_arg,
 		.doc = argp_program_doc,
 	};
-	struct perf_buffer_opts pb_opts;
 	struct perf_buffer *pb = NULL;
 	struct execsnoop_bpf *obj;
 	int err;
+	int idx, cg_map_fd;
+	int cgfd = -1;
 
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
 	if (err)
@@ -266,13 +285,13 @@ int main(int argc, char **argv)
 
 	libbpf_set_print(libbpf_print_fn);
 
-	err = bump_memlock_rlimit();
+	err = ensure_core_btf(&open_opts);
 	if (err) {
-		fprintf(stderr, "failed to increase rlimit: %d\n", err);
+		fprintf(stderr, "failed to fetch necessary BTF for CO-RE: %s\n", strerror(-err));
 		return 1;
 	}
 
-	obj = execsnoop_bpf__open();
+	obj = execsnoop_bpf__open_opts(&open_opts);
 	if (!obj) {
 		fprintf(stderr, "failed to open BPF object\n");
 		return 1;
@@ -282,11 +301,27 @@ int main(int argc, char **argv)
 	obj->rodata->ignore_failed = !env.fails;
 	obj->rodata->targ_uid = env.uid;
 	obj->rodata->max_args = env.max_args;
+	obj->rodata->filter_cg = env.cg;
 
 	err = execsnoop_bpf__load(obj);
 	if (err) {
 		fprintf(stderr, "failed to load BPF object: %d\n", err);
 		goto cleanup;
+	}
+
+	/* update cgroup path fd to map */
+	if (env.cg) {
+		idx = 0;
+		cg_map_fd = bpf_map__fd(obj->maps.cgroup_map);
+		cgfd = open(env.cgroupspath, O_RDONLY);
+		if (cgfd < 0) {
+			fprintf(stderr, "Failed opening Cgroup path: %s", env.cgroupspath);
+			goto cleanup;
+		}
+		if (bpf_map_update_elem(cg_map_fd, &idx, &cgfd, BPF_ANY)) {
+			fprintf(stderr, "Failed adding target cgroup to map");
+			goto cleanup;
+		}
 	}
 
 	clock_gettime(CLOCK_MONOTONIC, &start_time);
@@ -309,24 +344,37 @@ int main(int argc, char **argv)
 	printf("%-16s %-6s %-6s %3s %s\n", "PCOMM", "PID", "PPID", "RET", "ARGS");
 
 	/* setup event callbacks */
-	pb_opts.sample_cb = handle_event;
-	pb_opts.lost_cb = handle_lost_events;
-	pb = perf_buffer__new(bpf_map__fd(obj->maps.events), PERF_BUFFER_PAGES, &pb_opts);
-	err = libbpf_get_error(pb);
-	if (err) {
-		pb = NULL;
+	pb = perf_buffer__new(bpf_map__fd(obj->maps.events), PERF_BUFFER_PAGES,
+			      handle_event, handle_lost_events, NULL, NULL);
+	if (!pb) {
+		err = -errno;
 		fprintf(stderr, "failed to open perf buffer: %d\n", err);
 		goto cleanup;
 	}
 
+	if (signal(SIGINT, sig_int) == SIG_ERR) {
+		fprintf(stderr, "can't set signal handler: %s\n", strerror(errno));
+		err = 1;
+		goto cleanup;
+	}
+
 	/* main: poll */
-	while ((err = perf_buffer__poll(pb, 100)) >= 0)
-		;
-	printf("Error polling perf buffer: %d\n", err);
+	while (!exiting) {
+		err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS);
+		if (err < 0 && err != -EINTR) {
+			fprintf(stderr, "error polling perf buffer: %s\n", strerror(-err));
+			goto cleanup;
+		}
+		/* reset err to return 0 if exiting */
+		err = 0;
+	}
 
 cleanup:
 	perf_buffer__free(pb);
 	execsnoop_bpf__destroy(obj);
+	cleanup_core_btf(&open_opts);
+	if (cgfd > 0)
+		close(cgfd);
 
 	return err != 0;
 }

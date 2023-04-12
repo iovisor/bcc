@@ -2,7 +2,7 @@
 .SH NAME
 tcprtt \- Trace TCP RTT of established connections. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B tcprtt [\-h] [\-T] [\-D] [\-m] [\-i INTERVAL] [\-d DURATION] [\-b] [\-B] [\-e] [\-4 | \-6]
+.B tcprtt [\-h] [\-T] [\-D] [\-m] [\-p LPORT] [\-P RPORT] [\-a LADDR] [\-A RADDR] [\-i INTERVAL] [\-d DURATION] [\-b] [\-B] [\-e] [\-4 | \-6]
 .SH DESCRIPTION
 This tool traces established connections RTT(round-trip time) to analyze the
 quality of network. This can be useful for general troubleshooting to

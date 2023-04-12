@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # biolatpcts.py  Monitor IO latency distribution of a block device.
 #
@@ -56,25 +56,28 @@ parser.add_argument('--verbose', '-v', action='count', default = 0)
 bpf_source = """
 #include <linux/blk_types.h>
 #include <linux/blkdev.h>
+#include <linux/blk-mq.h>
 #include <linux/time64.h>
 
 BPF_PERCPU_ARRAY(rwdf_100ms, u64, 400);
 BPF_PERCPU_ARRAY(rwdf_1ms, u64, 400);
 BPF_PERCPU_ARRAY(rwdf_10us, u64, 400);
 
-void kprobe_blk_account_io_done(struct pt_regs *ctx, struct request *rq, u64 now)
+RAW_TRACEPOINT_PROBE(block_rq_complete)
 {
+        // TP_PROTO(struct request *rq, blk_status_t error, unsigned int nr_bytes)
+        struct request *rq = (void *)ctx->args[0];
         unsigned int cmd_flags;
         u64 dur;
         size_t base, slot;
 
         if (!rq->__START_TIME_FIELD__)
-                return;
+                return 0;
 
-        if (!rq->rq_disk ||
-            rq->rq_disk->major != __MAJOR__ ||
-            rq->rq_disk->first_minor != __MINOR__)
-                return;
+        if (!rq->__RQ_DISK__ ||
+            rq->__RQ_DISK__->major != __MAJOR__ ||
+            rq->__RQ_DISK__->first_minor != __MINOR__)
+                return 0;
 
         cmd_flags = rq->cmd_flags;
         switch (cmd_flags & REQ_OP_MASK) {
@@ -91,23 +94,24 @@ void kprobe_blk_account_io_done(struct pt_regs *ctx, struct request *rq, u64 now
                 base = 300;
                 break;
         default:
-                return;
+                return 0;
         }
 
-        dur = now - rq->__START_TIME_FIELD__;
+        dur = bpf_ktime_get_ns() - rq->__START_TIME_FIELD__;
 
         slot = min_t(size_t, div_u64(dur, 100 * NSEC_PER_MSEC), 99);
         rwdf_100ms.increment(base + slot);
         if (slot)
-                return;
+                return 0;
 
         slot = min_t(size_t, div_u64(dur, NSEC_PER_MSEC), 99);
         rwdf_1ms.increment(base + slot);
         if (slot)
-                return;
+                return 0;
 
         slot = min_t(size_t, div_u64(dur, 10 * NSEC_PER_USEC), 99);
         rwdf_10us.increment(base + slot);
+        return 0;
 }
 """
 
@@ -141,8 +145,12 @@ bpf_source = bpf_source.replace('__START_TIME_FIELD__', start_time_field)
 bpf_source = bpf_source.replace('__MAJOR__', str(major))
 bpf_source = bpf_source.replace('__MINOR__', str(minor))
 
+if BPF.kernel_struct_has_field(b'request', b'rq_disk') == 1:
+    bpf_source = bpf_source.replace('__RQ_DISK__', 'rq_disk')
+else:
+    bpf_source = bpf_source.replace('__RQ_DISK__', 'q->disk')
+
 bpf = BPF(text=bpf_source)
-bpf.attach_kprobe(event="blk_account_io_done", fn_name="kprobe_blk_account_io_done")
 
 # times are in usecs
 MSEC = 1000

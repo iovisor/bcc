@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # USAGE: test_usdt3.py
 #
@@ -63,7 +63,7 @@ int main() {
 }
 """
         # BPF program
-        self.bpf_text = """
+        self.bpf_text = b"""
 BPF_PERF_OUTPUT(event);
 int do_trace(struct pt_regs *ctx) {
     int result = 0;
@@ -131,7 +131,7 @@ int do_trace(struct pt_regs *ctx) {
             else:
                 self.probe_value_other = 1
 
-        b["event"].open_perf_buffer(print_event)
+        b[b"event"].open_perf_buffer(print_event)
         for i in range(100):
             if (self.probe_value_1 == 0 or
                 self.probe_value_2 == 0 or

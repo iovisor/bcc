@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # btrfsslower  Trace slow btrfs operations.
@@ -87,10 +87,10 @@ struct data_t {
     // XXX: switch some to u32's when supported
     u64 ts_us;
     u64 type;
-    u64 size;
+    u32 size;
     u64 offset;
     u64 delta_us;
-    u64 pid;
+    u32 pid;
     char task[TASK_COMM_LEN];
     char file[DNAME_INLINE_LEN];
 };
@@ -219,9 +219,11 @@ static int trace_return(struct pt_regs *ctx, int type)
         return 0;
 
     // populate output struct
-    u32 size = PT_REGS_RC(ctx);
-    struct data_t data = {.type = type, .size = size, .delta_us = delta_us,
-        .pid = pid};
+    struct data_t data = {};
+    data.type = type;
+    data.size = PT_REGS_RC(ctx);
+    data.delta_us = delta_us;
+    data.pid = pid;
     data.ts_us = ts / 1000;
     data.offset = valp->offset;
     bpf_get_current_comm(&data.task, sizeof(data.task));
@@ -310,7 +312,7 @@ def print_event(cpu, data, size):
             type, event.size, event.offset, event.delta_us,
             event.file.decode('utf-8', 'replace')))
         return
-    print("%-8s %-14.14s %-6s %1s %-7s %-8d %7.2f %s" % (strftime("%H:%M:%S"),
+    print("%-8s %-14.14s %-7d %1s %-7s %-8d %7.2f %s" % (strftime("%H:%M:%S"),
         event.task.decode('utf-8', 'replace'), event.pid, type, event.size,
         event.offset / 1024, float(event.delta_us) / 1000,
         event.file.decode('utf-8', 'replace')))
@@ -336,7 +338,7 @@ else:
         print("Tracing btrfs operations")
     else:
         print("Tracing btrfs operations slower than %d ms" % min_ms)
-    print("%-8s %-14s %-6s %1s %-7s %-8s %7s %s" % ("TIME", "COMM", "PID", "T",
+    print("%-8s %-14s %-7s %1s %-7s %-8s %7s %s" % ("TIME", "COMM", "PID", "T",
         "BYTES", "OFF_KB", "LAT(ms)", "FILENAME"))
 
 # read events

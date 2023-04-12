@@ -66,6 +66,7 @@ public:
 
   int arg_size() const { return arg_size_.value_or(sizeof(void *)); }
   std::string ctype() const;
+  const char *ctype_name() const;
 
   const optional<std::string> &deref_ident() const { return deref_ident_; }
   const optional<std::string> &base_register_name() const {
@@ -80,6 +81,7 @@ public:
 
   friend class ArgumentParser;
   friend class ArgumentParser_aarch64;
+  friend class ArgumentParser_loongarch64;
   friend class ArgumentParser_powerpc64;
   friend class ArgumentParser_s390x;
   friend class ArgumentParser_x64;
@@ -126,12 +128,22 @@ class ArgumentParser_aarch64 : public ArgumentParser {
  private:
   bool parse_register(ssize_t pos, ssize_t &new_pos, std::string &reg_name);
   bool parse_size(ssize_t pos, ssize_t &new_pos, optional<int> *arg_size);
-  bool parse_mem(ssize_t pos, ssize_t &new_pos, std::string &reg_name,
-                 optional<int> *offset);
+  bool parse_mem(ssize_t pos, ssize_t &new_pos, Argument *dest);
 
  public:
   bool parse(Argument *dest);
   ArgumentParser_aarch64(const char *arg) : ArgumentParser(arg) {}
+};
+
+class ArgumentParser_loongarch64 : public ArgumentParser {
+ private:
+  bool parse_register(ssize_t pos, ssize_t &new_pos, std::string &reg_name);
+  bool parse_size(ssize_t pos, ssize_t &new_pos, optional<int> *arg_size);
+  bool parse_mem(ssize_t pos, ssize_t &new_pos, Argument *dest);
+
+ public:
+  bool parse(Argument *dest);
+  ArgumentParser_loongarch64(const char *arg) : ArgumentParser(arg) {}
 };
 
 class ArgumentParser_powerpc64 : public ArgumentParser {
@@ -149,23 +161,39 @@ public:
 class ArgumentParser_x64 : public ArgumentParser {
 private:
   enum Register {
-    REG_A,
-    REG_B,
-    REG_C,
-    REG_D,
-    REG_SI,
-    REG_DI,
-    REG_BP,
-    REG_SP,
-    REG_8,
-    REG_9,
-    REG_10,
-    REG_11,
-    REG_12,
-    REG_13,
-    REG_14,
-    REG_15,
-    REG_RIP,
+    X64_REG_A,
+    X64_REG_B,
+    X64_REG_C,
+    X64_REG_D,
+    X64_REG_SI,
+    X64_REG_DI,
+    X64_REG_BP,
+    X64_REG_SP,
+    X64_REG_8,
+    X64_REG_9,
+    X64_REG_10,
+    X64_REG_11,
+    X64_REG_12,
+    X64_REG_13,
+    X64_REG_14,
+    X64_REG_15,
+    X64_REG_RIP,
+    X64_REG_XMM0,
+    X64_REG_XMM1,
+    X64_REG_XMM2,
+    X64_REG_XMM3,
+    X64_REG_XMM4,
+    X64_REG_XMM5,
+    X64_REG_XMM6,
+    X64_REG_XMM7,
+    X64_REG_XMM8,
+    X64_REG_XMM9,
+    X64_REG_XMM10,
+    X64_REG_XMM11,
+    X64_REG_XMM12,
+    X64_REG_XMM13,
+    X64_REG_XMM14,
+    X64_REG_XMM15,
   };
 
   struct RegInfo {
@@ -212,7 +240,7 @@ class Probe {
   optional<uint64_t> attached_semaphore_;
   uint8_t mod_match_inode_only_;
 
-  std::string largest_arg_type(size_t arg_n);
+  const char *largest_arg_type(size_t arg_n);
 
   bool add_to_semaphore(int16_t val);
   bool resolve_global_address(uint64_t *global, const std::string &bin_path,
@@ -237,6 +265,10 @@ public:
   bool usdt_getarg(std::ostream &stream);
   bool usdt_getarg(std::ostream &stream, const std::string& probe_func);
   std::string get_arg_ctype(int arg_index) {
+    return largest_arg_type(arg_index);
+  }
+
+  const char *get_arg_ctype_name(int arg_index) {
     return largest_arg_type(arg_index);
   }
 

@@ -2,7 +2,7 @@
 .SH NAME
 syscount \- Summarize syscall counts and latencies.
 .SH SYNOPSIS
-.B syscount [-h] [-p PID] [-i INTERVAL] [-d DURATION] [-T TOP] [-x] [-e ERRNO] [-L] [-m] [-P] [-l]
+.B syscount [-h] [-p PID] [-t TID] [-c PPID] [-i INTERVAL] [-d DURATION] [-T TOP] [-x] [-e ERRNO] [-L] [-m] [-P] [-l] [--syscall SYSCALL]
 .SH DESCRIPTION
 This tool traces syscall entry and exit tracepoints and summarizes either the
 number of syscalls of each type, or the number of syscalls per process. It can
@@ -19,6 +19,12 @@ Print usage message.
 .TP
 \-p PID
 Trace only this process.
+.TP
+\-t TID
+Trace only this thread.
+.TP
+\-c PPID
+Trace only child of this pid.
 .TP
 \-i INTERVAL
 Print the summary at the specified interval (in seconds).
@@ -45,6 +51,9 @@ Summarize by process and not by syscall.
 List the syscalls recognized by the tool (hard-coded list). Syscalls beyond this
 list will still be displayed, as "[unknown: nnn]" where nnn is the syscall
 number.
+.TP
+\--syscall SYSCALL
+Trace this syscall only (use option -l to get all recognized syscalls).
 .SH EXAMPLES
 .TP
 Summarize all syscalls by syscall:
@@ -105,6 +114,6 @@ Linux
 .SH STABILITY
 Unstable - in development.
 .SH AUTHOR
-Sasha Goldshtein
+Sasha Goldshtein, Rocky Xing
 .SH SEE ALSO
 funccount(8), ucalls(8), argdist(8), trace(8), funclatency(8)

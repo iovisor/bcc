@@ -2,7 +2,7 @@
 .SH NAME
 drsnoop \- Trace direct reclaim events. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B drsnoop.py [\-h] [\-T] [\-U] [\-p PID] [\-t TID] [\-u UID] [\-d DURATION] [-n name] [-v]
+.B drsnoop [\-h] [\-T] [\-U] [\-p PID] [\-t TID] [\-u UID] [\-d DURATION] [-n name] [-v]
 .SH DESCRIPTION
 drsnoop trace direct reclaim events, showing which processes are allocing pages 
 with direct reclaiming. This can be useful for discovering when allocstall (/p-
@@ -45,6 +45,9 @@ Total duration of trace in seconds.
 Only print processes where its name partially matches 'name'
 \-v verbose         
 Run in verbose mode. Will output system memory state
+.TP
+\-v
+show system memory state
 .SH EXAMPLES
 .TP
 Trace all direct reclaim events:

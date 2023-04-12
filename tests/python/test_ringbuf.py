@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
@@ -24,7 +24,7 @@ class TestRingbuf(TestCase):
             event = ct.cast(data, ct.POINTER(Data)).contents
             self.counter += 1
 
-        text = """
+        text = b"""
 BPF_RINGBUF_OUTPUT(events, 8);
 struct data_t {
     u64 ts;
@@ -36,11 +36,11 @@ int do_sys_nanosleep(void *ctx) {
 }
 """
         b = BPF(text=text)
-        b.attach_kprobe(event=b.get_syscall_fnname("nanosleep"),
-                        fn_name="do_sys_nanosleep")
-        b.attach_kprobe(event=b.get_syscall_fnname("clock_nanosleep"),
-                        fn_name="do_sys_nanosleep")
-        b["events"].open_ring_buffer(cb)
+        b.attach_kprobe(event=b.get_syscall_fnname(b"nanosleep"),
+                        fn_name=b"do_sys_nanosleep")
+        b.attach_kprobe(event=b.get_syscall_fnname(b"clock_nanosleep"),
+                        fn_name=b"do_sys_nanosleep")
+        b[b"events"].open_ring_buffer(cb)
         subprocess.call(['sleep', '0.1'])
         b.ring_buffer_poll()
         self.assertGreater(self.counter, 0)
@@ -58,7 +58,7 @@ int do_sys_nanosleep(void *ctx) {
             event = ct.cast(data, ct.POINTER(Data)).contents
             self.counter += 1
 
-        text = """
+        text = b"""
 BPF_RINGBUF_OUTPUT(events, 8);
 struct data_t {
     u64 ts;
@@ -70,11 +70,11 @@ int do_sys_nanosleep(void *ctx) {
 }
 """
         b = BPF(text=text)
-        b.attach_kprobe(event=b.get_syscall_fnname("nanosleep"),
-                        fn_name="do_sys_nanosleep")
-        b.attach_kprobe(event=b.get_syscall_fnname("clock_nanosleep"),
-                        fn_name="do_sys_nanosleep")
-        b["events"].open_ring_buffer(cb)
+        b.attach_kprobe(event=b.get_syscall_fnname(b"nanosleep"),
+                        fn_name=b"do_sys_nanosleep")
+        b.attach_kprobe(event=b.get_syscall_fnname(b"clock_nanosleep"),
+                        fn_name=b"do_sys_nanosleep")
+        b[b"events"].open_ring_buffer(cb)
         subprocess.call(['sleep', '0.1'])
         b.ring_buffer_consume()
         self.assertGreater(self.counter, 0)
@@ -92,7 +92,7 @@ int do_sys_nanosleep(void *ctx) {
             event = ct.cast(data, ct.POINTER(Data)).contents
             self.counter += 1
 
-        text = """
+        text = b"""
 BPF_RINGBUF_OUTPUT(events, 8);
 struct data_t {
     u64 ts;
@@ -107,11 +107,11 @@ int do_sys_nanosleep(void *ctx) {
 }
 """
         b = BPF(text=text)
-        b.attach_kprobe(event=b.get_syscall_fnname("nanosleep"),
-                        fn_name="do_sys_nanosleep")
-        b.attach_kprobe(event=b.get_syscall_fnname("clock_nanosleep"),
-                        fn_name="do_sys_nanosleep")
-        b["events"].open_ring_buffer(cb)
+        b.attach_kprobe(event=b.get_syscall_fnname(b"nanosleep"),
+                        fn_name=b"do_sys_nanosleep")
+        b.attach_kprobe(event=b.get_syscall_fnname(b"clock_nanosleep"),
+                        fn_name=b"do_sys_nanosleep")
+        b[b"events"].open_ring_buffer(cb)
         subprocess.call(['sleep', '0.1'])
         b.ring_buffer_poll()
         self.assertGreater(self.counter, 0)
@@ -129,7 +129,7 @@ int do_sys_nanosleep(void *ctx) {
             event = ct.cast(data, ct.POINTER(Data)).contents
             self.counter += 1
 
-        text = """
+        text = b"""
 BPF_RINGBUF_OUTPUT(events, 8);
 struct data_t {
     u64 ts;
@@ -144,11 +144,11 @@ int do_sys_nanosleep(void *ctx) {
 }
 """
         b = BPF(text=text)
-        b.attach_kprobe(event=b.get_syscall_fnname("nanosleep"),
-                        fn_name="do_sys_nanosleep")
-        b.attach_kprobe(event=b.get_syscall_fnname("clock_nanosleep"),
-                        fn_name="do_sys_nanosleep")
-        b["events"].open_ring_buffer(cb)
+        b.attach_kprobe(event=b.get_syscall_fnname(b"nanosleep"),
+                        fn_name=b"do_sys_nanosleep")
+        b.attach_kprobe(event=b.get_syscall_fnname(b"clock_nanosleep"),
+                        fn_name=b"do_sys_nanosleep")
+        b[b"events"].open_ring_buffer(cb)
         subprocess.call(['sleep', '0.1'])
         b.ring_buffer_poll()
         self.assertEqual(self.counter, 0)

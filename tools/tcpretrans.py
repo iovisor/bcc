@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # tcpretrans    Trace or count TCP retransmits and TLPs.
@@ -355,7 +355,7 @@ tcpstate[12] = 'NEW_SYN_RECV'
 # process event
 def print_ipv4_event(cpu, data, size):
     event = b["ipv4_events"].event(data)
-    print("%-8s %-6d %-2d %-20s %1s> %-20s" % (
+    print("%-8s %-7d %-2d %-20s %1s> %-20s" % (
         strftime("%H:%M:%S"), event.pid, event.ip,
         "%s:%d" % (inet_ntop(AF_INET, pack('I', event.saddr)), event.lport),
         type[event.type],
@@ -368,7 +368,7 @@ def print_ipv4_event(cpu, data, size):
 
 def print_ipv6_event(cpu, data, size):
     event = b["ipv6_events"].event(data)
-    print("%-8s %-6d %-2d %-20s %1s> %-20s" % (
+    print("%-8s %-7d %-2d %-20s %1s> %-20s" % (
         strftime("%H:%M:%S"), event.pid, event.ip,
         "%s:%d" % (inet_ntop(AF_INET6, event.saddr), event.lport),
         type[event.type],
@@ -415,7 +415,7 @@ if args.count:
 # read events
 else:
     # header
-    print("%-8s %-6s %-2s %-20s %1s> %-20s" % ("TIME", "PID", "IP",
+    print("%-8s %-7s %-2s %-20s %1s> %-20s" % ("TIME", "PID", "IP",
         "LADDR:LPORT", "T", "RADDR:RPORT"), end='')
     if args.sequence:
         print(" %-12s %-10s" % ("STATE", "SEQ"))

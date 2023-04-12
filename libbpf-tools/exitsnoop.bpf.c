@@ -5,9 +5,17 @@
 #include <bpf/bpf_core_read.h>
 #include "exitsnoop.h"
 
+const volatile bool filter_cg = false;
 const volatile pid_t target_pid = 0;
 const volatile bool trace_failed_only = false;
 const volatile bool trace_by_process = true;
+
+struct {
+	__uint(type, BPF_MAP_TYPE_CGROUP_ARRAY);
+	__type(key, u32);
+	__type(value, u32);
+	__uint(max_entries, 1);
+} cgroup_map SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
@@ -24,6 +32,9 @@ int sched_process_exit(void *ctx)
 	int exit_code;
 	struct task_struct *task;
 	struct event event = {};
+
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
 
 	if (target_pid && target_pid != pid)
 		return 0;

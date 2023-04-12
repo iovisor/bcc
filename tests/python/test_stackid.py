@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
@@ -13,7 +13,7 @@ import subprocess
 class TestStackid(unittest.TestCase):
     @mayFail("This fails on github actions environment, and needs to be fixed")
     def test_simple(self):
-        b = bcc.BPF(text="""
+        b = bcc.BPF(text=b"""
 #include <uapi/linux/ptrace.h>
 struct bpf_map;
 BPF_STACK_TRACE(stack_traces, 10240);
@@ -28,9 +28,9 @@ int kprobe__htab_map_lookup_elem(struct pt_regs *ctx, struct bpf_map *map, u64 *
     return 0;
 }
 """)
-        stub = b["stub"]
-        stack_traces = b["stack_traces"]
-        stack_entries = b["stack_entries"]
+        stub = b[b"stub"]
+        stack_traces = b[b"stack_traces"]
+        stack_entries = b[b"stack_entries"]
         try: x = stub[stub.Key(1)]
         except: pass
         k = stack_entries.Key(1)
@@ -50,7 +50,7 @@ def Get_libc_path():
 @unittest.skipUnless(kernel_version_ge(4,17), "requires kernel >= 4.17")
 class TestStackBuildid(unittest.TestCase):
     def test_simple(self):
-        b = bcc.BPF(text="""
+        b = bcc.BPF(text=b"""
 #include <uapi/linux/ptrace.h>
 struct bpf_map;
 BPF_STACK_TRACE_BUILDID(stack_traces, 10240);
@@ -66,9 +66,9 @@ int kprobe__sys_getuid(struct pt_regs *ctx, struct bpf_map *map, u64 *k) {
 }
 """)
         os.getuid()
-        stub = b["stub"]
-        stack_traces = b["stack_traces"]
-        stack_entries = b["stack_entries"]
+        stub = b[b"stub"]
+        stack_traces = b[b"stack_traces"]
+        stack_entries = b[b"stack_entries"]
         b.add_module(Get_libc_path())
         try: x = stub[stub.Key(1)]
         except: pass

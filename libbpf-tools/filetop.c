@@ -20,6 +20,7 @@
 #include <bpf/bpf.h>
 #include "filetop.h"
 #include "filetop.skel.h"
+#include "btf_helpers.h"
 #include "trace_helpers.h"
 
 #define warn(...) fprintf(stderr, __VA_ARGS__)
@@ -42,6 +43,7 @@ static int output_rows = 20;
 static int sort_by = ALL;
 static int interval = 1;
 static int count = 99999999;
+static bool verbose = false;
 
 const char *argp_program_version = "filetop 0.1";
 const char *argp_program_bug_address =
@@ -62,6 +64,7 @@ static const struct argp_option opts[] = {
 	{ "all", 'a', NULL, 0, "Include special files" },
 	{ "sort", 's', "SORT", 0, "Sort columns, default all [all, reads, writes, rbytes, wbytes]" },
 	{ "rows", 'r', "ROWS", 0, "Maximum rows to print, default 20" },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
@@ -114,6 +117,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		if (output_rows > OUTPUT_ROWS_LIMIT)
 			output_rows = OUTPUT_ROWS_LIMIT;
 		break;
+	case 'v':
+		verbose = true;
+		break;
 	case 'h':
 		argp_state_help(state, stderr, ARGP_HELP_STD_HELP);
 		break;
@@ -141,6 +147,13 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		return ARGP_ERR_UNKNOWN;
 	}
 	return 0;
+}
+
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
+{
+	if (level == LIBBPF_DEBUG && !verbose)
+		return 0;
+	return vfprintf(stderr, format, args);
 }
 
 static void sig_int(int signo)
@@ -183,7 +196,7 @@ static int print_stat(struct filetop_bpf *obj)
 		time(&t);
 		tm = localtime(&t);
 		strftime(ts, sizeof(ts), "%H:%M:%S", tm);
-		memset(buf, 0 , sizeof(buf));
+		memset(buf, 0, sizeof(buf));
 		n = fread(buf, 1, sizeof(buf), f);
 		if (n)
 			printf("%8s loadavg: %s\n", ts, buf);
@@ -244,6 +257,7 @@ static int print_stat(struct filetop_bpf *obj)
 
 int main(int argc, char **argv)
 {
+	LIBBPF_OPTS(bpf_object_open_opts, open_opts);
 	static const struct argp argp = {
 		.options = opts,
 		.parser = parse_arg,
@@ -256,13 +270,15 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
-	err = bump_memlock_rlimit();
+	libbpf_set_print(libbpf_print_fn);
+
+	err = ensure_core_btf(&open_opts);
 	if (err) {
-		warn("failed to increase rlimit: %d\n", err);
+		fprintf(stderr, "failed to fetch necessary BTF for CO-RE: %s\n", strerror(-err));
 		return 1;
 	}
 
-	obj = filetop_bpf__open();
+	obj = filetop_bpf__open_opts(&open_opts);
 	if (!obj) {
 		warn("failed to open BPF object\n");
 		return 1;
@@ -284,7 +300,8 @@ int main(int argc, char **argv)
 	}
 
 	if (signal(SIGINT, sig_int) == SIG_ERR) {
-		warn("can't set signal handler: %s\n", strerror(-errno));
+		warn("can't set signal handler: %s\n", strerror(errno));
+		err = 1;
 		goto cleanup;
 	}
 
@@ -308,6 +325,7 @@ int main(int argc, char **argv)
 
 cleanup:
 	filetop_bpf__destroy(obj);
+	cleanup_core_btf(&open_opts);
 
 	return err != 0;
 }

@@ -2,7 +2,7 @@
 .SH NAME
 biosnoop \- Trace block device I/O and print details incl. issuing PID.
 .SH SYNOPSIS
-.B biosnoop [\-hQ]
+.B biosnoop [\-h] [\-Q] [\-d DISK] [\-P]
 .SH DESCRIPTION
 This tools traces block device I/O (disk I/O), and prints a one-line summary
 for each I/O showing various details. These include the latency from the time of
@@ -28,7 +28,13 @@ CONFIG_BPF and bcc.
 Print usage message.
 .TP
 \-Q
-Include a column showing the time spent quueued in the OS.
+Include a column showing the time spent queued in the OS.
+.TP
+\-d DISK
+Trace this disk only.
+.TP
+\-P
+Display block I/O pattern (sequential or random).
 .SH EXAMPLES
 .TP
 Trace all block device I/O and print a summary line per I/O:
@@ -82,6 +88,6 @@ Linux
 .SH STABILITY
 Unstable - in development.
 .SH AUTHOR
-Brendan Gregg
+Brendan Gregg, Rocky Xing
 .SH SEE ALSO
 disksnoop(8), iostat(1)

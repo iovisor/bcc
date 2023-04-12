@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # swapin        Count swapins by process.
@@ -74,11 +74,11 @@ while 1:
 
     if not args.notime:
         print(strftime("%H:%M:%S"))
-    print("%-16s %-6s %s" % ("COMM", "PID", "COUNT"))
+    print("%-16s %-7s %s" % ("COMM", "PID", "COUNT"))
     counts = b.get_table("counts")
     for k, v in sorted(counts.items(),
 		       key=lambda counts: counts[1].value):
-        print("%-16s %-6d %d" % (k.comm, k.pid, v.value))
+        print("%-16s %-7d %d" % (k.comm, k.pid, v.value))
     counts.clear()
     print()
 

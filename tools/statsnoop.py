@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # statsnoop Trace stat() syscalls.
@@ -10,7 +10,8 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 08-Feb-2016   Brendan Gregg   Created this.
-# 17-Feb-2016   Allan McAleavy updated for BPF_PERF_OUTPUT
+# 17-Feb-2016   Allan McAleavy  updated for BPF_PERF_OUTPUT
+# 29-Nov-2022   Rocky Xing      Added stat() variants.
 
 from __future__ import print_function
 from bcc import BPF
@@ -59,7 +60,7 @@ struct data_t {
 BPF_HASH(infotmp, u32, struct val_t);
 BPF_PERF_OUTPUT(events);
 
-int syscall__entry(struct pt_regs *ctx, const char __user *filename)
+static int trace_entry(struct pt_regs *ctx, const char __user *filename)
 {
     struct val_t val = {};
     u64 pid_tgid = bpf_get_current_pid_tgid();
@@ -72,6 +73,16 @@ int syscall__entry(struct pt_regs *ctx, const char __user *filename)
 
     return 0;
 };
+
+int stat_entry(struct pt_regs *ctx, const char __user *filename)
+{
+    return trace_entry(ctx, filename);
+}
+
+int statx_entry(struct pt_regs *ctx, int dfd, const char __user *filename)
+{
+    return trace_entry(ctx, filename);
+}
 
 int trace_return(struct pt_regs *ctx)
 {
@@ -114,20 +125,20 @@ b = BPF(text=bpf_text)
 # system calls but the name of the actual entry point may
 # be different for which we must check if the entry points
 # actually exist before attaching the probes
-syscall_fnname = b.get_syscall_fnname("stat")
-if BPF.ksymname(syscall_fnname) != -1:
-    b.attach_kprobe(event=syscall_fnname, fn_name="syscall__entry")
-    b.attach_kretprobe(event=syscall_fnname, fn_name="trace_return")
+def try_attach_syscall_probes(syscall):
+    syscall_fnname = b.get_syscall_fnname(syscall)
+    if BPF.ksymname(syscall_fnname) != -1:
+        if syscall == "statx":
+            b.attach_kprobe(event=syscall_fnname, fn_name="statx_entry")
+        else:
+            b.attach_kprobe(event=syscall_fnname, fn_name="stat_entry")
+        b.attach_kretprobe(event=syscall_fnname, fn_name="trace_return")
 
-syscall_fnname = b.get_syscall_fnname("statfs")
-if BPF.ksymname(syscall_fnname) != -1:
-    b.attach_kprobe(event=syscall_fnname, fn_name="syscall__entry")
-    b.attach_kretprobe(event=syscall_fnname, fn_name="trace_return")
-
-syscall_fnname = b.get_syscall_fnname("newstat")
-if BPF.ksymname(syscall_fnname) != -1:
-    b.attach_kprobe(event=syscall_fnname, fn_name="syscall__entry")
-    b.attach_kretprobe(event=syscall_fnname, fn_name="trace_return")
+try_attach_syscall_probes("stat")
+try_attach_syscall_probes("statx")
+try_attach_syscall_probes("statfs")
+try_attach_syscall_probes("newstat")
+try_attach_syscall_probes("newlstat")
 
 start_ts = 0
 prev_ts = 0

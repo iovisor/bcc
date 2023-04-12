@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # argdist   Trace a function and display a distribution of its
 #           parameter values as a histogram or frequency count.
@@ -524,7 +524,7 @@ DATA_DECL
 class Tool(object):
         examples = """
 Probe specifier syntax:
-        {p,r,t,u}:{[library],category}:function(signature)[:type[,type...]:expr[,expr...][:filter]][#label]
+        {p,r,t,u}:{[library],category}:function(signature):type[,type...]:expr[,expr...][:filter]][#label]
 Where:
         p,r,t,u    -- probe at function entry, function exit, kernel
                       tracepoint, or USDT probe
@@ -648,6 +648,8 @@ argdist -I 'kernel/sched/sched.h' \\
                        "as either full path, "
                        "or relative to relative to current working directory, "
                        "or relative to default kernel header search path")
+                parser.add_argument("--ebpf", action="store_true",
+                  help=argparse.SUPPRESS)
                 self.args = parser.parse_args()
                 self.usdt_ctx = None
 
@@ -683,7 +685,10 @@ struct __string_t { char s[%d]; };
                                      for probe in self.probes
                                      if probe.usdt_ctx]:
                             print(text)
-                        print(bpf_source)
+                if self.args.verbose or self.args.ebpf:
+                    print(bpf_source)
+                    if self.args.ebpf:
+                        exit()
                 usdt_contexts = [probe.usdt_ctx
                                  for probe in self.probes if probe.usdt_ctx]
                 self.bpf = BPF(text=bpf_source, usdt_contexts=usdt_contexts)

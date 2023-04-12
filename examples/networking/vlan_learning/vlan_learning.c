@@ -5,8 +5,8 @@
 
 struct ifindex_leaf_t {
   int out_ifindex;
-  int vlan_tci; // populated by phys2virt and used by virt2phys
-  int vlan_proto; // populated by phys2virt and used by virt2phys
+  u16 vlan_tci; // populated by phys2virt and used by virt2phys
+  u16 vlan_proto; // populated by phys2virt and used by virt2phys
   u64 tx_pkts;
   u64 tx_bytes;
 };

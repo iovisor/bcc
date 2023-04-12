@@ -78,14 +78,14 @@ void handle_output(void *cb_cookie, void *data, int data_size) {
 int main() {
   ebpf::BPF bpf;
   auto res = bpf.init(BPF_PROGRAM);
-  if (res.code() != 0) {
+  if (!res.ok()) {
     std::cerr << res.msg() << std::endl;
     return 1;
   }
 
   int prog_fd;
   res = bpf.load_func("kfunc____x64_sys_openat", BPF_PROG_TYPE_TRACING, prog_fd);
-  if (res.code() != 0) {
+  if (!res.ok()) {
     std::cerr << res.msg() << std::endl;
     return 1;
   }
@@ -97,7 +97,7 @@ int main() {
   }
 
   res = bpf.load_func("kretfunc____x64_sys_openat", BPF_PROG_TYPE_TRACING, prog_fd);
-  if (res.code() != 0) {
+  if (!res.ok()) {
     std::cerr << res.msg() << std::endl;
     return 1;
   }
@@ -109,7 +109,7 @@ int main() {
   }
 
   auto open_res = bpf.open_perf_buffer("events", &handle_output);
-  if (open_res.code() != 0) {
+  if (!open_res.ok()) {
     std::cerr << open_res.msg() << std::endl;
     return 1;
   }

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # drsnoop  Trace direct reclaim and print details including issuing PID.
@@ -20,6 +20,7 @@ import argparse
 from datetime import datetime, timedelta
 import os
 import math
+import sys
 
 # symbols
 kallsyms = "/proc/kallsyms"
@@ -223,6 +224,8 @@ def print_event(cpu, data, size):
         print("%10d" % K(event.vm_stat[NR_FREE_PAGES]))
     else:
         print("")
+
+    sys.stdout.flush()
 
 
 # loop with callback to print_event

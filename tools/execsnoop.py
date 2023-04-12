@@ -1,11 +1,12 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # execsnoop Trace new processes via exec() syscalls.
 #           For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: execsnoop [-h] [-T] [-t] [-x] [-q] [-n NAME] [-l LINE]
-#                  [--max-args MAX_ARGS]
+# USAGE: execsnoop [-h] [-T] [-t] [-x] [--cgroupmap CGROUPMAP]
+#                  [--mntnsmap MNTNSMAP] [-u USER] [-q] [-n NAME] [-l LINE]
+#                  [-U] [--max-args MAX_ARGS] [-P PPID]
 #
 # This currently will print up to a maximum of 19 arguments, plus the process
 # name, so 20 fields in total (MAXARG).
@@ -16,6 +17,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 07-Feb-2016   Brendan Gregg   Created this.
+# 11-Aug-2022   Rocky Xing      Added PPID filter support.
 
 from __future__ import print_function
 from bcc import BPF
@@ -48,16 +50,17 @@ def parse_uid(user):
 
 # arguments
 examples = """examples:
-    ./execsnoop           # trace all exec() syscalls
-    ./execsnoop -x        # include failed exec()s
-    ./execsnoop -T        # include time (HH:MM:SS)
-    ./execsnoop -U        # include UID
-    ./execsnoop -u 1000   # only trace UID 1000
-    ./execsnoop -u user   # get user UID and trace only them
-    ./execsnoop -t        # include timestamps
-    ./execsnoop -q        # add "quotemarks" around arguments
-    ./execsnoop -n main   # only print command lines containing "main"
-    ./execsnoop -l tpkg   # only print command where arguments contains "tpkg"
+    ./execsnoop                      # trace all exec() syscalls
+    ./execsnoop -x                   # include failed exec()s
+    ./execsnoop -T                   # include time (HH:MM:SS)
+    ./execsnoop -P 181               # only trace new processes whose parent PID is 181
+    ./execsnoop -U                   # include UID
+    ./execsnoop -u 1000              # only trace UID 1000
+    ./execsnoop -u user              # get user UID and trace only them
+    ./execsnoop -t                   # include timestamps
+    ./execsnoop -q                   # add "quotemarks" around arguments
+    ./execsnoop -n main              # only print command lines containing "main"
+    ./execsnoop -l tpkg              # only print command where arguments contains "tpkg"
     ./execsnoop --cgroupmap mappath  # only trace cgroups in this BPF map
     ./execsnoop --mntnsmap mappath   # only trace mount namespaces in the map
 """
@@ -90,6 +93,8 @@ parser.add_argument("-U", "--print-uid", action="store_true",
     help="print UID column")
 parser.add_argument("--max-args", default="20",
     help="maximum number of arguments parsed and displayed, defaults to 20")
+parser.add_argument("-P", "--ppid",
+    help="trace this parent PID only")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
@@ -162,6 +167,8 @@ int syscall__execve(struct pt_regs *ctx,
     // We use the get_ppid function as a fallback in those cases. (#1883)
     data.ppid = task->real_parent->tgid;
 
+    PPID_FILTER
+
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
     data.type = EVENT_ARG;
 
@@ -202,6 +209,8 @@ int do_ret_sys_execve(struct pt_regs *ctx)
     // We use the get_ppid function as a fallback in those cases. (#1883)
     data.ppid = task->real_parent->tgid;
 
+    PPID_FILTER
+
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
     data.type = EVENT_RET;
     data.retval = PT_REGS_RC(ctx);
@@ -218,6 +227,13 @@ if args.uid:
         'if (uid != %s) { return 0; }' % args.uid)
 else:
     bpf_text = bpf_text.replace('UID_FILTER', '')
+
+if args.ppid:
+    bpf_text = bpf_text.replace('PPID_FILTER',
+        'if (data.ppid != %s) { return 0; }' % args.ppid)
+else:
+    bpf_text = bpf_text.replace('PPID_FILTER', '')
+
 bpf_text = filter_by_containers(args) + bpf_text
 if args.ebpf:
     print(bpf_text)
@@ -236,7 +252,7 @@ if args.timestamp:
     print("%-8s" % ("TIME(s)"), end="")
 if args.print_uid:
     print("%-6s" % ("UID"), end="")
-print("%-16s %-6s %-6s %3s %s" % ("PCOMM", "PID", "PPID", "RET", "ARGS"))
+print("%-16s %-7s %-7s %3s %s" % ("PCOMM", "PID", "PPID", "RET", "ARGS"))
 
 class EventType(object):
     EVENT_ARG = 0
@@ -290,7 +306,7 @@ def print_event(cpu, data, size):
             ppid = event.ppid if event.ppid > 0 else get_ppid(event.pid)
             ppid = b"%d" % ppid if ppid > 0 else b"?"
             argv_text = b' '.join(argv[event.pid]).replace(b'\n', b'\\n')
-            printb(b"%-16s %-6d %-6s %3d %s" % (event.comm, event.pid,
+            printb(b"%-16s %-7d %-7s %3d %s" % (event.comm, event.pid,
                    ppid, event.retval, argv_text))
         try:
             del(argv[event.pid])

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # deadlock  Detects potential deadlocks (lock order inversions)
 #           on a running process. For Linux, uses BCC, eBPF.

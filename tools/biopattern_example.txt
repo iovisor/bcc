@@ -1,0 +1,45 @@
+Demonstrations of biopattern, the Linux eBPF/bcc version.
+
+
+biopattern identifies random/sequential disk access patterns. Example:
+
+# ./biopattern.py
+TIME      DISK     %RND  %SEQ    COUNT     KBYTES
+22:03:51  vdb         0    99      788       3184
+22:03:51  Unknown     0   100        4          0
+22:03:51  vda        85    14       21        488
+[...]
+
+
+The -d option only print the matched disk.
+
+# ./biopattern.py -d vdb 1 10
+TIME      DISK     %RND  %SEQ    COUNT     KBYTES
+22:12:57  vdb         0    99      193        772
+22:12:58  vdb         0   100     1119       4476
+22:12:59  vdb         0   100     1126       4504
+22:13:00  vdb         0   100     1009       4036
+22:13:01  vdb         0   100      958       3832
+22:13:02  vdb         0    99      957       3856
+22:13:03  vdb         0   100     1130       4520
+22:13:04  vdb         0   100     1051       4204
+22:13:05  vdb         0   100     1158       4632
+[...]
+
+
+USAGE message:
+
+Show block device I/O pattern.
+
+positional arguments:
+  interval              Output interval in seconds
+  count                 Number of outputs
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -d DISK, --disk DISK  Trace this disk only
+
+examples:
+    ./biopattern            # show block device I/O pattern.
+    ./biopattern 1 10       # print 1 second summaries, 10 times
+    ./biopattern -d sdb     # show sdb only

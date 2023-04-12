@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) 2018 Clevernet, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
@@ -6,7 +6,7 @@ import unittest
 from bcc import BPF
 
 class TestLicense(unittest.TestCase):
-    gpl_only_text = """
+    gpl_only_text = b"""
 #include <uapi/linux/ptrace.h>
 struct gpl_s {
     u64 ts;
@@ -20,7 +20,7 @@ int license_program(struct pt_regs *ctx) {
 }
 """
 
-    proprietary_text = """
+    proprietary_text = b"""
 #include <uapi/linux/ptrace.h>
 struct key_t {
     u64 ip;
@@ -51,13 +51,13 @@ int license_program(struct pt_regs *ctx) {
 """
 
     def license(self, lic):
-        return '''
+        return b'''
 #define BPF_LICENSE %s
-''' % (lic)
+''' % (lic.encode())
 
     def load_bpf_code(self, bpf_code):
-        event_name = bpf_code.get_syscall_fnname("read")
-        bpf_code.attach_kprobe(event=event_name, fn_name="license_program")
+        event_name = bpf_code.get_syscall_fnname(b"read")
+        bpf_code.attach_kprobe(event=event_name, fn_name=b"license_program")
         bpf_code.detach_kprobe(event=event_name)
 
     def test_default(self):

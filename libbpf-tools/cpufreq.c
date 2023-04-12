@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <linux/perf_event.h>
 #include <asm/unistd.h>
+#include <fcntl.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 #include "cpufreq.h"
@@ -21,6 +22,8 @@ static struct env {
 	int duration;
 	int freq;
 	bool verbose;
+	char *cgroupspath;
+	bool cg;
 } env = {
 	.duration = -1,
 	.freq = 99,
@@ -32,16 +35,18 @@ const char *argp_program_bug_address =
 const char argp_program_doc[] =
 "Sampling CPU freq system-wide & by process. Ctrl-C to end.\n"
 "\n"
-"USAGE: cpufreq [--help] [-d DURATION] [-f FREQUENCY]\n"
+"USAGE: cpufreq [--help] [-d DURATION] [-f FREQUENCY] [-c CG]\n"
 "\n"
 "EXAMPLES:\n"
 "    cpufreq         # sample CPU freq at 99HZ (default)\n"
 "    cpufreq -d 5    # sample for 5 seconds only\n"
+"    cpufreq -c CG   # Trace process under cgroupsPath CG\n"
 "    cpufreq -f 199  # sample CPU freq at 199HZ\n";
 
 static const struct argp_option opts[] = {
 	{ "duration", 'd', "DURATION", 0, "Duration to sample in seconds" },
 	{ "frequency", 'f', "FREQUENCY", 0, "Sample with a certain frequency" },
+	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
@@ -63,6 +68,10 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			fprintf(stderr, "Invalid duration: %s\n", arg);
 			argp_usage(state);
 		}
+		break;
+	case 'c':
+		env.cgroupspath = arg;
+		env.cg = true;
 		break;
 	case 'f':
 		errno = 0;
@@ -102,10 +111,8 @@ static int open_and_attach_perf_event(int freq, struct bpf_program *prog,
 			return -1;
 		}
 		links[i] = bpf_program__attach_perf_event(prog, fd);
-		if (libbpf_get_error(links[i])) {
-			fprintf(stderr, "failed to attach perf event on cpu: "
-				"%d\n", i);
-			links[i] = NULL;
+		if (!links[i]) {
+			fprintf(stderr, "failed to attach perf event on cpu: %d\n", i);
 			close(fd);
 			return -1;
 		}
@@ -114,8 +121,7 @@ static int open_and_attach_perf_event(int freq, struct bpf_program *prog,
 	return 0;
 }
 
-int libbpf_print_fn(enum libbpf_print_level level,
-		    const char *format, va_list args)
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
 	if (level == LIBBPF_DEBUG && !env.verbose)
 		return 0;
@@ -126,7 +132,7 @@ static void sig_handler(int sig)
 {
 }
 
-static int init_freqs_hmz(__u32 *freqs_mhz, int nr_cpus)
+static int init_freqs_mhz(__u32 *freqs_mhz, int nr_cpus)
 {
 	char path[64];
 	FILE *f;
@@ -149,6 +155,11 @@ static int init_freqs_hmz(__u32 *freqs_mhz, int nr_cpus)
 			fclose(f);
 			return -1;
 		}
+		/*
+		 * scaling_cur_freq is in kHz. To be handled with
+		 * a small data size, it's converted in mHz.
+		 */
+		freqs_mhz[i] /= 1000;
 		fclose(f);
 	}
 
@@ -176,7 +187,7 @@ static void print_linear_hists(struct bpf_map *hists,
 
 	printf("\n");
 	print_linear_hist(bss->syswide.slots, MAX_SLOTS, 0, HIST_STEP_SIZE,
-			"syswide");
+			  "syswide");
 }
 
 int main(int argc, char **argv)
@@ -189,18 +200,14 @@ int main(int argc, char **argv)
 	struct bpf_link *links[MAX_CPU_NR] = {};
 	struct cpufreq_bpf *obj;
 	int err, i;
+	int idx, cg_map_fd;
+	int cgfd = -1;
 
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
 	if (err)
 		return err;
 
 	libbpf_set_print(libbpf_print_fn);
-
-	err = bump_memlock_rlimit();
-	if (err) {
-		fprintf(stderr, "failed to increase rlimit: %d\n", err);
-		return 1;
-	}
 
 	nr_cpus = libbpf_num_possible_cpus();
 	if (nr_cpus < 0) {
@@ -225,10 +232,27 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	err = init_freqs_hmz(obj->bss->freqs_mhz, nr_cpus);
+	err = init_freqs_mhz(obj->bss->freqs_mhz, nr_cpus);
 	if (err) {
 		fprintf(stderr, "failed to init freqs\n");
 		goto cleanup;
+	}
+
+	obj->bss->filter_cg = env.cg;
+
+	/* update cgroup path fd to map */
+	if (env.cg) {
+		idx = 0;
+		cg_map_fd = bpf_map__fd(obj->maps.cgroup_map);
+		cgfd = open(env.cgroupspath, O_RDONLY);
+		if (cgfd < 0) {
+			fprintf(stderr, "Failed opening Cgroup path: %s", env.cgroupspath);
+			goto cleanup;
+		}
+		if (bpf_map_update_elem(cg_map_fd, &idx, &cgfd, BPF_ANY)) {
+			fprintf(stderr, "Failed adding target cgroup to map");
+			goto cleanup;
+		}
 	}
 
 	err = open_and_attach_perf_event(env.freq, obj->progs.do_sample, links);
@@ -258,6 +282,8 @@ cleanup:
 	for (i = 0; i < nr_cpus; i++)
 		bpf_link__destroy(links[i]);
 	cpufreq_bpf__destroy(obj);
+	if (cgfd > 0)
+		close(cgfd);
 
 	return err != 0;
 }

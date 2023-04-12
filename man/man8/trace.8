@@ -2,13 +2,15 @@
 .SH NAME
 trace \- Trace a function and print its arguments or return value, optionally evaluating a filter. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B trace [-h] [-b BUFFER_PAGES] [-p PID] [-L TID] [-v] [-Z STRING_SIZE] [-S] [-s SYM_FILE_LIST]
-         [-M MAX_EVENTS] [-t] [-u] [-T] [-C] [-K] [-U] [-a] [-I header]
+.B trace [-h] [-b BUFFER_PAGES] [-p PID] [-L TID] [--uid UID] [-v] [-Z STRING_SIZE] [-S] [-M MAX_EVENTS] [-t]
+         [-u] [-T] [-C] [-c CGROUP_PATH] [-n NAME] [-f MSG_FILTER] [-B] [-s SYM_FILE_LIST] [-K] [-U] [-a]
+         [-I header] [-A]
          probe [probe ...]
+
 .SH DESCRIPTION
 trace probes functions you specify and displays trace messages if a particular
-condition is met. You can control the message format to display function 
-arguments and return values. 
+condition is met. You can control the message format to display function
+arguments and return values.
 
 Since this uses BPF, only the root user can use this tool.
 .SH REQUIREMENTS
@@ -24,6 +26,9 @@ Trace only functions in the process PID.
 \-L TID
 Trace only functions in the thread TID.
 .TP
+\--uid UID
+Trace only functions from user UID.
+.TP
 \-v
 Display the generated BPF program, for debugging purposes.
 .TP
@@ -32,7 +37,7 @@ When collecting string arguments (of type char*), collect up to STRING_SIZE
 characters. Longer strings will be truncated.
 .TP
 \-s SYM_FILE_LIST
-When collecting stack trace in build id format, use the coma separated list for
+When collecting stack trace in build id format, use the comma separated list for
 symbol resolution.
 .TP
 \-S
@@ -72,6 +77,7 @@ Print the kernel stack for each event.
 .TP
 \-U
 Print the user stack for each event.
+.TP
 \-a
 Print virtual address in kernel and user stacks.
 .TP
@@ -79,6 +85,9 @@ Print virtual address in kernel and user stacks.
 Additional header files to include in the BPF program. This is needed if your
 filter or print expressions use types or data structures that are not available
 in the standard headers. For example: 'linux/mm.h'
+.TP
+\-A
+Print aggregated amount of each trace. This should be used with -M/--max-events together.
 .TP
 probe [probe ...]
 One or more probes that attach to functions, filter conditions, and print
@@ -132,15 +141,15 @@ retval in a return probe. If necessary, use C cast operators to coerce the
 arguments to the desired type. For example, if arg1 is of type int, use the
 expression ((int)arg1 < 0) to trace only invocations where arg1 is negative.
 Note that only arg1-arg6 are supported, and only if the function is using the
-standard x86_64 convention where the first six arguments are in the RDI, RSI, 
-RDX, RCX, R8, R9 registers. If no predicate is specified, all function 
+standard x86_64 convention where the first six arguments are in the RDI, RSI,
+RDX, RCX, R8, R9 registers. If no predicate is specified, all function
 invocations are traced.
 
 The predicate expression may also use the STRCMP pseudo-function to compare
 a predefined string to a string argument. For example: STRCMP("test", arg1).
 The order of arguments is important: the first argument MUST be a quoted
 literal string, and the second argument can be a runtime string, most typically
-an argument. 
+an argument.
 .TP
 .B ["format string"[, arguments]]
 A printf-style format string that will be used for the trace message. You can
@@ -158,21 +167,21 @@ process, such as sprintf.
 
 In tracepoints, both the predicate and the arguments may refer to the tracepoint
 format structure, which is stored in the special "args" variable. For example, the
-block:block_rq_complete tracepoint can print or filter by args->nr_sector. To 
-discover the format of your tracepoint, use the tplist tool. 
+block:block_rq_complete tracepoint can print or filter by args->nr_sector. To
+discover the format of your tracepoint, use the tplist tool.
 
 In USDT probes, the arg1, ..., argN variables refer to the probe's arguments.
 To determine which arguments your probe has, use the tplist tool.
 
 The predicate expression and the format specifier replacements for printing
-may also use the following special keywords: $pid, $tgid to refer to the 
+may also use the following special keywords: $pid, $tgid to refer to the
 current process' pid and tgid; $uid, $gid to refer to the current user's
 uid and gid; $cpu to refer to the current processor number.
 .SH EXAMPLES
 .TP
-Trace all invocations of the open system call with the name of the file being opened:
+Trace all invocations of the open system call with the name of the file (from userspace) being opened:
 #
-.B trace '::do_sys_open """%s"", arg2'
+.B trace '::do_sys_open """%s"", arg2@user'
 .TP
 Trace all invocations of the read system call where the number of bytes requested is greater than 20,000:
 #
@@ -184,7 +193,7 @@ Trace all malloc calls and print the size of the requested allocation:
 .TP
 Trace returns from the readline function in bash and print the return value as a string:
 #
-.B trace 'r:bash:readline """%s"", retval' 
+.B trace 'r:bash:readline """%s"", retval'
 .TP
 Trace the block:block_rq_complete tracepoint and print the number of sectors completed:
 #

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # xfsdist  Summarize XFS operation latency.
@@ -169,7 +169,7 @@ while (1):
     if args.interval and (not args.notimestamp):
         print(strftime("%H:%M:%S:"))
 
-    dist.print_log2_hist(label, "operation")
+    dist.print_log2_hist(label, "operation", section_print_fn=bytes.decode)
     dist.clear()
 
     countdown -= 1

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # syncsnoop Trace sync() syscall.
@@ -15,6 +15,7 @@
 
 from __future__ import print_function
 from bcc import BPF
+import sys
 
 # load BPF program
 b = BPF(text="""
@@ -40,6 +41,7 @@ print("%-18s %s" % ("TIME(s)", "CALL"))
 def print_event(cpu, data, size):
     event = b["events"].event(data)
     print("%-18.9f sync()" % (float(event.ts) / 1000000))
+    sys.stdout.flush()
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)

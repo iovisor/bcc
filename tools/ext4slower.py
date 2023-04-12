@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # ext4slower  Trace slow ext4 operations.
@@ -82,10 +82,10 @@ struct data_t {
     // XXX: switch some to u32's when supported
     u64 ts_us;
     u64 type;
-    u64 size;
+    u32 size;
     u64 offset;
     u64 delta_us;
-    u64 pid;
+    u32 pid;
     char task[TASK_COMM_LEN];
     char file[DNAME_INLINE_LEN];
 };
@@ -101,7 +101,7 @@ BPF_PERF_OUTPUT(events);
 // own function, for reads. So we need to trace that and then filter on ext4,
 // which I do by checking file->f_op.
 // The new Linux version (since form 4.10) uses ext4_file_read_iter(), And if the 'CONFIG_FS_DAX' 
-// is not set ,then ext4_file_read_iter() will call generic_file_read_iter(), else it will call 
+// is not set, then ext4_file_read_iter() will call generic_file_read_iter(), else it will call
 // ext4_dax_read_iter(), and trace generic_file_read_iter() will fail.
 int trace_read_entry(struct pt_regs *ctx, struct kiocb *iocb)
 {
@@ -212,9 +212,11 @@ static int trace_return(struct pt_regs *ctx, int type)
         return 0;
 
     // populate output struct
-    u32 size = PT_REGS_RC(ctx);
-    struct data_t data = {.type = type, .size = size, .delta_us = delta_us,
-        .pid = pid};
+    struct data_t data = {};
+    data.type = type;
+    data.size = PT_REGS_RC(ctx);
+    data.delta_us = delta_us;
+    data.pid = pid;
     data.ts_us = ts / 1000;
     data.offset = valp->offset;
     bpf_get_current_comm(&data.task, sizeof(data.task));

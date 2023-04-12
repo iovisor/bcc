@@ -16,3 +16,6 @@ examples/cgroupid/cgroupid
 # Output from docker builds
 scripts/docker/output/
 /output/
+
+# UAPI header generated for libbpf package-based builds
+src/cc/compat/linux/bpf.h

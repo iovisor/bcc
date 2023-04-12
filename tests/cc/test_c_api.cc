@@ -13,11 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <fcntl.h>
 #include <dlfcn.h>
-#include <stdint.h>
-#include <string.h>
+#include <fcntl.h>
 #include <link.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
@@ -25,14 +26,15 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <cstdlib>
+
 #include "bcc_elf.h"
 #include "bcc_perf_map.h"
 #include "bcc_proc.h"
 #include "bcc_syms.h"
+#include "catch.hpp"
 #include "common.h"
 #include "vendor/tinyformat.hpp"
-
-#include "catch.hpp"
 
 using namespace std;
 
@@ -110,6 +112,105 @@ TEST_CASE("resolve symbol name in external library using loaded libraries", "[c_
   bcc_procutils_free(sym.module);
 }
 
+namespace {
+
+static std::string zipped_lib_path() {
+  return CMAKE_CURRENT_BINARY_DIR "/archive.zip!/libdebuginfo_test_lib.so";
+}
+
+}  // namespace
+
+TEST_CASE("resolve symbol name in external zipped library", "[c_api]") {
+  struct bcc_symbol sym;
+  REQUIRE(bcc_resolve_symname(zipped_lib_path().c_str(), "symbol", 0x0, 0,
+                              nullptr, &sym) == 0);
+  REQUIRE(sym.module == zipped_lib_path());
+  REQUIRE(sym.offset != 0);
+  bcc_procutils_free(sym.module);
+}
+
+namespace {
+
+void system(const std::string &command) {
+  if (::system(command.c_str())) {
+    abort();
+  }
+}
+
+class TmpDir {
+ public:
+  TmpDir() : path_("/tmp/bcc-test-XXXXXX") {
+    if (::mkdtemp(&path_[0]) == nullptr) {
+      abort();
+    }
+  }
+
+  ~TmpDir() { system("rm -rf " + path_); }
+
+  const std::string &path() const { return path_; }
+
+ private:
+  std::string path_;
+};
+
+void test_debuginfo_only_symbol(const std::string &lib) {
+  struct bcc_symbol sym;
+  REQUIRE(bcc_resolve_symname(lib.c_str(), "debuginfo_only_symbol", 0x0, 0,
+                              nullptr, &sym) == 0);
+  REQUIRE(sym.module[0] == '/');
+  REQUIRE(sym.offset != 0);
+  bcc_procutils_free(sym.module);
+}
+
+}  // namespace
+
+TEST_CASE("resolve symbol name via symfs", "[c_api]") {
+  TmpDir tmpdir;
+  std::string lib_path = tmpdir.path() + "/lib.so";
+  std::string symfs = tmpdir.path() + "/symfs";
+  std::string symfs_lib_dir = symfs + "/" + tmpdir.path();
+  std::string symfs_lib_path = symfs_lib_dir + "/lib.so";
+
+  system("mkdir -p " + symfs);
+  system("cp " CMAKE_CURRENT_BINARY_DIR "/libdebuginfo_test_lib.so " +
+         lib_path);
+  system("mkdir -p " + symfs_lib_dir);
+  system("cp " CMAKE_CURRENT_BINARY_DIR "/debuginfo.so " + symfs_lib_path);
+
+  ::setenv("BCC_SYMFS", symfs.c_str(), 1);
+  test_debuginfo_only_symbol(lib_path);
+  ::unsetenv("BCC_SYMFS");
+}
+
+TEST_CASE("resolve symbol name via buildid", "[c_api]") {
+  char build_id[128] = {0};
+  REQUIRE(bcc_elf_get_buildid(CMAKE_CURRENT_BINARY_DIR
+                              "/libdebuginfo_test_lib.so",
+                              build_id) == 0);
+
+  TmpDir tmpdir;
+  std::string debugso_dir =
+      tmpdir.path() + "/.build-id/" + build_id[0] + build_id[1];
+  std::string debugso = debugso_dir + "/" + (build_id + 2) + ".debug";
+  system("mkdir -p " + debugso_dir);
+  system("cp " CMAKE_CURRENT_BINARY_DIR "/debuginfo.so " + debugso);
+
+  ::setenv("BCC_DEBUGINFO_ROOT", tmpdir.path().c_str(), 1);
+  test_debuginfo_only_symbol(CMAKE_CURRENT_BINARY_DIR
+                             "/libdebuginfo_test_lib.so");
+  ::unsetenv("BCC_DEBUGINFO_ROOT");
+}
+
+TEST_CASE("resolve symbol name via gnu_debuglink", "[c_api]") {
+  test_debuginfo_only_symbol(CMAKE_CURRENT_BINARY_DIR "/with_gnu_debuglink.so");
+}
+
+#ifdef HAVE_LIBLZMA
+TEST_CASE("resolve symbol name via mini debug info", "[c_api]") {
+  test_debuginfo_only_symbol(CMAKE_CURRENT_BINARY_DIR "/with_gnu_debugdata.so");
+}
+#endif
+
 extern "C" int _a_test_function(const char *a_string) {
   int i;
   for (i = 0; a_string[i]; ++i)
@@ -156,7 +257,7 @@ static int mntns_func(void *arg) {
     return -1;
   }
 
-  strncpy(libpath, lm->l_name, 1024);
+  strncpy(libpath, lm->l_name, sizeof(libpath) - 1);
   dlclose(dlhdl);
   dlhdl = NULL;
 
@@ -309,6 +410,107 @@ TEST_CASE("resolve symbol addresses for a given PID", "[c_api]") {
     REQUIRE(bcc_symcache_resolve_name(lazy_resolver, "/tmp/libz.so.1", "zlibVersion",
         &lazy_addr) == 0);
     REQUIRE(lazy_addr == addr);
+    bcc_free_symcache(resolver, child);
+    bcc_free_symcache(lazy_resolver, child);
+  }
+  bcc_free_symcache(resolver, getpid());
+  bcc_free_symcache(lazy_resolver, getpid());
+}
+
+TEST_CASE("resolve symbol addresses for an exited process", "[c-api]") {
+  struct bcc_symbol sym;
+  struct bcc_symbol lazy_sym;
+  static struct bcc_symbol_option lazy_opt {
+    .use_debug_file = 1, .check_debug_file_crc = 1, .lazy_symbolize = 1,
+#if defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
+    .use_symbol_type = BCC_SYM_ALL_TYPES | (1 << STT_PPC64_ELFV2_SYM_LEP),
+#else
+    .use_symbol_type = BCC_SYM_ALL_TYPES,
+#endif
+  };
+
+  SECTION("resolve in current namespace") {
+    pid_t child = spawn_child(nullptr, false, false, [](void *) {
+      sleep(5);
+      return 0;
+    });
+    void *resolver = bcc_symcache_new(child, nullptr);
+    void *lazy_resolver = bcc_symcache_new(child, &lazy_opt);
+
+    REQUIRE(resolver);
+    REQUIRE(lazy_resolver);
+
+    kill(child, SIGTERM);
+
+    REQUIRE(bcc_symcache_resolve(resolver, (uint64_t)&_a_test_function, &sym) ==
+            0);
+
+    char *this_exe = realpath("/proc/self/exe", NULL);
+    REQUIRE(string(this_exe) == sym.module);
+    free(this_exe);
+
+    REQUIRE(string("_a_test_function") == sym.name);
+
+    REQUIRE(bcc_symcache_resolve(lazy_resolver, (uint64_t)&_a_test_function,
+                                 &lazy_sym) == 0);
+    REQUIRE(string(lazy_sym.name) == sym.name);
+    REQUIRE(string(lazy_sym.module) == sym.module);
+  }
+
+  SECTION("resolve in separate pid namespace") {
+    pid_t child = spawn_child(nullptr, true, false, [](void *) {
+      sleep(5);
+      return 0;
+    });
+    void *resolver = bcc_symcache_new(child, nullptr);
+    void *lazy_resolver = bcc_symcache_new(child, &lazy_opt);
+
+    REQUIRE(resolver);
+    REQUIRE(lazy_resolver);
+
+    kill(child, SIGTERM);
+
+    REQUIRE(bcc_symcache_resolve(resolver, (uint64_t)&_a_test_function, &sym) ==
+            0);
+
+    char *this_exe = realpath("/proc/self/exe", NULL);
+    REQUIRE(string(this_exe) == sym.module);
+    free(this_exe);
+
+    REQUIRE(string("_a_test_function") == sym.name);
+
+    REQUIRE(bcc_symcache_resolve(lazy_resolver, (uint64_t)&_a_test_function,
+                                 &lazy_sym) == 0);
+    REQUIRE(string(lazy_sym.name) == sym.name);
+    REQUIRE(string(lazy_sym.module) == sym.module);
+  }
+
+  SECTION("resolve in separate pid and mount namespace") {
+    pid_t child = spawn_child(nullptr, true, true, [](void *) {
+      sleep(5);
+      return 0;
+    });
+    void *resolver = bcc_symcache_new(child, nullptr);
+    void *lazy_resolver = bcc_symcache_new(child, &lazy_opt);
+
+    REQUIRE(resolver);
+    REQUIRE(lazy_resolver);
+
+    kill(child, SIGTERM);
+
+    REQUIRE(bcc_symcache_resolve(resolver, (uint64_t)&_a_test_function, &sym) ==
+            0);
+
+    char *this_exe = realpath("/proc/self/exe", NULL);
+    REQUIRE(string(this_exe) == sym.module);
+    free(this_exe);
+
+    REQUIRE(string("_a_test_function") == sym.name);
+
+    REQUIRE(bcc_symcache_resolve(lazy_resolver, (uint64_t)&_a_test_function,
+                                 &lazy_sym) == 0);
+    REQUIRE(string(lazy_sym.name) == sym.name);
+    REQUIRE(string(lazy_sym.module) == sym.module);
   }
 }
 
@@ -412,6 +614,8 @@ TEST_CASE("resolve symbols using /tmp/perf-pid.map", "[c_api]") {
     REQUIRE(sym.module);
     REQUIRE(string(sym.module) == perf_map_path(child));
     REQUIRE(string("right_next_door_fn") == sym.name);
+    bcc_free_symcache(resolver, child);
+
   }
 
   SECTION("separate namespace") {
@@ -428,6 +632,7 @@ TEST_CASE("resolve symbols using /tmp/perf-pid.map", "[c_api]") {
     REQUIRE(string(sym.module) == perf_map_path(1));
     REQUIRE(string("dummy_fn") == sym.name);
     unlink("/tmp/perf-1.map");
+    bcc_free_symcache(resolver, child);
   }
 
   SECTION("separate pid and mount namespace") {
@@ -444,6 +649,7 @@ TEST_CASE("resolve symbols using /tmp/perf-pid.map", "[c_api]") {
     // child is PID 1 in its namespace
     REQUIRE(string(sym.module) == perf_map_path(1));
     REQUIRE(string("dummy_fn") == sym.name);
+    bcc_free_symcache(resolver, child);
   }
 
   SECTION("separate pid and mount namespace, perf-map in host") {
@@ -465,6 +671,7 @@ TEST_CASE("resolve symbols using /tmp/perf-pid.map", "[c_api]") {
     REQUIRE(string("dummy_fn") == sym.name);
 
     unlink(path.c_str());
+    bcc_free_symcache(resolver, child);
   }
 
 
@@ -486,7 +693,8 @@ struct mod_search {
 };
 
 TEST_CASE("searching for modules in /proc/[pid]/maps", "[c_api][!mayfail]") {
-  FILE *dummy_maps = fopen("dummy_proc_map.txt", "r");
+  std::string dummy_maps_path = CMAKE_CURRENT_BINARY_DIR + std::string("/dummy_proc_map.txt");
+  FILE *dummy_maps = fopen(dummy_maps_path.c_str(), "r");
   REQUIRE(dummy_maps != NULL);
 
   SECTION("name match") {
@@ -578,6 +786,27 @@ TEST_CASE("searching for modules in /proc/[pid]/maps", "[c_api][!mayfail]") {
   }
 
   fclose(dummy_maps);
+
+  SECTION("seach for lib in zip") {
+    std::string line =
+        "7f151476e000-7f1514779000 r-xp 00001000 00:1b "
+        "72809479 " CMAKE_CURRENT_BINARY_DIR "/archive.zip\n";
+    dummy_maps = fmemopen(nullptr, line.size(), "w+");
+    REQUIRE(fwrite(line.c_str(), line.size(), 1, dummy_maps) == 1);
+    fseek(dummy_maps, 0, SEEK_SET);
+
+    struct mod_search search;
+    memset(&search, 0, sizeof(struct mod_search));
+    std::string zip_entry_path = zipped_lib_path();
+    search.name = zip_entry_path.c_str();
+    int res = _procfs_maps_each_module(dummy_maps, getpid(),
+                                       _bcc_syms_find_module, &search);
+    REQUIRE(res == 0);
+    REQUIRE(search.start == 0x7f151476e000);
+    REQUIRE(search.file_offset < 0x1000);
+
+    fclose(dummy_maps);
+  }
 }
 
 TEST_CASE("resolve global addr in libc in this process", "[c_api][!mayfail]") {
@@ -598,6 +827,60 @@ TEST_CASE("resolve global addr in libc in this process", "[c_api][!mayfail]") {
   res = bcc_resolve_global_addr(pid, sopath, local_addr, 0, &global_addr);
   REQUIRE(res == 0);
   REQUIRE(global_addr == (search.start + local_addr - search.file_offset));
+  free(sopath);
+}
+
+/* Consider the following scenario: we have some process that maps in a shared library [1] with a
+ * USDT probe [2]. The shared library's .text section doesn't have matching address and file off
+ * [3]. Since the location address in [2] is an offset relative to the base address of whatever.so
+ * in whatever process is mapping it, we need to convert the location address 0x77b8c to a global
+ * address in the process' address space in order to attach to the USDT.
+ *
+ * The formula for this (__so_calc_global_addr) is
+ *   global_addr = offset + (mod_start_addr - mod_file_offset)
+ *                        - (elf_sec_start_addr - elf_sec_file_offset)
+ *
+ * Which for our concrete example is
+ *   global_addr = 0x77b8c + (0x7f6cda31e000 - 0x72000) - (0x73c90 - 0x72c90)
+ *   global_addr = 0x7f6cda322b8c
+ *
+ * [1 - output from `cat /proc/PID/maps`]
+ * 7f6cda2ab000-7f6cda31e000 r--p 00000000 00:2d 5370022276                 /whatever.so
+ * 7f6cda31e000-7f6cda434000 r-xp 00072000 00:2d 5370022276                 /whatever.so
+ * 7f6cda434000-7f6cda43d000 r--p 00187000 00:2d 5370022276                 /whatever.so
+ * 7f6cda43d000-7f6cda43f000 rw-p 0018f000 00:2d 5370022276                 /whatever.so
+ *
+ * [2 - output from `readelf -n /whatever.so`]
+ * stapsdt              0x00000038 NT_STAPSDT (SystemTap probe descriptors)
+ *   Provider: test
+ *   Name: test_probe
+ *   Location: 0x0000000000077b8c, Base: 0x0000000000000000, Semaphore: 0x0000000000000000
+ *   Arguments: -8@$5
+ *
+ * [3 - output from `readelf -W --sections /whatever.so`]
+ *   [Nr] Name              Type            Address          Off    Size   ES Flg Lk Inf Al
+ *   [16] .text             PROGBITS        0000000000073c90 072c90 1132dc 00  AX  0   0 16
+ */
+TEST_CASE("conversion of module offset to/from global_addr", "[c_api]") {
+  uint64_t global_addr, offset, calc_offset, mod_start_addr, mod_file_offset;
+  uint64_t elf_sec_start_addr, elf_sec_file_offset;
+
+  /* Initialize per example in comment above */
+  offset = 0x77b8c;
+  mod_start_addr = 0x7f6cda31e000;
+  mod_file_offset = 0x00072000;
+  elf_sec_start_addr = 0x73c90;
+  elf_sec_file_offset = 0x72c90;
+  global_addr = __so_calc_global_addr(mod_start_addr, mod_file_offset,
+                                      elf_sec_start_addr, elf_sec_file_offset,
+                                      offset);
+  REQUIRE(global_addr == 0x7f6cda322b8c);
+
+  /* Reverse operation (global_addr -> offset) should yield original offset */
+  calc_offset = __so_calc_mod_offset(mod_start_addr, mod_file_offset,
+                                     elf_sec_start_addr, elf_sec_file_offset,
+                                     global_addr);
+  REQUIRE(calc_offset == offset);
 }
 
 TEST_CASE("get online CPUs", "[c_api]") {

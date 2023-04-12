@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) Sasha Goldshtein
 # Licensed under the Apache License, Version 2.0 (the "License")
 
@@ -12,7 +12,7 @@ import subprocess
 @unittest.skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
 class TestTracepoint(unittest.TestCase):
     def test_tracepoint(self):
-        text = """
+        text = b"""
         BPF_HASH(switches, u32, u64);
         TRACEPOINT_PROBE(sched, sched_switch) {
             u64 val = 0;
@@ -25,14 +25,14 @@ class TestTracepoint(unittest.TestCase):
         b = bcc.BPF(text=text)
         sleep(1)
         total_switches = 0
-        for k, v in b["switches"].items():
+        for k, v in b[b"switches"].items():
             total_switches += v.value
         self.assertNotEqual(0, total_switches)
 
 @unittest.skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
 class TestTracepointDataLoc(unittest.TestCase):
     def test_tracepoint_data_loc(self):
-        text = """
+        text = b"""
         struct value_t {
             char filename[64];
         };
@@ -51,7 +51,7 @@ class TestTracepointDataLoc(unittest.TestCase):
         subprocess.check_output(["/bin/ls"])
         sleep(1)
         self.assertTrue("/bin/ls" in [v.filename.decode()
-                                      for v in b["execs"].values()])
+                                      for v in b[b"execs"].values()])
 
 if __name__ == "__main__":
     unittest.main()

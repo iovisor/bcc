@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # solisten      Trace TCP listen events
 #               For Linux, uses BCC, eBPF. Embedded C.
@@ -58,8 +58,8 @@ bpf_text = """
 // Common structure for UDP/TCP IPv4/IPv6
 struct listen_evt_t {
     u64 ts_us;
-    u64 pid;
-    u64 backlog;
+    u32 pid;
+    int backlog;
     u64 netns;
     u64 proto;    // familiy << 16 | type
     u64 lport;    // use only 16 bits

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
@@ -139,10 +139,10 @@ class TestBPFSocket(TestCase):
     @mayFail("This fails on github actions environment, and needs to be fixed")
     def test_brb2(self):
         try:
-            b = BPF(src_file=arg1, debug=0)
-            self.pem_fn = b.load_func("pem", BPF.SCHED_CLS)
-            self.pem_dest= b.get_table("pem_dest")
-            self.pem_stats = b.get_table("pem_stats")
+            b = BPF(src_file=arg1.encode(), debug=0)
+            self.pem_fn = b.load_func(b"pem", BPF.SCHED_CLS)
+            self.pem_dest= b.get_table(b"pem_dest")
+            self.pem_stats = b.get_table(b"pem_stats")
 
             # set up the topology
             self.set_default_const()

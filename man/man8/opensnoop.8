@@ -2,8 +2,8 @@
 .SH NAME
 opensnoop \- Trace open() syscalls. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B opensnoop.py [\-h] [\-T] [\-U] [\-x] [\-p PID] [\-t TID] [\-u UID]
-             [\-d DURATION] [\-n NAME] [\-e] [\-f FLAG_FILTER]
+.B opensnoop [\-h] [\-T] [\-U] [\-x] [\-p PID] [\-t TID] [\-u UID]
+             [\-d DURATION] [\-n NAME] [\-e] [\-f FLAG_FILTER] [\-F]
              [--cgroupmap MAPPATH] [--mntnsmap MAPPATH]
 .SH DESCRIPTION
 opensnoop traces the open() syscall, showing which processes are attempting
@@ -55,6 +55,9 @@ Show extended fields.
 .TP
 \-f FLAG
 Filter on open() flags, e.g., O_WRONLY.
+.TP
+\-F
+Show full path for an open file with relative path.
 .TP
 \--cgroupmap MAPPATH
 Trace cgroups in this BPF map only (filtered in-kernel).
@@ -151,6 +154,6 @@ Linux
 .SH STABILITY
 Unstable - in development.
 .SH AUTHOR
-Brendan Gregg
+Brendan Gregg, Rocky Xing
 .SH SEE ALSO
 execsnoop(8), funccount(1)

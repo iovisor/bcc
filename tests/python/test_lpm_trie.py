@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) 2017 Facebook, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
@@ -20,7 +20,7 @@ class KeyV6(ct.Structure):
 @skipUnless(kernel_version_ge(4, 11), "requires kernel >= 4.11")
 class TestLpmTrie(TestCase):
     def test_lpm_trie_v4(self):
-        test_prog1 = """
+        test_prog1 = b"""
         struct key_v4 {
             u32 prefixlen;
             u32 data[4];
@@ -28,7 +28,7 @@ class TestLpmTrie(TestCase):
         BPF_LPM_TRIE(trie, struct key_v4, int, 16);
         """
         b = BPF(text=test_prog1)
-        t = b["trie"]
+        t = b[b"trie"]
 
         k1 = KeyV4(24, (192, 168, 0, 0))
         v1 = ct.c_int(24)
@@ -49,7 +49,7 @@ class TestLpmTrie(TestCase):
             v = t[k]
 
     def test_lpm_trie_v6(self):
-        test_prog1 = """
+        test_prog1 = b"""
         struct key_v6 {
             u32 prefixlen;
             u32 data[4];
@@ -57,7 +57,7 @@ class TestLpmTrie(TestCase):
         BPF_LPM_TRIE(trie, struct key_v6, int, 16);
         """
         b = BPF(text=test_prog1)
-        t = b["trie"]
+        t = b[b"trie"]
 
         k1 = KeyV6(64, IPAddress('2a00:1450:4001:814:200e::').words)
         v1 = ct.c_int(64)

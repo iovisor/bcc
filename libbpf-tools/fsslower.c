@@ -24,6 +24,7 @@
 
 #include "fsslower.h"
 #include "fsslower.skel.h"
+#include "btf_helpers.h"
 #include "trace_helpers.h"
 
 #define PERF_BUFFER_PAGES	64
@@ -41,42 +42,42 @@ enum fs_type {
 
 static struct fs_config {
 	const char *fs;
-	const char *op_funcs[MAX_OP];
+	const char *op_funcs[F_MAX_OP];
 } fs_configs[] = {
 	[BTRFS] = { "btrfs", {
-		[READ] = "btrfs_file_read_iter",
-		[WRITE] = "btrfs_file_write_iter",
-		[OPEN] = "btrfs_file_open",
-		[FSYNC] = "btrfs_sync_file",
+		[F_READ] = "btrfs_file_read_iter",
+		[F_WRITE] = "btrfs_file_write_iter",
+		[F_OPEN] = "btrfs_file_open",
+		[F_FSYNC] = "btrfs_sync_file",
 	}},
 	[EXT4] = { "ext4", {
-		[READ] = "ext4_file_read_iter",
-		[WRITE] = "ext4_file_write_iter",
-		[OPEN] = "ext4_file_open",
-		[FSYNC] = "ext4_sync_file",
+		[F_READ] = "ext4_file_read_iter",
+		[F_WRITE] = "ext4_file_write_iter",
+		[F_OPEN] = "ext4_file_open",
+		[F_FSYNC] = "ext4_sync_file",
 	}},
 	[NFS] = { "nfs", {
-		[READ] = "nfs_file_read",
-		[WRITE] = "nfs_file_write",
-		[OPEN] = "nfs_file_open",
-		[FSYNC] = "nfs_file_fsync",
+		[F_READ] = "nfs_file_read",
+		[F_WRITE] = "nfs_file_write",
+		[F_OPEN] = "nfs_file_open",
+		[F_FSYNC] = "nfs_file_fsync",
 	}},
 	[XFS] = { "xfs", {
-		[READ] = "xfs_file_read_iter",
-		[WRITE] = "xfs_file_write_iter",
-		[OPEN] = "xfs_file_open",
-		[FSYNC] = "xfs_file_fsync",
+		[F_READ] = "xfs_file_read_iter",
+		[F_WRITE] = "xfs_file_write_iter",
+		[F_OPEN] = "xfs_file_open",
+		[F_FSYNC] = "xfs_file_fsync",
 	}},
 };
 
 static char file_op[] = {
-	[READ] = 'R',
-	[WRITE] = 'W',
-	[OPEN] = 'O',
-	[FSYNC] = 'F',
+	[F_READ] = 'R',
+	[F_WRITE] = 'W',
+	[F_OPEN] = 'O',
+	[F_FSYNC] = 'F',
 };
 
-static volatile sig_atomic_t exiting;
+static volatile sig_atomic_t exiting = 0;
 
 /* options */
 static enum fs_type fs_type = NONE;
@@ -180,15 +181,14 @@ static void alias_parse(char *prog)
 	}
 }
 
-static int libbpf_print_fn(enum libbpf_print_level level,
-			   const char *format, va_list args)
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
 	if (level == LIBBPF_DEBUG && !verbose)
 		return 0;
 	return vfprintf(stderr, format, args);
 }
 
-static void sig_handler(int sig)
+static void sig_int(int signo)
 {
 	exiting = 1;
 }
@@ -199,10 +199,10 @@ static bool check_fentry()
 	const char *fn_name, *module;
 	bool support_fentry = true;
 
-	for (i = 0; i < MAX_OP; i++) {
+	for (i = 0; i < F_MAX_OP; i++) {
 		fn_name = fs_configs[fs_type].op_funcs[i];
 		module = fs_configs[fs_type].fs;
-		if (fn_name && !fentry_exists(fn_name, module)) {
+		if (fn_name && !fentry_can_attach(fn_name, module)) {
 			support_fentry = false;
 			break;
 		}
@@ -215,14 +215,14 @@ static int fentry_set_attach_target(struct fsslower_bpf *obj)
 	struct fs_config *cfg = &fs_configs[fs_type];
 	int err = 0;
 
-	err = err ?: bpf_program__set_attach_target(obj->progs.file_read_fentry, 0, cfg->op_funcs[READ]);
-	err = err ?: bpf_program__set_attach_target(obj->progs.file_read_fexit, 0, cfg->op_funcs[READ]);
-	err = err ?: bpf_program__set_attach_target(obj->progs.file_write_fentry, 0, cfg->op_funcs[WRITE]);
-	err = err ?: bpf_program__set_attach_target(obj->progs.file_write_fexit, 0, cfg->op_funcs[WRITE]);
-	err = err ?: bpf_program__set_attach_target(obj->progs.file_open_fentry, 0, cfg->op_funcs[OPEN]);
-	err = err ?: bpf_program__set_attach_target(obj->progs.file_open_fexit, 0, cfg->op_funcs[OPEN]);
-	err = err ?: bpf_program__set_attach_target(obj->progs.file_sync_fentry, 0, cfg->op_funcs[FSYNC]);
-	err = err ?: bpf_program__set_attach_target(obj->progs.file_sync_fexit, 0, cfg->op_funcs[FSYNC]);
+	err = err ?: bpf_program__set_attach_target(obj->progs.file_read_fentry, 0, cfg->op_funcs[F_READ]);
+	err = err ?: bpf_program__set_attach_target(obj->progs.file_read_fexit, 0, cfg->op_funcs[F_READ]);
+	err = err ?: bpf_program__set_attach_target(obj->progs.file_write_fentry, 0, cfg->op_funcs[F_WRITE]);
+	err = err ?: bpf_program__set_attach_target(obj->progs.file_write_fexit, 0, cfg->op_funcs[F_WRITE]);
+	err = err ?: bpf_program__set_attach_target(obj->progs.file_open_fentry, 0, cfg->op_funcs[F_OPEN]);
+	err = err ?: bpf_program__set_attach_target(obj->progs.file_open_fexit, 0, cfg->op_funcs[F_OPEN]);
+	err = err ?: bpf_program__set_attach_target(obj->progs.file_sync_fentry, 0, cfg->op_funcs[F_FSYNC]);
+	err = err ?: bpf_program__set_attach_target(obj->progs.file_sync_fexit, 0, cfg->op_funcs[F_FSYNC]);
 	return err;
 }
 
@@ -255,45 +255,38 @@ static int attach_kprobes(struct fsslower_bpf *obj)
 	long err = 0;
 	struct fs_config *cfg = &fs_configs[fs_type];
 
-	/* READ */
-	obj->links.file_read_entry = bpf_program__attach_kprobe(obj->progs.file_read_entry, false, cfg->op_funcs[READ]);
-	err = libbpf_get_error(obj->links.file_read_entry);
-	if (err)
+	/* F_READ */
+	obj->links.file_read_entry = bpf_program__attach_kprobe(obj->progs.file_read_entry, false, cfg->op_funcs[F_READ]);
+	if (!obj->links.file_read_entry)
 		goto errout;
-	obj->links.file_read_exit = bpf_program__attach_kprobe(obj->progs.file_read_exit, true, cfg->op_funcs[READ]);
-	err = libbpf_get_error(obj->links.file_read_exit);
-	if (err)
+	obj->links.file_read_exit = bpf_program__attach_kprobe(obj->progs.file_read_exit, true, cfg->op_funcs[F_READ]);
+	if (!obj->links.file_read_exit)
 		goto errout;
-	/* WRITE */
-	obj->links.file_write_entry = bpf_program__attach_kprobe(obj->progs.file_write_entry, false, cfg->op_funcs[WRITE]);
-	err = libbpf_get_error(obj->links.file_write_entry);
-	if (err)
+	/* F_WRITE */
+	obj->links.file_write_entry = bpf_program__attach_kprobe(obj->progs.file_write_entry, false, cfg->op_funcs[F_WRITE]);
+	if (!obj->links.file_write_entry)
 		goto errout;
-	obj->links.file_write_exit = bpf_program__attach_kprobe(obj->progs.file_write_exit, true, cfg->op_funcs[WRITE]);
-	err = libbpf_get_error(obj->links.file_write_exit);
-	if (err)
+	obj->links.file_write_exit = bpf_program__attach_kprobe(obj->progs.file_write_exit, true, cfg->op_funcs[F_WRITE]);
+	if (!obj->links.file_write_exit)
 		goto errout;
-	/* OPEN */
-	obj->links.file_open_entry = bpf_program__attach_kprobe(obj->progs.file_open_entry, false, cfg->op_funcs[OPEN]);
-	err = libbpf_get_error(obj->links.file_open_entry);
-	if (err)
+	/* F_OPEN */
+	obj->links.file_open_entry = bpf_program__attach_kprobe(obj->progs.file_open_entry, false, cfg->op_funcs[F_OPEN]);
+	if (!obj->links.file_open_entry)
 		goto errout;
-	obj->links.file_open_exit = bpf_program__attach_kprobe(obj->progs.file_open_exit, true, cfg->op_funcs[OPEN]);
-	err = libbpf_get_error(obj->links.file_open_exit);
-	if (err)
+	obj->links.file_open_exit = bpf_program__attach_kprobe(obj->progs.file_open_exit, true, cfg->op_funcs[F_OPEN]);
+	if (!obj->links.file_open_exit)
 		goto errout;
-	/* FSYNC */
-	obj->links.file_sync_entry = bpf_program__attach_kprobe(obj->progs.file_sync_entry, false, cfg->op_funcs[FSYNC]);
-	err = libbpf_get_error(obj->links.file_sync_entry);
-	if (err)
+	/* F_FSYNC */
+	obj->links.file_sync_entry = bpf_program__attach_kprobe(obj->progs.file_sync_entry, false, cfg->op_funcs[F_FSYNC]);
+	if (!obj->links.file_sync_entry)
 		goto errout;
-	obj->links.file_sync_exit = bpf_program__attach_kprobe(obj->progs.file_sync_exit, true, cfg->op_funcs[FSYNC]);
-	err = libbpf_get_error(obj->links.file_sync_exit);
-	if (err)
+	obj->links.file_sync_exit = bpf_program__attach_kprobe(obj->progs.file_sync_exit, true, cfg->op_funcs[F_FSYNC]);
+	if (!obj->links.file_sync_exit)
 		goto errout;
 	return 0;
 
 errout:
+	err = -errno;
 	warn("failed to attach kprobe: %ld\n", err);
 	return err;
 }
@@ -357,12 +350,12 @@ static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 
 int main(int argc, char **argv)
 {
+	LIBBPF_OPTS(bpf_object_open_opts, open_opts);
 	static const struct argp argp = {
 		.options = opts,
 		.parser = parse_arg,
 		.doc = argp_program_doc,
 	};
-	struct perf_buffer_opts pb_opts;
 	struct perf_buffer *pb = NULL;
 	struct fsslower_bpf *skel;
 	__u64 time_end = 0;
@@ -380,13 +373,13 @@ int main(int argc, char **argv)
 
 	libbpf_set_print(libbpf_print_fn);
 
-	err = bump_memlock_rlimit();
+	err = ensure_core_btf(&open_opts);
 	if (err) {
-		warn("failed to increase rlimit: %d\n", err);
+		fprintf(stderr, "failed to fetch necessary BTF for CO-RE: %s\n", strerror(-err));
 		return 1;
 	}
 
-	skel = fsslower_bpf__open();
+	skel = fsslower_bpf__open_opts(&open_opts);
 	if (!skel) {
 		warn("failed to open BPF object\n");
 		return 1;
@@ -429,15 +422,10 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	signal(SIGINT, sig_handler);
-
-	pb_opts.sample_cb = handle_event;
-	pb_opts.lost_cb = handle_lost_events;
 	pb = perf_buffer__new(bpf_map__fd(skel->maps.events), PERF_BUFFER_PAGES,
-			      &pb_opts);
-	err = libbpf_get_error(pb);
-	if (err) {
-		pb = NULL;
+			      handle_event, handle_lost_events, NULL, NULL);
+	if (!pb) {
+		err = -errno;
 		warn("failed to open perf buffer: %d\n", err);
 		goto cleanup;
 	}
@@ -447,17 +435,29 @@ int main(int argc, char **argv)
 	if (duration)
 		time_end = get_ktime_ns() + duration * NSEC_PER_SEC;
 
-	while (1) {
-		if ((err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS)) < 0)
-			break;
+	if (signal(SIGINT, sig_int) == SIG_ERR) {
+		warn("can't set signal handler: %s\n", strerror(errno));
+		err = 1;
+		goto cleanup;
+	}
+
+	/* main: poll */
+	while (!exiting) {
+		err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS);
+		if (err < 0 && err != -EINTR) {
+			fprintf(stderr, "error polling perf buffer: %s\n", strerror(-err));
+			goto cleanup;
+		}
 		if (duration && get_ktime_ns() > time_end)
 			goto cleanup;
+		/* reset err to return 0 if exiting */
+		err = 0;
 	}
-	warn("failed with polling perf buffer: %d\n", err);
 
 cleanup:
 	perf_buffer__free(pb);
 	fsslower_bpf__destroy(skel);
+	cleanup_core_btf(&open_opts);
 
 	return err != 0;
 }

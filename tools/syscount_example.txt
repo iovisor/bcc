@@ -139,20 +139,37 @@ unlink                        1
 rmdir                         1
 ^C
 
+Sometimes, you'd only care about a single syscall rather than all syscalls.
+Use the --syscall option for this; the following example also demonstrates
+the --syscall option, for printing at predefined intervals:
+
+# syscount --syscall stat -i 1
+Tracing syscall 'stat'... Ctrl+C to quit.
+[12:51:06]
+SYSCALL                   COUNT
+stat                        310
+
+[12:51:07]
+SYSCALL                   COUNT
+stat                        316
+^C
+
 USAGE:
 # syscount -h
-usage: syscount.py [-h] [-p PID] [-i INTERVAL] [-T TOP] [-x] [-e ERRNO] [-L]
-                   [-m] [-P] [-l]
+usage: syscount.py [-h] [-p PID] [-t TID] [-i INTERVAL] [-d DURATION] [-T TOP]
+                   [-x] [-e ERRNO] [-L] [-m] [-P] [-l] [--syscall SYSCALL]
 
 Summarize syscall counts and latencies.
 
 optional arguments:
   -h, --help            show this help message and exit
   -p PID, --pid PID     trace only this pid
+  -t TID, --tid TID     trace only this tid
+  -c PPID, --ppid PPID  trace only child of this pid
   -i INTERVAL, --interval INTERVAL
                         print summary at this interval (seconds)
   -d DURATION, --duration DURATION
-			total duration of trace, in seconds
+                        total duration of trace, in seconds
   -T TOP, --top TOP     print only the top syscalls by count or latency
   -x, --failures        trace only failed syscalls (return < 0)
   -e ERRNO, --errno ERRNO
@@ -163,3 +180,5 @@ optional arguments:
                         microseconds)
   -P, --process         count by process and not by syscall
   -l, --list            print list of recognized syscalls and exit
+  --syscall SYSCALL     trace this syscall only (use option -l to get all
+                        recognized syscalls)

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # bashreadline  Print entered bash commands from all running shells.
 #               For Linux, uses BCC, eBPF. Embedded C.
@@ -38,7 +38,7 @@ bpf_text = """
 #include <linux/sched.h>
 
 struct str_t {
-    u64 pid;
+    u32 pid;
     char str[80];
 };
 
@@ -47,11 +47,9 @@ BPF_PERF_OUTPUT(events);
 int printret(struct pt_regs *ctx) {
     struct str_t data  = {};
     char comm[TASK_COMM_LEN] = {};
-    u32 pid;
     if (!PT_REGS_RC(ctx))
         return 0;
-    pid = bpf_get_current_pid_tgid() >> 32;
-    data.pid = pid;
+    data.pid = bpf_get_current_pid_tgid() >> 32;
     bpf_probe_read_user(&data.str, sizeof(data.str), (void *)PT_REGS_RC(ctx));
 
     bpf_get_current_comm(&comm, sizeof(comm));
@@ -68,11 +66,11 @@ b = BPF(text=bpf_text)
 b.attach_uretprobe(name=name, sym="readline", fn_name="printret")
 
 # header
-print("%-9s %-6s %s" % ("TIME", "PID", "COMMAND"))
+print("%-9s %-7s %s" % ("TIME", "PID", "COMMAND"))
 
 def print_event(cpu, data, size):
     event = b["events"].event(data)
-    print("%-9s %-6d %s" % (strftime("%H:%M:%S"), event.pid,
+    print("%-9s %-7d %s" % (strftime("%H:%M:%S"), event.pid,
                             event.str.decode('utf-8', 'replace')))
 
 b["events"].open_perf_buffer(print_event)

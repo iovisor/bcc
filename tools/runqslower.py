@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # runqslower    Trace long process scheduling delays.
@@ -52,6 +52,8 @@ parser = argparse.ArgumentParser(
     epilog=examples)
 parser.add_argument("min_us", nargs="?", default='10000',
     help="minimum run queue latency to trace, in us (default 10000)")
+parser.add_argument("-P", "--previous", action="store_true",
+    help="also show previous task name and TID")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 
@@ -60,8 +62,6 @@ thread_group.add_argument("-p", "--pid", metavar="PID", dest="pid",
     help="trace this PID only", type=int)
 thread_group.add_argument("-t", "--tid", metavar="TID", dest="tid",
     help="trace this TID only", type=int)
-thread_group.add_argument("-P", "--previous", action="store_true",
-    help="also show previous task name and TID")
 args = parser.parse_args()
 
 min_us = int(args.min_us)
@@ -74,9 +74,7 @@ bpf_text = """
 #include <linux/nsproxy.h>
 #include <linux/pid_namespace.h>
 
-BPF_HASH(start, u32);
-
-struct rq;
+BPF_ARRAY(start, u64, MAX_PID);
 
 struct data_t {
     u32 pid;
@@ -114,16 +112,16 @@ int trace_ttwu_do_wakeup(struct pt_regs *ctx, struct rq *rq, struct task_struct 
 // calculate latency
 int trace_run(struct pt_regs *ctx, struct task_struct *prev)
 {
-    u32 pid, tgid, prev_pid;
+    u32 pid, tgid;
 
     // ivcsw: treat like an enqueue event and store timestamp
-    prev_pid = prev->pid;
-    if (prev->state == TASK_RUNNING) {
+    if (prev->STATE_FIELD == TASK_RUNNING) {
         tgid = prev->tgid;
+        pid = prev->pid;
         u64 ts = bpf_ktime_get_ns();
-        if (prev_pid != 0) {
+        if (pid != 0) {
             if (!(FILTER_PID) && !(FILTER_TGID)) {
-                start.update(&prev_pid, &ts);
+                start.update(&pid, &ts);
             }
         }
     }
@@ -134,7 +132,7 @@ int trace_run(struct pt_regs *ctx, struct task_struct *prev)
 
     // fetch timestamp and calculate delta
     tsp = start.lookup(&pid);
-    if (tsp == 0) {
+    if ((tsp == 0) || (*tsp == 0)) {
         return 0;   // missed enqueue
     }
     delta_us = (bpf_ktime_get_ns() - *tsp) / 1000;
@@ -144,7 +142,7 @@ int trace_run(struct pt_regs *ctx, struct task_struct *prev)
 
     struct data_t data = {};
     data.pid = pid;
-    data.prev_pid = prev_pid;
+    data.prev_pid = prev->pid;
     data.delta_us = delta_us;
     bpf_get_current_comm(&data.task, sizeof(data.task));
     bpf_probe_read_kernel_str(&data.prev_task, sizeof(data.prev_task), prev->comm);
@@ -152,7 +150,8 @@ int trace_run(struct pt_regs *ctx, struct task_struct *prev)
     // output
     events.perf_submit(ctx, &data, sizeof(data));
 
-    start.delete(&pid);
+    //array map has no delete method, set ts to 0 instead
+    *tsp = 0;
     return 0;
 }
 """
@@ -181,30 +180,32 @@ RAW_TRACEPOINT_PROBE(sched_switch)
     // TP_PROTO(bool preempt, struct task_struct *prev, struct task_struct *next)
     struct task_struct *prev = (struct task_struct *)ctx->args[1];
     struct task_struct *next= (struct task_struct *)ctx->args[2];
-    u32 tgid, pid, prev_pid;
+    u32 tgid, pid;
     long state;
 
     // ivcsw: treat like an enqueue event and store timestamp
-    bpf_probe_read_kernel(&state, sizeof(long), (const void *)&prev->state);
-    bpf_probe_read_kernel(&prev_pid, sizeof(prev->pid), &prev->pid);
+    bpf_probe_read_kernel(&state, sizeof(long), (const void *)&prev->STATE_FIELD);
+    bpf_probe_read_kernel(&pid, sizeof(prev->pid), &prev->pid);
     if (state == TASK_RUNNING) {
         bpf_probe_read_kernel(&tgid, sizeof(prev->tgid), &prev->tgid);
         u64 ts = bpf_ktime_get_ns();
-        if (prev_pid != 0) {
+        if (pid != 0) {
             if (!(FILTER_PID) && !(FILTER_TGID)) {
-                start.update(&prev_pid, &ts);
+                start.update(&pid, &ts);
             }
         }
 
     }
 
-    bpf_probe_read_kernel(&pid, sizeof(next->pid), &next->pid);
-
+    u32 prev_pid;
     u64 *tsp, delta_us;
+
+    prev_pid = pid;
+    bpf_probe_read_kernel(&pid, sizeof(next->pid), &next->pid);
 
     // fetch timestamp and calculate delta
     tsp = start.lookup(&pid);
-    if (tsp == 0) {
+    if ((tsp == 0) || (*tsp == 0)) {
         return 0;   // missed enqueue
     }
     delta_us = (bpf_ktime_get_ns() - *tsp) / 1000;
@@ -222,7 +223,8 @@ RAW_TRACEPOINT_PROBE(sched_switch)
     // output
     events.perf_submit(ctx, &data, sizeof(data));
 
-    start.delete(&pid);
+    //array map has no delete method, set ts to 0 instead
+    *tsp = 0;
     return 0;
 }
 """
@@ -234,6 +236,10 @@ else:
     bpf_text += bpf_text_kprobe
 
 # code substitutions
+if BPF.kernel_struct_has_field(b'task_struct', b'__state') == 1:
+    bpf_text = bpf_text.replace('STATE_FIELD', '__state')
+else:
+    bpf_text = bpf_text.replace('STATE_FIELD', 'state')
 if min_us == 0:
     bpf_text = bpf_text.replace('FILTER_US', '0')
 else:
@@ -258,12 +264,14 @@ if debug or args.ebpf:
 def print_event(cpu, data, size):
     event = b["events"].event(data)
     if args.previous:
-        print("%-8s %-16s %-6s %14s %-16s %-6s" % (strftime("%H:%M:%S"), event.task, event.pid, event.delta_us, event.prev_task, event.prev_pid))
+        print("%-8s %-16s %-6s %14s %-16s %-6s" % (strftime("%H:%M:%S"), event.task.decode('utf-8', 'replace'), event.pid, event.delta_us, event.prev_task.decode('utf-8', 'replace'), event.prev_pid))
     else:
-        print("%-8s %-16s %-6s %14s" % (strftime("%H:%M:%S"), event.task, event.pid, event.delta_us))
+        print("%-8s %-16s %-6s %14s" % (strftime("%H:%M:%S"), event.task.decode('utf-8', 'replace'), event.pid, event.delta_us))
+
+max_pid = int(open("/proc/sys/kernel/pid_max").read())
 
 # load BPF program
-b = BPF(text=bpf_text)
+b = BPF(text=bpf_text, cflags=["-DMAX_PID=%d" % max_pid])
 if not is_support_raw_tp:
     b.attach_kprobe(event="ttwu_do_wakeup", fn_name="trace_ttwu_do_wakeup")
     b.attach_kprobe(event="wake_up_new_task", fn_name="trace_wake_up_new_task")

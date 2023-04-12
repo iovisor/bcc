@@ -44,7 +44,7 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
         - [6. ringbuf_output()](#6-ringbuf_output)
         - [7. ringbuf_reserve()](#7-ringbuf_reserve)
         - [8. ringbuf_submit()](#8-ringbuf_submit)
-        - [9. ringbuf_discard()](#9-ringbuf_submit)
+        - [9. ringbuf_discard()](#9-ringbuf_discard)
     - [Maps](#maps)
         - [1. BPF_TABLE](#1-bpf_table)
         - [2. BPF_HASH](#2-bpf_hash)
@@ -104,11 +104,11 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
     - [Debug Output](#debug-output)
         - [1. trace_print()](#1-trace_print)
         - [2. trace_fields()](#2-trace_fields)
-    - [Output](#output)
+    - [Output APIs](#output-apis)
         - [1. perf_buffer_poll()](#1-perf_buffer_poll)
         - [2. ring_buffer_poll()](#2-ring_buffer_poll)
         - [3. ring_buffer_consume()](#3-ring_buffer_consume)
-    - [Maps](#maps)
+    - [Map APIs](#map-apis)
         - [1. get_table()](#1-get_table)
         - [2. open_perf_buffer()](#2-open_perf_buffer)
         - [3. items()](#3-items)
@@ -135,7 +135,7 @@ This guide is incomplete. If something feels missing, check the bcc and kernel s
     - [1. Invalid mem access](#1-invalid-mem-access)
     - [2. Cannot call GPL only function from proprietary program](#2-cannot-call-gpl-only-function-from-proprietary-program)
 
-- [Environment Variables](#envvars)
+- [Environment Variables](#Environment-Variables)
     - [1. kernel source directory](#1-kernel-source-directory)
     - [2. kernel version overriding](#2-kernel-version-overriding)
 
@@ -202,6 +202,9 @@ Syntax: TRACEPOINT_PROBE(*category*, *event*)
 
 This is a macro that instruments the tracepoint defined by *category*:*event*.
 
+The tracepoint name is `<category>:<event>`.
+The probe function name is `tracepoint__<category>__<event>`.
+
 Arguments are available in an ```args``` struct, which are the tracepoint arguments. One way to list these is to cat the relevant format file under /sys/kernel/debug/tracing/events/*category*/*event*/format.
 
 The ```args``` struct can be used in place of ``ctx`` in each functions requiring a context as an argument. This includes notably [perf_submit()](#3-perf_submit).
@@ -216,7 +219,11 @@ TRACEPOINT_PROBE(random, urandom_read) {
 }
 ```
 
-This instruments the random:urandom_read tracepoint, and prints the tracepoint argument ```got_bits```.
+This instruments the tracepoint `random:urandom_read tracepoint`, and prints the tracepoint argument ```got_bits```.
+When using Python API, this probe is automatically attached to the right tracepoint target.
+For C++, this tracepoint probe can be attached by specifying the tracepoint target and function name explicitly:
+`BPF::attach_tracepoint("random:urandom_read", "tracepoint__random__urandom_read")`
+Note the name of the probe function defined above is `tracepoint__random__urandom_read`.
 
 Examples in situ:
 [code](https://github.com/iovisor/bcc/blob/a4159da8c4ea8a05a3c6e402451f530d6e5a8b41/examples/tracing/urandomread.py#L19) ([output](https://github.com/iovisor/bcc/commit/e422f5e50ecefb96579b6391a2ada7f6367b83c4#diff-41e5ecfae4a3b38de5f4e0887ed160e5R10)),
@@ -411,7 +418,7 @@ used to audit security events and implement MAC security policies in BPF.
 It is defined by specifying the hook name followed by its arguments.
 
 Hook names can be found in
-[include/linux/security.h](https://github.com/torvalds/linux/tree/master/include/linux/security.h#L254)
+[include/linux/security.h](https://github.com/torvalds/linux/blob/v5.15/include/linux/security.h#L260)
 by taking functions like `security_hookname` and taking just the `hookname` part.
 For example, `security_bpf` would simply become `bpf`.
 
@@ -745,10 +752,10 @@ Creates a BPF table for pushing out custom event data to user space via a ringbu
 
 - Buffer is shared across all CPUs, meaning no per-CPU allocation
 - Supports two APIs for BPF programs
-    - ```map.ringbuf_output()``` works like ```map.perf_submit()``` (covered in [ringbuf_output](#5-ringbuf_output))
+    - ```map.ringbuf_output()``` works like ```map.perf_submit()``` (covered in [ringbuf_output](#6-ringbuf_output))
     - ```map.ringbuf_reserve()```/```map.ringbuf_submit()```/```map.ringbuf_discard()```
       split the process of reserving buffer space and submitting events into two steps
-      (covered in [ringbuf_reserve](#6-ringbuf_reserve), [ringbuf_submit](#7-ringbuf_submit), [ringbuf_discard](#8-ringbuf_submit))
+      (covered in [ringbuf_reserve](#7-ringbuf_reserve), [ringbuf_submit](#8-ringbuf_submit), [ringbuf_discard](#9-ringbuf_discard))
 - BPF APIs do not require access to a CPU ctx argument
 - Superior performance and latency in userspace thanks to a shared ring buffer manager
 - Supports two ways of consuming data in userspace
@@ -869,7 +876,7 @@ Maps are BPF data stores, and are the basis for higher level object types includ
 
 Syntax: ```BPF_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries)```
 
-Creates a map named ```_name```. Most of the time this will be used via higher-level macros, like BPF_HASH, BPF_ARRAY, BPF_HISTGRAM, etc.
+Creates a map named ```_name```. Most of the time this will be used via higher-level macros, like BPF_HASH, BPF_ARRAY, BPF_HISTOGRAM, etc.
 
 `BPF_F_TABLE` is a variant that takes a flag in the last parameter. `BPF_TABLE(...)` is actually a wrapper to `BPF_F_TABLE(..., 0 /* flag */)`.
 
@@ -1138,9 +1145,9 @@ Examples in situ:
 
 ### 13. BPF_XSKMAP
 
-Syntax: ```BPF_XSKMAP(name, size)```
+Syntax: ```BPF_XSKMAP(name, size [, "/sys/fs/bpf/xyz"])```
 
-This creates a xsk map named ```name``` with ```size``` entries. Each entry represents one NIC's queue id. This map is only used in XDP to redirect packet to an AF_XDP socket. If the AF_XDP socket is binded to a queue which is different than the current packet's queue id, the packet will be dropped. For kernel v5.3 and latter, `lookup` method is available and can be used to check whether and AF_XDP socket is available for the current packet's queue id. More details at [AF_XDP](https://www.kernel.org/doc/html/latest/networking/af_xdp.html).
+This creates a xsk map named ```name``` with ```size``` entries and pin it to the bpffs as a FILE. Each entry represents one NIC's queue id. This map is only used in XDP to redirect packet to an AF_XDP socket. If the AF_XDP socket is binded to a queue which is different than the current packet's queue id, the packet will be dropped. For kernel v5.3 and latter, `lookup` method is available and can be used to check whether and AF_XDP socket is available for the current packet's queue id. More details at [AF_XDP](https://www.kernel.org/doc/html/latest/networking/af_xdp.html).
 
 For example:
 ```C
@@ -1338,7 +1345,7 @@ Examples in situ:
 
 Syntax: ```void map.call(void *ctx, int index)```
 
-This invokes ```bpf_tail_call()``` to tail-call the bpf program which the ```index``` entry in [9. BPF_PROG_ARRAY](#9-bpf_prog_array) points to. A tail-call is different from the normal call. It reuses the current stack frame after jumping to another bpf program and never goes back. If the ```index``` entry is empty, it won't jump anywhere and the program execution continues as normal.
+This invokes ```bpf_tail_call()``` to tail-call the bpf program which the ```index``` entry in [BPF_PROG_ARRAY](#10-bpf_prog_array) points to. A tail-call is different from the normal call. It reuses the current stack frame after jumping to another bpf program and never goes back. If the ```index``` entry is empty, it won't jump anywhere and the program execution continues as normal.
 
 For example:
 
@@ -1377,7 +1384,7 @@ Examples in situ:
 
 Syntax: ```int map.redirect_map(int index, int flags)```
 
-This redirects the incoming packets based on the ```index``` entry. If the map is [10. BPF_DEVMAP](#10-bpf_devmap), the packet will be sent to the transmit queue of the network interface that the entry points to. If the map is [11. BPF_CPUMAP](#11-bpf_cpumap), the packet will be sent to the ring buffer of the ```index``` CPU and be processed by the CPU later. If the map is [12. BPF_XSKMAP](#12-bpf_xskmap), the packet will be sent to the AF_XDP socket attached to the queue.
+This redirects the incoming packets based on the ```index``` entry. If the map is [BPF_DEVMAP](#11-bpf_devmap), the packet will be sent to the transmit queue of the network interface that the entry points to. If the map is [BPF_CPUMAP](#12-bpf_cpumap), the packet will be sent to the ring buffer of the ```index``` CPU and be processed by the CPU later. If the map is [BPF_XSKMAP](#13-bpf_xskmap), the packet will be sent to the AF_XDP socket attached to the queue.
 
 If the packet is redirected successfully, the function will return XDP_REDIRECT. Otherwise, it will return XDP_ABORTED to discard the packet.
 
@@ -1808,7 +1815,7 @@ BPF.attach_raw_socket(bpf_func, ifname)
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=attach_raw_socket+path%3Aexamples+language%3Apython&type=Code)
 ### 9. attach_xdp()
-Syntax: ```BPF.attach_xdp(dev="device", fn=b.load_func("fn_name",BPF_XDP), flags)```
+Syntax: ```BPF.attach_xdp(dev="device", fn=b.load_func("fn_name",BPF.XDP), flags)```
 
 Instruments the network driver described by ```dev``` , and then receives the packet, run the BPF function ```fn_name()``` with flags.
 
@@ -1823,9 +1830,9 @@ XDP_FLAGS_HW_MODE = (1 << 3)
 XDP_FLAGS_REPLACE = (1 << 4)
 ```
 
-You can use flags like this ```BPF.attach_xdp(dev="device", fn=b.load_func("fn_name",BPF_XDP), flags=BPF.XDP_FLAGS_UPDATE_IF_NOEXIST)```
+You can use flags like this ```BPF.attach_xdp(dev="device", fn=b.load_func("fn_name",BPF.XDP), flags=BPF.XDP_FLAGS_UPDATE_IF_NOEXIST)```
 
-The default value of flgas is 0. This means if there is no xdp program with `device`, the fn will run with that device. If there is an xdp program running with device, the old program will be replaced with new fn program.
+The default value of flags is 0. This means if there is no xdp program with `device`, the fn will run with that device. If there is an xdp program running with device, the old program will be replaced with new fn program.
 
 Currently, bcc does not support XDP_FLAGS_REPLACE flag. The following are the descriptions of other flags.
 
@@ -1968,7 +1975,7 @@ Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=trace_fields+path%3Aexamples+language%3Apython&type=Code),
 [search /tools](https://github.com/iovisor/bcc/search?q=trace_fields+path%3Atools+language%3Apython&type=Code)
 
-## Output
+## Output APIs
 
 Normal output from a BPF program is either:
 
@@ -2049,7 +2056,7 @@ while 1:
 Examples in situ:
 [search /examples](https://github.com/iovisor/bcc/search?q=ring_buffer_consume+path%3Aexamples+language%3Apython&type=Code),
 
-## Maps
+## Map APIs
 
 Maps are BPF data stores, and are used in bcc to implement a table, and then higher level objects on top of tables, including hashes and histograms.
 

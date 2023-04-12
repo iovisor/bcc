@@ -24,7 +24,7 @@ Trace only functions in the process PID.
 Trace only functions in the thread TID.
 .TP
 \-z STRING_SIZE
-When collecting string arguments (of type char*), collect up to STRING_SIZE 
+When collecting string arguments (of type char*), collect up to STRING_SIZE
 characters. Longer strings will be truncated.
 .TP
 \-i INTERVAL
@@ -48,21 +48,21 @@ probe, which parameters to collect, how to aggregate them, and whether to perfor
 any filtering. See SPECIFIER SYNTAX below.
 .TP
 \-I header
-One or more header files that should be included in the BPF program. This 
+One or more header files that should be included in the BPF program. This
 enables the use of structure definitions, enumerations, and constants that
 are available in these headers. You should provide the same path you would
 include in the BPF program, e.g. 'linux/blkdev.h' or 'linux/time.h'. Note: in
-many cases, argdist will deduce the necessary header files automatically. 
+many cases, argdist will deduce the necessary header files automatically.
 .SH SPECIFIER SYNTAX
 The general specifier syntax is as follows:
 
-.B {p,r,t,u}:{[library],category}:function(signature)[:type[,type...]:expr[,expr...][:filter]][#label]
+.B {p,r,t,u}:{[library],category}:function(signature):type[,type...]:expr[,expr...][:filter]][#label]
 .TP
 .B {p,r,t,u}
 Probe type \- "p" for function entry, "r" for function return, "t" for kernel
 tracepoint, "u" for USDT probe; \-H for histogram collection, \-C for frequency count.
 Indicates where to place the probe and whether the probe should collect frequency
-count information, or aggregate the collected values into a histogram. Counting 
+count information, or aggregate the collected values into a histogram. Counting
 probes will collect the number of times every parameter value was observed,
 whereas histogram probes will collect the parameter values into a histogram.
 Only integral types can be used with histogram probes; there is no such limitation
@@ -80,7 +80,7 @@ The category of the kernel tracepoint. For example: net, sched, block.
 .B function(signature)
 The function to probe, and its signature.
 The function name must match exactly for the probe to be placed. The signature,
-on the other hand, is only required if you plan to collect parameter values 
+on the other hand, is only required if you plan to collect parameter values
 based on that signature. For example, if you only want to collect the first
 parameter, you don't have to specify the rest of the parameters in the signature.
 When capturing kernel tracepoints, this should be the name of the event, e.g.
@@ -101,7 +101,7 @@ parameters, such as "size % 10".
 Tracepoints may access a special structure called "args" that is formatted
 according to the tracepoint format (which you can obtain using tplist).
 For example, the block:block_rq_complete tracepoint can access args->nr_sector.
-USDT probes may access the arguments defined by the tracing program in the 
+USDT probes may access the arguments defined by the tracing program in the
 special arg1, arg2, ... variables. To obtain their types, use the tplist tool.
 Return probes can use the argument values received by the
 function when it was entered, through the $entry(paramname) special variable.
@@ -124,7 +124,7 @@ literal string, and the second argument can be a runtime string.
 .TP
 .B [label]
 The label that will be displayed when printing the probed values. By default,
-this is the probe specifier. 
+this is the probe specifier.
 .SH EXAMPLES
 .TP
 Print a histogram of allocation sizes passed to kmalloc:

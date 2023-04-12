@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from unittest import main, skipUnless, TestCase
 from utils import kernel_version_ge
@@ -7,7 +7,7 @@ import subprocess
 import sys
 import tempfile
 
-TOOLS_DIR = "../../tools/"
+TOOLS_DIR = "/bcc/tools/"
 
 
 class cfg:

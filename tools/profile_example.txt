@@ -161,6 +161,35 @@ but we're lacking the symbol translation. This is a common for all profilers
 on Linux, and is usually fixable. See the DEBUGGING section of the profile(8)
 man page.
 
+You can also profile different process:
+# ./profile -p 2040,1316151
+Sampling at 49 Hertz of PID [2040, 1316151] by user + kernel stack... Hit Ctrl-C to end.
+^C
+    PyEval_RestoreThread
+    [unknown]
+    [unknown]
+    -                python3 (1316151)
+        1
+[...]
+    rcu_all_qs
+    rcu_all_qs
+    dput
+    step_into
+    handle_dots.part.0
+    walk_component
+    link_path_walk.part.0
+    path_openat
+    do_filp_open
+    do_sys_openat2
+    do_sys_open
+    __x64_sys_openat
+    do_syscall_64
+    entry_SYSCALL_64_after_hwframe
+    __libc_open64
+    [unknown]
+    -                python3 (2040)
+        1
+
 
 Lets add delimiters between the user and kernel stacks, using -d:
 

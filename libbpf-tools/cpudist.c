@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <time.h>
+#include <fcntl.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 #include "cpudist.h"
@@ -17,6 +18,8 @@
 static struct env {
 	time_t interval;
 	pid_t pid;
+	char *cgroupspath;
+	bool cg;
 	int times;
 	bool offcpu;
 	bool timestamp;
@@ -38,11 +41,12 @@ const char *argp_program_bug_address =
 const char argp_program_doc[] =
 "Summarize on-CPU time per task as a histogram.\n"
 "\n"
-"USAGE: cpudist [--help] [-O] [-T] [-m] [-P] [-L] [-p PID] [interval] [count]\n"
+"USAGE: cpudist [--help] [-O] [-T] [-m] [-P] [-L] [-p PID] [interval] [count] [-c CG]\n"
 "\n"
 "EXAMPLES:\n"
 "    cpudist              # summarize on-CPU time as a histogram"
 "    cpudist -O           # summarize off-CPU time as a histogram"
+"    cpudist -c CG        # Trace process under cgroupsPath CG\n"
 "    cpudist 1 10         # print 1 second summaries, 10 times"
 "    cpudist -mT 1        # 1s summaries, milliseconds, and timestamps"
 "    cpudist -P           # show each PID separately"
@@ -52,6 +56,7 @@ static const struct argp_option opts[] = {
 	{ "offcpu", 'O', NULL, 0, "Measure off-CPU time" },
 	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
 	{ "milliseconds", 'm', NULL, 0, "Millisecond histogram" },
+	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path" },
 	{ "pids", 'P', NULL, 0, "Print a histogram per process ID" },
 	{ "tids", 'L', NULL, 0, "Print a histogram per thread ID" },
 	{ "pid", 'p', "PID", 0, "Trace this PID only" },
@@ -73,6 +78,10 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'm':
 		env.milliseconds = true;
+		break;
+	case 'c':
+		env.cgroupspath = arg;
+		env.cg = true;
 		break;
 	case 'p':
 		errno = 0;
@@ -121,8 +130,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	return 0;
 }
 
-int libbpf_print_fn(enum libbpf_print_level level,
-		    const char *format, va_list args)
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
 	if (level == LIBBPF_DEBUG && !env.verbose)
 		return 0;
@@ -193,6 +201,8 @@ int main(int argc, char **argv)
 	struct tm *tm;
 	char ts[32];
 	time_t t;
+	int idx, cg_map_fd;
+	int cgfd = -1;
 
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
 	if (err)
@@ -200,19 +210,19 @@ int main(int argc, char **argv)
 
 	libbpf_set_print(libbpf_print_fn);
 
-	err = bump_memlock_rlimit();
-	if (err) {
-		fprintf(stderr, "failed to increase rlimit: %d\n", err);
-		return 1;
-	}
-
 	obj = cpudist_bpf__open();
 	if (!obj) {
 		fprintf(stderr, "failed to open BPF object\n");
 		return 1;
 	}
 
+	if (probe_tp_btf("sched_switch"))
+		bpf_program__set_autoload(obj->progs.sched_switch_tp, false);
+	else
+		bpf_program__set_autoload(obj->progs.sched_switch_btf, false);
+
 	/* initialize global data (filtering options) */
+	obj->rodata->filter_cg = env.cg;
 	obj->rodata->targ_per_process = env.per_process;
 	obj->rodata->targ_per_thread = env.per_thread;
 	obj->rodata->targ_ms = env.milliseconds;
@@ -225,16 +235,31 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	bpf_map__resize(obj->maps.start, pid_max);
+	bpf_map__set_max_entries(obj->maps.start, pid_max);
 	if (!env.per_process && !env.per_thread)
-		bpf_map__resize(obj->maps.hists, 1);
+		bpf_map__set_max_entries(obj->maps.hists, 1);
 	else
-		bpf_map__resize(obj->maps.hists, pid_max);
+		bpf_map__set_max_entries(obj->maps.hists, pid_max);
 
 	err = cpudist_bpf__load(obj);
 	if (err) {
 		fprintf(stderr, "failed to load BPF object: %d\n", err);
 		goto cleanup;
+	}
+
+	/* update cgroup path fd to map */
+	if (env.cg) {
+		idx = 0;
+		cg_map_fd = bpf_map__fd(obj->maps.cgroup_map);
+		cgfd = open(env.cgroupspath, O_RDONLY);
+		if (cgfd < 0) {
+			fprintf(stderr, "Failed opening Cgroup path: %s", env.cgroupspath);
+			goto cleanup;
+		}
+		if (bpf_map_update_elem(cg_map_fd, &idx, &cgfd, BPF_ANY)) {
+			fprintf(stderr, "Failed adding target cgroup to map");
+			goto cleanup;
+		}
 	}
 
 	err = cpudist_bpf__attach(obj);
@@ -271,6 +296,8 @@ int main(int argc, char **argv)
 
 cleanup:
 	cpudist_bpf__destroy(obj);
+	if (cgfd > 0)
+		close(cgfd);
 
 	return err != 0;
 }

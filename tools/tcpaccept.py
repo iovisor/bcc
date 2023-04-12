@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # tcpaccept Trace TCP accept()s.
@@ -116,7 +116,7 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
         return 0;
 
     // check this is TCP
-    u8 protocol = 0;
+    u16 protocol = 0;
     // workaround for reading the sk_protocol bitfield:
 
     // Following comments add by Joe Yin:
@@ -132,7 +132,12 @@ int kretprobe__inet_csk_accept(struct pt_regs *ctx)
     int gso_max_segs_offset = offsetof(struct sock, sk_gso_max_segs);
     int sk_lingertime_offset = offsetof(struct sock, sk_lingertime);
 
-    if (sk_lingertime_offset - gso_max_segs_offset == 4)
+
+    // Since kernel v5.6 sk_protocol is its own u16 field and gso_max_segs
+    // precedes sk_lingertime.
+    if (sk_lingertime_offset - gso_max_segs_offset == 2)
+        protocol = newsk->sk_protocol;
+    else if (sk_lingertime_offset - gso_max_segs_offset == 4)
         // 4.10+ with little endian
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
         protocol = *(u8 *)((u64)&newsk->sk_gso_max_segs - 3);

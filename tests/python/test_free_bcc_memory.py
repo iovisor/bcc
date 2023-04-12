@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # USAGE: test_usdt.py
 #
@@ -14,21 +14,21 @@ import os
 
 class TestFreeLLVMMemory(TestCase):
     def getRssFile(self):
-        p = Popen(["cat", "/proc/" + str(os.getpid()) + "/status"],
-                  stdout=PIPE)
-        rss = None
-        unit = None
-        for line in p.stdout.readlines():
-            if (line.find(b'RssFile') >= 0):
-                rss  = line.split(b' ')[-2]
-                unit = line.split(b' ')[-1].rstrip()
-                break
+        with Popen(["cat", "/proc/" + str(os.getpid()) + "/status"],
+                  stdout=PIPE) as p:
+            rss = None
+            unit = None
+            for line in p.stdout.readlines():
+                if (line.find(b'RssFile') >= 0):
+                    rss  = line.split(b' ')[-2]
+                    unit = line.split(b' ')[-1].rstrip()
+                    break
 
-        return [rss, unit]
+            return [rss, unit]
 
     @skipUnless(kernel_version_ge(4,5), "requires kernel >= 4.5")
     def testFreeLLVMMemory(self):
-        text = "int test() { return 0; }"
+        text = b"int test() { return 0; }"
         b = BPF(text=text)
 
         # get the RssFile before freeing bcc memory

@@ -17,16 +17,6 @@
 #include "bpf_module.h"
 
 extern "C" {
-void * bpf_module_create_b(const char *filename, const char *proto_filename, unsigned flags,
-                           const char *dev_name) {
-  auto mod = new ebpf::BPFModule(flags, nullptr, true, "", true, dev_name);
-  if (mod->load_b(filename, proto_filename) != 0) {
-    delete mod;
-    return nullptr;
-  }
-  return mod;
-}
-
 void * bpf_module_create_c(const char *filename, unsigned flags, const char *cflags[],
                            int ncflags, bool allow_rlimit, const char *dev_name) {
   auto mod = new ebpf::BPFModule(flags, nullptr, true, "", allow_rlimit, dev_name);
@@ -45,6 +35,10 @@ void * bpf_module_create_c_from_string(const char *text, unsigned flags, const c
     return nullptr;
   }
   return mod;
+}
+
+bool bpf_module_rw_engine_enabled() {
+  return ebpf::bpf_module_rw_engine_enabled();
 }
 
 void bpf_module_destroy(void *program) {
@@ -242,12 +236,12 @@ int bcc_func_load(void *program, int prog_type, const char *name,
                   const struct bpf_insn *insns, int prog_len,
                   const char *license, unsigned kern_version,
                   int log_level, char *log_buf, unsigned log_buf_size,
-                  const char *dev_name) {
+                  const char *dev_name, int attach_type) {
   auto mod = static_cast<ebpf::BPFModule *>(program);
   if (!mod) return -1;
   return mod->bcc_func_load(prog_type, name, insns, prog_len,
                             license, kern_version, log_level,
-                            log_buf, log_buf_size, dev_name);
+                            log_buf, log_buf_size, dev_name, 0, attach_type);
 
 }
 

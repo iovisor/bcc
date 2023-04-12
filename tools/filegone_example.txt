@@ -1,0 +1,26 @@
+Demonstrations of filegone, the Linux eBPF/bcc version.
+
+
+filegone traces why file gone, either been deleted or renamed
+For example:
+
+# ./filegone 
+18:30:56 22905   vim               DELETE .fstab.swpx
+18:30:56 22905   vim               DELETE .fstab.swp
+18:31:00 22905   vim               DELETE .viminfo
+18:31:00 22905   vim               RENAME .viminfo.tmp > .viminfo
+18:31:00 22905   vim               DELETE .fstab.swp
+
+USAGE message:
+
+usage: filegone.py [-h] [-p PID]
+
+Trace why file gone (deleted or renamed)
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -p PID, --pid PID  trace this PID only
+
+examples:
+    ./filegone           # trace all file gone events
+    ./filegone -p 181    # only trace PID 181

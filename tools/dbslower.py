@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # dbslower      Trace MySQL and PostgreSQL queries slower than a threshold.
 #
@@ -100,7 +100,7 @@ struct temp_t {
 };
 
 struct data_t {
-    u64 pid;
+    u32 pid;
     u64 timestamp;
     u64 duration;
     char query[256];
@@ -212,7 +212,7 @@ start = BPF.monotonic_time()
 
 def print_event(cpu, data, size):
     event = bpf["events"].event(data)
-    print("%-14.6f %-6d %8.3f %s" % (
+    print("%-14.6f %-7d %8.3f %s" % (
         float(event.timestamp - start) / 1000000000,
         event.pid, float(event.duration) / 1000000, event.query))
 
@@ -223,7 +223,7 @@ else:
     print("Tracing database queries for pids %s slower than %d ms..." %
         (', '.join(map(str, args.pids)), args.threshold))
 
-print("%-14s %-6s %8s %s" % ("TIME(s)", "PID", "MS", "QUERY"))
+print("%-14s %-7s %8s %s" % ("TIME(s)", "PID", "MS", "QUERY"))
 
 bpf["events"].open_perf_buffer(print_event, page_cnt=64)
 while True:

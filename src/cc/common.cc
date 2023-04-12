@@ -17,9 +17,47 @@
 #include <sstream>
 
 #include "common.h"
+#include "bcc_libbpf_inc.h"
+#include "vendor/optional.hpp"
 #include "vendor/tinyformat.hpp"
 
 namespace ebpf {
+
+using std::experimental::optional;
+
+// Get enum value from BTF, since the enum may be anonymous, like:
+//   [608] ENUM '(anon)' size=4 vlen=1
+//   	'TASK_COMM_LEN' val=16
+// we have to traverse the whole BTF.
+// Though there is a BTF_KIND_ENUM64, but it is unlikely that it will
+// be used as array size, we don't handle it here.
+static optional<int32_t> get_enum_val_from_btf(const char *name) {
+  optional<int32_t> val;
+
+  auto btf = btf__load_vmlinux_btf();
+  if (libbpf_get_error(btf))
+    return {};
+
+  for (size_t i = 1; i < btf__type_cnt(btf); i++) {
+    auto t = btf__type_by_id(btf, i);
+    if (btf_kind(t) != BTF_KIND_ENUM)
+      continue;
+
+    auto m = btf_enum(t);
+    for (int j = 0, n = btf_vlen(t); j < n; j++, m++) {
+      if (!strcmp(btf__name_by_offset(btf, m->name_off), name)) {
+        val = m->val;
+        break;
+      }
+    }
+
+    if (val)
+      break;
+  }
+
+  btf__free(btf);
+  return val;
+}
 
 std::vector<int> read_cpu_range(std::string path) {
   std::ifstream cpus_range_stream { path };
@@ -126,9 +164,21 @@ static inline field_kind_t _get_field_kind(std::string const& line,
     return field_kind_t::data_loc;
   if (field_name.find("common_") == 0)
     return field_kind_t::common;
-  // do not change type definition for array
-  if (field_name.find("[") != std::string::npos)
+
+  // We may have `char comm[TASK_COMM_LEN];` on kernel v5.18+
+  // Let's replace `TASK_COMM_LEN` with value extracted from BTF
+  if (field_name.find("[") != std::string::npos) {
+    auto pos1 = field_name.find("[");
+    auto pos2 = field_name.find("]");
+    auto dim = field_name.substr(pos1 + 1, pos2 - pos1 - 1);
+    if (!dim.empty() && !isdigit(dim[0])) {
+      auto v = get_enum_val_from_btf(dim.c_str());
+      if (v)
+        dim = std::to_string(*v);
+      field_name.replace(pos1 + 1, pos2 - pos1 - 1, dim, 0);
+    }
     return field_kind_t::regular;
+  }
 
   // adjust the field_type based on the size of field
   // otherwise, incorrect value may be retrieved for big endian
@@ -159,6 +209,19 @@ static inline field_kind_t _get_field_kind(std::string const& line,
   }
 
   return field_kind_t::regular;
+}
+
+#define DEBUGFS_TRACEFS "/sys/kernel/debug/tracing"
+#define TRACEFS "/sys/kernel/tracing"
+
+std::string tracefs_path() {
+  static bool use_debugfs = access(DEBUGFS_TRACEFS, F_OK) == 0;
+  return use_debugfs ? DEBUGFS_TRACEFS : TRACEFS;
+}
+
+std::string tracepoint_format_file(std::string const& category,
+                                   std::string const& event) {
+  return tracefs_path() + "/events/" + category + "/" + event + "/format";
 }
 
 std::string parse_tracepoint(std::istream &input, std::string const& category,

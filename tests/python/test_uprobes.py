@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
@@ -13,7 +13,7 @@ import unittest
 
 class TestUprobes(unittest.TestCase):
     def test_simple_library(self):
-        text = """
+        text = b"""
 #include <uapi/linux/ptrace.h>
 BPF_ARRAY(stats, u64, 1);
 static void incr(int idx) {
@@ -29,20 +29,20 @@ int count(struct pt_regs *ctx) {
     return 0;
 }"""
         test_pid = os.getpid()
-        text = text.replace("PID", "%d" % test_pid)
+        text = text.replace(b"PID", b"%d" % test_pid)
         b = bcc.BPF(text=text)
-        b.attach_uprobe(name="c", sym="malloc_stats", fn_name="count", pid=test_pid)
-        b.attach_uretprobe(name="c", sym="malloc_stats", fn_name="count", pid=test_pid)
+        b.attach_uprobe(name=b"c", sym=b"malloc_stats", fn_name=b"count", pid=test_pid)
+        b.attach_uretprobe(name=b"c", sym=b"malloc_stats", fn_name=b"count", pid=test_pid)
         libc = ctypes.CDLL("libc.so.6")
         libc.malloc_stats.restype = None
         libc.malloc_stats.argtypes = []
         libc.malloc_stats()
-        self.assertEqual(b["stats"][ctypes.c_int(0)].value, 2)
-        b.detach_uretprobe(name="c", sym="malloc_stats", pid=test_pid)
-        b.detach_uprobe(name="c", sym="malloc_stats", pid=test_pid)
+        self.assertEqual(b[b"stats"][ctypes.c_int(0)].value, 2)
+        b.detach_uretprobe(name=b"c", sym=b"malloc_stats", pid=test_pid)
+        b.detach_uprobe(name=b"c", sym=b"malloc_stats", pid=test_pid)
 
     def test_simple_binary(self):
-        text = """
+        text = b"""
 #include <uapi/linux/ptrace.h>
 BPF_ARRAY(stats, u64, 1);
 static void incr(int idx) {
@@ -56,16 +56,18 @@ int count(struct pt_regs *ctx) {
     return 0;
 }"""
         b = bcc.BPF(text=text)
-        b.attach_uprobe(name="/usr/bin/python", sym="main", fn_name="count")
-        b.attach_uretprobe(name="/usr/bin/python", sym="main", fn_name="count")
-        with os.popen("/usr/bin/python -V") as f:
+        pythonpath = b"/usr/bin/python3"
+        symname = b"_start"
+        b.attach_uprobe(name=pythonpath, sym=symname, fn_name=b"count")
+        b.attach_uretprobe(name=pythonpath, sym=symname, fn_name=b"count")
+        with os.popen(pythonpath.decode() + " -V") as f:
             pass
-        self.assertGreater(b["stats"][ctypes.c_int(0)].value, 0)
-        b.detach_uretprobe(name="/usr/bin/python", sym="main")
-        b.detach_uprobe(name="/usr/bin/python", sym="main")
+        self.assertGreater(b[b"stats"][ctypes.c_int(0)].value, 0)
+        b.detach_uretprobe(name=pythonpath, sym=symname)
+        b.detach_uprobe(name=pythonpath, sym=symname)
 
     def test_mount_namespace(self):
-        text = """
+        text = b"""
 #include <uapi/linux/ptrace.h>
 BPF_TABLE("array", int, u64, stats, 1);
 static void incr(int idx) {
@@ -124,14 +126,14 @@ int count(struct pt_regs *ctx) {
             time.sleep(5)
             os._exit(0)
 
-        libname = "/tmp/libz.so.1"
-        symname = "zlibVersion"
-        text = text.replace("PID", "%d" % child_pid)
+        libname = b"/tmp/libz.so.1"
+        symname = b"zlibVersion"
+        text = text.replace(b"PID", b"%d" % child_pid)
         b = bcc.BPF(text=text)
-        b.attach_uprobe(name=libname, sym=symname, fn_name="count", pid=child_pid)
-        b.attach_uretprobe(name=libname, sym=symname, fn_name="count", pid=child_pid)
+        b.attach_uprobe(name=libname, sym=symname, fn_name=b"count", pid=child_pid)
+        b.attach_uretprobe(name=libname, sym=symname, fn_name=b"count", pid=child_pid)
         time.sleep(5)
-        self.assertEqual(b["stats"][ctypes.c_int(0)].value, 2)
+        self.assertEqual(b[b"stats"][ctypes.c_int(0)].value, 2)
         b.detach_uretprobe(name=libname, sym=symname, pid=child_pid)
         b.detach_uprobe(name=libname, sym=symname, pid=child_pid)
         os.wait()

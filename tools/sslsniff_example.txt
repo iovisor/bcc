@@ -103,15 +103,83 @@ lot of characters that are not printable or even Unicode replacement
 characters.
 
 
+Use -l or --latency option to show function latency, and show handshake latency
+by using both -l and --handshake. This is useful for SSL/TLS performance
+analysis. Tracing output of "echo | openssl s_client -connect example.com:443":
+
+# ./sslsniff.py -l --handshake
+FUNC         TIME(s)            COMM             PID     LEN    LAT(ms)
+WRITE/SEND   0.000000000        openssl          10377   1      0.005
+----- DATA -----
+
+
+----- END DATA -----
+
+Trace localhost server instead of example.com. It takes 0.7ms for server
+handshake before secure connection is ready for initial SSL_read or SSL_write.
+
+# ./sslsniff.py -l --handshake
+FUNC         TIME(s)            COMM             PID     LEN    LAT(ms)
+HANDSHAKE    0.000000000        nginx            7081    1      0.699
+WRITE/SEND   0.000132180        openssl          14800   1      0.010
+----- DATA -----
+
+
+----- END DATA -----
+
+READ/RECV    0.000136583        nginx            7081    1      0.004
+----- DATA -----
+
+
+----- END DATA -----
+
+Tracing output of "echo | gnutls-cli -p 443 example.com":
+
+# ./sslsniff.py -l --handshake
+FUNC         TIME(s)            COMM             PID     LEN    LAT(ms)
+WRITE/SEND   0.000000000        gnutls-cli       43554   1      0.012
+----- DATA -----
+
+
+----- END DATA -----
+
+Tracing output of "echo | gnutls-cli -p 443 --insecure localhost":
+
+# ./sslsniff.py -l --handshake
+FUNC         TIME(s)            COMM             PID     LEN    LAT(ms)
+HANDSHAKE    0.000000000        nginx            7081    1      0.710
+WRITE/SEND   0.000045126        gnutls-cli       43752   1      0.014
+----- DATA -----
+
+
+----- END DATA -----
+
+READ/RECV    0.000049464        nginx            7081    1      0.004
+----- DATA -----
+
+
+----- END DATA -----
+
+Tracing few extra libraries (useful for docker containers and other isolated
+apps)
+
+# ./sslsniff.py --extra-lib openssl:/var/lib/docker/overlay2/l/S4EMHE/lib/libssl.so.1.1
+
+
+
 USAGE message:
 
-usage: sslsniff.py [-h] [-p PID] [-c COMM] [-o] [-g] [-n] [-d] [--hexdump]
+usage: sslsniff.py [-h] [-p PID] [-u UID] [-x] [-c COMM] [-o] [-g] [-n] [-d]
+                   [--hexdump] [--max-buffer-size MAX_BUFFER_SIZE] [-l]
+                   [--handshake] [--extra-lib EXTRA_LIB]
 
 Sniff SSL data
 
 optional arguments:
   -h, --help            show this help message and exit
   -p PID, --pid PID     sniff this PID only.
+  -u UID, --uid UID     sniff this UID only.
+  -x, --extra           show extra fields (UID, TID)
   -c COMM, --comm COMM  sniff only commands matching string.
   -o, --no-openssl      do not show OpenSSL calls.
   -g, --no-gnutls       do not show GnuTLS calls.
@@ -119,12 +187,27 @@ optional arguments:
   -d, --debug           debug mode.
   --hexdump             show data as hexdump instead of trying to decode it as
                         UTF-8
+  --max-buffer-size MAX_BUFFER_SIZE
+                        Size of captured buffer
+  -l, --latency         show function latency
+  --handshake           show SSL handshake latency, enabled only if latency
+                        option is on. 
+  --extra-lib EXTRA_LIB
+                        Intercept calls from extra library
+                        (format: lib_type:lib_path)
+
+
 
 examples:
     ./sslsniff              # sniff OpenSSL and GnuTLS functions
     ./sslsniff -p 181       # sniff PID 181 only
+    ./sslsniff -u 1000      # sniff only UID 1000
     ./sslsniff -c curl      # sniff curl command only
     ./sslsniff --no-openssl # don't show OpenSSL calls
     ./sslsniff --no-gnutls  # don't show GnuTLS calls
     ./sslsniff --no-nss     # don't show NSS calls
     ./sslsniff --hexdump    # show data as hex instead of trying to decode it as UTF-8
+    ./sslsniff -x           # show process UID and TID
+    ./sslsniff -l           # show function latency
+    ./sslsniff -l --handshake  # show SSL handshake latency
+    ./sslsniff --extra-lib openssl:/path/libssl.so.1.1 # sniff extra library

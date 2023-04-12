@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # offwaketime   Summarize blocked time by kernel off-CPU stack + waker stack
 #               For Linux, uses BCC, eBPF.
@@ -139,12 +139,12 @@ bpf_text = """
 struct key_t {
     char waker[TASK_COMM_LEN];
     char target[TASK_COMM_LEN];
-    int w_k_stack_id;
-    int w_u_stack_id;
-    int t_k_stack_id;
-    int t_u_stack_id;
-    u32 t_pid;
-    u32 t_tgid;
+    s64 w_k_stack_id;
+    s64 w_u_stack_id;
+    s64 t_k_stack_id;
+    s64 t_u_stack_id;
+    u64 t_pid;
+    u64 t_tgid;
     u32 w_pid;
     u32 w_tgid;
 };
@@ -254,14 +254,18 @@ elif args.kernel_threads_only:
 else:
     thread_filter = '1'
 if args.state == 0:
-    state_filter = 'p->state == 0'
+    state_filter = 'p->STATE_FIELD == 0'
 elif args.state:
     # these states are sometimes bitmask checked
-    state_filter = 'p->state & %d' % args.state
+    state_filter = 'p->STATE_FIELD & %d' % args.state
 else:
     state_filter = '1'
 bpf_text = bpf_text.replace('THREAD_FILTER', thread_filter)
 bpf_text = bpf_text.replace('STATE_FILTER', state_filter)
+if BPF.kernel_struct_has_field(b'task_struct', b'__state') == 1:
+    bpf_text = bpf_text.replace('STATE_FIELD', '__state')
+else:
+    bpf_text = bpf_text.replace('STATE_FIELD', 'state')
 
 # set stack storage size
 bpf_text = bpf_text.replace('STACK_STORAGE_SIZE', str(args.stack_storage_size))
@@ -384,7 +388,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
                 print("    [Missed User Stack] %d" % k.w_u_stack_id)
             else:
                 for addr in waker_user_stack:
-                    print("    %s" % b.sym(addr, k.w_tgid))
+                    print("    %s" % b.sym(addr, k.w_tgid).decode('utf-8', 'replace'))
         if not args.user_stacks_only:
             if need_delimiter and k.w_u_stack_id > 0 and k.w_k_stack_id > 0:
                 print("    -")
@@ -392,7 +396,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
                 print("    [Missed Kernel Stack]")
             else:
                 for addr in waker_kernel_stack:
-                    print("    %s" % b.ksym(addr))
+                    print("    %s" % b.ksym(addr).decode('utf-8', 'replace'))
 
         # print waker/wakee delimiter
         print("    %-16s %s" % ("--", "--"))
@@ -402,7 +406,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
                 print("    [Missed Kernel Stack]")
             else:
                 for addr in target_kernel_stack:
-                    print("    %s" % b.ksym(addr))
+                    print("    %s" % b.ksym(addr).decode('utf-8', 'replace'))
         if not args.kernel_stacks_only:
             if need_delimiter and k.t_u_stack_id > 0 and k.t_k_stack_id > 0:
                 print("    -")
@@ -410,7 +414,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
                 print("    [Missed User Stack]")
             else:
                 for addr in target_user_stack:
-                    print("    %s" % b.sym(addr, k.t_tgid))
+                    print("    %s" % b.sym(addr, k.t_tgid).decode('utf-8', 'replace'))
         print("    %-16s %s %s" % ("target:", k.target.decode('utf-8', 'replace'), k.t_pid))
         print("        %d\n" % v.value)
 

@@ -6,9 +6,11 @@
 #include <bpf/bpf_core_read.h>
 #include "bitesize.h"
 #include "bits.bpf.h"
+#include "core_fixes.bpf.h"
 
 const volatile char targ_comm[TASK_COMM_LEN] = {};
-const volatile dev_t targ_dev = -1;
+const volatile bool filter_dev = false;
+const volatile __u32 targ_dev = 0;
 
 extern __u32 LINUX_KERNEL_VERSION __kconfig;
 
@@ -17,7 +19,6 @@ struct {
 	__uint(max_entries, 10240);
 	__type(key, struct hist_key);
 	__type(value, struct hist);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
 } hists SEC(".maps");
 
 static struct hist initial_hist;
@@ -39,9 +40,9 @@ static int trace_rq_issue(struct request *rq)
 	struct hist *histp;
 	u64 slot;
 
-	if (targ_dev != -1) {
-		struct gendisk *disk = BPF_CORE_READ(rq, rq_disk);
-		dev_t dev;
+	if (filter_dev) {
+		struct gendisk *disk = get_disk(rq);
+		u32 dev;
 
 		dev = disk ? MKDEV(BPF_CORE_READ(disk, major),
 				BPF_CORE_READ(disk, first_minor)) : 0;
@@ -75,7 +76,7 @@ int BPF_PROG(block_rq_issue)
 	 * from TP_PROTO(struct request_queue *q, struct request *rq)
 	 * to TP_PROTO(struct request *rq)
 	 */
-	if (LINUX_KERNEL_VERSION > KERNEL_VERSION(5, 10, 0))
+	if (LINUX_KERNEL_VERSION >= KERNEL_VERSION(5, 11, 0))
 		return trace_rq_issue((void *)ctx[0]);
 	else
 		return trace_rq_issue((void *)ctx[1]);

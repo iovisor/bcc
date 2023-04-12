@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # tcpdrop   Trace TCP kernel-dropped packets/segments.
@@ -16,6 +16,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 30-May-2018   Brendan Gregg   Created this.
+# 15-Jun-2022   Rong Tao        Add tracepoint:skb:kfree_skb
 
 from __future__ import print_function
 from bcc import BPF
@@ -100,7 +101,7 @@ static inline struct iphdr *skb_to_iphdr(const struct sk_buff *skb)
 #define tcp_flag_byte(th) (((u_int8_t *)th)[13])
 #endif
 
-int trace_tcp_drop(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb)
+static int __trace_tcp_drop(void *ctx, struct sock *sk, struct sk_buff *skb)
 {
     if (sk == NULL)
         return 0;
@@ -154,6 +155,29 @@ int trace_tcp_drop(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb)
 
     return 0;
 }
+
+int trace_tcp_drop(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb)
+{
+    return __trace_tcp_drop(ctx, sk, skb);
+}
+"""
+
+bpf_kfree_skb_text = """
+#include <linux/skbuff.h>
+
+TRACEPOINT_PROBE(skb, kfree_skb) {
+    struct sk_buff *skb = args->skbaddr;
+    struct sock *sk = skb->sk;
+    enum skb_drop_reason reason = args->reason;
+
+    // SKB_NOT_DROPPED_YET,
+    // SKB_DROP_REASON_NOT_SPECIFIED,
+    if (reason > SKB_DROP_REASON_NOT_SPECIFIED) {
+        return __trace_tcp_drop(args, sk, skb);
+    }
+
+    return 0;
+}
 """
 
 if debug or args.ebpf:
@@ -194,13 +218,22 @@ def print_ipv6_event(cpu, data, size):
         print("\t%s" % sym)
     print("")
 
+if BPF.tracepoint_exists("skb", "kfree_skb"):
+    if BPF.kernel_struct_has_field("trace_event_raw_kfree_skb", "reason") == 1:
+        bpf_text += bpf_kfree_skb_text
+
 # initialize BPF
 b = BPF(text=bpf_text)
+
 if b.get_kprobe_functions(b"tcp_drop"):
     b.attach_kprobe(event="tcp_drop", fn_name="trace_tcp_drop")
+elif b.tracepoint_exists("skb", "kfree_skb"):
+    print("WARNING: tcp_drop() kernel function not found or traceable. "
+          "Use tracpoint:skb:kfree_skb instead.")
 else:
-    print("ERROR: tcp_drop() kernel function not found or traceable. "
-        "Older kernel versions not supported.")
+    print("ERROR: tcp_drop() kernel function and tracpoint:skb:kfree_skb"
+          " not found or traceable. "
+          "The kernel might be too old or the the function has been inlined.")
     exit()
 stack_traces = b.get_table("stack_traces")
 

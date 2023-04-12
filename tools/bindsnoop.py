@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # bindsnoop       Trace IPv4 and IPv6 binds()s.
 #               For Linux, uses BCC, eBPF. Embedded C.
@@ -27,7 +27,7 @@
 # 14-Feb-2020   Pavel Dubovitsky   Created this.
 
 from __future__ import print_function, absolute_import, unicode_literals
-from bcc import BPF, DEBUG_SOURCE
+from bcc import BPF
 from bcc.containers import filter_by_containers
 from bcc.utils import printb
 import argparse
@@ -243,10 +243,14 @@ static int bindsnoop_return(struct pt_regs *ctx, short ipver)
     opts.fields.reuseport = bitfield >> 4 & 0x01;
 
     // workaround for reading the sk_protocol bitfield (from tcpaccept.py):
-    u8 protocol;
+    u16 protocol;
     int gso_max_segs_offset = offsetof(struct sock, sk_gso_max_segs);
     int sk_lingertime_offset = offsetof(struct sock, sk_lingertime);
-    if (sk_lingertime_offset - gso_max_segs_offset == 4)
+
+    // Since kernel v5.6 sk_protocol has its own u16 field
+    if (sk_lingertime_offset - gso_max_segs_offset == 2)
+        protocol = skp->sk_protocol;
+    else if (sk_lingertime_offset - gso_max_segs_offset == 4)
         // 4.10+ with little endian
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
         protocol = *(u8 *)((u64)&skp->sk_gso_max_segs - 3);

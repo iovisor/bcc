@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) 2016 PLUMgrid
 # Licensed under the Apache License, Version 2.0 (the "License")
 
@@ -11,7 +11,7 @@ import unittest
 
 class TestPerfCounter(unittest.TestCase):
     def test_cycles(self):
-        text = """
+        text = b"""
 BPF_PERF_ARRAY(cnt1, NUM_CPUS);
 BPF_ARRAY(prev, u64, NUM_CPUS);
 BPF_HISTOGRAM(dist);
@@ -42,10 +42,10 @@ int do_ret_sys_getuid(void *ctx) {
 """
         b = bcc.BPF(text=text, debug=0,
                 cflags=["-DNUM_CPUS=%d" % multiprocessing.cpu_count()])
-        event_name = b.get_syscall_fnname("getuid")
-        b.attach_kprobe(event=event_name, fn_name="do_sys_getuid")
-        b.attach_kretprobe(event=event_name, fn_name="do_ret_sys_getuid")
-        cnt1 = b["cnt1"]
+        event_name = b.get_syscall_fnname(b"getuid")
+        b.attach_kprobe(event=event_name, fn_name=b"do_sys_getuid")
+        b.attach_kretprobe(event=event_name, fn_name=b"do_ret_sys_getuid")
+        cnt1 = b[b"cnt1"]
         try:
             cnt1.open_perf_event(bcc.PerfType.HARDWARE, bcc.PerfHWConfig.CPU_CYCLES)
         except:
@@ -54,7 +54,7 @@ int do_ret_sys_getuid(void *ctx) {
             raise
         for i in range(0, 100):
             os.getuid()
-        b["dist"].print_log2_hist()
+        b[b"dist"].print_log2_hist()
 
 if __name__ == "__main__":
     unittest.main()

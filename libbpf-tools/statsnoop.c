@@ -7,11 +7,13 @@
 #include <errno.h>
 #include <signal.h>
 #include <time.h>
+#include <unistd.h>
 
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 #include "statsnoop.h"
 #include "statsnoop.skel.h"
+#include "btf_helpers.h"
 #include "trace_helpers.h"
 
 #define PERF_BUFFER_PAGES       16
@@ -23,6 +25,7 @@ static volatile sig_atomic_t exiting = 0;
 static pid_t target_pid = 0;
 static bool trace_failed_only = false;
 static bool emit_timestamp = false;
+static bool verbose = false;
 
 const char *argp_program_version = "statsnoop 0.1";
 const char *argp_program_bug_address =
@@ -39,10 +42,11 @@ const char argp_program_doc[] =
 "    statsnoop -p 1216     # only trace PID 1216\n";
 
 static const struct argp_option opts[] = {
-	{"pid", 'p', "PID", 0, "Process ID to trace"},
-	{"failed", 'x', NULL, 0, "Only show failed stats"},
-	{"timestamp", 't', NULL, 0, "Include timestamp on output"},
-	{NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help"},
+	{ "pid", 'p', "PID", 0, "Process ID to trace" },
+	{ "failed", 'x', NULL, 0, "Only show failed stats" },
+	{ "timestamp", 't', NULL, 0, "Include timestamp on output" },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
 
@@ -66,6 +70,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	case 't':
 		emit_timestamp = true;
 		break;
+	case 'v':
+		verbose = true;
+		break;
 	case 'h':
 		argp_state_help(state, stderr, ARGP_HELP_STD_HELP);
 		break;
@@ -73,6 +80,13 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		return ARGP_ERR_UNKNOWN;
 	}
 	return 0;
+}
+
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
+{
+	if (level == LIBBPF_DEBUG && !verbose)
+		return 0;
+	return vfprintf(stderr, format, args);
 }
 
 static void sig_int(int signo)
@@ -110,12 +124,12 @@ static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 
 int main(int argc, char **argv)
 {
+	LIBBPF_OPTS(bpf_object_open_opts, open_opts);
 	static const struct argp argp = {
 		.options = opts,
 		.parser = parse_arg,
 		.doc = argp_program_doc,
 	};
-	struct perf_buffer_opts pb_opts;
 	struct perf_buffer *pb = NULL;
 	struct statsnoop_bpf *obj;
 	int err;
@@ -124,13 +138,15 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
-	err = bump_memlock_rlimit();
+	libbpf_set_print(libbpf_print_fn);
+
+	err = ensure_core_btf(&open_opts);
 	if (err) {
-		warn("failed to increase rlimit: %d\n", err);
+		fprintf(stderr, "failed to fetch necessary BTF for CO-RE: %s\n", strerror(-err));
 		return 1;
 	}
 
-	obj = statsnoop_bpf__open();
+	obj = statsnoop_bpf__open_opts(&open_opts);
 	if (!obj) {
 		warn("failed to open BPF object\n");
 		return 1;
@@ -138,6 +154,27 @@ int main(int argc, char **argv)
 
 	obj->rodata->target_pid = target_pid;
 	obj->rodata->trace_failed_only = trace_failed_only;
+
+	if (!tracepoint_exists("syscalls", "sys_enter_statfs")) {
+		bpf_program__set_autoload(obj->progs.handle_statfs_entry, false);
+		bpf_program__set_autoload(obj->progs.handle_statfs_return, false);
+	}
+	if (!tracepoint_exists("syscalls", "sys_enter_statx")) {
+		bpf_program__set_autoload(obj->progs.handle_statx_entry, false);
+		bpf_program__set_autoload(obj->progs.handle_statx_return, false);
+	}
+	if (!tracepoint_exists("syscalls", "sys_enter_newstat")) {
+		bpf_program__set_autoload(obj->progs.handle_newstat_entry, false);
+		bpf_program__set_autoload(obj->progs.handle_newstat_return, false);
+	}
+	if (!tracepoint_exists("syscalls", "sys_enter_newfstatat")) {
+		bpf_program__set_autoload(obj->progs.handle_newfstatat_entry, false);
+		bpf_program__set_autoload(obj->progs.handle_newfstatat_return, false);
+	}
+	if (!tracepoint_exists("syscalls", "sys_enter_newlstat")) {
+		bpf_program__set_autoload(obj->progs.handle_newlstat_entry, false);
+		bpf_program__set_autoload(obj->progs.handle_newlstat_return, false);
+	}
 
 	err = statsnoop_bpf__load(obj);
 	if (err) {
@@ -151,18 +188,17 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	pb_opts.sample_cb = handle_event;
-	pb_opts.lost_cb = handle_lost_events;
 	pb = perf_buffer__new(bpf_map__fd(obj->maps.events), PERF_BUFFER_PAGES,
-			      &pb_opts);
-	err = libbpf_get_error(pb);
-	if (err) {
+			      handle_event, handle_lost_events, NULL, NULL);
+	if (!pb) {
+		err = -errno;
 		warn("failed to open perf buffer: %d\n", err);
 		goto cleanup;
 	}
 
 	if (signal(SIGINT, sig_int) == SIG_ERR) {
-		warn("can't set signal handler: %s\n", strerror(-errno));
+		warn("can't set signal handler: %s\n", strerror(errno));
+		err = 1;
 		goto cleanup;
 	}
 
@@ -171,16 +207,20 @@ int main(int argc, char **argv)
 	printf("%-7s %-20s %-4s %-4s %-s\n",
 	       "PID", "COMM", "RET", "ERR", "PATH");
 
-	while (1) {
-		if ((err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS)) < 0)
-			break;
-		if (exiting)
+	while (!exiting) {
+		err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS);
+		if (err < 0 && err != -EINTR) {
+			warn("error polling perf buffer: %s\n", strerror(-err));
 			goto cleanup;
+		}
+		/* reset err to return 0 if exiting */
+		err = 0;
 	}
-	warn("error polling perf buffer: %d\n", err);
 
 cleanup:
+	perf_buffer__free(pb);
 	statsnoop_bpf__destroy(obj);
+	cleanup_core_btf(&open_opts);
 
 	return err != 0;
 }

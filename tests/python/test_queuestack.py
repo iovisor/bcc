@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
@@ -14,11 +14,11 @@ from utils import kernel_version_ge
 class TestQueueStack(TestCase):
 
     def test_stack(self):
-        text = """
+        text = b"""
         BPF_STACK(stack, u64, 10);
         """
         b = BPF(text=text)
-        stack = b['stack']
+        stack = b[b'stack']
 
         for i in range(10):
             stack.push(ct.c_uint64(i))
@@ -47,11 +47,11 @@ class TestQueueStack(TestCase):
         b.cleanup()
 
     def test_queue(self):
-        text = """
+        text = b"""
         BPF_QUEUE(queue, u64, 10);
         """
         b = BPF(text=text)
-        queue = b['queue']
+        queue = b[b'queue']
 
         for i in range(10):
             queue.push(ct.c_uint64(i))

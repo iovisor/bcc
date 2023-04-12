@@ -1,3 +1,73 @@
+bcc (0.27.0-1) unstable; urgency=low
+
+  * Support for kernel up to 6.2
+  * bcc tool updates for ttysnoop, slabratetop, readahead, nfsslower, cpudist, cachetop, cachestat, etc.
+  * libbpf-tools updates for mdflush, drsnoop, statsnoop, ttysnoop, softirqs, wakeuptime, cachestat, numamove, etc.
+  * fix for incomplete static libraries
+  * implement zip archive support
+  * upgrade to use c++14 standard
+  * new libbpf-tools: memleak
+  * add loongarch support in libbpft-tools
+  * doc update, bug fixes and other tools improvement
+
+ -- Yonghong Song <ys114321@gmail.com>  Wed, 02 Apr 2023 17:00:00 +0000
+
+bcc (0.26.0-1) unstable; urgency=low
+
+  * Support for kernel up to 6.1
+  * bcc tool updates for biosnoop, opensnoop, biopattern, killsnoop, runqslower, offcputime, wakeuptime, etc.
+  * libbpf-tools updates for klockstat, sigsnoop, hardirqs, softirqs, opensnoop, statsnoop, offcputime, tcplife, cpufreq, cpudist, etc.
+  * new libbpf-tools: tcptop, tcpstates, biotop, capable
+  * ci: add support for fedora 36 container and new workflow for containers
+  * doc update, bug fixes and other tools improvement
+
+ -- Yonghong Song <ys114321@gmail.com>  Wed, 10 Aug 2022 17:00:00 +0000
+
+bcc (0.25.0-1) unstable; urgency=low
+
+  * Support for kernel up to 5.19
+  * bcc tool updates for oomkill.py, biolatpcts.py, sslsniff.py, tcpaccept.py, etc.
+  * libbpf tool updates for klockstat, opensnoop, tcpconnect, etc.
+  * new bcc tools: tcpcong
+  * new libbpf tools: tcpsynbl, mdflush, oomkill, sigsnoop
+  * usdt: support xmm registers as args for x64
+  * bpftool as a submodule now
+  * remove uses of libbpf deprecated APIs
+  * use new llvm pass manager
+  * support cgroup filtering libbpf tools
+  * fix shared lib module offset <-> global addr conversion
+  * riscv support
+  * LoongArch support
+  * doc update, bug fixes and other tools improvement
+
+ -- Yonghong Song <ys114321@gmail.com>  Wed, 10 Aug 2022 17:00:00 +0000
+
+bcc (0.24.0-1) unstable; urgency=low
+
+  * Support for kernel up to 5.16
+  * bcc tools: update for trace.py, sslsniff.py, tcptop.py, hardirqs.py, etc.
+  * new libbpf tools: bashreadline
+  * allow specify wakeup_events for perf buffer
+  * support BPF_MAP_TYPE_{INODE, TASK}_STORAGE maps
+  * remove all deprecated libbpf function usage
+  * remove P4/B language support
+  * major test infra change, using github actions now
+  * doc update, bug fixes and other tools improvement
+
+ -- Yonghong Song <ys114321@gmail.com>  Wed, 14 Jan 2022 17:00:00 +0000
+
+bcc (0.23.0-1) unstable; urgency=low
+
+  * Support for kernel up to 5.15
+  * bcc tools: update for kvmexit.py, tcpv4connect.py, cachetop.py, cachestat.py, etc.
+  * libbpf tools: update for update for mountsnoop, ksnoop, gethostlatency, etc.
+  * fix renaming of task_struct->state
+  * get pid namespace properly for a number of tools
+  * initial work for more libbpf utilization (less section names)
+  * doc update, bug fixes and other tools improvement
+
+ -- Yonghong Song <ys114321@gmail.com>  Wed, 15 Nov 2021 17:00:00 +0000
+
 bcc (0.22.0-1) unstable; urgency=low
 
   * Support for kernel up to 5.14

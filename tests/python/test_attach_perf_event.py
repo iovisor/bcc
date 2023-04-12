@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright 2021, Athira Rajeev, IBM Corp.
 # Licensed under the Apache License, Version 2.0 (the "License")
 
@@ -16,7 +16,7 @@ class TestPerfAttachRaw(unittest.TestCase):
     @unittest.skipUnless(kernel_version_ge(4,9), "requires kernel >= 4.9")
     def test_attach_raw_event_powerpc(self):
         # on PowerPC, 'addr' is always written to; for x86 see _x86 version of test
-        bpf_text="""
+        bpf_text=b"""
 #include <linux/perf_event.h>
 struct key_t {
     int cpu;
@@ -56,7 +56,7 @@ int on_sample_hit(struct bpf_perf_event_data *ctx) {
             event_attr.sample_period = 1000000
             event_attr.sample_type = PerfEventSampleFormat.ADDR
             event_attr.exclude_kernel = 1
-            b.attach_perf_event_raw(attr=event_attr, fn_name="on_sample_hit", pid=-1, cpu=-1)
+            b.attach_perf_event_raw(attr=event_attr, fn_name=b"on_sample_hit", pid=-1, cpu=-1)
         except Exception:
             print("Failed to attach to a raw event. Please check the event attr used")
             exit()
@@ -68,7 +68,7 @@ int on_sample_hit(struct bpf_perf_event_data *ctx) {
     @unittest.skipUnless(kernel_version_ge(4,17), "bpf_perf_event_data->addr requires kernel >= 4.17")
     def test_attach_raw_event_x86(self):
         # on x86, need to set precise_ip in order for perf_events to write to 'addr'
-        bpf_text="""
+        bpf_text=b"""
 #include <linux/perf_event.h>
 struct key_t {
     int cpu;
@@ -102,7 +102,7 @@ int on_sample_hit(struct bpf_perf_event_data *ctx) {
             event_attr.sample_type = PerfEventSampleFormat.ADDR
             event_attr.exclude_kernel = 1
             event_attr.precise_ip = 2
-            b.attach_perf_event_raw(attr=event_attr, fn_name="on_sample_hit", pid=-1, cpu=-1)
+            b.attach_perf_event_raw(attr=event_attr, fn_name=b"on_sample_hit", pid=-1, cpu=-1)
         except Exception:
             print("Failed to attach to a raw event. Please check the event attr used")
             exit()
@@ -114,7 +114,7 @@ int on_sample_hit(struct bpf_perf_event_data *ctx) {
     # SW perf events should work on GH actions, so expect this to succeed
     @unittest.skipUnless(kernel_version_ge(4,17), "bpf_perf_event_data->addr requires kernel >= 4.17")
     def test_attach_raw_sw_event(self):
-        bpf_text="""
+        bpf_text=b"""
 #include <linux/perf_event.h>
 struct key_t {
     int cpu;
@@ -147,7 +147,7 @@ int on_sample_hit(struct bpf_perf_event_data *ctx) {
             event_attr.sample_period = 100
             event_attr.sample_type = PerfEventSampleFormat.ADDR
             event_attr.exclude_kernel = 1
-            b.attach_perf_event_raw(attr=event_attr, fn_name="on_sample_hit", pid=-1, cpu=-1)
+            b.attach_perf_event_raw(attr=event_attr, fn_name=b"on_sample_hit", pid=-1, cpu=-1)
         except Exception:
             print("Failed to attach to a raw event. Please check the event attr used")
             exit()

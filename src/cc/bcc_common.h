@@ -25,13 +25,12 @@
 extern "C" {
 #endif
 
-void * bpf_module_create_b(const char *filename, const char *proto_filename, unsigned flags,
-                           const char *dev_name);
 void * bpf_module_create_c(const char *filename, unsigned flags, const char *cflags[], int ncflags,
                            bool allow_rlimit, const char *dev_name);
 void * bpf_module_create_c_from_string(const char *text, unsigned flags, const char *cflags[],
                                        int ncflags, bool allow_rlimit,
                                        const char *dev_name);
+bool bpf_module_rw_engine_enabled();
 void bpf_module_destroy(void *program);
 char * bpf_module_license(void *program);
 unsigned bpf_module_kern_version(void *program);
@@ -72,7 +71,7 @@ int bcc_func_load(void *program, int prog_type, const char *name,
                   const struct bpf_insn *insns, int prog_len,
                   const char *license, unsigned kern_version,
                   int log_level, char *log_buf, unsigned log_buf_size,
-                  const char *dev_name);
+                  const char *dev_name, int attach_type);
 
 #ifdef __cplusplus
 }
