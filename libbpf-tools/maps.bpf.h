@@ -10,7 +10,23 @@ static __always_inline void *
 bpf_map_lookup_or_try_init(void *map, const void *key, const void *init)
 {
 	void *val;
-	long err;
+	/* bpf helper functions like bpf_map_update_elem() below normally return
+	 * long, but using int instead of long to store the result is a workaround
+	 * to avoid incorrectly evaluating err in cases where the following criteria
+	 * is met:
+	 *     the architecture is 64-bit
+	 *     the helper function return type is long
+	 *     the helper function returns the value of a call to a bpf_map_ops func
+	 *     the bpf_map_ops function return type is int
+	 *     the compiler inlines the helper function
+	 *     the compiler does not sign extend the result of the bpf_map_ops func
+	 *
+	 * if this criteria is met, at best an error can only be checked as zero or
+	 * non-zero. it will not be possible to check for a negative value or a
+	 * specific error value. this is because the sign bit would have been stuck
+	 * at the 32nd bit of a 64-bit long int.
+	 */
+	int err;
 
 	val = bpf_map_lookup_elem(map, key);
 	if (val)
