@@ -1,0 +1,62 @@
+Demonstrations of kvmexitaarch64, the Linux eBPF/bcc version.
+
+
+In the performance optimization of virtualization, the frequency of the 
+KVM EXIT event often needs to be tracked. In addition, the time interval from 
+the KVM EXIT event to the Guest mode(kvm entry) is more important. 
+These can help us find the bottleneck of performance. So KVMexitaarch64 is here.
+
+
+For example:
+
+# ./kvmexitaarch64.py
+^C
+TGID     TID      COMM             KVM_EXIT_REASON  COUNT    AVG_TIME    
+24877    24901    b'CPU 3/KVM'     EC_WFx           7        503369309.4
+24877    24900    b'CPU 2/KVM'     UNKNOWN_EC       4        1020.0     
+24877    24900    b'CPU 2/KVM'     EC_WFx           25       156462294.0
+24877    24900    b'CPU 2/KVM'     EC_DABT_LOW      2        11320.0    
+24919    24938    b'CPU 1/KVM'     EC_WFx           93       41886282.7 
+24919    24938    b'CPU 1/KVM'     EC_SYS64         11       7105.5     
+24919    24938    b'CPU 1/KVM'     EC_DABT_LOW      2        11370.0    
+24877    24899    b'CPU 1/KVM'     UNKNOWN_EC       3        1500.0   
+
+
+# ./kvmexitaarch64.py 5
+
+TGID     TID      COMM             KVM_EXIT_REASON  COUNT    AVG_TIME    
+24919    24939    b'CPU 2/KVM'     UNKNOWN_EC       1        720.0      
+24919    24939    b'CPU 2/KVM'     EC_WFx           71       70343825.8 
+24919    24939    b'CPU 2/KVM'     EC_SYS64         1        5560.0     
+24877    24901    b'CPU 3/KVM'     EC_WFx           15       320333855.1
+24877    24901    b'CPU 3/KVM'     EC_DABT_LOW      1        11640.0    
+24919    24940    b'CPU 3/KVM'     UNKNOWN_EC       1        2260.0     
+
+@TID: the user space's thread of each vcpu of that virtual machine.
+@TGID: thread group id, means qmeu's pid in user space.
+@COMM: the name of vcpu thread.
+@KVM_EXIT_REASON: the reason why the vm exits on aarch64.
+@COUNT: the counts of the @KVM_EXIT_REASONS.
+@AVG_TIME: the average of all time interval from kvm_exit to the next kvm_entry. unit:ns
+
+
+Limited:
+In view of the hardware-assisted virtualization technology of
+different architectures, currently we only adapt on aarch64.
+
+
+USAGE message:
+
+kvmexitaarch64.py [-h] [duration]
+
+Display kvm_exit_reason and its statistics at a timed interval on aarch64
+
+positional arguments:
+  duration    show delta for next several seconds
+
+optional arguments:
+  -h, --help  show this help message and exit
+
+examples:
+    ./kvmexitaarch64.py                              # Display kvm_exit_reason and its statistics in real-time until Ctrl-C
+    ./kvmexitaarch64.py 5                            # Display in real-time after sleeping 5s

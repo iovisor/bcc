@@ -1,0 +1,75 @@
+.TH kvmexitaarch64 8  "2023-04-14" "USER COMMANDS"
+.SH NAME
+kvmexitaarch64 \- Display the kvm exit reason and count, duration of kvm exiting for all vcpus on aarch64.
+.SH SYNOPSIS
+.B kvmexitaarch64 [\-h] [duration]
+.SH DESCRIPTION
+In the performance optimization of virtualization, the frequency of the
+KVM EXIT event often needs to be tracked. In addition, the time interval from
+the KVM EXIT event to the Guest mode(kvm entry) is more important.
+These can help us find the bottleneck of performance. So KVMexitaarch64 is here.
+
+The tool uses a BPF_HASH: to save the timestamp of KVM EXIT and ENTRY, Reason, 
+the accumulated Exit duration, maximum value, minimum value, thread TID and names.
+
+Limitation: In view of the hardware-assisted virtualization technology of
+different architectures, currently we only adapt on aarch64.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+
+This also requires Linux 4.7+ (BPF_PROG_TYPE_TRACEPOINT support).
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+duration
+Duration of display, after sleeping several seconds.
+.SH EXAMPLES
+.TP
+Display kvm exit reasons and statistics for all threads... Hit Ctrl-C to end:
+#
+.B kvmexitaarch64
+.TP
+Display kvm exit reasons and statistics for all threads after sleeping 5 secs:
+#
+.B kvmexitaarch64 5
+.SH FIELDS 
+.TP 
+TID
+The user space's thread of each vcpu of that virtual machine.
+.TP
+TID 
+Thread group id, means qmeu's pid in user space.
+.TP 
+COMM
+The name of vcpu thread.
+.TP
+KVM_EXIT_REASON
+The reason why the vm exits on aarch64.
+.TP
+COUNT
+The counts of the @KVM_EXIT_REASONS.
+.TP
+AVG_TIME
+The average of all time interval from kvm_exit to the next kvm_entry. unit:ns
+
+.SH OVERHEAD
+This traces the "kvm_exit" and "kvm_entry" kernel function, records the exit reason 
+and time interval from the KVM EXIT event to the Guest mode(kvm entry), max value, 
+min value. In the end, given the statistics.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+LongJun Tang <tanglongjun@kylinos.cn>
