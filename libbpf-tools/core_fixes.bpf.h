@@ -131,4 +131,39 @@ static __always_inline bool renamedata_has_old_mnt_userns_field(void)
 	return false;
 }
 
+/**
+ * commit 3544de8ee6e4("mm, tracing: record slab name for kmem_cache_free()")
+ * replaces `trace_event_raw_kmem_free` with `trace_event_raw_kfree` and adds
+ * `tracepoint_kmem_cache_free` to enhance the information recorded for
+ * `kmem_cache_free`.
+ * see:
+ *     https://github.com/torvalds/linux/commit/3544de8ee6e4
+ */
+
+struct trace_event_raw_kmem_free___x {
+	const void *ptr;
+} __attribute__((preserve_access_index));
+
+struct trace_event_raw_kfree___x {
+	const void *ptr;
+} __attribute__((preserve_access_index));
+
+struct trace_event_raw_kmem_cache_free___x {
+	const void *ptr;
+} __attribute__((preserve_access_index));
+
+static __always_inline bool has_kfree()
+{
+	if (bpf_core_type_exists(struct trace_event_raw_kfree___x))
+		return true;
+	return false;
+}
+
+static __always_inline bool has_kmem_cache_free()
+{
+	if (bpf_core_type_exists(struct trace_event_raw_kmem_cache_free___x))
+		return true;
+	return false;
+}
+
 #endif /* __CORE_FIXES_BPF_H */
