@@ -6,6 +6,7 @@
 
 #include "maps.bpf.h"
 #include "memleak.h"
+#include "core_fixes.bpf.h"
 
 const volatile size_t min_size = 0;
 const volatile size_t max_size = -1;
@@ -324,9 +325,19 @@ int memleak__kmalloc_node(struct trace_event_raw_kmem_alloc_node *ctx)
 }
 
 SEC("tracepoint/kmem/kfree")
-int memleak__kfree(struct trace_event_raw_kfree *ctx)
+int memleak__kfree(void *ctx)
 {
-	return gen_free_enter(ctx->ptr);
+	const void *ptr;
+
+	if (has_kfree()) {
+		struct trace_event_raw_kfree___x *args = ctx;
+		ptr = BPF_CORE_READ(args, ptr);
+	} else {
+		struct trace_event_raw_kmem_free___x *args = ctx;
+		ptr = BPF_CORE_READ(args, ptr);
+	}
+
+	return gen_free_enter((void *)ptr);
 }
 
 SEC("tracepoint/kmem/kmem_cache_alloc")
@@ -352,9 +363,19 @@ int memleak__kmem_cache_alloc_node(struct trace_event_raw_kmem_alloc_node *ctx)
 }
 
 SEC("tracepoint/kmem/kmem_cache_free")
-int memleak__kmem_cache_free(struct trace_event_raw_kmem_cache_free *ctx)
+int memleak__kmem_cache_free(void *ctx)
 {
-	return gen_free_enter(ctx->ptr);
+	const void *ptr;
+
+	if (has_kmem_cache_free()) {
+		struct trace_event_raw_kmem_cache_free___x *args = ctx;
+		ptr = BPF_CORE_READ(args, ptr);
+	} else {
+		struct trace_event_raw_kmem_free___x *args = ctx;
+		ptr = BPF_CORE_READ(args, ptr);
+	}
+
+	return gen_free_enter((void *)ptr);
 }
 
 SEC("tracepoint/kmem/mm_page_alloc")
