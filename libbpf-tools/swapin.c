@@ -12,8 +12,6 @@
 /* 03-Jul-2019   Brendan Gregg   Ported from bpftrace to BCC. */
 /* 06-Apr-2023   Ben Olson       Ported from BCC to libbpf. */
 
-#include "swapin.h"
-
 #include <argp.h>
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
@@ -25,6 +23,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "swapin.h"
 #include "swapin.skel.h"
 #include "trace_helpers.h"
 

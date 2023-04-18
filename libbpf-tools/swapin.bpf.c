@@ -7,13 +7,13 @@
 /* 03-Jul-2019   Brendan Gregg   Ported from bpftrace to BCC. */
 /* 06-Apr-2023   Ben Olson       Ported from BCC to libbpf */
 
-#include "swapin.h"
 
-#include <bpf/bpf_core_read.h>
-#include <bpf/bpf_helpers.h>
-#include <bpf/bpf_tracing.h>
 #include <vmlinux.h>
+#include <bpf/bpf_helpers.h>
+#include <bpf/bpf_core_read.h>
+#include <bpf/bpf_tracing.h>
 
+#include "swapin.h"
 #include "bits.bpf.h"
 #include "maps.bpf.h"
 
