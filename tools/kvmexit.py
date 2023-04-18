@@ -5,10 +5,11 @@
 # Display the exit_reason and its statistics of each vm exit
 # for all vcpus of all virtual machines. For example:
 # $./kvmexit.py
-#  PID      TID      KVM_EXIT_REASON                     COUNT
-#  1273551  1273568  EXIT_REASON_MSR_WRITE               6
-#  1274253  1274261  EXIT_REASON_EXTERNAL_INTERRUPT      1
-#  1274253  1274261  EXIT_REASON_HLT                     12
+# PID      TID      KVM_EXIT_REASON                     COUNT EXIT_TIME_AVG
+# 9352     9385     EXTERNAL_INTERRUPT                  4        6600
+# 9352     9385     HLT                                 697      67104726
+# 9352     9385     MSR_READ                            47       1519
+# 9352     9385     MSR_WRITE                           2295     1616
 #  ...
 #
 # Besides, we also allow users to specify one pid, tid(s), or one
@@ -18,6 +19,7 @@
 # @TID: the user space's thread of each vcpu of that virtual machine.
 # @KVM_EXIT_REASON: the reason why the vm exits.
 # @COUNT: the counts of the @KVM_EXIT_REASONS.
+# @EXIT_TIME_AVG: the average of all interval from kvm_exit to the next kvm_entry. unit:ns
 #
 # REQUIRES: Linux 4.7+ (BPF_PROG_TYPE_TRACEPOINT support)
 #
@@ -84,19 +86,65 @@ bpf_text = """
 #define REASON_NUM 69
 #define TGID_NUM 1024
 
+
+typedef struct kvm_exit {
+    u64 count;
+    u64 exit_ts;    //timestamp of kvm_exit
+    u64 entry_ts;   //timestamp of kvm_entry after kvm_exit for the same vcpu thread.
+    u64 sum_hd;     //the sum of the duration of all exiting status
+}kvm_exit_t;
+
 struct exit_count {
-    u64 exit_ct[REASON_NUM];
+    u32 reason;
+    kvm_exit_t kvm_exit[REASON_NUM];
 };
 BPF_PERCPU_ARRAY(init_value, struct exit_count, 1);
 BPF_TABLE("percpu_hash", u64, struct exit_count, pcpu_kvm_stat, TGID_NUM);
 
 struct cache_info {
     u64 cache_pid_tgid;
-    struct exit_count cache_exit_ct;
+    struct exit_count cache_kvm_exit;
 };
 BPF_PERCPU_ARRAY(pcpu_cache, struct cache_info, 1);
 
-FUNC_ENTRY {
+FUNC_KVM_ENTRY {
+    struct exit_count *tmp_exit_count = NULL;
+    kvm_exit_t *tmp_kvm_exit = NULL;
+    u64 time_hd = 0;
+    u64 cur_tgid_pid = bpf_get_current_pid_tgid();
+    struct exit_count *tmp_pcpu_kvm_stat = NULL;
+    struct cache_info *tmp_pcpu_cache = NULL;
+    int zero = 0;
+
+    tmp_pcpu_cache = pcpu_cache.lookup(&zero);
+    if (tmp_pcpu_cache == NULL) {
+        return 0;
+    }
+    if (tmp_pcpu_cache->cache_pid_tgid == cur_tgid_pid) {
+        tmp_exit_count = &tmp_pcpu_cache->cache_kvm_exit;
+    } else {
+        tmp_pcpu_kvm_stat = pcpu_kvm_stat.lookup(&cur_tgid_pid);
+        if(tmp_pcpu_kvm_stat == NULL) {
+            return 0;
+        }
+        tmp_exit_count = tmp_pcpu_kvm_stat;
+    }
+
+    if (tmp_exit_count->reason >= REASON_NUM) {
+        return 0;
+    }
+    tmp_kvm_exit = &tmp_exit_count->kvm_exit[tmp_exit_count->reason];
+
+    tmp_kvm_exit->entry_ts = bpf_ktime_get_ns();
+
+    // time_hd is time interval from kvm_exit to next kvm_entry
+    time_hd = tmp_kvm_exit->entry_ts - tmp_kvm_exit->exit_ts;
+    tmp_kvm_exit->sum_hd += time_hd;
+
+    return 0;
+}
+
+FUNC_KVM_EXIT {
     int cache_miss = 0;
     int zero = 0;
     u32 er = GET_ER;
@@ -120,7 +168,7 @@ FUNC_ENTRY {
 
     if (cache_p->cache_pid_tgid == cur_pid_tgid) {
         //a. If the cur_pid_tgid hit this physical cpu consecutively, save it to pcpu_cache
-        tmp_info = &cache_p->cache_exit_ct;
+        tmp_info = &cache_p->cache_kvm_exit;
     } else {
         //b. If another pid_tgid matches this pcpu for the last hit, OR it is the first time to hit this physical cpu.
         cache_miss = 1;
@@ -146,15 +194,17 @@ FUNC_ENTRY {
     }
 
     if (er < REASON_NUM) {
-        tmp_info->exit_ct[er]++;
+        tmp_info->reason = er;
+        tmp_info->kvm_exit[er].count++;
+        tmp_info->kvm_exit[er].exit_ts = bpf_ktime_get_ns();
         if (cache_miss == 1) {
             if (cache_p->cache_pid_tgid != 0) {
                 // b.*.a Let's save the last hit cache_info into kvm_stat.
-                pcpu_kvm_stat.update(&cache_p->cache_pid_tgid, &cache_p->cache_exit_ct);
+                pcpu_kvm_stat.update(&cache_p->cache_pid_tgid, &cache_p->cache_kvm_exit);
             }
             // b.* As the cur_pid_tgid meets current pcpu_cache_array for the first time, save it.
             cache_p->cache_pid_tgid = cur_pid_tgid;
-            bpf_probe_read(&cache_p->cache_exit_ct, sizeof(*tmp_info), tmp_info);
+            bpf_probe_read(&cache_p->cache_kvm_exit, sizeof(*tmp_info), tmp_info);
         }
         return 0;
     }
@@ -257,13 +307,16 @@ except Exception as e:
     raise Exception("Failed to do precondition check, due to: %s." % e)
 
 try:
-    if BPF.support_raw_tracepoint_in_module():
+    #if BPF.support_raw_tracepoint_in_module():
+    if 0:
         # Let's firstly try raw_tracepoint_in_module
-        func_entry = "RAW_TRACEPOINT_PROBE(kvm_exit)"
+        func_kvm_exit = "RAW_TRACEPOINT_PROBE(kvm_exit)"
+        func_kvm_entry = "RAW_TRACEPOINT_PROBE(kvm_entry)"
         get_er = "ctx->args[0]"
     else:
         # If raw_tp_in_module is not supported, fall back to regular tp
-        func_entry = "TRACEPOINT_PROBE(kvm, kvm_exit)"
+        func_kvm_exit = "TRACEPOINT_PROBE(kvm, kvm_exit)"
+        func_kvm_entry = "TRACEPOINT_PROBE(kvm, kvm_entry)"
         get_er = "args->exit_reason"
 except Exception as e:
     raise Exception("Failed to catch kvm exit reasons due to: %s" % e)
@@ -311,7 +364,8 @@ else:
 bpf_text = bpf_text.replace('THREAD_FILTER', thread_filter)
 
 # For kernel >= 5.0, use RAW_TRACEPOINT_MODULE for performance consideration
-bpf_text = bpf_text.replace('FUNC_ENTRY', func_entry)
+bpf_text = bpf_text.replace('FUNC_KVM_EXIT', func_kvm_exit)
+bpf_text = bpf_text.replace('FUNC_KVM_ENTRY', func_kvm_entry)
 bpf_text = bpf_text.replace('GET_ER', get_er)
 b = BPF(text=bpf_text)
 
@@ -336,7 +390,7 @@ if (args.pid or args.tid):
         tgid_exit = [0 for i in range(len(exit_reasons))]
 
 # output
-print("%s%-35s %s" % (header_format, "KVM_EXIT_REASON", "COUNT"))
+print("%s%-35s %s %s" % (header_format, "KVM_EXIT_REASON", "COUNT", "EXIT_TIME_AVG"))
 
 pcpu_kvm_stat = b["pcpu_kvm_stat"]
 pcpu_cache = b["pcpu_cache"]
@@ -344,26 +398,30 @@ for k, v in pcpu_kvm_stat.items():
     tgid = k.value >> 32
     pid = k.value & 0xffffffff
     for i in range(0, len(exit_reasons)):
-        sum1 = 0
+        count_sum = 0
+        time_sum = 0
         for inner_cpu in range(0, multiprocessing.cpu_count()):
             cachePIDTGID = pcpu_cache[0][inner_cpu].cache_pid_tgid
             # Take priority to check if it is in cache
             if cachePIDTGID == k.value:
-                sum1 += pcpu_cache[0][inner_cpu].cache_exit_ct.exit_ct[i]
+                count_sum += pcpu_cache[0][inner_cpu].cache_kvm_exit.kvm_exit[i].count
+                time_sum += pcpu_cache[0][inner_cpu].cache_kvm_exit.kvm_exit[i].sum_hd
             # If not in cache, find from kvm_stat
             else:
-                sum1 += v[inner_cpu].exit_ct[i]
-        if sum1 == 0:
+                count_sum += v[inner_cpu].kvm_exit[i].count
+                time_sum += v[inner_cpu].kvm_exit[i].sum_hd
+        if count_sum == 0:
             continue
+        avg_time = int(time_sum / count_sum)
 
         if (args.pid and args.pid == tgid and need_collapse):
-            tgid_exit[i] += sum1
+            tgid_exit[i] += count_sum
         elif (args.tid and args.tid == pid):
-            ct_reason.append((sum1, i))
+            ct_reason.append((count_sum, i, avg_time))
         elif not need_collapse or args.tids:
-            print("%-8u %-35s %-8u" % (pid, exit_reasons[i], sum1))
+            print("%-8u %-35s %-8u %-12u" % (pid, exit_reasons[i], count_sum, avg_time))
         else:
-            print("%-8u %-8u %-35s %-8u" % (tgid, pid, exit_reasons[i], sum1))
+            print("%-8u %-8u %-35s %-8u %-12u" % (tgid, pid, exit_reasons[i], count_sum, avg_time))
 
     # Display only for the target tid in descending sort
     if (args.tid and args.tid == pid):
@@ -371,7 +429,7 @@ for k, v in pcpu_kvm_stat.items():
         for i in range(0, len(ct_reason)):
             if ct_reason[i][0] == 0:
                 continue
-            print("%-35s %-8u" % (exit_reasons[ct_reason[i][1]], ct_reason[i][0]))
+            print("%-35s %-8u %-12u" % (exit_reasons[ct_reason[i][1]], ct_reason[i][0], ct_reason[i][2]))
         break
 
 
