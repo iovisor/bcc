@@ -371,6 +371,9 @@ int main(int argc, char **argv)
 		}
 
 		print_log2_hist(obj->bss->hist, MAX_SLOTS, unit_str());
+
+		/* Cleanup histograms for interval output */
+		memset(obj->bss->hist, 0, sizeof(obj->bss->hist));
 	}
 
 	printf("Exiting trace of %s\n", env.funcname);
