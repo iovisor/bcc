@@ -90,24 +90,23 @@ BPF_PERF_OUTPUT(events);
 """
 
 bpf_text_kprobe = """
-//int trace_finish_task_switch(struct pt_regs *ctx, struct task_struct *prev)
-int trace_finish_task_switch(struct pt_regs *ctx, struct rq *rq, struct task_struct *prev)
+TRACE_FINISH_TASK_SWITCH_FUNC
 {
     u32 pid, tgid, ppid;
     u64 ts = bpf_ktime_get_ns();
 
     // prev task go to sleep
-    u32 state = prev->STATE_FIELD;
+    long state = prev->STATE_FIELD;
     if (state != 0) {
-        if(STATE_FILTER)
-            return 0;
-        pid = prev->pid;
-        tgid = prev->tgid;
-        ppid = prev->real_parent->tgid;
-        if (pid != 0) {
-            if (!(FILTER_PID) && !(FILTER_TGID) && !(FILTER_PPID)) {
-                struct ts_stack_t ts_stack = { .ts = ts };
-                start.update(&pid, &ts_stack);
+        if(STATE_FILTER) {
+            pid = prev->pid;
+            tgid = prev->tgid;
+            ppid = prev->real_parent->tgid;
+            if (pid != 0) {
+                if (!(FILTER_PID) && !(FILTER_TGID) && !(FILTER_PPID)) {
+                    struct ts_stack_t ts_stack = { .ts = ts };
+                    start.update(&pid, &ts_stack);
+                }
             }
         }
     }
@@ -209,21 +208,21 @@ RAW_TRACEPOINT_PROBE(sched_switch)
     u32 pid, tgid, ppid;
 
     // prev task go to sleep
-    u32 state = prev->STATE_FIELD;
+    long state = prev->STATE_FIELD;
     if ( state != 0 ) {
-        if(STATE_FILTER)
-            return 0;
-        pid = prev->pid;
-        tgid = prev->tgid;
-        ppid = prev->real_parent->tgid;
-        u64 ts = bpf_ktime_get_ns();
-        if (pid != 0) {
-            if (!(FILTER_PID) && !(FILTER_TGID) && !(FILTER_PPID)) {
-                struct ts_stack_t ts_stack = { .ts = ts };
+        if(STATE_FILTER){
+            pid = prev->pid;
+            tgid = prev->tgid;
+            ppid = prev->real_parent->tgid;
+            u64 ts = bpf_ktime_get_ns();
+            if (pid != 0) {
+                if (!(FILTER_PID) && !(FILTER_TGID) && !(FILTER_PPID)) {
+                    struct ts_stack_t ts_stack = { .ts = ts };
 #ifdef SHOW_STACK
-                ts_stack.stack_id = stack_traces.get_stackid(ctx, 0);
+                    ts_stack.stack_id = stack_traces.get_stackid(ctx, 0);
 #endif
-                start.update(&pid, &ts_stack);
+                    start.update(&pid, &ts_stack);
+                }
             }
         }
     }
@@ -242,6 +241,19 @@ if BPF.kernel_struct_has_field(b'task_struct', b'__state') == 1:
     bpf_text = bpf_text.replace('STATE_FIELD', '__state')
 else:
     bpf_text = bpf_text.replace('STATE_FIELD', 'state')
+
+bpf_text_finish_task_switch_old = """
+int trace_finish_task_switch(struct pt_regs *ctx, struct rq *rq, struct task_struct *prev)
+"""
+bpf_text_finish_task_switch_new = """
+int trace_finish_task_switch(struct pt_regs *ctx, struct task_struct *prev)
+"""
+# kernel v3.19 task_struct added numa_faults field and changed proto of finish_task_switch
+if BPF.kernel_struct_has_field(b'task_struct', b'numa_faults') == 1:
+    bpf_text = bpf_text.replace('TRACE_FINISH_TASK_SWITCH_FUNC', bpf_text_finish_task_switch_new)
+else:
+    bpf_text = bpf_text.replace('TRACE_FINISH_TASK_SWITCH_FUNC', bpf_text_finish_task_switch_old)
+
 if min_us == 0:
     bpf_text = bpf_text.replace('FILTER_US', '0')
 else:
@@ -262,10 +274,10 @@ else:
     bpf_text = bpf_text.replace('FILTER_PPID', '0')
 
 if args.state == 'S':
-    bpf_text = bpf_text.replace('STATE_FILTER', '!(state & TASK_INTERRUPTIBLE)')
+    bpf_text = bpf_text.replace('STATE_FILTER', 'state & TASK_INTERRUPTIBLE')
 elif args.state == 'D':
     bpf_text = bpf_text.replace('STATE_FILTER', 
-        '!( (state & TASK_UNINTERRUPTIBLE) && !(state & TASK_NOLOAD) )')
+        '(state & TASK_UNINTERRUPTIBLE) && !(state & TASK_NOLOAD) ')
 else:
     bpf_text = bpf_text.replace('STATE_FILTER', '0');
 
