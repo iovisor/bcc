@@ -337,7 +337,7 @@ int memleak__kfree(void *ctx)
 		ptr = BPF_CORE_READ(args, ptr);
 	}
 
-	return gen_free_enter((void *)ptr);
+	return gen_free_enter(ptr);
 }
 
 SEC("tracepoint/kmem/kmem_cache_alloc")
@@ -375,7 +375,7 @@ int memleak__kmem_cache_free(void *ctx)
 		ptr = BPF_CORE_READ(args, ptr);
 	}
 
-	return gen_free_enter((void *)ptr);
+	return gen_free_enter(ptr);
 }
 
 SEC("tracepoint/kmem/mm_page_alloc")
