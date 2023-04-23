@@ -674,6 +674,7 @@ static int libbpf_bpf_prog_load(enum bpf_prog_type prog_type,
   case BPF_PROG_TYPE_EXT:
     p.attach_btf_id = opts->attach_btf_id;
     p.attach_prog_fd = opts->attach_prog_fd;
+    p.attach_btf_obj_fd = opts->attach_btf_obj_fd;
     break;
   default:
     p.prog_ifindex = opts->prog_ifindex;
@@ -695,6 +696,86 @@ static int libbpf_bpf_prog_load(enum bpf_prog_type prog_type,
                        insns, insn_cnt, &p);
 }
 
+static int find_btf_id(const char *module_name, const char *func_name,
+                       enum bpf_attach_type expected_attach_type, int *btf_fd)
+{
+  struct btf *vmlinux_btf = NULL, *module_btf = NULL;
+  struct bpf_btf_info info;
+  int err, fd, btf_id;
+  __u32 id = 0, len;
+  char name[64];
+
+  if (!module_name[0] || !strcmp(module_name, "vmlinux"))
+    return libbpf_find_vmlinux_btf_id(func_name, expected_attach_type);
+
+  while (true) {
+    err = bpf_btf_get_next_id(id, &id);
+    if (err) {
+      fprintf(stderr, "bpf_btf_get_next_id failed: %d\n", err);
+      return err;
+    }
+
+    fd = bpf_btf_get_fd_by_id(id);
+    if (fd < 0) {
+      err = fd;
+      fprintf(stderr, "bpf_btf_get_fd_by_id failed: %d\n", err);
+      return err;
+    }
+
+    len = sizeof(info);
+    memset(&info, 0, sizeof(info));
+    info.name = ptr_to_u64(name);
+    info.name_len = sizeof(name);
+
+    err = bpf_btf_get_info_by_fd(fd, &info, &len);
+    if (err) {
+      fprintf(stderr, "bpf_btf_get_info_by_fd failed: %d\n", err);
+      goto err_out;
+    }
+
+    if (!info.kernel_btf || strcmp(name, module_name)) {
+      close(fd);
+      continue;
+    }
+
+    vmlinux_btf = btf__load_vmlinux_btf();
+    err = libbpf_get_error(vmlinux_btf);
+    if (err) {
+      fprintf(stderr, "btf__load_vmlinux_btf failed: %d\n", err);
+      goto err_out;
+    }
+
+    module_btf = btf__load_module_btf(module_name, vmlinux_btf);
+    err = libbpf_get_error(vmlinux_btf);
+    if (err) {
+      fprintf(stderr, "btf__load_module_btf failed: %d\n", err);
+      goto err_out;
+    }
+
+    btf_id = btf__find_by_name_kind(module_btf, func_name, BTF_KIND_FUNC);
+    if (btf_id < 0) {
+      err = btf_id;
+      fprintf(stderr, "btf__find_by_name_kind failed: %d\n", err);
+      goto err_out;
+    }
+
+    btf__free(module_btf);
+    btf__free(vmlinux_btf);
+
+    *btf_fd = fd;
+    return btf_id;
+
+err_out:
+    btf__free(module_btf);
+    btf__free(vmlinux_btf);
+    close(fd);
+    *btf_fd = -1;
+    return err;
+  }
+
+  return -1;
+}
+
 int bcc_prog_load_xattr(enum bpf_prog_type prog_type, const char *prog_name,
                         const char *license, const struct bpf_insn *insns,
                         struct bpf_prog_load_opts *opts, int prog_len,
@@ -705,6 +786,10 @@ int bcc_prog_load_xattr(enum bpf_prog_type prog_type, const char *prog_name,
   unsigned tmp_log_buf_size = 0, opts_log_buf_size = 0;
   int ret = 0, name_offset = 0, expected_attach_type = 0;
   char new_prog_name[BPF_OBJ_NAME_LEN] = {};
+  char mod_name[64] = {};
+  char *mod_end;
+  int mod_len;
+  int fd = -1;
 
   unsigned insns_cnt = prog_len / sizeof(struct bpf_insn);
 
@@ -730,7 +815,6 @@ int bcc_prog_load_xattr(enum bpf_prog_type prog_type, const char *prog_name,
     }
   }
 
-
   if (name_len) {
     if (strncmp(prog_name, "kprobe__", 8) == 0)
       name_offset = 8;
@@ -741,13 +825,21 @@ int bcc_prog_load_xattr(enum bpf_prog_type prog_type, const char *prog_name,
     else if (strncmp(prog_name, "raw_tracepoint__", 16) == 0)
       name_offset = 16;
     else if (strncmp(prog_name, "kfunc__", 7) == 0) {
-      name_offset = 7;
+      // kfunc__vmlinux__vfs_read
+      mod_end = strstr(prog_name + 7, "__");
+      mod_len = mod_end - prog_name - 7;
+      strncpy(mod_name, prog_name + 7, mod_len);
+      name_offset = 7 + mod_len + 2;
       expected_attach_type = BPF_TRACE_FENTRY;
     } else if (strncmp(prog_name, "kmod_ret__", 10) == 0) {
       name_offset = 10;
       expected_attach_type = BPF_MODIFY_RETURN;
     } else if (strncmp(prog_name, "kretfunc__", 10) == 0) {
-      name_offset = 10;
+      // kretfunc__vmlinux__vfs_read
+      mod_end = strstr(prog_name + 10, "__");
+      mod_len = mod_end - prog_name - 10;
+      strncpy(mod_name, prog_name + 10, mod_len);
+      name_offset = 10 + mod_len + 2;
       expected_attach_type = BPF_TRACE_FEXIT;
     } else if (strncmp(prog_name, "lsm__", 5) == 0) {
       name_offset = 5;
@@ -759,17 +851,18 @@ int bcc_prog_load_xattr(enum bpf_prog_type prog_type, const char *prog_name,
 
     if (prog_type == BPF_PROG_TYPE_TRACING ||
         prog_type == BPF_PROG_TYPE_LSM) {
-      ret = libbpf_find_vmlinux_btf_id(prog_name + name_offset,
-                                       expected_attach_type);
+      ret = find_btf_id(mod_name, prog_name + name_offset,
+                        expected_attach_type, &fd);
       if (ret == -EINVAL) {
-        fprintf(stderr, "bpf: vmlinux BTF is not found\n");
+        fprintf(stderr, "bpf: %s BTF is not found\n", mod_name);
         return ret;
       } else if (ret < 0) {
-        fprintf(stderr, "bpf: %s is not found in vmlinux BTF\n",
-                prog_name + name_offset);
+        fprintf(stderr, "bpf: %s is not found in %s BTF\n",
+                prog_name + name_offset, mod_name);
         return ret;
       }
 
+      opts->attach_btf_obj_fd = fd;
       opts->attach_btf_id = ret;
       opts->expected_attach_type = expected_attach_type;
     }
@@ -881,6 +974,8 @@ int bcc_prog_load_xattr(enum bpf_prog_type prog_type, const char *prog_name,
   }
 
 return_result:
+  if (fd >= 0)
+    close(fd);
   if (tmp_log_buf)
     free(tmp_log_buf);
   return ret;
