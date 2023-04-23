@@ -367,6 +367,7 @@ Examples in situ:
 ### 9. kfuncs
 
 Syntax: KFUNC_PROBE(*function*, typeof(arg1) arg1, typeof(arg2) arge ...)
+        MODULE_KFUNC_PROBE(*module*, *function*, typeof(arg1) arg1, typeof(arg2) arge ...)
 
 This is a macro that instruments the kernel function via trampoline
 *before* the function is executed. It's defined by *function* name and
@@ -388,6 +389,7 @@ Examples in situ:
 ### 10. kretfuncs
 
 Syntax: KRETFUNC_PROBE(*event*, typeof(arg1) arg1, typeof(arg2) arge ..., int ret)
+        MODULE_KRETFUNC_PROBE(*module*, *function*, typeof(arg1) arg1, typeof(arg2) arge ...)
 
 This is a macro that instruments the kernel function via trampoline
 *after* the function is executed. It's defined by *function* name and

@@ -1481,10 +1481,16 @@ int name(unsigned long long *ctx)                               \
 static int ____##name(unsigned long long *ctx, ##args)
 
 #define KFUNC_PROBE(event, args...) \
-        BPF_PROG(kfunc__ ## event, ##args)
+        BPF_PROG(kfunc__vmlinux__ ## event, ##args)
 
 #define KRETFUNC_PROBE(event, args...) \
-        BPF_PROG(kretfunc__ ## event, ##args)
+        BPF_PROG(kretfunc__vmlinux__ ## event, ##args)
+
+#define MODULE_KFUNC_PROBE(module, event, args...) \
+        BPF_PROG(kfunc__ ## module ## __ ## event, ##args)
+
+#define MODULE_KRETFUNC_PROBE(module, event, args...) \
+        BPF_PROG(kretfunc__ ## module ## __ ## event, ##args)
 
 #define KMOD_RET(event, args...) \
         BPF_PROG(kmod_ret__ ## event, ##args)
