@@ -10,6 +10,7 @@
 #
 # 14-Jan-2016	Brendan Gregg	Created this.
 # 03-Apr-2023	Rocky Xing   	Modified the order of stack output.
+# 04-Apr-2023   Rocky Xing      Updated default stack storage size.
 
 from __future__ import print_function
 from bcc import BPF
@@ -58,10 +59,10 @@ parser.add_argument("-v", "--verbose", action="store_true",
     help="show raw addresses")
 parser.add_argument("-f", "--folded", action="store_true",
     help="output folded format")
-parser.add_argument("--stack-storage-size", default=1024,
+parser.add_argument("--stack-storage-size", default=16384,
     type=positive_nonzero_int,
     help="the number of unique stack traces that can be stored and "
-         "displayed (default 1024)")
+         "displayed (default 16384)")
 parser.add_argument("duration", nargs="?", default=99999999,
     type=positive_nonzero_int,
     help="duration of trace, in seconds")
