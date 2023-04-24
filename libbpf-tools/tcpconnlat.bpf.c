@@ -110,6 +110,15 @@ int BPF_KPROBE(tcp_rcv_state_process, struct sock *sk)
 	return handle_tcp_rcv_state_process(ctx, sk);
 }
 
+SEC("tracepoint/tcp/tcp_destroy_sock")
+int tcp_destroy_sock(struct trace_event_raw_tcp_event_sk *ctx)
+{
+	const struct sock *sk = ctx->skaddr;
+
+	bpf_map_delete_elem(&start, &sk);
+	return 0;
+}
+
 SEC("fentry/tcp_v4_connect")
 int BPF_PROG(fentry_tcp_v4_connect, struct sock *sk)
 {
