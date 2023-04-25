@@ -467,6 +467,13 @@ def main():
         help='Specifies the maximum number of edge cases that can be recorded. '
              'default 65536. Note. 88 bytes per edge case.'
     )
+    parser.add_argument(
+        '-s', '--stacktraces', type=int, default=65536,
+        help='Specifies the maximum number of stack traces that can be recorded. '
+             'This number is rounded up to the next power of two.'
+             'default 65536. Note. 1 kbytes vmalloced per stack trace.'
+    )
+
     args = parser.parse_args()
     if not args.binary:
         try:
@@ -479,6 +486,7 @@ def main():
         text = f.read()
     text = text.replace('MAX_THREADS', str(args.threads));
     text = text.replace('MAX_EDGES', str(args.edges));
+    text = text.replace('MAX_TRACES', str(args.stacktraces));
     bpf = BPF(text=text)
 
     # Trace where threads are created
