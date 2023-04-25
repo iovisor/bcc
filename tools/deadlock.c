@@ -60,7 +60,7 @@ struct thread_created_leaf_t {
 BPF_HASH(thread_to_parent, u32, struct thread_created_leaf_t);
 
 // Stack traces when threads are created and when mutexes are locked/unlocked.
-BPF_STACK_TRACE(stack_traces, 655360);
+BPF_STACK_TRACE(stack_traces, MAX_TRACES);
 
 // The first argument to the user space function we are tracing
 // is a pointer to the mutex M held by thread T.
