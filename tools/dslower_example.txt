@@ -59,6 +59,7 @@ optional arguments:
   -p PID, --pid PID  trace this PID only
   -t TID, --tid TID  trace this TID only
   -s, --stack        also show block stack trace
+  -c PPID, --ppid PPID  trace only child of this pid
 
 examples:
     ./dslower         # trace process block longer than 10000 us (default)

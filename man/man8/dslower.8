@@ -2,7 +2,7 @@
 .SH NAME
 dslower \- Trace long process block time(in D state). Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B dslower [\-h] [\-p PID | \-t TID] [\-s] [min_us]
+.B dslower [\-h] [\-p PID | \-t TID | \-c PPID] [\-s] [min_us]
 .SH DESCRIPTION
 This script traces long process block time(in D state).
 This measures the time between a task was switched off cpu because of
@@ -21,6 +21,9 @@ Trace this process ID only (filtered in-kernel).
 .TP
 \-t TID
 Trace this thread ID only (filtered in-kernel).
+.TP
+\-c PPID
+Trace only child of this pid.
 .TP
 \-s
 also show stack trace

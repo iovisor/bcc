@@ -29,6 +29,7 @@ examples = """examples:
     ./dslower 1000    # trace process block longer than 1000 us
     ./dslower -p 123  # trace pid 123
     ./dslower -t 123  # trace tid 123 (use for threads only)
+    ./dslower -c 123  # trace only child of pid 123
     ./dslower -s  # also show stack trace
 
 """
