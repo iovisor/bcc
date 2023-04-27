@@ -1059,6 +1059,11 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
           string args = rewriter_.getRewrittenText(expansionRange(SourceRange(GET_BEGINLOC(Call->getArg(0)),
                                                            GET_ENDLOC(Call->getArg(1)))));
           txt = "bpf_ringbuf_discard(" + args + ")";
+        } else if (memb_name == "ringbuf_query") {
+          string name = string(Ref->getDecl()->getName());
+          string arg0 = rewriter_.getRewrittenText(expansionRange(Call->getArg(0)->getSourceRange()));
+          txt = "bpf_ringbuf_query((void *)bpf_pseudo_fd(1, " + fd + ")";
+          txt += ", " + arg0 + ")";
         } else if (memb_name == "ringbuf_submit") {
           string name = string(Ref->getDecl()->getName());
           string args = rewriter_.getRewrittenText(expansionRange(SourceRange(GET_BEGINLOC(Call->getArg(0)),
