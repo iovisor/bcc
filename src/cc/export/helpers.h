@@ -231,6 +231,8 @@ struct _name##_table_t { \
   void (*ringbuf_discard) (void *, u64); \
   /* map.ringbuf_submit(data, flags) */ \
   void (*ringbuf_submit) (void *, u64); \
+  /* map.ringbuf_query(flags) */ \
+  u64 (*ringbuf_query) (u64); \
   u32 max_entries; \
 }; \
 __attribute__((section("maps/ringbuf"))) \
