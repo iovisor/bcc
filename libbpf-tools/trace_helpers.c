@@ -1068,10 +1068,31 @@ bool fentry_can_attach(const char *name, const char *mod)
 
 bool kprobe_exists(const char *name)
 {
+	char addr_range[256];
 	char sym_name[256];
 	FILE *f;
 	int ret;
 
+	f = fopen("/sys/kernel/debug/kprobes/blacklist", "r");
+	if (!f)
+		goto avail_filter;
+
+	while (true) {
+		ret = fscanf(f, "%s %s%*[^\n]\n", addr_range, sym_name);
+		if (ret == EOF && feof(f))
+			break;
+		if (ret != 2) {
+			fprintf(stderr, "failed to read symbol from kprobe blacklist\n");
+			break;
+		}
+		if (!strcmp(name, sym_name)) {
+			fclose(f);
+			return false;
+		}
+	}
+	fclose(f);
+
+avail_filter:
 	f = fopen("/sys/kernel/debug/tracing/available_filter_functions", "r");
 	if (!f)
 		goto slow_path;
