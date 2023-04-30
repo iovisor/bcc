@@ -755,13 +755,13 @@ BTypeVisitor::BTypeVisitor(ASTContext &C, BFrontendAction &fe)
 
 void BTypeVisitor::genParamDirectAssign(FunctionDecl *D, string& preamble,
                                         const char **calling_conv_regs) {
-  for (size_t idx = 0; idx < fn_args_.size(); idx++) {
+  for (size_t idx = 1; idx < fn_args_.size(); idx++) {
     ParmVarDecl *arg = fn_args_[idx];
 
-    if (idx >= 1) {
+    if (arg->isUsed()) {
       // Move the args into a preamble section where the same params are
       // declared and initialized from pt_regs.
-      // Todo: this init should be done only when the program requests it.
+      // This init is only performed when requested by the program.
       string text = rewriter_.getRewrittenText(expansionRange(arg->getSourceRange()));
       arg->addAttr(UnavailableAttr::CreateImplicit(C, "ptregs"));
       size_t d = idx - 1;
@@ -774,33 +774,41 @@ void BTypeVisitor::genParamDirectAssign(FunctionDecl *D, string& preamble,
 
 void BTypeVisitor::genParamIndirectAssign(FunctionDecl *D, string& preamble,
                                           const char **calling_conv_regs) {
-  string new_ctx;
+  string tmp_preamble;
+  bool hasUsed = false;
+  ParmVarDecl *arg = fn_args_[0];
+  string new_ctx = "__" + arg->getName().str();
 
-  for (size_t idx = 0; idx < fn_args_.size(); idx++) {
-    ParmVarDecl *arg = fn_args_[idx];
+  for (size_t idx = 1; idx < fn_args_.size(); idx++) {
+    arg = fn_args_[idx];
 
-    if (idx == 0) {
-      new_ctx = "__" + arg->getName().str();
-      preamble += " struct pt_regs * " + new_ctx + " = (void *)" +
-                  arg->getName().str() + "->" +
-                  string(pt_regs_syscall_regs()) + ";";
-    } else {
+    if (arg->isUsed()) {
       // Move the args into a preamble section where the same params are
       // declared and initialized from pt_regs.
-      // Todo: this init should be done only when the program requests it.
+      // This init is only performed when requested by the program.
+      hasUsed = true;
       string text = rewriter_.getRewrittenText(expansionRange(arg->getSourceRange()));
       size_t d = idx - 1;
       const char *reg = calling_conv_regs[d];
-      preamble += "\n " + text + ";";
+      tmp_preamble += "\n " + text + ";";
       if (cannot_fall_back_safely)
-        preamble += " bpf_probe_read_kernel";
+        tmp_preamble += " bpf_probe_read_kernel";
       else
-        preamble += " bpf_probe_read";
-      preamble += "(&" + arg->getName().str() + ", sizeof(" +
+        tmp_preamble += " bpf_probe_read";
+      tmp_preamble += "(&" + arg->getName().str() + ", sizeof(" +
                   arg->getName().str() + "), &" + new_ctx + "->" +
                   string(reg) + ");";
     }
   }
+
+  arg = fn_args_[0];
+  if ( hasUsed || arg->isUsed()) {
+    preamble += " struct pt_regs * " + new_ctx + " = (void *)" +
+                arg->getName().str() + "->" +
+                string(pt_regs_syscall_regs()) + ";";
+  }
+
+  preamble += tmp_preamble;
 }
 
 void BTypeVisitor::rewriteFuncParam(FunctionDecl *D) {
