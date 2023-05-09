@@ -252,22 +252,30 @@ def agg_colval(key):
     else:
         return syscall_name(key.value)
 
+# check whether hash table batch ops is supported
+htab_batch_ops = True if BPF.kernel_struct_has_field(b'bpf_map_ops',
+        b'map_lookup_and_delete_batch') == 1 else False
+
 def print_count_stats():
     data = bpf["data"]
     print("[%s]" % strftime("%H:%M:%S"))
     print("%-22s %8s" % (agg_colname, "COUNT"))
-    for k, v in sorted(data.items(), key=lambda kv: -kv[1].value)[:args.top]:
+    for k, v in sorted(data.items_lookup_and_delete_batch()
+                       if htab_batch_ops else data.items(),
+                       key=lambda kv: -kv[1].value)[:args.top]:
         if k.value == 0xFFFFFFFF:
             continue    # happens occasionally, we don't need it
         printb(b"%-22s %8d" % (agg_colval(k), v.value))
     print("")
-    data.clear()
+    if not htab_batch_ops:
+        data.clear()
 
 def print_latency_stats():
     data = bpf["data"]
     print("[%s]" % strftime("%H:%M:%S"))
     print("%-22s %8s %16s" % (agg_colname, "COUNT", time_colname))
-    for k, v in sorted(data.items(),
+    for k, v in sorted(data.items_lookup_and_delete_batch()
+                       if htab_batch_ops else data.items(),
                        key=lambda kv: -kv[1].total_ns)[:args.top]:
         if k.value == 0xFFFFFFFF:
             continue    # happens occasionally, we don't need it
@@ -275,7 +283,8 @@ def print_latency_stats():
                (agg_colval(k), v.count,
                 v.total_ns / (1e6 if args.milliseconds else 1e3)))
     print("")
-    data.clear()
+    if not htab_batch_ops:
+        data.clear()
 
 if args.syscall is not None:
     print("Tracing %ssyscall '%s'... Ctrl+C to quit." %

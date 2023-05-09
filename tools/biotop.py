@@ -287,6 +287,10 @@ elif BPF.get_kprobe_functions(b'blk_account_io_done'):
 else:
     b.attach_tracepoint(tp="block:block_io_done", fn_name="trace_req_completion_tp")
 
+# check whether hash table batch ops is supported
+htab_batch_ops = True if BPF.kernel_struct_has_field(b'bpf_map_ops',
+        b'map_lookup_and_delete_batch') == 1 else False
+
 print('Tracing... Output every %d secs. Hit Ctrl-C to end' % interval)
 
 # cache disk major,minor -> diskname
@@ -317,7 +321,8 @@ while 1:
     # by-PID output
     counts = b.get_table("counts")
     line = 0
-    for k, v in reversed(sorted(counts.items(),
+    for k, v in reversed(sorted(counts.items_lookup_and_delete_batch()
+                                if htab_batch_ops else counts.items(),
                                 key=lambda counts: counts[1].bytes)):
 
         # lookup disk
@@ -336,7 +341,9 @@ while 1:
         line += 1
         if line >= maxrows:
             break
-    counts.clear()
+
+    if not htab_batch_ops:
+        counts.clear()
 
     countdown -= 1
     if exiting or countdown == 0:

@@ -140,6 +140,10 @@ else:
                     ("folio_account_dirtied", "account_page_dirtied"))
 b.attach_kprobe(event="mark_buffer_dirty", fn_name="do_count_mbd")
 
+# check whether hash table batch ops is supported
+htab_batch_ops = True if BPF.kernel_struct_has_field(b'bpf_map_ops',
+        b'map_lookup_and_delete_batch') == 1 else False
+
 # header
 if tstamp:
     print("%-8s " % "TIME", end="")
@@ -162,7 +166,9 @@ while 1:
         signal.signal(signal.SIGINT, signal_ignore)
 
     counts = b["counts"]
-    for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
+    for k, v in sorted(counts.items_lookup_and_delete_batch()
+                                if htab_batch_ops else counts.items(),
+                                key=lambda counts: counts[1].value):
         # partial string matches in case of .isra (necessary?)
         if k.nf == 0: # NF_APCL
             apcl = max(0, v.value)
@@ -197,7 +203,8 @@ while 1:
         print("%d %d %d %d %d %d %d\n" %
         (mpa, mbd, apcl, apd, total, misses, hits))
 
-    counts.clear()
+    if not htab_batch_ops:
+        counts.clear()
 
     # Get memory info
     mem = get_meminfo()
