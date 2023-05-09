@@ -64,7 +64,8 @@ def get_meminfo():
 def get_processes_stats(
         bpf,
         sort_field=DEFAULT_SORT_FIELD,
-        sort_reverse=False):
+        sort_reverse=False,
+        htab_batch_ops=False):
     '''
     Return a tuple containing:
     buffer
@@ -73,7 +74,8 @@ def get_processes_stats(
     '''
     counts = bpf.get_table("counts")
     stats = defaultdict(lambda: defaultdict(int))
-    for k, v in counts.items():
+    for k, v in (counts.items_lookup_batch()
+                if htab_batch_ops else counts.items()):
         stats["%d-%d-%s" % (k.pid, k.uid, k.comm.decode('utf-8', 'replace'))][k.nf] = v.value
     stats_list = []
 
@@ -129,7 +131,11 @@ def get_processes_stats(
     stats_list = sorted(
         stats_list, key=lambda stat: stat[sort_field], reverse=sort_reverse
     )
-    counts.clear()
+    if htab_batch_ops:
+        counts.items_delete_batch()
+    else:
+        counts.clear()
+
     return stats_list
 
 
@@ -220,6 +226,10 @@ def handle_loop(stdscr, args):
 
     exiting = 0
 
+    # check whether hash table batch ops is supported
+    htab_batch_ops = True if BPF.kernel_struct_has_field(b'bpf_map_ops',
+            b'map_lookup_and_delete_batch') == 1 else False
+
     while 1:
         s = stdscr.getch()
         if s == ord('q'):
@@ -245,7 +255,8 @@ def handle_loop(stdscr, args):
         process_stats = get_processes_stats(
             b,
             sort_field=sort_field,
-            sort_reverse=sort_reverse)
+            sort_reverse=sort_reverse,
+            htab_batch_ops=htab_batch_ops)
         stdscr.clear()
         stdscr.addstr(
             0, 0,

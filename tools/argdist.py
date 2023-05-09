@@ -470,6 +470,12 @@ DATA_DECL
                         self._attach_k()
                 if self.entry_probe_required:
                         self._attach_entry_probe()
+                # Check whether hash table batch ops is supported
+                if self.type == "freq" and self.bpf.kernel_struct_has_field(
+                        b'bpf_map_ops', b'map_lookup_and_delete_batch') == 1:
+                    self.htab_batch_ops = True
+                else:
+                    self.htab_batch_ops = False
 
         def _v2s(self, v):
                 # Most fields can be converted with plain str(), but strings
@@ -510,7 +516,9 @@ DATA_DECL
                 if self.type == "freq":
                         print(self.label or self.raw_spec)
                         print("\t%-10s %s" % ("COUNT", "EVENT"))
-                        sdata = sorted(data.items(), key=lambda p: p[1].value)
+                        sdata = sorted(data.items_lookup_batch()
+                                if self.htab_batch_ops else data.items(),
+                                key=lambda p: p[1].value)
                         if top is not None:
                                 sdata = sdata[-top:]
                         for key, value in sdata:
@@ -531,6 +539,9 @@ DATA_DECL
                                 if not self.is_default_expr else "retval")
                         data.print_log2_hist(val_type=label)
                 if not self.cumulative:
+                    if self.htab_batch_ops:
+                        data.items_delete_batch()
+                    else:
                         data.clear()
 
         def __str__(self):
