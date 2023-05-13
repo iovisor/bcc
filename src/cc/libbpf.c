@@ -862,7 +862,7 @@ int bcc_prog_load_xattr(enum bpf_prog_type prog_type, const char *prog_name,
         return ret;
       }
 
-      opts->attach_btf_obj_fd = fd;
+      opts->attach_btf_obj_fd = fd == -1 ? 0 : fd;
       opts->attach_btf_id = ret;
       opts->expected_attach_type = expected_attach_type;
     }
