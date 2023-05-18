@@ -166,4 +166,30 @@ static __always_inline bool has_kmem_cache_free()
 	return false;
 }
 
+/**
+ * commit 8cd54c1c8480 ("iov_iter: separate direction from flavour")
+ * Instead of having them mixed in iter->type, use separate ->iter_type
+ * and ->data_source (u8 and bool resp.)
+ * see:
+ *     https://github.com/torvalds/linux/commit/8cd54c1c8480
+ */
+struct iov_iter___o {
+	unsigned int type;
+} __attribute__((preserve_access_index));
+
+struct iov_iter___x {
+	u8 iter_type;
+	/* commit fcb14cb1bdac ("new iov_iter flavour - ITER_UBUF")
+	 * implement new iov_iter flavour ITER_UBUF
+	 */
+	void *ubuf;
+} __attribute__((preserve_access_index));
+
+static __always_inline bool iov_iter_has_iter_type(void)
+{
+	if (bpf_core_field_exists(struct iov_iter___x, iter_type))
+		return true;
+	return false;
+}
+
 #endif /* __CORE_FIXES_BPF_H */
