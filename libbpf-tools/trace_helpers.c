@@ -243,6 +243,7 @@ static bool is_file_backed(const char *mapname)
 		STARTS_WITH(mapname, "[stack") ||
 		STARTS_WITH(mapname, "/SYSV") ||
 		STARTS_WITH(mapname, "[heap]") ||
+		STARTS_WITH(mapname, "[uprobes]") ||
 		STARTS_WITH(mapname, "[vsyscall]"));
 }
 
@@ -256,6 +257,11 @@ static bool is_vdso(const char *path)
 	return !strcmp(path, "[vdso]");
 }
 
+static bool is_uprobes(const char *path)
+{
+	return !strcmp(path, "[uprobes]");
+}
+
 static int get_elf_type(const char *path)
 {
 	GElf_Ehdr hdr;
@@ -264,6 +270,8 @@ static int get_elf_type(const char *path)
 	int fd;
 
 	if (is_vdso(path))
+		return -1;
+	if (is_uprobes(path))
 		return -1;
 	e = open_elf(path, &fd);
 	if (!e)
