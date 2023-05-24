@@ -9,6 +9,7 @@
 struct args_t {
 	const char *fname;
 	int flags;
+	__u16 mode;
 };
 
 struct event {
@@ -21,6 +22,7 @@ struct event {
 	__u64 callers[2];
 	char comm[TASK_COMM_LEN];
 	char fname[NAME_MAX];
+	__u16 mode;
 };
 
 #endif /* __OPENSNOOP_H */

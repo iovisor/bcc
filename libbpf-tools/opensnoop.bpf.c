@@ -47,7 +47,7 @@ bool trace_allowed(u32 tgid, u32 pid)
 }
 
 static __always_inline
-int trace_enter(const char *filename, int flags)
+int trace_enter(const char *filename, int flags, __u16 mode)
 {
 	u64 id = bpf_get_current_pid_tgid();
 	/* use kernel terminology here for tgid/pid: */
@@ -59,6 +59,7 @@ int trace_enter(const char *filename, int flags)
 		struct args_t args = {};
 		args.fname = filename;
 		args.flags = flags;
+		args.mode = mode;
 		bpf_map_update_elem(&start, &pid, &args, 0);
 	}
 	return 0;
@@ -67,13 +68,13 @@ int trace_enter(const char *filename, int flags)
 SEC("tracepoint/syscalls/sys_enter_open")
 int tracepoint__syscalls__sys_enter_open(struct trace_event_raw_sys_enter* ctx)
 {
-	return trace_enter((const char *)ctx->args[0], (int)ctx->args[1]);
+	return trace_enter((const char *)ctx->args[0], (int)ctx->args[1], (__u16)ctx->args[2]);
 }
 
 SEC("tracepoint/syscalls/sys_enter_openat")
 int tracepoint__syscalls__sys_enter_openat(struct trace_event_raw_sys_enter* ctx)
 {
-	return trace_enter((const char *)ctx->args[1], (int)ctx->args[2]);
+	return trace_enter((const char *)ctx->args[1], (int)ctx->args[2], (__u16)ctx->args[3]);
 }
 
 static __always_inline
@@ -98,6 +99,7 @@ int trace_exit(struct trace_event_raw_sys_exit* ctx)
 	bpf_get_current_comm(&event.comm, sizeof(event.comm));
 	bpf_probe_read_user_str(&event.fname, sizeof(event.fname), ap->fname);
 	event.flags = ap->flags;
+	event.mode = ap->mode;
 	event.ret = ret;
 
 	bpf_get_stack(ctx, &stack, sizeof(stack),
