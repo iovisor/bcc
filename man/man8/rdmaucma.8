@@ -1,0 +1,34 @@
+.TH rdmaucma 8 "2023-05-29" "USER COMMANDS"
+.SH NAME
+rdmaucma \- Trace RDMA Userspace Connection Manager Access Event. For Linux, uses BCC, eBPF.
+.SH SYNOPSIS
+.B rdmaucma [\-h] [\-D]
+.SH DESCRIPTION
+This program traces RDMA UCMA(Userspace Connection Manager Access) events,
+This can be useful to analyze issues on RDMA CM.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-D
+Show debug infomation of bpf text.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+zhenwei pi
+.SH SEE ALSO
+rdma(8)
