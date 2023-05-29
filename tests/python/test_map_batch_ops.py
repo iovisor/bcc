@@ -31,9 +31,9 @@ class TestMapBatch(TestCase):
             count = self.SUBSET_SIZE
         keys = (hmap.Key * count)()
         i = 0
-        for k, _ in sorted(hmap.items_lookup_batch()):
+        for k, _ in sorted(hmap.items_lookup_batch(), key=lambda k:k[0].value):
             if i < count:
-                keys[i] = k
+                keys[i] = k.value
                 i += 1
             else:
                 break
@@ -45,9 +45,9 @@ class TestMapBatch(TestCase):
             count = self.SUBSET_SIZE
         values = (hmap.Leaf * count)()
         i = 0
-        for _, v in sorted(hmap.items_lookup_batch()):
+        for _, v in sorted(hmap.items_lookup_batch(), key=lambda k:k[0].value):
             if i < count:
-                values[i] = v*v
+                values[i] = v.value * v.value
                 i += 1
             else:
                 break
@@ -55,9 +55,9 @@ class TestMapBatch(TestCase):
 
     def check_hashmap_values(self, it):
         i = 0
-        for k, v in sorted(it):
-            self.assertEqual(k, i)
-            self.assertEqual(v, i)
+        for k, v in sorted(it, key=lambda kv:kv[0].value):
+            self.assertEqual(k.value, i)
+            self.assertEqual(v.value, i)
             i += 1
         return i
 
@@ -129,12 +129,15 @@ class TestMapBatch(TestCase):
         # the first self.SUBSET_SIZE keys follow this rule value = keys * keys
         # the remaning keys follow this rule : value = keys
         i = 0
-        for k, v in sorted(hmap.items_lookup_batch()):
+        for k, v in sorted(hmap.items_lookup_batch(),
+                           key=lambda kv:kv[0].value):
             if i < self.SUBSET_SIZE:
-                self.assertEqual(v, k*k)  # values are the square of the keys
+                # values are the square of the keys
+                self.assertEqual(v.value, k.value * k.value)
                 i += 1
             else:
-                self.assertEqual(v, k)  # values = keys
+                # values = keys
+                self.assertEqual(v.value, k.value)
 
         self.assertEqual(i, self.SUBSET_SIZE)
 

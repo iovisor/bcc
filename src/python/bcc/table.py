@@ -609,7 +609,13 @@ class TableBase(MutableMapping):
                 break
 
         for i in range(0, total):
-            yield (ct_keys[i], ct_values[i])
+            k = ct_keys[i]
+            v = ct_values[i]
+            if not isinstance(k, ct.Structure):
+                k = self.Key(k)
+            if not isinstance(v, ct.Structure):
+                v = self.Leaf(v)
+            yield (k, v)
 
     def zero(self):
         # Even though this is not very efficient, we grab the entire list of
