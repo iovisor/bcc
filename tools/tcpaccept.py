@@ -50,7 +50,7 @@ parser.add_argument("-P", "--port",
     help="comma-separated list of local ports to trace")
 parser.add_argument("-c", "--count", action="store_true",
     help="count the accept numbers by PID")
-parser.add_argument("-i", "--interval", nargs="?", default=5,
+parser.add_argument("-i", "--interval", nargs=1, default=[5],
     help="Output the accept numbers by PID with interval, in seconds")
 group = parser.add_mutually_exclusive_group()
 group.add_argument("-4", "--ipv4", action="store_true",
@@ -266,8 +266,6 @@ bpf_text = bpf_text.replace('##FILTER_FAMILY##', '')
 def print_ipv4_event(cpu, data, size):
     event = b["ipv4_events"].event(data)
     global start_ts
-    if args.count:
-        return 0
     if args.time:
         printb(b"%-9s" % strftime("%H:%M:%S").encode('ascii'), nl="")
     if args.timestamp:
@@ -284,8 +282,6 @@ def print_ipv4_event(cpu, data, size):
 def print_ipv6_event(cpu, data, size):
     event = b["ipv6_events"].event(data)
     global start_ts
-    if args.count:
-        return 0
     if args.time:
         printb(b"%-9s" % strftime("%H:%M:%S").encode('ascii'), nl="")
     if args.timestamp:
@@ -328,11 +324,10 @@ start_ts = 0
 
 # read events
 if args.count:
-    b.attach_kretprobe(event="inet_csk_accept", fn_name="kretprobe__inet_csk_accept")
     while (1):
         pid_accept_cnt = b.get_table("pid_accept_cnt")
         try:
-            sleep(int(args.interval))
+            sleep(int(args.interval[0]))
         except KeyboardInterrupt:
             depict_cnt(b["pid_accept_cnt"])
             exit()

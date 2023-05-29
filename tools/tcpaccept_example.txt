@@ -33,7 +33,7 @@ TIME(s)  PID    COMM         IP RADDR            RPORT LADDR            LPORT
 1.984    907    sshd         4  127.0.0.1        51250 127.0.0.1        22
 
 The -c option trace the tcp accept number of each PID
-The -i option specify the count interval
+The -i option specify the count interval in seconds(default 5s)
 
 # ./tcpaccept -c -i 2
 Tracing accept count... Hit Ctrl-C to end
