@@ -18,7 +18,6 @@
 from __future__ import print_function
 from bcc import BPF
 from sys import stderr
-from time import strftime
 import argparse
 import errno
 import signal

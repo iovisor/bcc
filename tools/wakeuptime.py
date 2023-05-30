@@ -15,7 +15,7 @@
 from __future__ import print_function
 from bcc import BPF
 from bcc.utils import printb
-from time import sleep, strftime
+from time import sleep
 import argparse
 import signal
 import errno
