@@ -85,6 +85,7 @@ APPS = \
 	tcpstates \
 	tcpsynbl \
 	tcptop \
+	ttysnoop \
 	vfsstat \
 	wakeuptime \
 	$(BZ_APPS) \
