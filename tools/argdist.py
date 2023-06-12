@@ -21,7 +21,7 @@ import sys
 class Probe(object):
         next_probe_index = 0
         streq_index = 0
-        aliases = {"$PID": "(bpf_get_current_pid_tgid() >> 32)"}
+        aliases = {"$PID": "(bpf_get_current_pid_tgid() >> 32)", "$COMM": "&val.name"}
 
         def _substitute_aliases(self, expr):
                 if expr is None:
@@ -124,6 +124,20 @@ u64 __time = bpf_ktime_get_ns();
                                  self.hashname_prefix + pname)
                         text += "if (%s == 0) { return 0 ; }\n" % val_name
                         self.param_val_names[pname] = val_name
+                return text
+        
+        def _generate_comm_prefix(self):
+                text = """
+enum {
+        TASK_COMM_LEN = 16,
+};
+struct val_t {
+        u32 pid;
+        char name[TASK_COMM_LEN];
+};
+struct val_t val = {.pid = (bpf_get_current_pid_tgid() >> 32) };
+bpf_get_current_comm(&val.name, sizeof(val.name));
+        """
                 return text
 
         def _replace_entry_exprs(self):
@@ -396,6 +410,10 @@ DATA_DECL
                         # Only entry uprobes/kprobes can have user-specified
                         # signatures. Other probes force it to ().
                         signature = ", " + self.signature
+
+                # If COMM is specified prefix with code to get process name
+                if self.exprs.count(self.aliases['$COMM']):
+                        prefix += self._generate_comm_prefix()
 
                 program += probe_text.replace("PROBENAME",
                                               self.probe_func_name)
