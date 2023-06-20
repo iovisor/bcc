@@ -1,0 +1,70 @@
+Demonstrations of tcppktlat, the Linux BPF CO-RE version.
+
+tcppktlat traces latency between TCP received pkt and picked up by userspace thread system-wide, and prints various details.
+Example output:
+
+# tcppktlat
+PID     COMM             LADDR           LPORT RADDR           RPORT MS
+4424    etcd             127.0.0.1       2379  127.0.0.1       53202 0.06
+4405    kube-apiserver   127.0.0.1       53202 127.0.0.1       2379  0.06
+1370211 wakatime-cli     172.22.130.115  59394 143.244.210.202 443   2.75
+3894    kubelet          172.18.0.3      51584 172.18.0.4      6443  0.08
+^C
+
+In the process of tracing, when a network soft interrupt reads a TCP packet, it is placed into the corresponding socket's receive queue, and then copied from kernel space to user space by a user-level thread. The latency between receiving the packet and it being retrieved can be used to determine if there are any performance issues in the user-level path for handling received TCP packet.
+
+The -l option can be used to filter on a local port, which is filtered in-kernel.
+
+# tcppktlat -l 7000
+PID     COMM             LADDR           LPORT RADDR           RPORT MS
+1354840 server           127.0.0.1       7000  127.0.0.1       43932 0.05
+1354840 server           127.0.0.1       7000  127.0.0.1       43932 4.88
+1354840 server           127.0.0.1       7000  127.0.0.1       43932 6.02
+^C
+
+The output shows server experiences jitter and higher latency in reading data, requiring troubleshooting.
+
+
+We can use minimum latency(us) as a filtering condition.
+
+# tcppktlat 1000
+PID     COMM             LADDR           LPORT RADDR           RPORT MS
+1354840 server           127.0.0.1       7000  127.0.0.1       35924 130.21
+1370211 wakatime-cli     172.22.130.115  59394 143.244.210.202 443   2.75
+4405    kube-apiserver   ::              6443  ::              55726 1.61
+1370227 wakatime-cli     172.22.130.115  50642 143.244.210.202 443   2.80
+4405    kube-apiserver   127.0.0.1       53178 127.0.0.1       2379  1.57
+1370281 wakatime-cli     172.22.130.115  40908 143.244.210.202 443   3.31
+1370315 sshd             127.0.0.1       22    127.0.0.1       42070 6.41
+^C
+
+
+# tcppktlat --help
+Usage: tcppktlat [OPTION...]
+Trace latency between TCP received pkt and picked up by userspace thread.
+
+USAGE: tcppktlat [--help] [-T] [-p PID] [-t TID] [-l LPORT] [-r RPORT] [-v]
+
+EXAMPLES:
+    tcppktlat             # Trace all TCP packet picked up latency
+    tcppktlat -T          # summarize with timestamps
+    tcppktlat -p          # filter for pid
+    tcppktlat -t          # filter for tid
+    tcppktlat -l          # filter for local port
+    tcppktlat -r          # filter for remote port
+    tcppktlat 1000        # filter for latency higher than 1000us
+
+  -l, --lport=LPORT          filter for local port
+  -p, --pid=PID              Process PID to trace
+  -r, --rport=RPORT          filter for remote port
+  -t, --tid=TID              Thread TID to trace
+  -T, --timestamp            include timestamp on output
+  -v, --verbose              Verbose debug output
+  -?, --help                 Give this help list
+      --usage                Give a short usage message
+  -V, --version              Print program version
+
+Mandatory or optional arguments to long options are also mandatory or optional
+for any corresponding short options.
+
+Report bugs to https://github.com/iovisor/bcc/tree/master/libbpf-tools.
