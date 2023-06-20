@@ -128,12 +128,9 @@ u64 __time = bpf_ktime_get_ns();
         
         def _generate_comm_prefix(self):
                 text = """
-enum {
-        TASK_COMM_LEN = 16,
-};
 struct val_t {
         u32 pid;
-        char name[TASK_COMM_LEN];
+        char name[sizeof(struct __string_t)];
 };
 struct val_t val = {.pid = (bpf_get_current_pid_tgid() >> 32) };
 bpf_get_current_comm(&val.name, sizeof(val.name));
