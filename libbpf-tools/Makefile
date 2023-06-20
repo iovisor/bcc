@@ -81,6 +81,7 @@ APPS = \
 	tcpconnect \
 	tcpconnlat \
 	tcplife \
+	tcppktlat \
 	tcprtt \
 	tcpstates \
 	tcpsynbl \
