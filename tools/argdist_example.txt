@@ -203,6 +203,24 @@ r::__vfs_read():u32:$PID:$latency > 100000
 
 It looks like process 2780 performed 21 slow reads.
 
+You can print the name of the process. This is helpful for short lived processes
+and for easier identification of processes response. For example, we can identify
+the process using the epoll I/O multiplexing system call
+
+# ./argdist -C 't:syscalls:sys_exit_epoll_wait():char*:$COMM'
+[19:57:56]
+t:syscalls:sys_exit_epoll_wait():char*:$COMM
+	COUNT      EVENT
+	4          $COMM = b'node'
+[19:57:57]
+t:syscalls:sys_exit_epoll_wait():char*:$COMM
+	COUNT      EVENT
+	2          $COMM = b'open5gs-sgwud'
+	3          $COMM = b'open5gs-sgwcd'
+	3          $COMM = b'open5gs-nrfd'
+	3          $COMM = b'open5gs-udmd'
+	4          $COMM = b'open5gs-scpd'
+
 Occasionally, entry parameter values are also interesting. For example, you
 might be curious how long it takes malloc() to allocate memory -- nanoseconds
 per byte allocated. Let's go:
@@ -412,6 +430,9 @@ argdist -p 1005 -H 'r:c:read()'
 
 argdist -C 'r::__vfs_read():u32:$PID:$latency > 100000'
         Print frequency of reads by process where the latency was >0.1ms
+
+argdist -C 'r::__vfs_read():u32:$COMM:$latency > 100000'
+        Print frequency of reads by process name where the latency was >0.1ms
 
 argdist -H 'r::__vfs_read(void *file, void *buf, size_t count):size_t:$entry(count):$latency > 1000000' 
         Print a histogram of read sizes that were longer than 1ms
