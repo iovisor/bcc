@@ -1005,7 +1005,7 @@ class BPF(object):
                 if os.path.isdir(evt_dir):
                     tp = ("%s:%s" % (category, event))
                     if re.match(tp_re.decode(), tp):
-                        results.append(tp)
+                        results.append(tp.encode())
         return results
 
     @staticmethod
