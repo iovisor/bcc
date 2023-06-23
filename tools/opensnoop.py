@@ -470,8 +470,11 @@ def print_event(cpu, data, size):
     elif event.type == EventType.EVENT_ENTRY:
         entries[event.id].append(event.name)
 
+def my_print_event(*args):
+    raise Exception("fail script")
+        
 # loop with callback to print_event
-b["events"].open_perf_buffer(print_event, page_cnt=args.buffer_pages)
+b["events"].open_perf_buffer(my_print_event, page_cnt=args.buffer_pages)
 start_time = datetime.now()
 while not args.duration or datetime.now() - start_time < args.duration:
     try:
