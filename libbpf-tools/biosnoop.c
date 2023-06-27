@@ -212,6 +212,16 @@ void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 	fprintf(stderr, "lost %llu events on CPU #%d\n", lost_cnt, cpu);
 }
 
+static void blk_account_io_set_attach_target(struct biosnoop_bpf *obj)
+{
+	if (fentry_can_attach("blk_account_io_start", NULL))
+		bpf_program__set_attach_target(obj->progs.blk_account_io_start,
+					       0, "blk_account_io_start");
+	else
+		bpf_program__set_attach_target(obj->progs.blk_account_io_start,
+					       0, "__blk_account_io_start");
+}
+
 int main(int argc, char **argv)
 {
 	const struct partition *partition;
@@ -260,12 +270,23 @@ int main(int argc, char **argv)
 	obj->rodata->filter_cg = env.cg;
 	obj->rodata->min_ns = env.min_lat_ms * 1000000;
 
-	if (fentry_can_attach("blk_account_io_start", NULL))
-		bpf_program__set_attach_target(obj->progs.blk_account_io_start, 0,
-					       "blk_account_io_start");
-	else
-		bpf_program__set_attach_target(obj->progs.blk_account_io_start, 0,
-					       "__blk_account_io_start");
+	if (tracepoint_exists("block", "block_io_start"))
+		bpf_program__set_autoload(obj->progs.blk_account_io_start, false);
+	else {
+		bpf_program__set_autoload(obj->progs.block_io_start, false);
+		blk_account_io_set_attach_target(obj);
+	}
+
+	ksyms = ksyms__load();
+	if (!ksyms) {
+		fprintf(stderr, "failed to load kallsyms\n");
+		goto cleanup;
+	}
+	if (!ksyms__get_symbol(ksyms, "blk_account_io_merge_bio"))
+		bpf_program__set_autoload(obj->progs.blk_account_io_merge_bio, false);
+
+	if (!env.queued)
+		bpf_program__set_autoload(obj->progs.block_rq_insert, false);
 
 	err = biosnoop_bpf__load(obj);
 	if (err) {
@@ -288,48 +309,9 @@ int main(int argc, char **argv)
 		}
 	}
 
-	obj->links.blk_account_io_start = bpf_program__attach(obj->progs.blk_account_io_start);
-	if (!obj->links.blk_account_io_start) {
-		err = -errno;
-		fprintf(stderr, "failed to attach blk_account_io_start: %s\n",
-			strerror(-err));
-		goto cleanup;
-	}
-	ksyms = ksyms__load();
-	if (!ksyms) {
-		err = -ENOMEM;
-		fprintf(stderr, "failed to load kallsyms\n");
-		goto cleanup;
-	}
-	if (ksyms__get_symbol(ksyms, "blk_account_io_merge_bio")) {
-		obj->links.blk_account_io_merge_bio =
-			bpf_program__attach(obj->progs.blk_account_io_merge_bio);
-		if (!obj->links.blk_account_io_merge_bio) {
-			err = -errno;
-			fprintf(stderr, "failed to attach blk_account_io_merge_bio: %s\n",
-				strerror(-err));
-			goto cleanup;
-		}
-	}
-	if (env.queued) {
-		obj->links.block_rq_insert =
-			bpf_program__attach(obj->progs.block_rq_insert);
-		if (!obj->links.block_rq_insert) {
-			err = -errno;
-			fprintf(stderr, "failed to attach block_rq_insert: %s\n", strerror(-err));
-			goto cleanup;
-		}
-	}
-	obj->links.block_rq_issue = bpf_program__attach(obj->progs.block_rq_issue);
-	if (!obj->links.block_rq_issue) {
-		err = -errno;
-		fprintf(stderr, "failed to attach block_rq_issue: %s\n", strerror(-err));
-		goto cleanup;
-	}
-	obj->links.block_rq_complete = bpf_program__attach(obj->progs.block_rq_complete);
-	if (!obj->links.block_rq_complete) {
-		err = -errno;
-		fprintf(stderr, "failed to attach block_rq_complete: %s\n", strerror(-err));
+	err = biosnoop_bpf__attach(obj);
+	if (err) {
+		fprintf(stderr, "failed to attach BPF programs: %d\n", err);
 		goto cleanup;
 	}
 

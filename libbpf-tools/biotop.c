@@ -354,6 +354,38 @@ static int print_stat(struct biotop_bpf *obj)
 	return err;
 }
 
+static bool has_block_io_tracepoints(void)
+{
+	return tracepoint_exists("block", "block_io_start") &&
+		tracepoint_exists("block", "block_io_done");
+}
+
+static void disable_block_io_tracepoints(struct biotop_bpf *obj)
+{
+	bpf_program__set_autoload(obj->progs.block_io_start, false);
+	bpf_program__set_autoload(obj->progs.block_io_done, false);
+}
+
+static void disable_blk_account_io_kprobes(struct biotop_bpf *obj)
+{
+	bpf_program__set_autoload(obj->progs.blk_account_io_start, false);
+	bpf_program__set_autoload(obj->progs.blk_account_io_done, false);
+	bpf_program__set_autoload(obj->progs.__blk_account_io_start, false);
+	bpf_program__set_autoload(obj->progs.__blk_account_io_done, false);
+}
+
+static void blk_account_io_set_autoload(struct biotop_bpf *obj,
+					struct ksyms *ksyms)
+{
+	if (!ksyms__get_symbol(ksyms, "__blk_account_io_start")) {
+		bpf_program__set_autoload(obj->progs.__blk_account_io_start, false);
+		bpf_program__set_autoload(obj->progs.__blk_account_io_done, false);
+	} else {
+		bpf_program__set_autoload(obj->progs.blk_account_io_start, false);
+		bpf_program__set_autoload(obj->progs.blk_account_io_done, false);
+	}
+}
+
 int main(int argc, char **argv)
 {
 	static const struct argp argp = {
@@ -386,29 +418,16 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
+	if (has_block_io_tracepoints())
+		disable_blk_account_io_kprobes(obj);
+	else {
+		disable_block_io_tracepoints(obj);
+		blk_account_io_set_autoload(obj, ksyms);
+	}
+
 	err = biotop_bpf__load(obj);
 	if (err) {
 		warn("failed to load BPF object: %d\n", err);
-		goto cleanup;
-	}
-
-	if (ksyms__get_symbol(ksyms, "__blk_account_io_start"))
-		obj->links.blk_account_io_start = bpf_program__attach_kprobe(obj->progs.blk_account_io_start, false, "__blk_account_io_start");
-	else
-		obj->links.blk_account_io_start = bpf_program__attach_kprobe(obj->progs.blk_account_io_start, false, "blk_account_io_start");
-
-	if (!obj->links.blk_account_io_start) {
-		warn("failed to load attach blk_account_io_start\n");
-		goto cleanup;
-	}
-
-	if (ksyms__get_symbol(ksyms, "__blk_account_io_done"))
-		obj->links.blk_account_io_done = bpf_program__attach_kprobe(obj->progs.blk_account_io_done, false, "__blk_account_io_done");
-	else
-		obj->links.blk_account_io_done = bpf_program__attach_kprobe(obj->progs.blk_account_io_done, false, "blk_account_io_done");
-
-	if (!obj->links.blk_account_io_done) {
-		warn("failed to load attach blk_account_io_done\n");
 		goto cleanup;
 	}
 
