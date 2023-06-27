@@ -76,6 +76,15 @@ int BPF_PROG(blk_account_io_start, struct request *rq)
 	return trace_pid(rq);
 }
 
+SEC("tp_btf/block_io_start")
+int BPF_PROG(block_io_start, struct request *rq)
+{
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
+
+	return trace_pid(rq);
+}
+
 SEC("kprobe/blk_account_io_merge_bio")
 int BPF_KPROBE(blk_account_io_merge_bio, struct request *rq)
 {
