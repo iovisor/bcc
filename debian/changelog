@@ -1,3 +1,19 @@
+bcc (0.28.0-1) unstable; urgency=low
+
+  * Support for kernel up to 6.3.
+  * new libbpf tool: tcppktlat.
+  * bcc tool updates: funcslower, wakeuptime, profile, offcputime, deadlock, funccount, argdist, kvmexit, runqlen and cpuunclaimed.
+  * libbpf tool update: memleak, tcprtt, tcpconnlat, funclatency, syscount, cpufreq, biosnoop.
+  * support ringbuf_query for bcc tools.
+  * handle '[uprobes]' memory mapped file properly during stack tracing.
+  * Fix maximum allowed index for print_linear_hist for bcc tools.
+  * add module kfunc/kretfunc support.
+  * clang rewriter: initialize only the requested parameters
+  * filter with available_filter_functions to make multi-functions kprobes more robust for both bcc and libbpf tools.
+  * doc update, other bug fixes and tools improvement
+
+ -- Yonghong Song <ys114321@gmail.com>  Wed, 28 Jun 2023 17:00:00 +0000
+
 bcc (0.27.0-1) unstable; urgency=low
 
   * Support for kernel up to 6.2
