@@ -179,9 +179,9 @@ int BPF_PROG(block_rq_complete, struct request *rq, int error,
 			event.qdelta = stagep->issue - stagep->insert;
 	}
 	event.ts = ts;
-	event.sector = rq->__sector;
-	event.len = rq->__data_len;
-	event.cmd_flags = rq->cmd_flags;
+	event.sector = BPF_CORE_READ(rq, __sector);
+	event.len = BPF_CORE_READ(rq, __data_len);
+	event.cmd_flags = BPF_CORE_READ(rq, cmd_flags);
 	event.dev = stagep->dev;
 	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &event,
 			sizeof(event));
