@@ -82,9 +82,10 @@ struct ipv4_data_t {
     u32 daddr;
     u64 span_us;
     u32 pid;
-    u32 ports;
-    u32 oldstate;
-    u32 newstate;
+    u16 lport;
+    u16 dport;
+    int oldstate;
+    int newstate;
     char task[TASK_COMM_LEN];
 };
 BPF_PERF_OUTPUT(ipv4_events);
@@ -96,9 +97,10 @@ struct ipv6_data_t {
     unsigned __int128 daddr;
     u64 span_us;
     u32 pid;
-    u32 ports;
-    u32 oldstate;
-    u32 newstate;
+    u16 lport;
+    u16 dport;
+    int oldstate;
+    int newstate;
     char task[TASK_COMM_LEN];
 };
 BPF_PERF_OUTPUT(ipv6_events);
@@ -132,6 +134,9 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
     u16 family = args->family;
     FILTER_FAMILY
 
+    // workaround to avoid llvm optimization which will cause context ptr args modified
+    int tcp_newstate = args->newstate;
+
     if (args->family == AF_INET) {
         struct ipv4_data_t data4 = {
             .span_us = delta_us,
@@ -141,8 +146,8 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
         data4.ts_us = bpf_ktime_get_ns() / 1000;
         __builtin_memcpy(&data4.saddr, args->saddr, sizeof(data4.saddr));
         __builtin_memcpy(&data4.daddr, args->daddr, sizeof(data4.daddr));
-        // a workaround until data4 compiles with separate lport/dport
-        data4.ports = dport + ((0ULL + lport) << 16);
+        data4.lport = lport;
+        data4.dport = dport;
         data4.pid = pid;
 
         bpf_get_current_comm(&data4.task, sizeof(data4.task));
@@ -157,14 +162,14 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state)
         data6.ts_us = bpf_ktime_get_ns() / 1000;
         __builtin_memcpy(&data6.saddr, args->saddr_v6, sizeof(data6.saddr));
         __builtin_memcpy(&data6.daddr, args->daddr_v6, sizeof(data6.daddr));
-        // a workaround until data6 compiles with separate lport/dport
-        data6.ports = dport + ((0ULL + lport) << 16);
+        data6.lport = lport;
+        data6.dport = dport;
         data6.pid = pid;
         bpf_get_current_comm(&data6.task, sizeof(data6.task));
         ipv6_events.perf_submit(args, &data6, sizeof(data6));
     }
 
-    if (args->newstate == TCP_CLOSE) {
+    if (tcp_newstate == TCP_CLOSE) {
         last.delete(&sk);
     } else {
         u64 ts = bpf_ktime_get_ns();
@@ -210,8 +215,8 @@ int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
         data4.ts_us = bpf_ktime_get_ns() / 1000;
         data4.saddr = sk->__sk_common.skc_rcv_saddr;
         data4.daddr = sk->__sk_common.skc_daddr;
-        // a workaround until data4 compiles with separate lport/dport
-        data4.ports = dport + ((0ULL + lport) << 16);
+        data4.lport = lport;
+        data4.dport = dport;
         data4.pid = pid;
 
         bpf_get_current_comm(&data4.task, sizeof(data4.task));
@@ -228,8 +233,8 @@ int kprobe__tcp_set_state(struct pt_regs *ctx, struct sock *sk, int state)
             sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
         bpf_probe_read_kernel(&data6.daddr, sizeof(data6.daddr),
             sk->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
-        // a workaround until data6 compiles with separate lport/dport
-        data6.ports = dport + ((0ULL + lport) << 16);
+        data6.lport = lport;
+        data6.dport = dport;
         data6.pid = pid;
         bpf_get_current_comm(&data6.task, sizeof(data6.task));
         ipv6_events.perf_submit(ctx, &data6, sizeof(data6));
@@ -346,9 +351,9 @@ def journal_fields(event, addr_family):
         'OBJECT_COMM': event.task.decode('utf-8', 'replace'),
         # Custom fields, aka "stuff we sort of made up".
         'OBJECT_' + addr_pfx + '_SOURCE_ADDRESS': inet_ntop(addr_family, pack("I", event.saddr)),
-        'OBJECT_TCP_SOURCE_PORT': str(event.ports >> 16),
+        'OBJECT_TCP_SOURCE_PORT': str(event.lport),
         'OBJECT_' + addr_pfx + '_DESTINATION_ADDRESS': inet_ntop(addr_family, pack("I", event.daddr)),
-        'OBJECT_TCP_DESTINATION_PORT': str(event.ports & 0xffff),
+        'OBJECT_TCP_DESTINATION_PORT': str(event.dport),
         'OBJECT_TCP_OLD_STATE': tcpstate2str(event.oldstate),
         'OBJECT_TCP_NEW_STATE': tcpstate2str(event.newstate),
         'OBJECT_TCP_SPAN_TIME': str(event.span_us)
@@ -386,8 +391,8 @@ def print_ipv4_event(cpu, data, size):
             print("%-9.6f " % delta_s, end="")
     print(format_string % (event.skaddr, event.pid, event.task.decode('utf-8', 'replace'),
         "4" if args.wide or args.csv else "",
-        inet_ntop(AF_INET, pack("I", event.saddr)), event.ports >> 16,
-        inet_ntop(AF_INET, pack("I", event.daddr)), event.ports & 0xffff,
+        inet_ntop(AF_INET, pack("I", event.saddr)), event.lport,
+        inet_ntop(AF_INET, pack("I", event.daddr)), event.dport,
         tcpstate2str(event.oldstate), tcpstate2str(event.newstate),
         float(event.span_us) / 1000))
     if args.journal:
@@ -411,8 +416,8 @@ def print_ipv6_event(cpu, data, size):
             print("%-9.6f " % delta_s, end="")
     print(format_string % (event.skaddr, event.pid, event.task.decode('utf-8', 'replace'),
         "6" if args.wide or args.csv else "",
-        inet_ntop(AF_INET6, event.saddr), event.ports >> 16,
-        inet_ntop(AF_INET6, event.daddr), event.ports & 0xffff,
+        inet_ntop(AF_INET6, event.saddr), event.lport,
+        inet_ntop(AF_INET6, event.daddr), event.dport,
         tcpstate2str(event.oldstate), tcpstate2str(event.newstate),
         float(event.span_us) / 1000))
     if args.journal:
