@@ -7,7 +7,7 @@
 struct event {
 	__u32 saddr[4];
 	__u32 daddr[4];
-        __u64 delta_us;
+	__u64 delta_us;
 	pid_t pid;
 	pid_t tid;
 	__u16 dport;

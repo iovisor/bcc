@@ -215,4 +215,26 @@ static __always_inline bool has_kmem_alloc(void)
 	return false;
 }
 
+/**
+ * The bpf_get_socket_cookie helper is landed since kernel v4.12，
+ * but only available for tracing programs since kernel v5.12
+ * via commit c5dbb89fc2ac("bpf: Expose bpf_get_socket_cookie to tracing programs").
+ * Since the helper is used to provide a unique socket identifier,
+ * we could use the sock itself as the identifier if the helper is not available.
+ * Here, we use BPF_FUNC_check_mtu to check the availability of the helper
+ * since they are both introduced in v5.12.
+ *
+ * see:
+ *    https://github.com/torvalds/linux/commit/91b8270f2a4d
+ *    https://github.com/torvalds/linux/commit/c5dbb89fc2ac
+ *    https://github.com/torvalds/linux/commit/34b2021cc616
+ */
+static __always_inline __u64 get_sock_ident(struct sock *sk)
+{
+	if (bpf_core_enum_value_exists(enum bpf_func_id, BPF_FUNC_check_mtu)) {
+		return bpf_get_socket_cookie(sk);
+	}
+	return (__u64)sk;
+}
+
 #endif /* __CORE_FIXES_BPF_H */
