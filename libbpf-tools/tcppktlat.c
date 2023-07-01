@@ -212,9 +212,11 @@ int main(int argc, char **argv)
 	if (probe_tp_btf("tcp_probe")) {
 		bpf_program__set_autoload(obj->progs.tcp_probe, false);
 		bpf_program__set_autoload(obj->progs.tcp_rcv_space_adjust, false);
+		bpf_program__set_autoload(obj->progs.tcp_destroy_sock, false);
 	} else {
 		bpf_program__set_autoload(obj->progs.tcp_probe_btf, false);
 		bpf_program__set_autoload(obj->progs.tcp_rcv_space_adjust_btf, false);
+		bpf_program__set_autoload(obj->progs.tcp_destroy_sock_btf, false);
 	}
 
 	err = tcppktlat_bpf__load(obj);
