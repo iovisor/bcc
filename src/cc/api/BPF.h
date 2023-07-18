@@ -305,7 +305,7 @@ class BPF {
   bool add_module(std::string module);
 
   StatusTuple open_perf_event(const std::string& name, uint32_t type,
-                              uint64_t config);
+                              uint64_t config, int pid = -1);
 
   StatusTuple close_perf_event(const std::string& name);
 

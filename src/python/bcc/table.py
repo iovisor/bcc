@@ -1016,14 +1016,14 @@ class PerfEventArray(ArrayBase):
         # The actual fd is held by the perf reader, add to track opened keys
         self._open_key_fds[cpu] = -1
 
-    def _open_perf_event(self, cpu, typ, config):
-        fd = lib.bpf_open_perf_event(typ, config, -1, cpu)
+    def _open_perf_event(self, cpu, typ, config, pid=-1):
+        fd = lib.bpf_open_perf_event(typ, config, pid, cpu)
         if fd < 0:
             raise Exception("bpf_open_perf_event failed")
         self[self.Key(cpu)] = self.Leaf(fd)
         self._open_key_fds[cpu] = fd
 
-    def open_perf_event(self, typ, config):
+    def open_perf_event(self, typ, config, pid=-1):
         """open_perf_event(typ, config)
 
         Configures the table such that calls from the bpf program to
@@ -1031,7 +1031,7 @@ class PerfEventArray(ArrayBase):
         counter denoted by event ev on the local cpu.
         """
         for i in get_online_cpus():
-            self._open_perf_event(i, typ, config)
+            self._open_perf_event(i, typ, config, pid)
 
 
 class PerCpuHash(HashTable):
