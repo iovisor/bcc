@@ -610,7 +610,7 @@ StatusTuple BPF::detach_perf_event_raw(void* perf_event_attr) {
 }
 
 StatusTuple BPF::open_perf_event(const std::string& name, uint32_t type,
-                                 uint64_t config) {
+                                 uint64_t config, int pid) {
   if (perf_event_arrays_.find(name) == perf_event_arrays_.end()) {
     TableStorage::iterator it;
     if (!bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
@@ -619,7 +619,7 @@ StatusTuple BPF::open_perf_event(const std::string& name, uint32_t type,
     perf_event_arrays_[name] = new BPFPerfEventArray(it->second);
   }
   auto table = perf_event_arrays_[name];
-  TRY2(table->open_all_cpu(type, config));
+  TRY2(table->open_all_cpu(type, config, pid));
   return StatusTuple::OK();
 }
 
