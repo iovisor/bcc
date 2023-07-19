@@ -6,6 +6,7 @@
 #include <bpf/bpf_tracing.h>
 #include "offcputime.h"
 #include "core_fixes.bpf.h"
+#include "unwind_helpers.bpf.h"
 
 #define PF_KTHREAD		0x00200000	/* I am a kernel thread */
 #define MAX_ENTRIES		10240
@@ -92,8 +93,12 @@ static int handle_sched_switch(void *ctx, bool preempt, struct task_struct *prev
 
 		if (BPF_CORE_READ(prev, flags) & PF_KTHREAD)
 			i_key.key.user_stack_id = -1;
-		else
-			i_key.key.user_stack_id = bpf_get_stackid(ctx, &stackmap, BPF_F_USER_STACK);
+		else {
+			if (!dwarf_unwind)
+				i_key.key.user_stack_id = bpf_get_stackid(ctx, &stackmap, BPF_F_USER_STACK);
+			else
+				i_key.key.user_stack_id = uw_get_stackid();
+		}
 		i_key.key.kern_stack_id = bpf_get_stackid(ctx, &stackmap, 0);
 		bpf_map_update_elem(&start, &pid, &i_key, 0);
 		bpf_probe_read_kernel_str(&val.comm, sizeof(prev->comm), BPF_CORE_READ(prev, comm));

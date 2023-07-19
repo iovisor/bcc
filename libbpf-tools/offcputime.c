@@ -14,6 +14,9 @@
 #include "offcputime.h"
 #include "offcputime.skel.h"
 #include "trace_helpers.h"
+#ifdef USE_DWARF_UNWIND
+#include "unwind_helpers.h"
+#endif
 
 static struct env {
 	pid_t pids[MAX_PID_NR];
@@ -27,6 +30,10 @@ static struct env {
 	long state;
 	int duration;
 	bool verbose;
+#ifdef USE_DWARF_UNWIND
+	bool dwarf_unwind;
+	int dwarf_ustack_size;
+#endif
 } env = {
 	.stack_storage_size = 1024,
 	.perf_max_stack_depth = 127,
@@ -34,6 +41,9 @@ static struct env {
 	.max_block_time = -1,
 	.state = -1,
 	.duration = 99999999,
+#ifdef USE_DWARF_UNWIND
+	.dwarf_ustack_size = 128,
+#endif
 };
 
 const char *argp_program_version = "offcputime 0.1";
@@ -58,6 +68,9 @@ const char argp_program_doc[] =
 #define OPT_PERF_MAX_STACK_DEPTH	1 /* --pef-max-stack-depth */
 #define OPT_STACK_STORAGE_SIZE		2 /* --stack-storage-size */
 #define OPT_STATE			3 /* --state */
+#ifdef USE_DWARF_UNWIND
+#define OPT_DWARF_STACK_SIZE		4 /* --dwarf-stack-size */
+#endif
 
 static const struct argp_option opts[] = {
 	{ "pid", 'p', "PID", 0, "Trace these PIDs only, comma-separated list", 0 },
@@ -75,6 +88,10 @@ static const struct argp_option opts[] = {
 	{ "max-block-time", 'M', "MAX-BLOCK-TIME", 0,
 	  "the amount of time in microseconds under which we store traces (default U64_MAX)", 0 },
 	{ "state", OPT_STATE, "STATE", 0, "filter on this thread state bitmask (eg, 2 == TASK_UNINTERRUPTIBLE) see include/linux/sched.h", 0 },
+#ifdef USE_DWARF_UNWIND
+	{ "dwarf-unwind", 'D', NULL, 0, "Enable DWARF mode stack traces", 0 },
+	{ "dwarf-stack-size", OPT_DWARF_STACK_SIZE, "STACK-SIZE", 0, "Set user stack size for DWARF mode (default 128)", 0 },
+#endif
 	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
@@ -164,6 +181,25 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			argp_usage(state);
 		}
 		break;
+#ifdef USE_DWARF_UNWIND
+	case 'D':
+		env.dwarf_unwind = true;
+		break;
+	case OPT_DWARF_STACK_SIZE:
+		errno = 0;
+		env.dwarf_ustack_size = strtol(arg, NULL, 10);
+		if (errno) {
+			fprintf(stderr, "invalid stack size: %s\n", arg);
+			argp_usage(state);
+		}
+		if (env.dwarf_ustack_size > UW_STACK_MAX_SZ) {
+			fprintf(stderr, "the stack size is too big, please "
+				"increase UW_STACK_MAX_SZ's value and recompile");
+			argp_usage(state);
+		}
+
+		break;
+#endif
 	case ARGP_KEY_ARG:
 		if (pos_args++) {
 			fprintf(stderr,
@@ -192,6 +228,25 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 
 static void sig_handler(int sig)
 {
+}
+
+static int stack_map_lookup_elem(int sfd, int *stack_id, pid_t pid, unsigned long *ip, size_t count)
+{
+#ifdef USE_DWARF_UNWIND
+	int err;
+
+	if (env.dwarf_unwind) {
+		err = uw_map_lookup_elem(stack_id, pid, ip, count);
+		if (err == -ENOBUFS) {
+			fprintf(stderr, "WARNING: The stack trace cannot be fully displayed."
+					" Consider increasing --dwarf-stack-size.\n");
+			err = 0;
+		}
+		return err;
+	}
+
+#endif
+	return bpf_map_lookup_elem(sfd, stack_id, ip);
 }
 
 static void print_map(struct ksyms *ksyms, struct syms_cache *syms_cache,
@@ -247,7 +302,9 @@ print_ustack:
 		if (next_key.user_stack_id == -1)
 			goto skip_ustack;
 
-		if (bpf_map_lookup_elem(sfd, &next_key.user_stack_id, ip) != 0) {
+
+		if (stack_map_lookup_elem(sfd, &next_key.user_stack_id, next_key.pid, ip,
+					  env.perf_max_stack_depth) != 0) {
 			fprintf(stderr, "    [Missed User Stack]\n");
 			goto skip_ustack;
 		}
@@ -375,6 +432,11 @@ int main(int argc, char **argv)
 	bpf_map__set_value_size(obj->maps.stackmap,
 				env.perf_max_stack_depth * sizeof(unsigned long));
 	bpf_map__set_max_entries(obj->maps.stackmap, env.stack_storage_size);
+
+#ifdef USE_DWARF_UNWIND
+	if (env.dwarf_unwind)
+		UW_MAP_SET(obj, env.dwarf_ustack_size, env.stack_storage_size);
+#endif
 
 	if (!probe_tp_btf("sched_switch"))
 		bpf_program__set_autoload(obj->progs.sched_switch, false);
