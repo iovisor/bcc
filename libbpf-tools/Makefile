@@ -48,6 +48,7 @@ BZ_APPS = \
 	#
 
 UNW_APPS = \
+	offcputime \
 	#
 
 APPS = \
@@ -80,7 +81,6 @@ APPS = \
 	mdflush \
 	mountsnoop \
 	numamove \
-	offcputime \
 	oomkill \
 	profile \
 	readahead \
