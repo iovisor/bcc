@@ -6,6 +6,7 @@
 #include <bpf/bpf_tracing.h>
 #include "offcputime.h"
 #include "core_fixes.bpf.h"
+#include "unwind.bpf.h"
 
 #define PF_KTHREAD		0x00200000	/* I am a kernel thread */
 #define MAX_ENTRIES		10240
@@ -17,6 +18,7 @@ const volatile __u64 min_block_ns = 1;
 const volatile pid_t targ_tgid = -1;
 const volatile pid_t targ_pid = -1;
 const volatile long state = -1;
+
 
 struct internal_key {
 	u64 start_ts;
@@ -76,10 +78,16 @@ int BPF_PROG(sched_switch, bool preempt, struct task_struct *prev, struct task_s
 
 		if (prev->flags & PF_KTHREAD)
 			i_key.key.user_stack_id = -1;
-		else
-			i_key.key.user_stack_id =
-				bpf_get_stackid(ctx, &stackmap,
-						BPF_F_USER_STACK);
+		else {
+			if (!sample_user_stack) {
+				i_key.key.user_stack_id =
+					bpf_get_stackid(ctx, &stackmap,
+							BPF_F_USER_STACK);
+			} else {
+				i_key.key.user_stack_id =
+					get_user_stackid();
+			}
+		}
 		i_key.key.kern_stack_id = bpf_get_stackid(ctx, &stackmap, 0);
 		bpf_map_update_elem(&start, &pid, &i_key, 0);
 		bpf_probe_read_kernel_str(&val.comm, sizeof(prev->comm), prev->comm);
