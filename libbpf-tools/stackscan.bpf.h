@@ -62,6 +62,22 @@
  */
 #define VM_EXEC         0x00000004  /* include/linux/mm.h */
 
+
+#if defined(__TARGET_ARCH_arm64)
+#define IS_BL(inst)     (((inst) & 0xfc000000) == 0x94000000)
+#define IS_BLR(inst)    (((inst) & 0xfffffc1f) == 0xd63f0000)
+#define IS_BLRAA(inst)  (((inst) & 0xfffffc00) == 0xd73f0800)
+#define IS_BLRAAZ(inst) (((inst) & 0xfffffc1f) == 0xd63f081f)
+#define IS_BLRAB(inst)  (((inst) & 0xfffffc00) == 0xd73f0c00)
+#define IS_BLRABZ(inst) (((inst) & 0xfffffc1f) == 0xd63f0c1f)
+#define IS_BL_GROUP(code)	(IS_BL(code) ||     \
+				 IS_BLR(code) ||    \
+				 IS_BLRAA(code) ||  \
+				 IS_BLRAAZ(code) || \
+				 IS_BLRAB(code) ||  \
+				 IS_BLRABZ(code))
+#endif
+
 /*
  * bpf maps for stack scanning
  */
@@ -127,6 +143,26 @@ static void get_code_ranges(struct mm_struct *mm, unsigned long ranges[][2], int
 	}
 }
 
+#if defined(__TARGET_ARCH_arm64)
+static __always_inline
+int is_lr(u64 addr)
+{
+	u32 code;
+
+	if (bpf_probe_read_user(&code, sizeof(code), (u32*)addr - 1) != 0)
+		return false;
+
+	return IS_BL_GROUP(code);
+}
+#else
+static __always_inline
+int is_lr(u64 addr)
+{
+	/* not implemented */
+	return true;
+}
+#endif
+
 /*
  * get_scan_user_stackid - get stack id of similar-backtrace for @ctx
  * @ctx: context to get similar-backtrace
@@ -139,7 +175,7 @@ static int get_scan_user_stackid(struct pt_regs *ctx, const volatile unsigned lo
 {
 	int ret;
 	u64 sp, pc, lr;
-	int i = 0, j;
+	int i = 0, j, k;
 	u32 stack_len;
 	__u64* stack;
 	__u64 addr;
@@ -207,6 +243,13 @@ static int get_scan_user_stackid(struct pt_regs *ctx, const volatile unsigned lo
 		if (is_code_addr(addr, ranges, MAX_RANGE_NR))
 			addrs[i++] = addr;
         }
+
+	/* Exclude non-lr addresses */
+	for (j = 2, k = 2; j < i && j < MAX_ADDR_NR; j++) {
+		if (is_lr(addrs[j]))
+			addrs[k++] = addrs[j];
+	}
+	addrs[k] = 0;
 
 store_addrs:
 	/* Store addrs */
