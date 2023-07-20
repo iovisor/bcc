@@ -4,6 +4,13 @@
 
 #define TASK_COMM_LEN		16
 
+/*
+ * Definitions for stack scanning
+ */
+#define STACK_SIZE		128
+#define MAX_RANGE_NR		16
+#define MAX_ADDR_NR		32
+
 struct key_t {
 	__u32 pid;
 	__u32 tgid;
