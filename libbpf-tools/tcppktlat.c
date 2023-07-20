@@ -100,6 +100,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			fprintf(stderr, "invalid lport: %s\n", arg);
 			argp_usage(state);
 		}
+		env.lport = htons(env.lport);
 		break;
 	case 'r':
 		errno = 0;
@@ -108,6 +109,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			fprintf(stderr, "invalid rport: %s\n", arg);
 			argp_usage(state);
 		}
+		env.rport = htons(env.rport);
 		break;
 	case 'w':
 		column_width = 26;
@@ -162,8 +164,8 @@ static int handle_event(void *ctx, void *data, size_t data_sz)
 	inet_ntop(e->family, &e->daddr, daddr, sizeof(daddr));
 
 	printf("%-7d %-7d %-16s %-*s %-5d %-*s %-5d %-.2f\n",
-		e->pid, e->tid, e->comm, column_width, saddr, e->sport, column_width, daddr,
-		e->dport, e->delta_us / 1000.0);
+		e->pid, e->tid, e->comm, column_width, saddr, ntohs(e->sport), column_width, daddr,
+		ntohs(e->dport), e->delta_us / 1000.0);
 
 	return 0;
 }
