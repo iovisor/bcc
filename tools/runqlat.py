@@ -270,7 +270,7 @@ if args.pids or args.tids:
     bpf_text = bpf_text.replace('STORAGE',
         'BPF_HISTOGRAM(dist, pid_key_t);')
     bpf_text = bpf_text.replace('STORE',
-        'pid_key_t key = {.id = ' + pid + ', .slot = bpf_log2l(delta)}; ' +
+        'pid_key_t key = {}; key.id = ' + pid + '; key.slot = bpf_log2l(delta); ' +
         'dist.increment(key);')
 elif args.pidnss:
     section = "pidns"
