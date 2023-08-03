@@ -141,6 +141,20 @@ static inline void *slab_address(const struct slab *slab)
     return NULL;
 }
 
+#ifdef CONFIG_64BIT
+typedef __uint128_t freelist_full_t;
+#else
+typedef u64 freelist_full_t;
+#endif
+
+typedef union {
+	struct {
+		void *freelist;
+		unsigned long counter;
+	};
+	freelist_full_t full;
+} freelist_aba_t;
+
 #ifdef CONFIG_SLUB
 #include <linux/slub_def.h>
 #else
