@@ -66,8 +66,6 @@ static const struct argp_option opts[] = {
 	{ "rport", 'P', "RPORT", 0, "filter for remote port" },
 	{ "laddr", 'a', "LADDR", 0, "filter for local address" },
 	{ "raddr", 'A', "RADDR", 0, "filter for remote address" },
-	{ "laddr-v6", 'c', "LADDR_V6", 0, "filter for local IPv6 address" },
-	{ "raddr-v6", 'C', "RADDR_V6", 0, "filter for remote IPv6 address" },
 	{ "byladdr", 'b', NULL, 0,
 	  "show sockets histogram by local address" },
 	{ "byraddr", 'B', NULL, 0,
@@ -131,32 +129,34 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		env.rport = htons(env.rport);
 		break;
 	case 'a':
-		if (inet_aton(arg, &addr) < 0) {
-			fprintf(stderr, "invalid local address: %s\n", arg);
-			argp_usage(state);
-		}
-		env.laddr = addr.s_addr;
+                if (strchr(arg, ':')) {
+                        if (inet_pton(AF_INET6, arg, &addr_v6) < 1) {
+                                fprintf(stderr, "invalid local IPv6 address: %s\n", arg);
+                                argp_usage(state);
+                        }
+                        memcpy(env.laddr_v6, &addr_v6, sizeof(env.laddr_v6));
+                } else {
+                        if (inet_pton(AF_INET, arg, &addr) < 0) {
+                                fprintf(stderr, "invalid local address: %s\n", arg);
+                                argp_usage(state);
+                        }
+                        env.laddr = addr.s_addr;
+                }
 		break;
 	case 'A':
-		if (inet_aton(arg, &addr) < 0) {
-			fprintf(stderr, "invalid remote address: %s\n", arg);
-			argp_usage(state);
-		}
-		env.raddr = addr.s_addr;
-		break;
-	case 'c':
-		if (inet_pton(AF_INET6, arg, &addr_v6) < 1) {
-			fprintf(stderr, "invalid local IPv6 address: %s\n", arg);
-			argp_usage(state);
-		}
-		memcpy(env.laddr_v6, &addr_v6, sizeof(env.laddr_v6));
-		break;
-	case 'C':
-		if (inet_pton(AF_INET6, arg, &addr_v6) < 1) {
-			fprintf(stderr, "invalid remote IPv6 address: %s\n", arg);
-			argp_usage(state);
-		}
-		memcpy(env.raddr_v6, &addr_v6, sizeof(env.raddr_v6));
+                if (strchr(arg, ':')) {
+                        if (inet_pton(AF_INET6, arg, &addr_v6) < 1) {
+                                fprintf(stderr, "invalid remote address: %s\n", arg);
+                                argp_usage(state);
+                        }
+                        memcpy(env.raddr_v6, &addr_v6, sizeof(env.raddr_v6));
+                } else {
+                        if (inet_pton(AF_INET, arg, &addr) < 0) {
+                                fprintf(stderr, "invalid remote address: %s\n", arg);
+                                argp_usage(state);
+                        }
+                        env.raddr = addr.s_addr;
+                }
 		break;
 	case 'b':
 		env.laddr_hist = true;
