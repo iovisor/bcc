@@ -101,9 +101,9 @@ BPF_HASH(latency, u64, sock_latency_t);
 
 int trace_tcp_rcv(struct pt_regs *ctx, struct sock *sk, struct sk_buff *skb)
 {
-    struct tcp_sock *ts = tcp_sk(sk);
+    struct tcp_sock *ts = (struct tcp_sock *)sk;
     u32 srtt = ts->srtt_us >> 3;
-    const struct inet_sock *inet = inet_sk(sk);
+    const struct inet_sock *inet = (struct inet_sock *)sk;
 
     /* filters */
     u16 sport = 0;
