@@ -20,7 +20,7 @@ struct probe_SSL_data_t {
     int rw;
     char comm[TASK_COMM_LEN];
     __u8 buf[MAX_BUF_SIZE];
-    bool is_handshake;
+    int is_handshake;
 };
 
 #endif /* __SSLSNIFF_H */
