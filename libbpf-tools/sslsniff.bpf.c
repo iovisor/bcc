@@ -50,21 +50,16 @@ struct {
 } bufs SEC(".maps");
 
 const volatile pid_t targ_pid = 0;
-const volatile uid_t targ_uid = 0;
-
-static __always_inline bool valid_uid(uid_t uid)
-{ 
-    return uid != -1;
-}
+const volatile uid_t targ_uid = -1;
 
 static __always_inline bool trace_allowed(u32 uid, u32 pid)
 {
     /* filters */
     if (targ_pid && targ_pid != pid)
         return false;
-    if (valid_uid(targ_uid)) {
+    if (targ_uid != -1) {
         if (targ_uid != uid) {
-        return false;
+            return false;
         }
     }
     return true;
@@ -78,11 +73,11 @@ int BPF_UPROBE(probe_SSL_rw_enter, void *ssl, void *buf, int num) {
     u32 uid = bpf_get_current_uid_gid();
     u64 ts = bpf_ktime_get_ns();
 
-    /* store arg info for later lookup */
-    if (trace_allowed(uid, pid)) {
+    if (!trace_allowed(uid, pid)) {
         return 0;
     }
 
+    /* store arg info for later lookup */
     bpf_map_update_elem(&bufs, &tid, &buf, BPF_ANY);
     bpf_map_update_elem(&start_ns, &tid, &ts, BPF_ANY);
     return 0;
@@ -97,11 +92,11 @@ static int SSL_exit(struct pt_regs *ctx, int rw) {
     u32 uid = bpf_get_current_uid_gid();
     u64 ts = bpf_ktime_get_ns();
 
-    /* store arg info for later lookup */
-    if (trace_allowed(uid, pid)) {
+    if (!trace_allowed(uid, pid)) {
         return 0;
     }
 
+    /* store arg info for later lookup */
     u64 *bufp = bpf_map_lookup_elem(&bufs, &tid);
     if (bufp == 0)
         return 0;
@@ -166,11 +161,11 @@ int BPF_UPROBE(probe_SSL_do_handshake_enter, void *ssl) {
     u64 ts = bpf_ktime_get_ns();
     u32 uid = bpf_get_current_uid_gid();
 
-    /* store arg info for later lookup */
-    if (trace_allowed(uid, pid)) {
+    if (!trace_allowed(uid, pid)) {
         return 0;
     }
 
+    /* store arg info for later lookup */
     bpf_map_update_elem(&start_ns, &tid, &ts, BPF_ANY);
     return 0;
 }
@@ -189,7 +184,7 @@ int BPF_URETPROBE(probe_SSL_do_handshake_exit) {
     u32 tgid = pid_tgid >> 32;
 
     /* store arg info for later lookup */
-    if (trace_allowed(tgid, pid)) {
+    if (!trace_allowed(tgid, pid)) {
         return 0;
     }
 
