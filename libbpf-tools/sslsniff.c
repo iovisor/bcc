@@ -47,11 +47,6 @@
       __CHECK_PROGRAM(skel, prog_name);                                     \
     } while (false)
 
-#define ATTACH_UPROBE(skel, binary_path, sym_name, prog_name)     \
-    __ATTACH_UPROBE(skel, binary_path, sym_name, prog_name, false)
-#define ATTACH_URETPROBE(skel, binary_path, sym_name, prog_name)  \
-    __ATTACH_UPROBE(skel, binary_path, sym_name, prog_name, true)
-
 #define ATTACH_UPROBE_CHECKED(skel, binary_path, sym_name, prog_name)     \
     __ATTACH_UPROBE_CHECKED(skel, binary_path, sym_name, prog_name, false)
 #define ATTACH_URETPROBE_CHECKED(skel, binary_path, sym_name, prog_name)  \
@@ -306,8 +301,7 @@ char *find_library_path(const char *libname) {
         // Extract the path from the ldconfig output
         char *start = strrchr(path, '>');
         if (start && *(start + 1) == ' ') {
-            strncpy(path, start + 2, sizeof(path) - 1);
-            path[sizeof(path) - 1] = '\0';
+            memmove(path, start + 2, strlen(start + 2) + 1);
             char *end = strchr(path, '\n');
             if (end) {
                 *end = '\0';  // Null-terminate the path
