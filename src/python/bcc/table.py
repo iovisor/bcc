@@ -136,9 +136,6 @@ def _get_json_hist(vals, val_type, section_bucket=None):
         histogram[section_bucket[0]] = section_bucket[1]
     return histogram
 
-def _print_json_hist(vals, val_type, section_bucket=None):
-    print(_get_json_hist(vals, val_type, section_bucket=None))
-
 def _print_log2_hist(vals, val_type, strip_leading_zero):
     global stars_max
     log2_dist_max = 64
