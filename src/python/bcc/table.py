@@ -108,7 +108,10 @@ def _stars(val, val_max, width):
         text = text[:-1] + "+"
     return text
 
-def _print_json_hist(vals, val_type, section_bucket=None):
+def get_json_hist(vals, val_type, section_bucket=None):
+    return _get_json_hist(vals, val_type, section_bucket=None)
+
+def _get_json_hist(vals, val_type, section_bucket=None):
     hist_list = []
     max_nonzero_idx = 0
     for i in range(len(vals)):
@@ -131,7 +134,10 @@ def _print_json_hist(vals, val_type, section_bucket=None):
     histogram = {"ts": strftime("%Y-%m-%d %H:%M:%S"), "val_type": val_type, "data": hist_list}
     if section_bucket:
         histogram[section_bucket[0]] = section_bucket[1]
-    print(histogram)
+    return histogram
+
+def _print_json_hist(vals, val_type, section_bucket=None):
+    print(_get_json_hist(vals, val_type, section_bucket=None))
 
 def _print_log2_hist(vals, val_type, strip_leading_zero):
     global stars_max
@@ -708,13 +714,13 @@ class TableBase(MutableMapping):
                     section_bucket = (section_header, section_print_fn(bucket))
                 else:
                     section_bucket = (section_header, bucket)
-                _print_json_hist(vals, val_type, section_bucket)
+                print(_get_json_hist(vals, val_type, section_bucket))
 
         else:
             vals = [0] * log2_index_max
             for k, v in self.items():
                 vals[k.value] = v.value
-            _print_json_hist(vals, val_type)
+            print(_get_json_hist(vals, val_type))
 
     def print_log2_hist(self, val_type="value", section_header="Bucket ptr",
             section_print_fn=None, bucket_fn=None, strip_leading_zero=None,
