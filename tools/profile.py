@@ -231,7 +231,6 @@ try:
     bpf_text = bpf_text.replace('USE_PIDNS', "1")
     bpf_text = bpf_text.replace('PIDNS_DEV', str(devinfo.st_dev))
     bpf_text = bpf_text.replace('PIDNS_INO', str(devinfo.st_ino))
-    pidns_translation = "1"
 except:
     bpf_text = bpf_text.replace('USE_PIDNS', "0")
     bpf_text = bpf_text.replace('PIDNS_DEV', "0")
