@@ -1,0 +1,32 @@
+Demonstartion of scheduler_decison_latency
+
+scheduler latency is the amount of time a task waits on a cpu before it
+actually gets a chance to run.
+
+scheduler decision latency is the time taken by the cpu in deciding the
+processor on which the task needs to be wokenup.
+
+Usage: scheduler_decision_latency.py [-h] [-c COMM]
+
+options:
+  -h, --help            show this help message and exit
+  -c COMM, --comm COMM  Collects stats only for the comm specified
+
+Sample output:
+
+Press ctrl-c to end
+^CThe minimum and maximum scheduler latency is 0 and 49 microseconds
+The avg scheduler latency is 3.475 microseconds
+The 50 th %ile scheduler latency is 2 microseconds
+The 90 th %ile scheduler latency is 7 microseconds
+The 95 th %ile scheduler latency is 12 microseconds
+The 99 th %ile scheduler latency is 20 microseconds
+The 99.99 th %ile scheduler latency is 49 microseconds
+
+The minimum and maximum decision latency is 0 and 14 microseconds
+The avg decision latency is 2.213 microseconds
+The 50 th %ile decision latency is 1 microseconds
+The 90 th %ile decision latency is 7 microseconds
+The 95 th %ile decision latency is 9 microseconds
+The 99 th %ile decision latency is 9 microseconds
+The 99.99 th %ile decision latency is 14 microseconds
