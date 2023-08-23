@@ -117,16 +117,28 @@ static __always_inline struct gendisk *get_disk(void *request)
  * way, determine whether there is a `old_mnt_userns` field for `struct
  * renamedata` to decide which input parameter of the vfs_create() to use as
  * `dentry`.
+ * commit abf08576afe3("fs: port vfs_*() helpers to struct mnt_idmap") use
+ * `struct mnt_idmap *new_mnt_idmap` instead of `struct user_namespace *
+ * old_mnt_userns`.
  * see:
  *     https://github.com/torvalds/linux/commit/6521f8917082
+ *     https://github.com/torvalds/linux/commit/abf08576afe3
  */
 struct renamedata___x {
 	struct user_namespace *old_mnt_userns;
+	struct new_mnt_idmap *new_mnt_idmap;
 } __attribute__((preserve_access_index));
 
 static __always_inline bool renamedata_has_old_mnt_userns_field(void)
 {
 	if (bpf_core_field_exists(struct renamedata___x, old_mnt_userns))
+		return true;
+	return false;
+}
+
+static __always_inline bool renamedata_has_new_mnt_idmap_field(void)
+{
+	if (bpf_core_field_exists(struct renamedata___x, new_mnt_idmap))
 		return true;
 	return false;
 }
