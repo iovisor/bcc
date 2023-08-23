@@ -124,19 +124,27 @@ TRACE_UNLINK_FUNC
 }
 """
 
-trace_create_text_old="""
+trace_create_text_1="""
 int trace_create(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
 """
-trace_create_text_new="""
+trace_create_text_2="""
 int trace_create(struct pt_regs *ctx, struct user_namespace *mnt_userns,
         struct inode *dir, struct dentry *dentry)
 """
+trace_create_text_3="""
+int trace_create(struct pt_regs *ctx, struct mnt_idmap *idmap,
+        struct inode *dir, struct dentry *dentry)
+"""
 
-trace_unlink_text_old="""
+trace_unlink_text_1="""
 int trace_unlink(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
 """
-trace_unlink_text_new="""
+trace_unlink_text_2="""
 int trace_unlink(struct pt_regs *ctx, struct user_namespace *mnt_userns,
+        struct inode *dir, struct dentry *dentry)
+"""
+trace_unlink_text_3="""
+int trace_unlink(struct pt_regs *ctx, struct mnt_idmap *idmap,
         struct inode *dir, struct dentry *dentry)
 """
 
@@ -150,12 +158,15 @@ if debug or args.ebpf:
     if args.ebpf:
         exit()
 
-if BPF.kernel_struct_has_field(b'renamedata', b'old_mnt_userns') == 1:
-    bpf_text = bpf_text.replace('TRACE_CREATE_FUNC', trace_create_text_new)
-    bpf_text = bpf_text.replace('TRACE_UNLINK_FUNC', trace_unlink_text_new)
+if BPF.kernel_struct_has_field(b'renamedata', b'new_mnt_idmap') == 1:
+    bpf_text = bpf_text.replace('TRACE_CREATE_FUNC', trace_create_text_3)
+    bpf_text = bpf_text.replace('TRACE_UNLINK_FUNC', trace_unlink_text_3)
+elif BPF.kernel_struct_has_field(b'renamedata', b'old_mnt_userns') == 1:
+    bpf_text = bpf_text.replace('TRACE_CREATE_FUNC', trace_create_text_2)
+    bpf_text = bpf_text.replace('TRACE_UNLINK_FUNC', trace_unlink_text_2)
 else:
-    bpf_text = bpf_text.replace('TRACE_CREATE_FUNC', trace_create_text_old)
-    bpf_text = bpf_text.replace('TRACE_UNLINK_FUNC', trace_unlink_text_old)
+    bpf_text = bpf_text.replace('TRACE_CREATE_FUNC', trace_create_text_1)
+    bpf_text = bpf_text.replace('TRACE_UNLINK_FUNC', trace_unlink_text_1)
 
 # initialize BPF
 b = BPF(text=bpf_text)
