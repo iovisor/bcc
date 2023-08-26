@@ -5,7 +5,7 @@ if(NOT PYTHON_CMD)
   set(PYTHON_CMD "python3")
 endif()
 
-if(EXISTS "/etc/debian_version")
+if(EXISTS "/etc/debian_version" AND NOT PY_SKIP_DEB_LAYOUT)
   set(PYTHON_FLAGS "${PYTHON_FLAGS} --install-layout deb")
 endif()
 
@@ -37,10 +37,14 @@ foreach(PY_CMD ${PYTHON_CMD})
   )
   add_custom_target(bcc_py_${PY_CMD_ESCAPED} ALL DEPENDS ${PIP_INSTALLABLE})
 
+  if(NOT PYTHON_PREFIX)
+     set(PYTHON_PREFIX, ${CMAKE_INSTALL_PREFIX} )
+  endif()
+
   install(
     CODE "
       execute_process(
-        COMMAND ${PY_CMD} setup.py install -f ${PYTHON_FLAGS} --prefix=${CMAKE_INSTALL_PREFIX} --record ${CMAKE_BINARY_DIR}/install_manifest_python_bcc.txt
+        COMMAND ${PY_CMD} setup.py install -f ${PYTHON_FLAGS} --prefix=${PYTHON_PREFIX} --record ${CMAKE_BINARY_DIR}/install_manifest_python_bcc.txt
         WORKING_DIRECTORY ${PY_DIRECTORY})"
     COMPONENT python)
 endforeach()
