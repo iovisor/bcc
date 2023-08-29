@@ -33,7 +33,8 @@ int get_pid_binary_path(pid_t pid, char *path, size_t path_sz)
 	}
 	ret = readlink(proc_pid_exe, path, path_sz);
 	if (ret < 0) {
-		warn("No such pid %d\n", pid);
+		warn("Failed to readlink %s: %s\n", proc_pid_exe,
+		     strerror(errno));
 		return -1;
 	}
 	if (ret >= path_sz) {
@@ -66,7 +67,7 @@ int get_pid_lib_path(pid_t pid, const char *lib, char *path, size_t path_sz)
 	}
 	maps = fopen(proc_pid_maps, "r");
 	if (!maps) {
-		warn("No such pid %d\n", pid);
+		warn("Failed to open %s: %s\n", proc_pid_maps, strerror(errno));
 		return -1;
 	}
 	while (fgets(line_buf, sizeof(line_buf), maps)) {
