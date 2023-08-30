@@ -77,9 +77,6 @@ if not args.interval:
 
 # define BPF program
 bpf_text = """
-#ifndef KBUILD_MODNAME
-#define KBUILD_MODNAME "bcc"
-#endif
 #include <uapi/linux/ptrace.h>
 #include <linux/tcp.h>
 #include <net/sock.h>

@@ -35,9 +35,6 @@ args = parser.parse_args()
 
 # define BPF program
 bpf_text = """
-#ifndef KBUILD_MODNAME
-#define KBUILD_MODNAME "bcc"
-#endif
 #include <linux/bpf.h>
 #include <uapi/linux/ptrace.h>
 #include <rdma/rdma_cm.h>

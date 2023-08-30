@@ -70,9 +70,6 @@ bpf_text = """
 #include <linux/fs.h>
 #include <linux/sched.h>
 #include <linux/dcache.h>
-#ifndef KBUILD_MODNAME
-#define KBUILD_MODNAME "bcc"
-#endif
 #include <linux/nfs_fs.h>
 
 #define TRACE_READ 0
