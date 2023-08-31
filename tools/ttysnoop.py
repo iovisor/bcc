@@ -15,6 +15,7 @@
 # 15-Oct-2016   Brendan Gregg   Created this.
 # 13-Dec-2022   Rong Tao        Detect whether kfunc is supported.
 # 07-Jan-2023   Rong Tao        Support ITER_UBUF(CO-RE way)
+# 31-Aug-2023   Rong Tao        Support iov_iter.__ubuf_iovec field.
 
 from __future__ import print_function
 from bcc import BPF
@@ -135,13 +136,12 @@ int kprobe__tty_write(struct pt_regs *ctx, struct file *file,
 PROBE_TTY_WRITE
 {
     const char __user *buf = NULL;
-    const struct kvec *kvec;
     size_t count = 0;
 
     if (iocb->ki_filp->f_inode->i_ino != PTS)
         return 0;
 /**
- * commit 8cd54c1c8480 iov_iter: separate direction from flavour 
+ * commit 8cd54c1c8480 iov_iter: separate direction from flavour
  * `type` is represented by iter_type and data_source seperately
  */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0)
@@ -156,15 +156,7 @@ PROBE_TTY_WRITE
 
     /* Support 'type' and 'iter_type' field name */
     switch (from->IOV_ITER_TYPE_NAME) {
-    /**
-     * <  5.14.0: case ITER_IOVEC + WRITE
-     * >= 5.14.0: case ITER_IOVEC
-     */
-    case CASE_ITER_IOVEC_NAME:
-        kvec  = from->kvec;
-        buf   = kvec->iov_base;
-        count = kvec->iov_len;
-        break;
+    CASE_ITER_IOVEC_TEXT
     CASE_ITER_UBUF_TEXT
     /* TODO: Support more type */
     default:
@@ -184,18 +176,29 @@ int kprobe__tty_write(struct pt_regs *ctx, struct kiocb *iocb,
     struct iov_iter *from)
 """
 
-is_support_kfunc = BPF.support_kfunc()
-if is_support_kfunc:
-    bpf_text = bpf_text.replace('PROBE_TTY_WRITE', probe_tty_write_kfunc)
-else:
-    bpf_text = bpf_text.replace('PROBE_TTY_WRITE', probe_tty_write_kprobe)
+case_iter_iovec_text="""
+    /**
+     * <  5.14.0: case ITER_IOVEC + WRITE
+     * >= 5.14.0: case ITER_IOVEC
+     */
+    case CASE_ITER_IOVEC_NAME:
+        buf   = from->kvec->iov_base;
+        count = from->kvec->iov_len;
+        break;
+"""
 
-if BPF.kernel_struct_has_field(b'iov_iter', b'iter_type') == 1:
-    bpf_text = bpf_text.replace('IOV_ITER_TYPE_NAME', 'iter_type')
-    bpf_text = bpf_text.replace('CASE_ITER_IOVEC_NAME', 'ITER_IOVEC')
-else:
-    bpf_text = bpf_text.replace('IOV_ITER_TYPE_NAME', 'type')
-    bpf_text = bpf_text.replace('CASE_ITER_IOVEC_NAME', 'ITER_IOVEC + WRITE')
+# kernel commit 747b1f65d39a("iov_iter: overlay struct iovec and ubuf/len")
+# is compatible with multiple iov_iter and __ubuf_iovec should be used first.
+case_iter_iovec_text_ubuf_iovec="""
+    /**
+     * <  5.14.0: case ITER_IOVEC + WRITE
+     * >= 5.14.0: case ITER_IOVEC
+     */
+    case CASE_ITER_IOVEC_NAME:
+        buf   = from->__ubuf_iovec.iov_base;
+        count = from->__ubuf_iovec.iov_len;
+        break;
+"""
 
 case_iter_ubuf_text = """
     case ITER_UBUF:
@@ -204,12 +207,38 @@ case_iter_ubuf_text = """
         break;
 """
 
+is_support_kfunc = BPF.support_kfunc()
+if is_support_kfunc:
+    bpf_text = bpf_text.replace('PROBE_TTY_WRITE', probe_tty_write_kfunc)
+else:
+    bpf_text = bpf_text.replace('PROBE_TTY_WRITE', probe_tty_write_kprobe)
+
+if BPF.kernel_struct_has_field(b'iov_iter', b'iter_type') == 1:
+    bpf_text = bpf_text.replace('IOV_ITER_TYPE_NAME', 'iter_type')
+    case_iter_iovec_text = case_iter_iovec_text.replace('CASE_ITER_IOVEC_NAME',
+                                                        'ITER_IOVEC')
+    case_iter_iovec_text_ubuf_iovec = case_iter_iovec_text_ubuf_iovec.replace(
+            'CASE_ITER_IOVEC_NAME', 'ITER_IOVEC')
+else:
+    bpf_text = bpf_text.replace('IOV_ITER_TYPE_NAME', 'type')
+    case_iter_iovec_text = case_iter_iovec_text.replace('CASE_ITER_IOVEC_NAME',
+                                                        'ITER_IOVEC + WRITE')
+    case_iter_iovec_text_ubuf_iovec = case_iter_iovec_text_ubuf_iovec.replace(
+            'CASE_ITER_IOVEC_NAME',
+            'ITER_IOVEC + WRITE')
+
 if BPF.kernel_struct_has_field(b'iov_iter', b'ubuf') == 1:
     bpf_text = bpf_text.replace('CASE_ITER_UBUF_TEXT', case_iter_ubuf_text)
     bpf_text = bpf_text.replace('ADD_FILTER_ITER_UBUF', 'from->iter_type != ITER_UBUF &&')
 else:
     bpf_text = bpf_text.replace('CASE_ITER_UBUF_TEXT', '')
     bpf_text = bpf_text.replace('ADD_FILTER_ITER_UBUF', '')
+
+if BPF.kernel_struct_has_field(b'iov_iter', b'__ubuf_iovec') == 1:
+    bpf_text = bpf_text.replace('CASE_ITER_IOVEC_TEXT',
+                                case_iter_iovec_text_ubuf_iovec)
+else:
+    bpf_text = bpf_text.replace('CASE_ITER_IOVEC_TEXT', case_iter_iovec_text)
 
 if BPF.kernel_struct_has_field(b'bpf_ringbuf', b'waitq') == 1:
     PERF_MODE = "USE_BPF_RING_BUF"
