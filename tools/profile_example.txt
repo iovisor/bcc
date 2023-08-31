@@ -154,7 +154,10 @@ Sampling at 49 Hertz of PID 25036 by user + kernel stack... Hit Ctrl-C to end.
         7
 
 Again, I've truncated some lines. Now we're just analyzing the dd process.
-The filtering is performed in kernel context, for efficiency.
+The filter is configured by specifying the target PID (from the current PID
+namespace where we are profiling) via the "-p" flag.
+Filtering is performed in kernel context, for efficiency, with automatic
+PID translation to the top-level namespace (if required).
 
 This output has some "[unknown]" frames that probably have valid addresses,
 but we're lacking the symbol translation. This is a common for all profilers

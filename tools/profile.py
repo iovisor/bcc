@@ -162,9 +162,18 @@ BPF_STACK_TRACE(stack_traces, STACK_STORAGE_SIZE);
 // This code gets a bit complex. Probably not suitable for casual hacking.
 
 int do_perf_event(struct bpf_perf_event_data *ctx) {
-    u64 id = bpf_get_current_pid_tgid();
-    u32 tgid = id >> 32;
-    u32 pid = id;
+    u32 tgid = 0;
+    u32 pid = 0;
+
+    struct bpf_pidns_info ns = {};
+    if (USE_PIDNS && !bpf_get_ns_current_pid_tgid(PIDNS_DEV, PIDNS_INO, &ns, sizeof(struct bpf_pidns_info))) {
+        tgid = ns.tgid;
+        pid = ns.pid;
+    } else {
+        u64 id = bpf_get_current_pid_tgid();
+        tgid = id >> 32;
+        pid = id;
+    }
 
     if (IDLE_FILTER)
         return 0;
@@ -215,6 +224,17 @@ int do_perf_event(struct bpf_perf_event_data *ctx) {
     return 0;
 }
 """
+
+# pid-namespace translation
+try:
+    devinfo = os.stat("/proc/self/ns/pid")
+    bpf_text = bpf_text.replace('USE_PIDNS', "1")
+    bpf_text = bpf_text.replace('PIDNS_DEV', str(devinfo.st_dev))
+    bpf_text = bpf_text.replace('PIDNS_INO', str(devinfo.st_ino))
+except:
+    bpf_text = bpf_text.replace('USE_PIDNS', "0")
+    bpf_text = bpf_text.replace('PIDNS_DEV', "0")
+    bpf_text = bpf_text.replace('PIDNS_INO', "0")
 
 # set idle filter
 idle_filter = "pid == 0"
