@@ -175,6 +175,16 @@ hcall_table = {
     1100: 'H_SCM_FLUSH',
     1104: 'H_GET_ENERGY_SCALE_INFO',
     1116: 'H_WATCHDOG',
+    # Platform specific hcalls used by KVM on PowerVM
+    1120: 'H_GUEST_GET_CAPABILITIES',
+    1124: 'H_GUEST_SET_CAPABILITIES',
+    1136: 'H_GUEST_CREATE',
+    1140: 'H_GUEST_CREATE_VCPU',
+    1144: 'H_GUEST_GET_STATE',
+    1148: 'H_GUEST_SET_STATE',
+    1152: 'H_GUEST_RUN_VCPU',
+    1156: 'H_GUEST_COPY_MEMORY',
+    1160: 'H_GUEST_DELETE',
     # Platform-specific hcalls used by the Ultravisor
     61184: 'H_SVM_PAGE_IN',
     61188: 'H_SVM_PAGE_OUT',
