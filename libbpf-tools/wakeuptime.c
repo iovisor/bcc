@@ -20,6 +20,7 @@ struct env {
 	pid_t pid;
 	bool user_threads_only;
 	bool verbose;
+	bool flame_support;
 	int stack_storage_size;
 	int perf_max_stack_depth;
 	__u64 min_block_time;
@@ -27,6 +28,7 @@ struct env {
 	int duration;
 } env = {
 	.verbose = false,
+	.flame_support = false,
 	.stack_storage_size = 1024,
 	.perf_max_stack_depth = 127,
 	.min_block_time = 1,
@@ -46,7 +48,8 @@ const char argp_program_doc[] =
 "	wakeuptime		# trace blocked time with waker stacks\n"
 "	wakeuptime 5		# trace for 5 seconds only\n"
 "	wakeuptime -u		# don't include kernel threads (user only)\n"
-"	wakeuptime -p 185	# trace for PID 185 only\n";
+"	wakeuptime -p 185	# trace for PID 185 only\n"
+"	wakeuptime -f > out.stacks		# generate stacks which support flame graph\n";;
 
 #define OPT_PERF_MAX_STACK_DEPTH	1 /* --pef-max-stack-depth */
 #define OPT_STACK_STORAGE_SIZE		2 /* --stack-storage-size */
@@ -63,6 +66,7 @@ static const struct argp_option opts[] = {
 		"the amount of time in microseconds over which we store traces (default 1)" },
 	{ "max-block-time", 'M', "MAX-BLOCK-TIME", 0,
 		"the amount of time in microseconds under which we store traces (default U64_MAX)" },
+	{ "flame-support", 'f', NULL, 0, "flame supported stacks output" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
@@ -78,6 +82,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'v':
 		env.verbose = true;
+		break;
+	case 'f':
+		env.flame_support = true;
 		break;
 	case 'u':
 		env.user_threads_only = true;
@@ -153,6 +160,42 @@ static void sig_int(int signo)
 {
 }
 
+/* The return string have to be freeed after using */
+static char *string_joint(char *tail, char *head, ...)
+{
+	char *ret, *head_buf;
+	va_list args;
+	int size;
+
+	va_start(args, head);
+	size = vsnprintf(NULL, 0, head, args);
+	head_buf = (char *)malloc((size + 1) * sizeof(char));
+	if (!head_buf)
+		goto joint_nomem;
+	vsnprintf(head_buf, size + 1, head, args);
+	va_end(args);
+
+	if (!tail)
+		return head_buf;
+
+	ret = (char *)malloc((size + 1) * sizeof(char) + strlen(tail));
+	if (!ret) {
+		free(head_buf);
+		goto joint_nomem;
+	}
+	strcpy(ret, head_buf);
+	strcat(ret, tail);
+
+	free(head_buf);
+
+	return ret;
+
+joint_nomem:
+	fprintf(stderr, "failed to alloc string\n");
+	return NULL;
+}
+
+
 static void print_map(struct ksyms *ksyms, struct wakeuptime_bpf *obj)
 {
 	struct key_t lookup_key = {}, next_key;
@@ -160,6 +203,7 @@ static void print_map(struct ksyms *ksyms, struct wakeuptime_bpf *obj)
 	unsigned long *ip;
 	const struct ksym *ksym;
 	__u64 val;
+	char *flame_output = NULL, *tmp_buf;
 
 	ip = calloc(env.perf_max_stack_depth, sizeof(*ip));
 	if (!ip) {
@@ -177,20 +221,41 @@ static void print_map(struct ksyms *ksyms, struct wakeuptime_bpf *obj)
 			free(ip);
 			return;
 		}
-		printf("\n	%-16s %s\n", "target:", next_key.target);
-		lookup_key = next_key;
 
 		err = bpf_map_lookup_elem(stack_traces_fd, &next_key.w_k_stack_id, ip);
 		if (err < 0) {
 			fprintf(stderr, "missed kernel stack: %d\n", err);
 		}
+
+		/*to convert val in microseconds*/
+		val /= 1000;
+		if (env.flame_support) {
+			flame_output = string_joint(NULL, " %lld\n", val);
+			tmp_buf = flame_output;
+			flame_output = string_joint(flame_output, "%s;", next_key.target);
+			free(tmp_buf);
+			for (i = 0; i < env.perf_max_stack_depth && ip[i]; i++) {
+				ksym = ksyms__map_addr(ksyms, ip[i]);
+				tmp_buf = flame_output;
+				flame_output = string_joint(flame_output, "%s;", ksym ? ksym->name: "Unknown");
+				free(tmp_buf);
+			}
+			tmp_buf = flame_output;
+			flame_output = string_joint(flame_output, "%s;", next_key.waker);
+			free(tmp_buf);
+			lookup_key = next_key;
+			printf(flame_output);
+			free(flame_output);
+			continue;
+		}
+		printf("\n	%-16s %s\n", "target:", next_key.target);
+		lookup_key = next_key;
+
 		for (i = 0; i < env.perf_max_stack_depth && ip[i]; i++) {
 			ksym = ksyms__map_addr(ksyms, ip[i]);
 			printf("	%-16lx %s\n", ip[i], ksym ? ksym->name: "Unknown");
 		}
 		printf("	%16s %s\n","waker:", next_key.waker);
-		/*to convert val in microseconds*/
-		val /= 1000;
 		printf("	%lld\n", val);
 	}
 

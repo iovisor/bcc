@@ -27,6 +27,7 @@ static struct env {
 	long state;
 	int duration;
 	bool verbose;
+	bool flame_support;
 } env = {
 	.pid = -1,
 	.tid = -1,
@@ -36,6 +37,7 @@ static struct env {
 	.max_block_time = -1,
 	.state = -1,
 	.duration = 99999999,
+	.flame_support = false
 };
 
 const char *argp_program_version = "offcputime 0.1";
@@ -55,7 +57,8 @@ const char argp_program_doc[] =
 "    offcputime -p 185      # only trace threads for PID 185\n"
 "    offcputime -t 188      # only trace thread 188\n"
 "    offcputime -u          # only trace user threads (no kernel)\n"
-"    offcputime -k          # only trace kernel threads (no user)\n";
+"    offcputime -k          # only trace kernel threads (no user)\n"
+"    offcputime -f > out.stacks         # generate stacks which support flame graph\n";
 
 #define OPT_PERF_MAX_STACK_DEPTH	1 /* --pef-max-stack-depth */
 #define OPT_STACK_STORAGE_SIZE		2 /* --stack-storage-size */
@@ -78,6 +81,7 @@ static const struct argp_option opts[] = {
 	  "the amount of time in microseconds under which we store traces (default U64_MAX)" },
 	{ "state", OPT_STATE, "STATE", 0, "filter on this thread state bitmask (eg, 2 == TASK_UNINTERRUPTIBLE) see include/linux/sched.h" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
+	{ "flame-support", 'f', NULL, 0, "flame supported stacks output" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
@@ -92,6 +96,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'v':
 		env.verbose = true;
+		break;
+	case 'f':
+		env.flame_support = true;
 		break;
 	case 'p':
 		errno = 0;
@@ -185,6 +192,41 @@ static void sig_handler(int sig)
 {
 }
 
+/* The return string have to be freeed after using */
+static char *string_joint(char *tail, char *head, ...)
+{
+	char *ret, *head_buf;
+	va_list args;
+	int size;
+
+	va_start(args, head);
+	size = vsnprintf(NULL, 0, head, args);
+	head_buf = (char *)malloc((size + 1) * sizeof(char));
+	if (!head_buf)
+		goto joint_nomem;
+	vsnprintf(head_buf, size + 1, head, args);
+	va_end(args);
+
+	if (!tail)
+		return head_buf;
+
+	ret = (char *)malloc((size + 1) * sizeof(char) + strlen(tail));
+	if (!ret) {
+		free(head_buf);
+		goto joint_nomem;
+	}
+	strcpy(ret, head_buf);
+	strcat(ret, tail);
+
+	free(head_buf);
+
+	return ret;
+
+joint_nomem:
+	fprintf(stderr, "failed to alloc string\n");
+	return NULL;
+}
+
 static void print_map(struct ksyms *ksyms, struct syms_cache *syms_cache,
 		      struct offcputime_bpf *obj)
 {
@@ -198,6 +240,7 @@ static void print_map(struct ksyms *ksyms, struct syms_cache *syms_cache,
 	char *dso_name;
 	unsigned long dso_offset;
 	int idx;
+	char *flame_output = NULL, *tmp_buf;
 
 	ip = calloc(env.perf_max_stack_depth, sizeof(*ip));
 	if (!ip) {
@@ -223,15 +266,23 @@ static void print_map(struct ksyms *ksyms, struct syms_cache *syms_cache,
 			goto print_ustack;
 		}
 
+		if (env.flame_support) {
+			flame_output = string_joint(NULL, " %lld\n", val.delta);
+		}
+
 		for (i = 0; i < env.perf_max_stack_depth && ip[i]; i++) {
 			ksym = ksyms__map_addr(ksyms, ip[i]);
-			if (!env.verbose) {
+			if (!env.verbose && !env.flame_support) {
 				printf("    %s\n", ksym ? ksym->name : "unknown");
-			} else {
+			} else if (!env.flame_support){
 				if (ksym)
 					printf("    #%-2d 0x%lx %s+0x%lx\n", idx++, ip[i], ksym->name, ip[i] - ksym->addr);
 				else
 					printf("    #%-2d 0x%lx [unknown]\n", idx++, ip[i]);
+			} else {
+				tmp_buf = flame_output;
+				flame_output = string_joint(flame_output, "%s;", ksym ? ksym->name : "unknown");
+				free(tmp_buf);
 			}
 		}
 
@@ -246,22 +297,28 @@ print_ustack:
 
 		syms = syms_cache__get_syms(syms_cache, next_key.tgid);
 		if (!syms) {
-			if (!env.verbose) {
+			if (!env.verbose && !env.flame_support) {
 				fprintf(stderr, "failed to get syms\n");
-			} else {
+			} else if (!env.flame_support) {
 				for (i = 0; i < env.perf_max_stack_depth && ip[i]; i++)
 					printf("    #%-2d 0x%016lx [unknown]\n", idx++, ip[i]);
+			} else {
+				for (i = 0; i < env.perf_max_stack_depth && ip[i]; i++) {
+					tmp_buf = flame_output;
+					flame_output = string_joint(flame_output, "#%-2d 0x%016lx [unknown];", idx++, ip[i]);
+					free(tmp_buf);
+				}
 			}
 			goto skip_ustack;
 		}
 		for (i = 0; i < env.perf_max_stack_depth && ip[i]; i++) {
-			if (!env.verbose) {
+			if (!env.verbose && !env.flame_support) {
 				sym = syms__map_addr(syms, ip[i]);
 				if (sym)
 					printf("    %s\n", sym->name);
 				else
 					printf("    [unknown]\n");
-			} else {
+			} else if (!env.flame_support) {
 				sym = syms__map_addr_dso(syms, ip[i], &dso_name, &dso_offset);
 				printf("    #%-2d 0x%016lx", idx++, ip[i]);
 				if (sym)
@@ -269,10 +326,29 @@ print_ustack:
 				if (dso_name)
 					printf(" (%s+0x%lx)", dso_name, dso_offset);
 				printf("\n");
+			} else {
+				sym = syms__map_addr_dso(syms, ip[i], &dso_name, &dso_offset);
+				tmp_buf = flame_output;
+				if (sym) {
+					flame_output = string_joint(flame_output, "%s+0x%lx:", sym->name, sym->offset);
+				}
+				if (dso_name)
+					flame_output = string_joint(flame_output, "(%s+0x%lx):", dso_name, dso_offset);
+				free(tmp_buf);
 			}
 		}
 
 skip_ustack:
+		if (env.flame_support) {
+			tmp_buf = flame_output;
+			flame_output = string_joint(flame_output, "%s;", val.comm);
+			free(tmp_buf);
+			printf(flame_output);
+			free(flame_output);
+			flame_output = NULL;
+			continue;
+		}
+
 		printf("    %-16s %s (%d)\n", "-", val.comm, next_key.pid);
 		printf("        %lld\n\n", val.delta);
 	}
