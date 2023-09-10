@@ -1,0 +1,310 @@
+Demonstrations of workqlat, the Linux eBPF/bcc version.
+
+
+This program summarizes workqueue latency as a histogram, showing
+how long work items spent waiting before being served by a worker.
+
+Below snippet shows workqueue latency on a fairly idle system.
+
+# ./workqlat.py
+Tracing work queue latency ... Hit Ctrl-C to end.
+^C
+Printing histogram
+     usecs               : count     distribution
+         0 -> 1          : 87       |                                        |
+         2 -> 3          : 7        |                                        |
+         4 -> 7          : 60       |                                        |
+         8 -> 15         : 167      |*                                       |
+        16 -> 31         : 53       |                                        |
+        32 -> 63         : 24       |                                        |
+        64 -> 127        : 3        |                                        |
+       128 -> 255        : 4        |                                        |
+       256 -> 511        : 1        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 1012     |********                                |
+      4096 -> 8191       : 3953     |*******************************         |
+      8192 -> 16383      : 5035     |****************************************|
+
+And following snippet shows workqueue latency on a loaded system.
+
+# ./workqlat.py
+Tracing work queue latency ... Hit Ctrl-C to end.
+^C
+Printing histogram
+     usecs               : count     distribution
+         0 -> 1          : 10       |                                        |
+         2 -> 3          : 89       |                                        |
+         4 -> 7          : 196      |                                        |
+         8 -> 15         : 254      |*                                       |
+        16 -> 31         : 47       |                                        |
+        32 -> 63         : 24       |                                        |
+        64 -> 127        : 13       |                                        |
+       128 -> 255        : 2        |                                        |
+       256 -> 511        : 2        |                                        |
+       512 -> 1023       : 1        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 0        |                                        |
+      4096 -> 8191       : 0        |                                        |
+      8192 -> 16383      : 0        |                                        |
+     16384 -> 32767      : 1        |                                        |
+     32768 -> 65535      : 0        |                                        |
+     65536 -> 131071     : 0        |                                        |
+    131072 -> 262143     : 1        |                                        |
+    262144 -> 524287     : 3        |                                        |
+    524288 -> 1048575    : 3        |                                        |
+   1048576 -> 2097151    : 10001    |****************************************|
+   2097152 -> 4194303    : 0        |                                        |
+   4194304 -> 8388607    : 4        |                                        |
+
+A bimodal distribution is pretty visible in the above 2 snippets. We see that
+when system is idle all of the enqueued work items are served by a worker within
+16ms after getting enqueued but on a fairly loaded system most of thework items
+are waiting for more than 1 second before being served.
+
+A custom kernel module has been used for enqueing known number of work items and
+simulating high load condition. Under normal scenario, the module just enqueues
+10000 delayed work items with delay of 8sec. The 8sec delay is arbitrary here.
+The idea was that after doing insmod we should have time to launch  workqlat and
+workqlat should be able to see involved work handler before work items are
+actually enqueued. This 8sec delay just ensures that workqlat is able to record
+queing of work items submitted by this module.
+To simulate high load situation, just after submitting delayed work items (with
+same 8sec delay), the kernel module creates N kthreads (N is the number of CPUs)
+and each of these kthreads are looping for 10sec as shown below:
+
+	for(i = 0; i < 2000; i++) {
+                mdelay(5);
+                need_resched();
+        }
+
+Since the submitted (delayed) work items have 8sec accosiated delay, actual
+enqueing of work will happen after ~8sec but at that point of time most of the
+CPUs will be busy executing the above mentioned kthread loops and hence most of
+the submitted work items will not be served immediately. The effect can be seen
+in second snippet above, where most of the enqueued work was executed at least
+after 1sec of getting enqueued.
+
+This tool can also be used with an interval and a count option, to show latency
+at regular intervals for a specified number of times.
+For example, showing three x five second summary:
+
+# ./workqlat.py 5 3
+Tracing work queue latency ... Hit Ctrl-C to end.
+
+Printing histogram
+     usecs               : count     distribution
+         0 -> 1          : 24       |*************************               |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 37       |****************************************|
+         8 -> 15         : 19       |********************                    |
+        16 -> 31         : 17       |******************                      |
+        32 -> 63         : 1        |*                                       |
+
+Printing histogram
+     usecs               : count     distribution
+         0 -> 1          : 25       |**********************************      |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 29       |****************************************|
+         8 -> 15         : 26       |***********************************     |
+        16 -> 31         : 14       |*******************                     |
+
+Printing histogram
+     usecs               : count     distribution
+         0 -> 1          : 24       |***************                         |
+         2 -> 3          : 14       |*********                               |
+         4 -> 7          : 62       |****************************************|
+         8 -> 15         : 34       |*********************                   |
+        16 -> 31         : 23       |**************                          |
+        32 -> 63         : 1        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 2        |*                                       |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 1        |                                        |
+
+This shows quite similar distribution across all the three summaries.
+
+A -W option can be used to show data for each work handler separately.
+For example:
+
+# ./workqlat.py -W
+Tracing work queue latency ... Hit Ctrl-C to end.
+^C
+Printing histogram
+
+work handles = b'pci_pme_list_scan'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 2        |****************                        |
+         8 -> 15         : 5        |****************************************|
+
+work handles = b'xfs_buf_ioend_work'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 2        |****************************************|
+         8 -> 15         : 2        |****************************************|
+
+work handles = b'edac_pci_workq_function'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 2        |**************************              |
+         8 -> 15         : 3        |****************************************|
+        16 -> 31         : 1        |*************                           |
+
+work handles = b'blk_mq_run_work_fn'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 1        |****************************************|
+
+work handles = b'iscsi_xmitworker'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 1        |****************************************|
+         8 -> 15         : 1        |****************************************|
+        16 -> 31         : 1        |****************************************|
+        32 -> 63         : 1        |****************************************|
+
+work handles = b'flush_to_ldisc'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 1        |*************                           |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 3        |****************************************|
+
+work handles = b'xfs_reclaim_worker'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 1        |****************************************|
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 1        |****************************************|
+
+work handles = b'vmstat_update'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 3        |*************                           |
+         8 -> 15         : 9        |****************************************|
+        16 -> 31         : 5        |**********************                  |
+
+work handles = b'xlog_cil_push_work'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 1        |****************************************|
+
+work handles = b'xlog_ioend_work'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 1        |****************************************|
+
+work handles = b'blk_mq_timeout_work'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 1        |****************************************|
+
+work handles = b'sync_hw_clock'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 5        |****************************************|
+         8 -> 15         : 2        |****************                        |
+
+work handles = b'wb_workfn'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 1        |****************************************|
+
+work handles = b'bnxt_sp_task'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 2        |********                                |
+        16 -> 31         : 10       |****************************************|
+        32 -> 63         : 1        |****                                    |
+
+work handles = b'vmstat_shepherd'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 3        |****************************************|
+
+work handles = b'fb_flashcursor'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 30       |****************************************|
+         8 -> 15         : 1        |*                                       |
+
+work handles = b'drm_fb_helper_dirty_work'
+     usecs               : count     distribution
+         0 -> 1          : 31       |****************************************|
+
+work handles = b'xfs_log_worker'
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 2        |****************************************|
+
+
+We can see in the above snippet that work handler fb_flashcursor was executed
+everytime 4-15us after being enqueued. On the other hand work handler
+drm_fb_helper_dirty_work always got executed within 1us of getting enqueued. 
+
+
+A -w option can be used to show data for one work handler only. For example for
+handler flush_to_ldisc:
+
+# ./workqlat.py -w flush_to_ldisc
+Tracing work queue latency for flush_to_ldisc... Hit Ctrl-C to end.
+^C
+Printing histogram
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 1        |*************                           |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 3        |****************************************|
+
+
+USAGE message:
+
+# ./workqlat -h
+usage: workqlat.py [-h] [-W] [-w WORK] [interval] [count]
+
+Summarize work queue latency as a histogram
+
+positional arguments:
+  interval              output interval, in seconds
+  count                 number of outputs
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -W, --works           print a histogram per work-handler item
+  -w WORK, --work WORK  trace only specified work-handler
+
+examples:
+    ./workqlat           # summarize work queue latency as a histogram
+    ./workqlat 1 10      # print 1 second summaries, 10 times
+    ./workqlat -W        # show each work-handler item separately
+    ./workqlat -w xyz    # show work-handler named "xyz" only
