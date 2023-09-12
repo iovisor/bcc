@@ -50,7 +50,8 @@ const char argp_program_doc[] =
 	"[--pid PID] [--verbose]\n"
 	"\n"
 	"EXAMPLES:\n"
-	"    swapin          # Print swapins per-process\n";
+	"  swapin          # Print swapins per-process\n"
+  "  swapin -T -i 5  # Print swapins, with timestamps, every 5 seconds\n";
 
 static const struct argp_option opts[] = {
 	{"timestamp", 'T', NULL, 0, "Include timestamp in output."},
