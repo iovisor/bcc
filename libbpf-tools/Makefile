@@ -76,6 +76,7 @@ APPS = \
 	softirqs \
 	solisten \
 	statsnoop \
+	swapin \
 	syscount \
 	tcptracer \
 	tcpconnect \
