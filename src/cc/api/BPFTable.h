@@ -437,11 +437,11 @@ class BPFPerfEventArray : public BPFTableBase<int, int> {
   BPFPerfEventArray(const TableDesc& desc);
   ~BPFPerfEventArray();
 
-  StatusTuple open_all_cpu(uint32_t type, uint64_t config);
+  StatusTuple open_all_cpu(uint32_t type, uint64_t config, int pid = -1);
   StatusTuple close_all_cpu();
 
  private:
-  StatusTuple open_on_cpu(int cpu, uint32_t type, uint64_t config);
+  StatusTuple open_on_cpu(int cpu, uint32_t type, uint64_t config, int pid = -1);
   StatusTuple close_on_cpu(int cpu);
 
   std::map<int, int> cpu_fds_;

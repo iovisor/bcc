@@ -61,8 +61,6 @@ RUN apt-get update && apt-get install -y \
       bridge-utils \
       libtinfo5 \
       libtinfo-dev \
-      iperf \
-      netperf \
       xz-utils \
       zip && \
       apt-get -y clean

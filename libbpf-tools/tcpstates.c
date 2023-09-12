@@ -153,7 +153,7 @@ static void sig_int(int signo)
 
 static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
-	char ts[32], saddr[26], daddr[26];
+	char ts[32], saddr[39], daddr[39];
 	struct event *e = data;
 	struct tm *tm;
 	int family;
@@ -170,7 +170,7 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	inet_ntop(e->family, &e->daddr, daddr, sizeof(daddr));
 	if (wide_output) {
 		family = e->family == AF_INET ? 4 : 6;
-		printf("%-16llx %-7d %-16s %-2d %-26s %-5d %-26s %-5d %-11s -> %-11s %.3f\n",
+		printf("%-16llx %-7d %-16s %-2d %-39s %-5d %-39s %-5d %-11s -> %-11s %.3f\n",
 		       e->skaddr, e->pid, e->task, family, saddr, e->sport, daddr, e->dport,
 		       tcp_states[e->oldstate], tcp_states[e->newstate], (double)e->delta_us / 1000);
 	} else {
@@ -269,7 +269,7 @@ int main(int argc, char **argv)
 	if (emit_timestamp)
 		printf("%-8s ", "TIME(s)");
 	if (wide_output)
-		printf("%-16s %-7s %-16s %-2s %-26s %-5s %-26s %-5s %-11s -> %-11s %s\n",
+		printf("%-16s %-7s %-16s %-2s %-39s %-5s %-39s %-5s %-11s -> %-11s %s\n",
 		       "SKADDR", "PID", "COMM", "IP", "LADDR", "LPORT",
 		       "RADDR", "RPORT", "OLDSTATE", "NEWSTATE", "MS");
 	else

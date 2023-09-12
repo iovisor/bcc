@@ -1,0 +1,36 @@
+Demonstrations of rdmaucma, the Linux eBPF/bcc version.
+
+
+This program traces RDMA UCMA(Userspace Connection Manager Access) events,
+then help us to analyze issues on RDMA CM.
+
+Example of rdmaucma:
+# ./rdmaucma
+Tracing RDMA Userspace Connection Manager Access event... Hit Ctrl-C to end.
+Timestamp Event            Family Local                                         Remote
+09:47:49  connect request  IPv6   fdcc:abcd:15:479::165:6379                    fdcc:abcd:15:479::166:61293
+09:47:49  established      IPv6   fdcc:abcd:15:479::165:6379                    fdcc:abcd:15:479::166:61293
+09:47:51  disconnected     IPv6   fdcc:abcd:15:479::165:6379                    fdcc:abcd:15:479::166:61293
+09:47:52  connect request  IPv6   fdcc:abcd:15:479::165:6379                    fdcc:abcd:15:479::166:33402
+09:47:52  established      IPv6   fdcc:abcd:15:479::165:6379                    fdcc:abcd:15:479::166:33402
+09:47:53  disconnected     IPv6   fdcc:abcd:15:479::165:6379                    fdcc:abcd:15:479::166:33402
+09:48:06  connect request  IPv4   192.168.122.165:6379                          192.168.122.166:41498
+09:48:06  established      IPv4   192.168.122.165:6379                          192.168.122.166:41498
+09:48:10  disconnected     IPv4   192.168.122.165:6379                          192.168.122.166:41498
+09:48:11  connect request  IPv4   192.168.122.165:6379                          192.168.122.166:19047
+09:48:11  established      IPv4   192.168.122.165:6379                          192.168.122.166:19047
+09:48:11  disconnected     IPv4   192.168.122.165:6379                          192.168.122.166:19047
+
+Full USAGE:
+
+# ./rdmaucma -h
+usage: rdmaucma [-h] [-D]
+
+Trace RDMA Userspace Connection Manager Access Event
+
+optional arguments:
+  -h, --help   show this help message and exit
+  -D, --debug  print BPF program before starting (for debugging purposes)
+
+examples:
+    ./rdmaucma            # Trace all RDMA Userspace Connection Manager Access Event

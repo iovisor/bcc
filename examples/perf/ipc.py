@@ -158,20 +158,22 @@ print("%-8s %-12s %-8s %-8s %s" % ('CLOCK', 'INSTRUCTION', 'IPC', 'TIME', 'CPU')
 
 b["output"].open_perf_buffer(print_data)
 
-# Perf Event for Unhalted Cycles, The hex value is
-# combination of event, umask and cmask. Read Intel
-# Doc to find the event and cmask. Or use 
-# perf list --details to get event, umask and cmask
+# Perf Events for Unhalted Cycles and Retired Instructions are supported on
+# most platforms with a PMU and the kernel will attempt to translate these
+# into an architecture-specific event code. For architectures that do not have
+# these mappings, see perf list --details to find event details.
 # NOTE: Events can be multiplexed by kernel in case the
 # number of counters is greater than supported by CPU
 # performance monitoring unit, which can result in inaccurate
 # results. Counter values need to be normalized for a more
 # accurate value.
-PERF_TYPE_RAW = 4
+PERF_TYPE_HARDWARE = 0
+PERF_COUNT_HW_CPU_CYCLES = 0
+PERF_COUNT_HW_INSTRUCTIONS = 1
 # Unhalted Clock Cycles
-b["clk"].open_perf_event(PERF_TYPE_RAW, 0x0000003C)
+b["clk"].open_perf_event(PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES)
 # Instruction Retired
-b["inst"].open_perf_event(PERF_TYPE_RAW, 0x000000C0)
+b["inst"].open_perf_event(PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS)
 
 while True:
 	try:

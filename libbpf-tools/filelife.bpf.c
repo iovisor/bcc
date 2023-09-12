@@ -48,11 +48,14 @@ probe_create(struct dentry *dentry)
  *            bool want_excl);
  * int vfs_create(struct user_namespace *mnt_userns, struct inode *dir,
  *            struct dentry *dentry, umode_t mode, bool want_excl);
+ * int vfs_create(struct mnt_idmap *idmap, struct inode *dir,
+ *            struct dentry *dentry, umode_t mode, bool want_excl);
  */
 SEC("kprobe/vfs_create")
 int BPF_KPROBE(vfs_create, void *arg0, void *arg1, void *arg2)
 {
-	if (renamedata_has_old_mnt_userns_field())
+	if (renamedata_has_old_mnt_userns_field()
+		|| renamedata_has_new_mnt_idmap_field())
 		return probe_create(arg2);
 	else
 		return probe_create(arg1);
@@ -85,6 +88,8 @@ int BPF_KPROBE(security_inode_create, struct inode *dir,
  *        struct inode **delegated_inode);
  * int vfs_unlink(struct user_namespace *mnt_userns, struct inode *dir,
  *        struct dentry *dentry, struct inode **delegated_inode);
+ * int vfs_unlink(struct mnt_idmap *idmap, struct inode *dir,
+ *        struct dentry *dentry, struct inode **delegated_inode);
  */
 SEC("kprobe/vfs_unlink")
 int BPF_KPROBE(vfs_unlink, void *arg0, void *arg1, void *arg2)
@@ -94,7 +99,8 @@ int BPF_KPROBE(vfs_unlink, void *arg0, void *arg1, void *arg2)
 	const u8 *qs_name_ptr;
 	u32 tgid = id >> 32;
 	u64 *tsp, delta_ns;
-	bool has_arg = renamedata_has_old_mnt_userns_field();
+	bool has_arg = renamedata_has_old_mnt_userns_field()
+				|| renamedata_has_new_mnt_idmap_field();
 
 	tsp = has_arg
 		? bpf_map_lookup_elem(&start, &arg2)

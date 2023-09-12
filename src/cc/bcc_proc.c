@@ -262,10 +262,6 @@ int bcc_procutils_each_ksym(bcc_procutils_ksymcb callback, void *payload) {
   FILE *kallsyms;
   unsigned long long addr;
 
-  /* root is needed to list ksym addresses */
-  if (geteuid() != 0)
-    return -1;
-
   kallsyms = fopen("/proc/kallsyms", "r");
   if (!kallsyms)
     return -1;

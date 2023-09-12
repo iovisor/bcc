@@ -40,6 +40,7 @@ int do_ret_sys_getuid(void *ctx) {
     return 0;
 }
 """
+        mypid = os.getpid()
         b = bcc.BPF(text=text, debug=0,
                 cflags=["-DNUM_CPUS=%d" % multiprocessing.cpu_count()])
         event_name = b.get_syscall_fnname(b"getuid")
@@ -47,7 +48,8 @@ int do_ret_sys_getuid(void *ctx) {
         b.attach_kretprobe(event=event_name, fn_name=b"do_ret_sys_getuid")
         cnt1 = b[b"cnt1"]
         try:
-            cnt1.open_perf_event(bcc.PerfType.HARDWARE, bcc.PerfHWConfig.CPU_CYCLES)
+            cnt1.open_perf_event(bcc.PerfType.HARDWARE,
+                                 bcc.PerfHWConfig.CPU_CYCLES, pid=mypid)
         except:
             if ctypes.get_errno() == 2:
                 raise self.skipTest("hardware events unsupported")

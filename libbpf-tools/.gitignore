@@ -53,6 +53,7 @@
 /tcpconnect
 /tcpconnlat
 /tcplife
+/tcppktlat
 /tcptracer
 /tcprtt
 /tcpstates

@@ -698,6 +698,15 @@ class BPF(object):
                 raise e
             blacklist = set([])
 
+        avail_filter_file = "%s/tracing/available_filter_functions" % DEBUGFS
+        try:
+            with open(avail_filter_file, "rb") as avail_filter_f:
+                avail_filter = set([line.rstrip().split()[0] for line in avail_filter_f])
+        except IOError as e:
+            if e.errno != errno.EPERM:
+                raise e
+            avail_filter = set([])
+
         fns = []
 
         in_init_section = 0
@@ -749,7 +758,8 @@ class BPF(object):
                 elif re.match(b'^.*\.cold(\.\d+)?$', fn):
                     continue
                 if (t.lower() in [b't', b'w']) and re.fullmatch(event_re, fn) \
-                    and fn not in blacklist:
+                    and fn not in blacklist \
+                    and fn in avail_filter:
                     fns.append(fn)
         return set(fns)     # Some functions may appear more than once
 
@@ -995,7 +1005,7 @@ class BPF(object):
                 if os.path.isdir(evt_dir):
                     tp = ("%s:%s" % (category, event))
                     if re.match(tp_re.decode(), tp):
-                        results.append(tp)
+                        results.append(tp.encode())
         return results
 
     @staticmethod

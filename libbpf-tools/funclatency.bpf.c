@@ -28,8 +28,7 @@ struct {
 
 __u32 hist[MAX_SLOTS] = {};
 
-SEC("kprobe/dummy_kprobe")
-int BPF_KPROBE(dummy_kprobe)
+static void entry(void)
 {
 	u64 id = bpf_get_current_pid_tgid();
 	u32 tgid = id >> 32;
@@ -37,18 +36,29 @@ int BPF_KPROBE(dummy_kprobe)
 	u64 nsec;
 
 	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
-		return 0;
+		return;
 
 	if (targ_tgid && targ_tgid != tgid)
-		return 0;
+		return;
 	nsec = bpf_ktime_get_ns();
 	bpf_map_update_elem(&starts, &pid, &nsec, BPF_ANY);
+}
 
+SEC("fentry/dummy_fentry")
+int BPF_PROG(dummy_fentry)
+{
+	entry();
 	return 0;
 }
 
-SEC("kretprobe/dummy_kretprobe")
-int BPF_KRETPROBE(dummy_kretprobe)
+SEC("kprobe/dummy_kprobe")
+int BPF_KPROBE(dummy_kprobe)
+{
+	entry();
+	return 0;
+}
+
+static void exit(void)
 {
 	u64 *start;
 	u64 nsec = bpf_ktime_get_ns();
@@ -57,11 +67,11 @@ int BPF_KRETPROBE(dummy_kretprobe)
 	u64 slot, delta;
 
 	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
-		return 0;
+		return;
 
 	start = bpf_map_lookup_elem(&starts, &pid);
 	if (!start)
-		return 0;
+		return;
 
 	delta = nsec - *start;
 
@@ -78,7 +88,19 @@ int BPF_KRETPROBE(dummy_kretprobe)
 	if (slot >= MAX_SLOTS)
 		slot = MAX_SLOTS - 1;
 	__sync_fetch_and_add(&hist[slot], 1);
+}
 
+SEC("fexit/dummy_fexit")
+int BPF_PROG(dummy_fexit)
+{
+	exit();
+	return 0;
+}
+
+SEC("kretprobe/dummy_kretprobe")
+int BPF_KRETPROBE(dummy_kretprobe)
+{
+	exit();
 	return 0;
 }
 

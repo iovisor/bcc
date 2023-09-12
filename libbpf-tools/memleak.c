@@ -73,10 +73,17 @@ static struct env {
 	.command = {0}, // -c --command
 };
 
+struct allocation_node {
+	uint64_t address;
+	size_t size;
+	struct allocation_node* next;
+};
+
 struct allocation {
 	uint64_t stack_id;
 	size_t size;
 	size_t count;
+	struct allocation_node* allocations;
 };
 
 #define __ATTACH_UPROBE(skel, sym_name, prog_name, is_retprobe) \
@@ -126,9 +133,12 @@ static int event_notify(int fd, uint64_t event);
 static pid_t fork_sync_exec(const char *command, int fd);
 
 #ifdef USE_BLAZESYM
-static void print_stack_frame(size_t frame, uint64_t addr, const blazesym_csym *sym);
+static void print_stack_frame_by_blazesym(size_t frame, uint64_t addr, const blazesym_csym *sym);
+static void print_stack_frames_by_blazesym();
+#else
+static void print_stack_frames_by_ksyms();
+static void print_stack_frames_by_syms_cache();
 #endif
-
 static int print_stack_frames(struct allocation *allocs, size_t nr_allocs, int stack_traces_fd);
 
 static int alloc_size_compare(const void *a, const void *b);
@@ -150,7 +160,7 @@ const char *argp_program_bug_address =
 const char argp_args_doc[] =
 "Trace outstanding memory allocations\n"
 "\n"
-"USAGE: memleak [-h] [-c COMMAND] [-p PID] [-t] [-n] [-a] [-o AGE_MS] [-C] [-F] [-s SAMPLE_RATE] [-T TOP_STACKS] [-z MIN_SIZE] [-Z MAX_SIZE] [-O OBJECT] [-P PERCPU] [INTERVAL] [INTERVALS]\n"
+"USAGE: memleak [-h] [-c COMMAND] [-p PID] [-t] [-n] [-a] [-o AGE_MS] [-C] [-F] [-s SAMPLE_RATE] [-T TOP_STACKS] [-z MIN_SIZE] [-Z MAX_SIZE] [-O OBJECT] [-P] [INTERVAL] [INTERVALS]\n"
 "\n"
 "EXAMPLES:\n"
 "./memleak -p $(pidof allocs)\n"
@@ -187,7 +197,7 @@ static const struct argp_option argp_options[] = {
 	{"min-size", 'z', "MIN_SIZE", 0, "capture only allocations larger than this size"},
 	{"max-size", 'Z', "MAX_SIZE", 0, "capture only allocations smaller than this size"},
 	{"obj", 'O', "OBJECT", 0, "attach to allocator functions in the specified object"},
-	{"percpu", 'P', "PERCPU", 0, "trace percpu allocations"},
+	{"percpu", 'P', NULL, 0, "trace percpu allocations"},
 	{},
 };
 
@@ -203,7 +213,11 @@ static int child_exec_event_fd = -1;
 #ifdef USE_BLAZESYM
 static blazesym *symbolizer;
 static sym_src_cfg src_cfg;
+#else
+struct syms_cache *syms_cache;
+struct ksyms *ksyms;
 #endif
+static void (*print_stack_frames_func)();
 
 static uint64_t *stack;
 
@@ -388,6 +402,33 @@ int main(int argc, char *argv[])
 
 #ifdef USE_BLAZESYM
 	symbolizer = blazesym_new();
+	if (!symbolizer) {
+		fprintf(stderr, "Failed to load blazesym\n");
+		ret = -ENOMEM;
+
+		goto cleanup;
+	}
+	print_stack_frames_func = print_stack_frames_by_blazesym;
+#else
+	if (env.kernel_trace) {
+		ksyms = ksyms__load();
+		if (!ksyms) {
+			fprintf(stderr, "Failed to load ksyms\n");
+			ret = -ENOMEM;
+
+			goto cleanup;
+		}
+		print_stack_frames_func = print_stack_frames_by_ksyms;
+	} else {
+		syms_cache = syms_cache__new(0);
+		if (!syms_cache) {
+			fprintf(stderr, "Failed to create syms_cache\n");
+			ret = -ENOMEM;
+
+			goto cleanup;
+		}
+		print_stack_frames_func = print_stack_frames_by_syms_cache;
+	}
 #endif
 
 	printf("Tracing outstanding memory allocs...  Hit Ctrl-C to end\n");
@@ -405,7 +446,7 @@ int main(int argc, char *argv[])
 	}
 
 	// after loop ends, check for child process and cleanup accordingly
-	if (env.pid > 0) {
+	if (env.pid > 0 && strlen(env.command)) {
 		if (!child_exited) {
 			if (kill(env.pid, SIGTERM)) {
 				perror("failed to signal child process");
@@ -428,6 +469,11 @@ int main(int argc, char *argv[])
 cleanup:
 #ifdef USE_BLAZESYM
 	blazesym_free(symbolizer);
+#else
+	if (syms_cache)
+		syms_cache__free(syms_cache);
+	if (ksyms)
+		ksyms__free(ksyms);
 #endif
 	memleak_bpf__destroy(skel);
 
@@ -626,7 +672,7 @@ pid_t fork_sync_exec(const char *command, int fd)
 }
 
 #if USE_BLAZESYM
-void print_stack_frame(size_t frame, uint64_t addr, const blazesym_csym *sym)
+void print_stack_frame_by_blazesym(size_t frame, uint64_t addr, const blazesym_csym *sym)
 {
 	if (!sym)
 		printf("\t%zu [<%016lx>] <%s>\n", frame, addr, "null sym");
@@ -634,6 +680,90 @@ void print_stack_frame(size_t frame, uint64_t addr, const blazesym_csym *sym)
 		printf("\t%zu [<%016lx>] %s+0x%lx %s:%ld\n", frame, addr, sym->symbol, addr - sym->start_address, sym->path, sym->line_no);
 	else
 		printf("\t%zu [<%016lx>] %s+0x%lx\n", frame, addr, sym->symbol, addr - sym->start_address);
+}
+
+void print_stack_frames_by_blazesym()
+{
+	const blazesym_result *result = blazesym_symbolize(symbolizer, &src_cfg, 1, stack, env.perf_max_stack_depth);
+
+	for (size_t j = 0; j < result->size; ++j) {
+		const uint64_t addr = stack[j];
+
+		if (addr == 0)
+			break;
+
+		// no symbol found
+		if (!result || j >= result->size || result->entries[j].size == 0) {
+			print_stack_frame_by_blazesym(j, addr, NULL);
+
+			continue;
+		}
+
+		// single symbol found
+		if (result->entries[j].size == 1) {
+			const blazesym_csym *sym = &result->entries[j].syms[0];
+			print_stack_frame_by_blazesym(j, addr, sym);
+
+			continue;
+		}
+
+		// multi symbol found
+		printf("\t%zu [<%016lx>] (%lu entries)\n", j, addr, result->entries[j].size);
+
+		for (size_t k = 0; k < result->entries[j].size; ++k) {
+			const blazesym_csym *sym = &result->entries[j].syms[k];
+			if (sym->path && strlen(sym->path))
+				printf("\t\t%s@0x%lx %s:%ld\n", sym->symbol, sym->start_address, sym->path, sym->line_no);
+			else
+				printf("\t\t%s@0x%lx\n", sym->symbol, sym->start_address);
+		}
+	}
+
+	blazesym_result_free(result);
+}
+#else
+void print_stack_frames_by_ksyms()
+{
+	for (size_t i = 0; i < env.perf_max_stack_depth; ++i) {
+		const uint64_t addr = stack[i];
+
+		if (addr == 0)
+			break;
+
+		const struct ksym *ksym = ksyms__map_addr(ksyms, addr);
+		if (ksym)
+			printf("\t%zu [<%016lx>] %s+0x%lx\n", i, addr, ksym->name, addr - ksym->addr);
+		else
+			printf("\t%zu [<%016lx>] <%s>\n", i, addr, "null sym");
+	}
+}
+
+void print_stack_frames_by_syms_cache()
+{
+	const struct syms *syms = syms_cache__get_syms(syms_cache, env.pid);
+	if (!syms) {
+		fprintf(stderr, "Failed to get syms\n");
+		return;
+	}
+
+	for (size_t i = 0; i < env.perf_max_stack_depth; ++i) {
+		const uint64_t addr = stack[i];
+
+		if (addr == 0)
+			break;
+
+		char *dso_name;
+		uint64_t dso_offset;
+		const struct sym *sym = syms__map_addr_dso(syms, addr, &dso_name, &dso_offset);
+		if (sym) {
+			printf("\t%zu [<%016lx>] %s+0x%lx", i, addr, sym->name, sym->offset);
+			if (dso_name)
+				printf(" [%s]", dso_name);
+			printf("\n");
+		} else {
+			printf("\t%zu [<%016lx>] <%s>\n", i, addr, "null sym");
+		}
+	}
 }
 #endif
 
@@ -644,6 +774,14 @@ int print_stack_frames(struct allocation *allocs, size_t nr_allocs, int stack_tr
 
 		printf("%zu bytes in %zu allocations from stack\n", alloc->size, alloc->count);
 
+		if (env.show_allocs) {
+			struct allocation_node* it = alloc->allocations;
+			while (it != NULL) {
+				printf("\taddr = %#lx size = %zu\n", it->address, it->size);
+				it = it->next;
+			}
+		}
+
 		if (bpf_map_lookup_elem(stack_traces_fd, &alloc->stack_id, stack)) {
 			if (errno == ENOENT)
 				continue;
@@ -653,53 +791,7 @@ int print_stack_frames(struct allocation *allocs, size_t nr_allocs, int stack_tr
 			return -errno;
 		}
 
-#ifdef USE_BLAZESYM
-		const blazesym_result *result = blazesym_symbolize(symbolizer, &src_cfg, 1, stack, env.perf_max_stack_depth);
-
-		for (size_t j = 0; j < result->size; ++j) {
-			const uint64_t addr = stack[j];
-
-			if (addr == 0)
-				break;
-
-			// no symbol found
-			if (!result || j >= result->size || result->entries[j].size == 0) {
-				print_stack_frame(j, addr, NULL);
-
-				continue;
-			}
-
-			// single symbol found
-			if (result->entries[j].size == 1) {
-				const blazesym_csym *sym = &result->entries[j].syms[0];
-				print_stack_frame(j, addr, sym);
-
-				continue;
-			}
-
-			// multi symbol found
-			printf("\t%zu [<%016lx>] (%lu entries)\n", j, addr, result->entries[j].size);
-
-			for (size_t k = 0; k < result->entries[j].size; ++k) {
-				const blazesym_csym *sym = &result->entries[j].syms[k];
-				if (sym->path && strlen(sym->path))
-					printf("\t\t%s@0x%lx %s:%ld\n", sym->symbol, sym->start_address, sym->path, sym->line_no);
-				else
-					printf("\t\t%s@0x%lx\n", sym->symbol, sym->start_address);
-			}
-		}
-
-		blazesym_result_free(result);
-#else
-		for (size_t j = 0; j < env.perf_max_stack_depth; ++j) {
-			const uint64_t addr = stack[j];
-
-			if (addr == 0)
-				break;
-
-			printf("\t%zu [<%016lx>]\n", j, addr);
-		}
-#endif
+		(*print_stack_frames_func)();
 	}
 
 	return 0;
@@ -773,6 +865,18 @@ int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 				alloc->size += alloc_info.size;
 				alloc->count++;
 
+				if (env.show_allocs) {
+					struct allocation_node* node = malloc(sizeof(struct allocation_node));
+					if (!node) {
+						perror("malloc failed");
+						return -errno;
+					}
+					node->address = curr_key;
+					node->size = alloc_info.size;
+					node->next = alloc->allocations;
+					alloc->allocations = node;
+				}
+
 				stack_exists = true;
 				break;
 			}
@@ -783,11 +887,24 @@ int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 
 		// when the stack_id does not exist in the allocs array,
 		//   create a new entry in the array
-		const struct allocation alloc = {
+		struct allocation alloc = {
 			.stack_id = alloc_info.stack_id,
 			.size = alloc_info.size,
-			.count = 1
+			.count = 1,
+			.allocations = NULL
 		};
+
+		if (env.show_allocs) {
+			struct allocation_node* node = malloc(sizeof(struct allocation_node));
+			if (!node) {
+				perror("malloc failed");
+				return -errno;
+			}
+			node->address = curr_key;
+			node->size = alloc_info.size;
+			node->next = NULL;
+			alloc.allocations = node;
+		}
 
 		memcpy(&allocs[nr_allocs], &alloc, sizeof(alloc));
 		nr_allocs++;
@@ -797,12 +914,26 @@ int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 	qsort(allocs, nr_allocs, sizeof(allocs[0]), alloc_size_compare);
 
 	// get min of allocs we stored vs the top N requested stacks
-	nr_allocs = nr_allocs < env.top_stacks ? nr_allocs : env.top_stacks;
+	size_t nr_allocs_to_show = nr_allocs < env.top_stacks ? nr_allocs : env.top_stacks;
 
 	printf("[%d:%d:%d] Top %zu stacks with outstanding allocations:\n",
-			tm->tm_hour, tm->tm_min, tm->tm_sec, nr_allocs);
+			tm->tm_hour, tm->tm_min, tm->tm_sec, nr_allocs_to_show);
 
-	print_stack_frames(allocs, nr_allocs, stack_traces_fd);
+	print_stack_frames(allocs, nr_allocs_to_show, stack_traces_fd);
+
+	// Reset allocs list so that we dont accidentaly reuse data the next time we call this function
+	for (size_t i = 0; i < nr_allocs; i++) {
+		allocs[i].stack_id = 0;
+		if (env.show_allocs) {
+			struct allocation_node *it = allocs[i].allocations;
+			while (it != NULL) {
+				struct allocation_node *this = it;
+				it = it->next;
+				free(this);
+			}
+			allocs[i].allocations = NULL;
+		}
+	}
 
 	return 0;
 }
@@ -842,7 +973,8 @@ int print_outstanding_combined_allocs(int combined_allocs_fd, int stack_traces_f
 		const struct allocation alloc = {
 			.stack_id = curr_key,
 			.size = combined_alloc_info.total_size,
-			.count = combined_alloc_info.number_of_allocs
+			.count = combined_alloc_info.number_of_allocs,
+			.allocations = NULL
 		};
 
 		memcpy(&allocs[nr_allocs], &alloc, sizeof(alloc));

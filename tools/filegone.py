@@ -106,11 +106,14 @@ int trace_rename(struct pt_regs *ctx, struct renamedata *rd)
     struct dentry *new_dentry = rd->new_dentry;
 """
 
-bpf_vfs_unlink_text_old="""
+bpf_vfs_unlink_text_1="""
 int trace_unlink(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
 """
-bpf_vfs_unlink_text_new="""
+bpf_vfs_unlink_text_2="""
 int trace_unlink(struct pt_regs *ctx, struct user_namespace *ns, struct inode *dir, struct dentry *dentry)
+"""
+bpf_vfs_unlink_text_3="""
+int trace_unlink(struct pt_regs *ctx, struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry)
 """
 
 def action2str(action):
@@ -132,12 +135,15 @@ if debug or args.ebpf:
         exit()
 
 # check 'struct renamedata' exist or not
-if BPF.kernel_struct_has_field("renamedata", "old_mnt_userns") == 1:
+if BPF.kernel_struct_has_field(b'renamedata', b'new_mnt_idmap') == 1:
     bpf_text = bpf_text.replace('TRACE_VFS_RENAME_FUNC', bpf_vfs_rename_text_new)
-    bpf_text = bpf_text.replace('TRACE_VFS_UNLINK_FUNC', bpf_vfs_unlink_text_new)
+    bpf_text = bpf_text.replace('TRACE_VFS_UNLINK_FUNC', bpf_vfs_unlink_text_3)
+elif BPF.kernel_struct_has_field("renamedata", "old_mnt_userns") == 1:
+    bpf_text = bpf_text.replace('TRACE_VFS_RENAME_FUNC', bpf_vfs_rename_text_new)
+    bpf_text = bpf_text.replace('TRACE_VFS_UNLINK_FUNC', bpf_vfs_unlink_text_2)
 else:
     bpf_text = bpf_text.replace('TRACE_VFS_RENAME_FUNC', bpf_vfs_rename_text_old)
-    bpf_text = bpf_text.replace('TRACE_VFS_UNLINK_FUNC', bpf_vfs_unlink_text_old)
+    bpf_text = bpf_text.replace('TRACE_VFS_UNLINK_FUNC', bpf_vfs_unlink_text_1)
 
 # initialize BPF
 b = BPF(text=bpf_text)

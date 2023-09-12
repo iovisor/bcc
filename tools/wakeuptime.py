@@ -9,11 +9,13 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 14-Jan-2016	Brendan Gregg	Created this.
+# 03-Apr-2023	Rocky Xing   	Modified the order of stack output.
+# 04-Apr-2023   Rocky Xing      Updated default stack storage size.
 
 from __future__ import print_function
 from bcc import BPF
 from bcc.utils import printb
-from time import sleep, strftime
+from time import sleep
 import argparse
 import signal
 import errno
@@ -57,10 +59,10 @@ parser.add_argument("-v", "--verbose", action="store_true",
     help="show raw addresses")
 parser.add_argument("-f", "--folded", action="store_true",
     help="output folded format")
-parser.add_argument("--stack-storage-size", default=1024,
+parser.add_argument("--stack-storage-size", default=16384,
     type=positive_nonzero_int,
     help="the number of unique stack traces that can be stored and "
-         "displayed (default 1024)")
+         "displayed (default 16384)")
 parser.add_argument("duration", nargs="?", default=99999999,
     type=positive_nonzero_int,
     help="duration of trace, in seconds")
@@ -242,14 +244,14 @@ while (1):
             continue
 
         waker_kernel_stack = [] if k.w_k_stack_id < 1 else \
-            reversed(list(stack_traces.walk(k.w_k_stack_id))[1:])
+            list(stack_traces.walk(k.w_k_stack_id))[1:]
 
         if folded:
             # print folded stack output
             line = \
                 [k.waker] + \
                 [b.ksym(addr)
-                    for addr in reversed(list(waker_kernel_stack))] + \
+                    for addr in reversed(waker_kernel_stack)] + \
                 [k.target]
             printb(b"%s %d" % (b";".join(line), v.value))
         else:

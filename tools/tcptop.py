@@ -166,7 +166,7 @@ static int tcp_sendstat(int size)
     return 0;
 }
 
-int kretprobe__tcp_sendmsg(struct pt_regs *ctx)
+int tcp_send_ret(struct pt_regs *ctx)
 {
     int size = PT_REGS_RC(ctx);
     if (size > 0)
@@ -175,16 +175,7 @@ int kretprobe__tcp_sendmsg(struct pt_regs *ctx)
         return 0;
 }
 
-int kretprobe__tcp_sendpage(struct pt_regs *ctx)
-{
-    int size = PT_REGS_RC(ctx);
-    if (size > 0)
-        return tcp_sendstat(size);
-    else
-        return 0;
-}
-
-static int tcp_send_entry(struct sock *sk)
+int tcp_send_entry(struct pt_regs *ctx, struct sock *sk)
 {
     if (container_should_be_filtered()) {
         return 0;
@@ -198,17 +189,6 @@ static int tcp_send_entry(struct sock *sk)
     return 0;
 }
 
-int kprobe__tcp_sendmsg(struct pt_regs *ctx, struct sock *sk,
-    struct msghdr *msg, size_t size)
-{
-    return tcp_send_entry(sk);
-}
-
-int kprobe__tcp_sendpage(struct pt_regs *ctx, struct sock *sk,
-    struct page *page, int offset, size_t size)
-{
-    return tcp_send_entry(sk);
-}
 /*
  * tcp_recvmsg() would be obvious to trace, but is less suitable because:
  * - we'd need to trace both entry and return, to have both sock and size
@@ -299,6 +279,12 @@ def get_ipv6_session_key(k):
 
 # initialize BPF
 b = BPF(text=bpf_text)
+
+b.attach_kprobe(event='tcp_sendmsg', fn_name='tcp_send_entry')
+b.attach_kretprobe(event='tcp_sendmsg', fn_name='tcp_send_ret')
+if BPF.get_kprobe_functions(b'tcp_sendpage'):
+    b.attach_kprobe(event='tcp_sendpage', fn_name='tcp_send_entry')
+    b.attach_kretprobe(event='tcp_sendpage', fn_name='tcp_send_ret')
 
 ipv4_send_bytes = b["ipv4_send_bytes"]
 ipv4_recv_bytes = b["ipv4_recv_bytes"]

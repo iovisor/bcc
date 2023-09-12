@@ -30,8 +30,8 @@ struct {
 	__type(value, struct val_t);
 } counts SEC(".maps");
 
-SEC("kprobe")
-int BPF_KPROBE(blk_account_io_start, struct request *req)
+static __always_inline
+int trace_start(struct request *req)
 {
 	struct who_t who = {};
 
@@ -56,8 +56,8 @@ int BPF_KPROBE(blk_mq_start_request, struct request *req)
 	return 0;
 }
 
-SEC("kprobe")
-int BPF_KPROBE(blk_account_io_done, struct request *req, u64 now)
+static __always_inline
+int trace_done(struct request *req)
 {
 	struct val_t *valp, zero = {};
 	struct info_t info = {};
@@ -101,6 +101,42 @@ int BPF_KPROBE(blk_account_io_done, struct request *req, u64 now)
 	bpf_map_delete_elem(&whobyreq, &req);
 
 	return 0;
+}
+
+SEC("kprobe/blk_account_io_start")
+int BPF_KPROBE(blk_account_io_start, struct request *req)
+{
+	return trace_start(req);
+}
+
+SEC("kprobe/blk_account_io_done")
+int BPF_KPROBE(blk_account_io_done, struct request *req)
+{
+	return trace_done(req);
+}
+
+SEC("kprobe/__blk_account_io_start")
+int BPF_KPROBE(__blk_account_io_start, struct request *req)
+{
+	return trace_start(req);
+}
+
+SEC("kprobe/__blk_account_io_done")
+int BPF_KPROBE(__blk_account_io_done, struct request *req)
+{
+	return trace_done(req);
+}
+
+SEC("tp_btf/block_io_start")
+int BPF_PROG(block_io_start, struct request *req)
+{
+	return trace_start(req);
+}
+
+SEC("tp_btf/block_io_done")
+int BPF_PROG(block_io_done, struct request *req)
+{
+	return trace_done(req);
 }
 
 char LICENSE[] SEC("license") = "GPL";

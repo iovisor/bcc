@@ -6,6 +6,7 @@
 
 #include "maps.bpf.h"
 #include "memleak.h"
+#include "core_fixes.bpf.h"
 
 const volatile size_t min_size = 0;
 const volatile size_t max_size = -1;
@@ -302,59 +303,129 @@ int BPF_KRETPROBE(pvalloc_exit)
 }
 
 SEC("tracepoint/kmem/kmalloc")
-int memleak__kmalloc(struct trace_event_raw_kmem_alloc *ctx)
+int memleak__kmalloc(void *ctx)
 {
+	const void *ptr;
+	size_t bytes_alloc;
+
+	if (has_kmem_alloc()) {
+		struct trace_event_raw_kmem_alloc___x *args = ctx;
+		ptr = BPF_CORE_READ(args, ptr);
+		bytes_alloc = BPF_CORE_READ(args, bytes_alloc);
+	} else {
+		struct trace_event_raw_kmalloc___x *args = ctx;
+		ptr = BPF_CORE_READ(args, ptr);
+		bytes_alloc = BPF_CORE_READ(args, bytes_alloc);
+	}
+
 	if (wa_missing_free)
-		gen_free_enter(ctx->ptr);
+		gen_free_enter(ptr);
 
-	gen_alloc_enter(ctx->bytes_alloc);
+	gen_alloc_enter(bytes_alloc);
 
-	return gen_alloc_exit2(ctx, (u64)(ctx->ptr));
+	return gen_alloc_exit2(ctx, (u64)ptr);
 }
 
 SEC("tracepoint/kmem/kmalloc_node")
-int memleak__kmalloc_node(struct trace_event_raw_kmem_alloc_node *ctx)
+int memleak__kmalloc_node(void *ctx)
 {
-	if (wa_missing_free)
-		gen_free_enter(ctx->ptr);
+	const void *ptr;
+	size_t bytes_alloc;
 
-	gen_alloc_enter(ctx->bytes_alloc);
+	if (has_kmem_alloc_node()) {
+		struct trace_event_raw_kmem_alloc_node___x *args = ctx;
+		ptr = BPF_CORE_READ(args, ptr);
+		bytes_alloc = BPF_CORE_READ(args, bytes_alloc);
 
-	return gen_alloc_exit2(ctx, (u64)(ctx->ptr));
+		if (wa_missing_free)
+			gen_free_enter(ptr);
+
+		gen_alloc_enter( bytes_alloc);
+
+		return gen_alloc_exit2(ctx, (u64)ptr);
+	} else {
+		/* tracepoint is disabled if not exist, avoid compile warning */
+		return 0;
+	}
 }
 
 SEC("tracepoint/kmem/kfree")
-int memleak__kfree(struct trace_event_raw_kfree *ctx)
+int memleak__kfree(void *ctx)
 {
-	return gen_free_enter(ctx->ptr);
+	const void *ptr;
+
+	if (has_kfree()) {
+		struct trace_event_raw_kfree___x *args = ctx;
+		ptr = BPF_CORE_READ(args, ptr);
+	} else {
+		struct trace_event_raw_kmem_free___x *args = ctx;
+		ptr = BPF_CORE_READ(args, ptr);
+	}
+
+	return gen_free_enter(ptr);
 }
 
 SEC("tracepoint/kmem/kmem_cache_alloc")
-int memleak__kmem_cache_alloc(struct trace_event_raw_kmem_alloc *ctx)
+int memleak__kmem_cache_alloc(void *ctx)
 {
+	const void *ptr;
+	size_t bytes_alloc;
+
+	if (has_kmem_alloc()) {
+		struct trace_event_raw_kmem_alloc___x *args = ctx;
+		ptr = BPF_CORE_READ(args, ptr);
+		bytes_alloc = BPF_CORE_READ(args, bytes_alloc);
+	} else {
+		struct trace_event_raw_kmem_cache_alloc___x *args = ctx;
+		ptr = BPF_CORE_READ(args, ptr);
+		bytes_alloc = BPF_CORE_READ(args, bytes_alloc);
+	}
+
 	if (wa_missing_free)
-		gen_free_enter(ctx->ptr);
+		gen_free_enter(ptr);
 
-	gen_alloc_enter(ctx->bytes_alloc);
+	gen_alloc_enter(bytes_alloc);
 
-	return gen_alloc_exit2(ctx, (u64)(ctx->ptr));
+	return gen_alloc_exit2(ctx, (u64)ptr);
 }
 
 SEC("tracepoint/kmem/kmem_cache_alloc_node")
-int memleak__kmem_cache_alloc_node(struct trace_event_raw_kmem_alloc_node *ctx)
+int memleak__kmem_cache_alloc_node(void *ctx)
 {
-	if (wa_missing_free)
-		gen_free_enter(ctx->ptr);
+	const void *ptr;
+	size_t bytes_alloc;
 
-	gen_alloc_enter(ctx->bytes_alloc);
+	if (has_kmem_alloc_node()) {
+		struct trace_event_raw_kmem_alloc_node___x *args = ctx;
+		ptr = BPF_CORE_READ(args, ptr);
+		bytes_alloc = BPF_CORE_READ(args, bytes_alloc);
 
-	return gen_alloc_exit2(ctx, (u64)(ctx->ptr));
+		if (wa_missing_free)
+			gen_free_enter(ptr);
+
+		gen_alloc_enter(bytes_alloc);
+
+		return gen_alloc_exit2(ctx, (u64)ptr);
+	} else {
+		/* tracepoint is disabled if not exist, avoid compile warning */
+		return 0;
+	}
 }
 
 SEC("tracepoint/kmem/kmem_cache_free")
-int memleak__kmem_cache_free(struct trace_event_raw_kmem_cache_free *ctx)
+int memleak__kmem_cache_free(void *ctx)
 {
-	return gen_free_enter(ctx->ptr);
+	const void *ptr;
+
+	if (has_kmem_cache_free()) {
+		struct trace_event_raw_kmem_cache_free___x *args = ctx;
+		ptr = BPF_CORE_READ(args, ptr);
+	} else {
+		struct trace_event_raw_kmem_free___x *args = ctx;
+		ptr = BPF_CORE_READ(args, ptr);
+	}
+
+	return gen_free_enter(ptr);
 }
 
 SEC("tracepoint/kmem/mm_page_alloc")

@@ -21,7 +21,7 @@ import sys
 class Probe(object):
         next_probe_index = 0
         streq_index = 0
-        aliases = {"$PID": "(bpf_get_current_pid_tgid() >> 32)"}
+        aliases = {"$PID": "(bpf_get_current_pid_tgid() >> 32)", "$COMM": "&val.name"}
 
         def _substitute_aliases(self, expr):
                 if expr is None:
@@ -124,6 +124,17 @@ u64 __time = bpf_ktime_get_ns();
                                  self.hashname_prefix + pname)
                         text += "if (%s == 0) { return 0 ; }\n" % val_name
                         self.param_val_names[pname] = val_name
+                return text
+        
+        def _generate_comm_prefix(self):
+                text = """
+struct val_t {
+        u32 pid;
+        char name[sizeof(struct __string_t)];
+};
+struct val_t val = {.pid = (bpf_get_current_pid_tgid() >> 32) };
+bpf_get_current_comm(&val.name, sizeof(val.name));
+        """
                 return text
 
         def _replace_entry_exprs(self):
@@ -397,6 +408,10 @@ DATA_DECL
                         # signatures. Other probes force it to ().
                         signature = ", " + self.signature
 
+                # If COMM is specified prefix with code to get process name
+                if self.exprs.count(self.aliases['$COMM']):
+                        prefix += self._generate_comm_prefix()
+
                 program += probe_text.replace("PROBENAME",
                                               self.probe_func_name)
                 program = program.replace("SIGNATURE", signature)
@@ -567,6 +582,9 @@ argdist -p 1005 -H 'r:c:read()'
 
 argdist -C 'r::__vfs_read():u32:$PID:$latency > 100000'
         Print frequency of reads by process where the latency was >0.1ms
+
+argdist -C 'r::__vfs_read():u32:$COMM:$latency > 100000'
+        Print frequency of reads by process name where the latency was >0.1ms
 
 argdist -H 'r::__vfs_read(void *file, void *buf, size_t count):size_t:
             $entry(count):$latency > 1000000'

@@ -122,10 +122,17 @@ class MyMemoryManager : public SectionMemoryManager {
       if (!section)
         continue;
 
+#if LLVM_MAJOR_VERSION >= 10
       auto sec_name = section.get()->getName();
       if (!sec_name)
         continue;
+#else
+      llvm::StringRef sec_name_obj;
+      if (!section.get()->getName(sec_name_obj))
+        continue;
 
+      auto sec_name = &sec_name_obj;
+#endif
       info->section_ = sec_name->str();
       info->size_ = ss.second;
     }
