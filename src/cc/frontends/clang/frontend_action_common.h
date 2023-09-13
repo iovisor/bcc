@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#if LLVM_MAJOR_VERSION >= 8
+#include <llvm/Config/llvm-config.h>
+
+#if LLVM_VERSION_MAJOR >= 8
 #define GET_BEGINLOC(E)  ((E)->getBeginLoc())
 #define GET_ENDLOC(E)  ((E)->getEndLoc())
 #else

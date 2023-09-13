@@ -49,12 +49,12 @@ void BPFModule::cleanup_rw_engine() {
 
 static LoadInst *createLoad(IRBuilder<> &B, Value *addr, bool isVolatile = false)
 {
-#if LLVM_MAJOR_VERSION >= 15
+#if LLVM_VERSION_MAJOR >= 15
   if (isa<AllocaInst>(addr))
     return B.CreateLoad(dyn_cast<AllocaInst>(addr)->getAllocatedType(), addr, isVolatile);
   else
     return B.CreateLoad(addr->getType(), addr, isVolatile);
-#elif LLVM_MAJOR_VERSION >= 13
+#elif LLVM_VERSION_MAJOR >= 13
   return B.CreateLoad(addr->getType()->getPointerElementType(), addr, isVolatile);
 #else
   return B.CreateLoad(addr, isVolatile);
@@ -63,12 +63,12 @@ static LoadInst *createLoad(IRBuilder<> &B, Value *addr, bool isVolatile = false
 
 static Value *createInBoundsGEP(IRBuilder<> &B, Value *ptr, ArrayRef<Value *>idxlist)
 {
-#if LLVM_MAJOR_VERSION >= 15
+#if LLVM_VERSION_MAJOR >= 15
   if (isa<GlobalValue>(ptr))
     return B.CreateInBoundsGEP(dyn_cast<GlobalValue>(ptr)->getValueType(), ptr, idxlist);
   else
     return B.CreateInBoundsGEP(ptr->getType(), ptr, idxlist);
-#elif LLVM_MAJOR_VERSION >= 13
+#elif LLVM_VERSION_MAJOR >= 13
   return B.CreateInBoundsGEP(ptr->getType()->getScalarType()->getPointerElementType(),
                              ptr, idxlist);
 #else
@@ -385,7 +385,7 @@ unique_ptr<ExecutionEngine> BPFModule::finalize_rw(unique_ptr<Module> m) {
   string err;
   EngineBuilder builder(move(m));
   builder.setErrorStr(&err);
-#if LLVM_MAJOR_VERSION <= 11
+#if LLVM_VERSION_MAJOR <= 11
   builder.setUseOrcMCJITReplacement(false);
 #endif
   auto engine = unique_ptr<ExecutionEngine>(builder.create());
@@ -410,7 +410,7 @@ int BPFModule::annotate() {
     table_names_[table.name] = id++;
     GlobalValue *gvar = mod_->getNamedValue(table.name);
     if (!gvar) continue;
-#if LLVM_MAJOR_VERSION >= 14
+#if LLVM_VERSION_MAJOR >= 14
     {
       Type *t = gvar->getValueType();
       StructType *st = dyn_cast<StructType>(t);

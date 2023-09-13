@@ -21,6 +21,7 @@
 #include <clang/AST/RecordLayout.h>
 #include <clang/AST/RecursiveASTVisitor.h>
 #include <llvm/ADT/StringExtras.h>
+#include <llvm/Config/llvm-config.h>
 #include "common.h"
 #include "table_desc.h"
 
@@ -80,7 +81,7 @@ void BMapDeclVisitor::genJSONForField(FieldDecl *F) {
   result_ += "[";
   TraverseDecl(F);
   if (const ConstantArrayType *T = dyn_cast<ConstantArrayType>(F->getType()))
-#if LLVM_MAJOR_VERSION >= 13
+#if LLVM_VERSION_MAJOR >= 13
     result_ += ", [" + toString(T->getSize(), 10, false) + "]";
 #else
     result_ += ", [" + T->getSize().toString(10, false) + "]";

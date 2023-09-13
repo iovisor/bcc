@@ -19,7 +19,7 @@
 #include <tuple>
 #include <vector>
 
-#if LLVM_MAJOR_VERSION >= 15
+#if LLVM_VERSION_MAJOR >= 15
 #include <llvm/DebugInfo/DWARF/DWARFCompileUnit.h>
 #endif
 #include <llvm/DebugInfo/DWARF/DWARFContext.h>
@@ -32,10 +32,10 @@
 #include <llvm/MC/MCInstrInfo.h>
 #include <llvm/MC/MCObjectFileInfo.h>
 #include <llvm/MC/MCRegisterInfo.h>
-#if LLVM_MAJOR_VERSION >= 15
+#if LLVM_VERSION_MAJOR >= 15
 #include <llvm/MC/MCSubtargetInfo.h>
 #endif
-#if LLVM_MAJOR_VERSION >= 14
+#if LLVM_VERSION_MAJOR >= 14
 #include <llvm/MC/TargetRegistry.h>
 #else
 #include <llvm/Support/TargetRegistry.h>
@@ -127,7 +127,7 @@ void SourceDebugger::dump() {
     errs() << "Debug Error: cannot get register info\n";
     return;
   }
-#if LLVM_MAJOR_VERSION >= 10
+#if LLVM_VERSION_MAJOR >= 10
   MCTargetOptions MCOptions;
   std::unique_ptr<MCAsmInfo> MAI(T->createMCAsmInfo(*MRI, TripleStr, MCOptions));
 #else
@@ -141,7 +141,7 @@ void SourceDebugger::dump() {
   std::unique_ptr<MCSubtargetInfo> STI(
       T->createMCSubtargetInfo(TripleStr, "", ""));
   MCObjectFileInfo MOFI;
-#if LLVM_MAJOR_VERSION >= 13
+#if LLVM_VERSION_MAJOR >= 13
   MCContext Ctx(TheTriple, MAI.get(), MRI.get(), STI.get(), nullptr);
   Ctx.setObjectFileInfo(&MOFI);
   MOFI.initMCObjectFileInfo(Ctx, false, false);
@@ -176,7 +176,7 @@ void SourceDebugger::dump() {
 
   // bcc has only one compilation unit
   // getCompileUnitAtIndex() was gone in llvm 8.0 (https://reviews.llvm.org/D49741)
-#if LLVM_MAJOR_VERSION >= 8
+#if LLVM_VERSION_MAJOR >= 8
   DWARFCompileUnit *CU = cast<DWARFCompileUnit>(DwarfCtx->getUnitAtIndex(0));
 #else
   DWARFCompileUnit *CU = DwarfCtx->getCompileUnitAtIndex(0);
@@ -202,7 +202,7 @@ void SourceDebugger::dump() {
     uint64_t Size;
     uint8_t *FuncStart = info.start_;
     uint64_t FuncSize = info.size_;
-#if LLVM_MAJOR_VERSION >= 9
+#if LLVM_VERSION_MAJOR >= 9
     auto section = sections_.find(info.section_);
     if (section == sections_.end()) {
       errs() << "Debug Error: no section entry for section " << info.section_
@@ -219,7 +219,7 @@ void SourceDebugger::dump() {
     string src_dbg_str;
     llvm::raw_string_ostream os(src_dbg_str);
     for (uint64_t Index = 0; Index < FuncSize; Index += Size) {
-#if LLVM_MAJOR_VERSION >= 10
+#if LLVM_VERSION_MAJOR >= 10
       S = DisAsm->getInstruction(Inst, Size, Data.slice(Index), Index, nulls());
 #else
       S = DisAsm->getInstruction(Inst, Size, Data.slice(Index), Index, nulls(),
@@ -232,7 +232,7 @@ void SourceDebugger::dump() {
         DILineInfo LineInfo;
 
         LineTable->getFileLineInfoForAddress(
-#if LLVM_MAJOR_VERSION >= 9
+#if LLVM_VERSION_MAJOR >= 9
             {(uint64_t)FuncStart + Index, SectionID},
 #else
             (uint64_t)FuncStart + Index,
@@ -245,7 +245,7 @@ void SourceDebugger::dump() {
                     os);
         os << format("%4" PRIu64 ":", Index >> 3) << '\t';
         dumpBytes(Data.slice(Index, Size), os);
-#if LLVM_MAJOR_VERSION >= 10
+#if LLVM_VERSION_MAJOR >= 10
         IP->printInst(&Inst, 0, "", *STI, os);
 #else
         IP->printInst(&Inst, os, "", *STI);
