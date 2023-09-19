@@ -1,0 +1,216 @@
+Demonstrations of blkalgn, the Linux eBPF/bcc version.
+
+1. fio test with different block sizes.
+
+The blkalgn tool records all write commands issued to the nvme0n2 device and
+produces two histograms representing the block sizes of the transmitted data,
+and the alignment of the commands.
+
+- fio test commands:
+
+fio -bs=4k   -iodepth=1 -rw=write -ioengine=sync -size=4k \
+    -name=sync -direct=1 -filename=/dev/nvme0n2 -loop 40
+fio -bs=8k   -iodepth=1 -rw=write -ioengine=sync -size=8k \
+    -name=sync -direct=1 -filename=/dev/nvme0n2 -loop 60
+fio -bs=16k  -iodepth=1 -rw=write -ioengine=sync -size=16k \
+    -name=sync -direct=1 -filename=/dev/nvme0n2 -loop 80
+fio -bs=32k  -iodepth=1 -rw=write -ioengine=sync -size=32k \
+    -name=sync -direct=1 -filename=/dev/nvme0n2 -loop 100
+fio -bs=64k  -iodepth=1 -rw=write -ioengine=sync -size=64k \
+    -name=sync -direct=1 -filename=/dev/nvme0n2 -loop 100
+fio -bs=128k -iodepth=1 -rw=write -ioengine=sync -size=128k \
+    -name=sync -direct=1 -filename=/dev/nvme0n2 -loop 80
+fio -bs=256k -iodepth=1 -rw=write -ioengine=sync -size=256k \
+    -name=sync -direct=1 -filename=/dev/nvme0n2 -loop 60
+fio -bs=512k -iodepth=1 -rw=write -ioengine=sync -size=512k \
+    -name=sync -direct=1 -filename=/dev/nvme0n2 -loop 40
+
+- blkalgn capture command:
+
+tools/blkalgn.py --disk nvme0n2 --ops Write
+^C
+     Block size          : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 0        |                                        |
+      4096 -> 8191       : 40       |****************                        |
+      8192 -> 16383      : 60       |************************                |
+     16384 -> 32767      : 80       |********************************        |
+     32768 -> 65535      : 100      |****************************************|
+     65536 -> 131071     : 100      |****************************************|
+    131072 -> 262143     : 80       |********************************        |
+    262144 -> 524287     : 60       |************************                |
+    524288 -> 1048575    : 40       |****************                        |
+
+     Algn size           : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 0        |                                        |
+      4096 -> 8191       : 40       |****************                        |
+      8192 -> 16383      : 60       |************************                |
+     16384 -> 32767      : 80       |********************************        |
+     32768 -> 65535      : 100      |****************************************|
+     65536 -> 131071     : 100      |****************************************|
+    131072 -> 262143     : 80       |********************************        |
+    262144 -> 524287     : 60       |************************                |
+    524288 -> 1048575    : 40       |****************                        |
+
+2. fio test with different block sizes with an offset:
+
+The blkalgn tool records all write commands issued to the nvme0n2 device and
+produces two histograms representing the block sizes of the transmitted data,
+and the alignment of the commands.
+
+- fio test commands:
+
+fio -bs=4k   -iodepth=1 -rw=write -ioengine=sync -size=4k \
+    -name=sync -direct=1 -filename=/dev/nvme0n2 -loop 40  -offset=4096
+fio -bs=8k   -iodepth=1 -rw=write -ioengine=sync -size=8k \
+    -name=sync -direct=1 -filename=/dev/nvme0n2 -loop 60  -offset=4096
+fio -bs=16k  -iodepth=1 -rw=write -ioengine=sync -size=16k \
+    -name=sync -direct=1 -filename=/dev/nvme0n2 -loop 80  -offset=4096
+fio -bs=32k  -iodepth=1 -rw=write -ioengine=sync -size=32k \
+    -name=sync -direct=1 -filename=/dev/nvme0n2 -loop 100 -offset=4096
+fio -bs=64k  -iodepth=1 -rw=write -ioengine=sync -size=64k \
+    -name=sync -direct=1 -filename=/dev/nvme0n2 -loop 100 -offset=4096
+fio -bs=128k -iodepth=1 -rw=write -ioengine=sync -size=128k \
+    -name=sync -direct=1 -filename=/dev/nvme0n2 -loop 80  -offset=4096
+fio -bs=256k -iodepth=1 -rw=write -ioengine=sync -size=256k \
+    -name=sync -direct=1 -filename=/dev/nvme0n2 -loop 60  -offset=4096
+fio -bs=512k -iodepth=1 -rw=write -ioengine=sync -size=512k \
+    -name=sync -direct=1 -filename=/dev/nvme0n2 -loop 40  -offset=4096
+
+- blkalgn capture command:
+
+tools/blkalgn.py --disk nvme0n2 --ops Write
+^C
+     Block size          : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 0        |                                        |
+      4096 -> 8191       : 40       |****************                        |
+      8192 -> 16383      : 60       |************************                |
+     16384 -> 32767      : 80       |********************************        |
+     32768 -> 65535      : 100      |****************************************|
+     65536 -> 131071     : 100      |****************************************|
+    131072 -> 262143     : 80       |********************************        |
+    262144 -> 524287     : 60       |************************                |
+    524288 -> 1048575    : 40       |****************                        |
+
+     Algn size           : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 0        |                                        |
+      4096 -> 8191       : 560      |****************************************|
+
+3. PostgreSQL workload using sybench:
+
+The blkalgn tool records and traces all NVMe write commands issued to the
+nvme0n2 device and produces two histograms representing the block sizes of the
+transmitted data, and the alignment of the commands.
+
+- blkalgn capture command:
+
+tools/blkalgn.py --disk nvme0n2 --ops Write --trace
+Tracing NVMe commands... Hit Ctrl-C to end.
+DISK       OPS      LEN      LBA        PID        COMM             ALGN
+...
+nvme0n1    Write    16384    5592372    1402       postgres         16384
+nvme0n1    Write    4096     8131612    1406       postgres         4096
+nvme0n1    Write    4096     8476298    1407       postgres         4096
+nvme0n1    Write    4096     5562083    1404       postgres         4096
+nvme0n1    Write    4096     5562081    1404       postgres         4096
+nvme0n1    Write    8192     5740024    977        postgres         8192
+nvme0n1    Write    8192     8476258    1407       postgres         8192
+nvme0n1    Write    16384    2809028    1400       postgres         16384
+nvme0n1    Write    8192     9393492    1402       postgres         8192
+nvme0n1    Write    16384    1777248    1401       postgres         16384
+nvme0n1    Write    8192     11376510   1404       postgres         8192
+nvme0n1    Write    4096     11376508   1404       postgres         4096
+nvme0n1    Write    8192     1022036    1405       postgres         8192
+nvme0n1    Write    4096     5755970    977        postgres         4096
+nvme0n1    Write    16384    1777252    1401       postgres         16384
+nvme0n1    Write    4096     9393589    1402       postgres         4096
+nvme0n1    Write    4096     2809039    1400       postgres         4096
+nvme0n2    Write    8192     9637351    1403       postgres         4096
+nvme0n1    Write    4096     5822235    1406       postgres         4096
+...
+^C
+     Block size          : count     distribution
+         0 -> 1          : 560      |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 0        |                                        |
+      4096 -> 8191       : 325687   |****************************************|
+      8192 -> 16383      : 92798    |***********                             |
+     16384 -> 32767      : 14121    |*                                       |
+     32768 -> 65535      : 745      |                                        |
+     65536 -> 131071     : 496      |                                        |
+    131072 -> 262143     : 640      |                                        |
+    262144 -> 524287     : 6365     |                                        |
+    524288 -> 1048575    : 497      |                                        |
+
+     Algn size           : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 0        |                                        |
+        64 -> 127        : 0        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 0        |                                        |
+      4096 -> 8191       : 392148   |****************************************|
+      8192 -> 16383      : 36459    |***                                     |
+     16384 -> 32767      : 12781    |*                                       |
+     32768 -> 65535      : 491      |                                        |
+     65536 -> 131071     : 49       |                                        |
+    131072 -> 262143     : 33       |                                        |
+    262144 -> 524287     : 10       |                                        |
