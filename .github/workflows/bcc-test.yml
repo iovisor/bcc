@@ -21,7 +21,8 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        os: [{distro: "ubuntu", version: "18.04", nick: bionic}, {distro: "ubuntu", version: "20.04", nick: focal}]
+        os: [{distro: "ubuntu", version: "18.04", nick: bionic, installed_llvm_versions: "11 12"}, {distro: "ubuntu", version: "20.04", nick: focal, installed_llvm_versions: "11 12 15"}]
+        llvm_version: [11, 12, 15]
         env:
         - TYPE: Debug
           PYTHON_TEST_LOGFILE: critical.log
@@ -32,6 +33,9 @@ jobs:
         - TYPE: Release
           PYTHON_TEST_LOGFILE: critical.log
           RW_ENGINE_ENABLED: ON
+        exclude:
+          - os: {distro: "ubuntu", version: "18.04", nick: bionic, installed_llvm_versions: "11 12"}
+            llvm_version: 15
     steps:
     - uses: actions/checkout@v2
     - uses: dorny/paths-filter@v2
@@ -55,10 +59,11 @@ jobs:
         os_distro: ${{ matrix.os.distro }}
         os_version: ${{ matrix.os.version }}
         os_nick: ${{ matrix.os.nick }}
+        llvm_versions: ${{ matrix.os.installed_llvm_versions }}
     - name: Tag docker container
       run: |
         docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.os.distro }}-${{ matrix.os.version }} bcc-docker
-    - name: Run bcc build
+    - name: Run bcc build - llvm-${{ matrix.llvm_version }}
       env: ${{ matrix.env }}
       run: |
         /bin/bash -c \
@@ -72,7 +77,7 @@ jobs:
                    bcc-docker \
                    /bin/bash -c \
                    'mkdir -p /bcc/build && cd /bcc/build && \
-                    cmake -DCMAKE_BUILD_TYPE=${TYPE} -DENABLE_LLVM_NATIVECODEGEN=${RW_ENGINE_ENABLED} .. && make -j9'"
+                    LLVM_ROOT=/usr/lib/llvm-${{ matrix.llvm_version }} cmake -DCMAKE_BUILD_TYPE=${TYPE} -DENABLE_LLVM_NATIVECODEGEN=${RW_ENGINE_ENABLED} .. && make -j9'"
     - name: Run bcc's cc tests
       env: ${{ matrix.env }}
       # tests are wrapped with `script` as a hack to get a TTY as github actions doesn't provide this
