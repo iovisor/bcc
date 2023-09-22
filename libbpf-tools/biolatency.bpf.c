@@ -20,6 +20,7 @@ const volatile bool targ_queued = false;
 const volatile bool targ_ms = false;
 const volatile bool filter_dev = false;
 const volatile __u32 targ_dev = 0;
+const volatile bool targ_single = true;
 
 struct {
 	__uint(type, BPF_MAP_TYPE_CGROUP_ARRAY);
@@ -76,7 +77,7 @@ static int handle_block_rq_insert(__u64 *ctx)
 	 * from TP_PROTO(struct request_queue *q, struct request *rq)
 	 * to TP_PROTO(struct request *rq)
 	 */
-	if (LINUX_KERNEL_VERSION < KERNEL_VERSION(5, 11, 0))
+	if (!targ_single)
 		return trace_rq_start((void *)ctx[1], false);
 	else
 		return trace_rq_start((void *)ctx[0], false);
@@ -89,7 +90,7 @@ static int handle_block_rq_issue(__u64 *ctx)
 	 * from TP_PROTO(struct request_queue *q, struct request *rq)
 	 * to TP_PROTO(struct request *rq)
 	 */
-	if (LINUX_KERNEL_VERSION < KERNEL_VERSION(5, 11, 0))
+	if (!targ_single)
 		return trace_rq_start((void *)ctx[1], true);
 	else
 		return trace_rq_start((void *)ctx[0], true);
