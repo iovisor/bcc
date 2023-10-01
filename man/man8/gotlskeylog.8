@@ -1,0 +1,81 @@
+.TH gotlskeylog 8  "2023-10-01" "USER COMMANDS"
+.SH NAME
+gotlskeylog \- Print TLS secrets of golang app for TLS decryption. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B gotlskeylog.py [-h] [-p PID] [-u UID] [--max-label-size MAX_LABEL_SIZE]
+.B                [--max-client-random-size MAX_CLIENT_RANDOM_SIZE]
+.B                [--max-secret-size MAX_SECRET_SIZE] [-o OUTPUT]
+.B                path [path ...]
+.SH DESCRIPTION
+gotlskeylog logs TLS secrets from golang application in a SSLKEYLOGFILE format,
+which then can be used in a Wireshark to decrypt TLS messages. It supports only
+applications written in a Golang and compiled with recent versions of golang
+that uses new register based ABI.
+
+It works by tracing
+"crypto/tls.(*Config).writeKeyLog" function and interception all 3 arguments of
+this function. \fBNote\fP,
+this tool currently only works on amd64 architecture.
+
+For more information refer to this page:
+.UR https://wiki.wireshark.org/TLS
+.UE
+and
+.UR https://datatracker.ietf.org/doc/html/draft-thomson-tls-keylogfile-01
+.UE
+for SSLKEYLOGFILE spec.
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\fB-h\fP, \fB--help\fP
+Print help message and exit.
+.TP
+\fB-p\fP PID, \fB--pid\fP PID
+Trace this PID only
+.TP
+\fB-u\fP UID, \fB--uid\fP UID
+Trace this UID only
+.TP
+\fB--max-label-size\fP MAX_LABEL_SIZE
+Max label size, should be in [32, 128] range, default is 32 as defined by spec.
+.TP
+\fB--max-client-random-size\fP MAX_CLIENT_RANDOM_SIZE
+Max size of client_random, should be in [32, 256], default is 32 as defined by spec.
+.TP
+\fB--max-secret-size\fP MAX_SECRET_SIZE
+Max secret size, should be in [48, 256] range, default is 64.
+.TP
+-\fBo\fP OUTPUT, \fB--output\fP OUTPUT
+Output file to use instead of stdout
+.TP
+\fBpath\fP [path ...]
+Path to application binaries, could be passed more than one to trace multiple
+applications.
+.SH EXAMPLES
+.TP
+Log TLS secrets from Golang app in /tmp/test path and output to stdout:
+# 
+.B gotlskeylog.py /tmp/test
+.TP
+You also can trace multiple golang programs at the same time:
+# 
+.B gotlskeylog.py /opt/bin/foo /opt/bin/bar
+.TP
+Output can be saved into file:
+# 
+.B gotlskeylog.py -o /tmp/sslkeylog.txt /tmp/test
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH SEE ALSO
+wireshark(1) tcpdump(1) sslsniff(8)
