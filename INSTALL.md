@@ -399,6 +399,11 @@ sudo apt install -y zip bison build-essential cmake flex git libedit-dev \
 sudo apt install -y zip bison build-essential cmake flex git libedit-dev \
   libllvm14 llvm-14-dev libclang-14-dev python3 zlib1g-dev libelf-dev libfl-dev python3-setuptools \
   liblzma-dev libdebuginfod-dev arping netperf iperf
+  
+# For Lunar Lobster (23.04)
+sudo apt install -y zip bison build-essential cmake flex git libedit-dev \
+  libllvm15 llvm-15-dev libclang-15-dev python3 zlib1g-dev libelf-dev libfl-dev python3-setuptools \
+  liblzma-dev libdebuginfod-dev arping netperf iperf libpolly-15-dev
 
 # For other versions
 sudo apt-get -y install zip bison build-essential cmake flex git libedit-dev \
