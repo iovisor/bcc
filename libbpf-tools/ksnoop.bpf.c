@@ -89,7 +89,11 @@ static struct trace *get_trace(struct pt_regs *ctx, bool entry)
 		return NULL;
 
 	if (entry) {
-		ip = KSNOOP_IP_FIX(PT_REGS_IP_CORE(ctx));
+		if (bpf_core_enum_value_exists(enum bpf_func_id,
+					       BPF_FUNC_get_func_ip))
+			ip = bpf_get_func_ip(ctx);
+		else
+			ip = KSNOOP_IP_FIX(PT_REGS_IP_CORE(ctx));
 		if (stack_depth >= FUNC_MAX_STACK_DEPTH - 1)
 			return NULL;
 		/* verifier doesn't like using "stack_depth - 1" as array index
