@@ -94,7 +94,7 @@ hcall_table = {
     420: 'H_CREATE_RPT',
     424: 'H_REMOVE_RPT',
     428: 'H_REGISTER_RPAGES',
-    432: 'H_DISABLE_AND_GETC',
+    432: 'H_DISABLE_AND_GET',
     436: 'H_ERROR_DATA',
     440: 'H_GET_HCA_INFO',
     444: 'H_GET_PERF_COUNT',
