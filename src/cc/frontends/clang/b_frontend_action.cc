@@ -729,7 +729,7 @@ bool ProbeVisitor::IsContextMemberExpr(Expr *E) {
 
 SourceRange
 ProbeVisitor::expansionRange(SourceRange range) {
-#if LLVM_MAJOR_VERSION >= 7
+#if LLVM_VERSION_MAJOR >= 7
   return rewriter_.getSourceMgr().getExpansionRange(range).getAsRange();
 #else
   return rewriter_.getSourceMgr().getExpansionRange(range);
@@ -1387,7 +1387,7 @@ bool BTypeVisitor::VisitImplicitCastExpr(ImplicitCastExpr *E) {
 
 SourceRange
 BTypeVisitor::expansionRange(SourceRange range) {
-#if LLVM_MAJOR_VERSION >= 7
+#if LLVM_VERSION_MAJOR >= 7
   return rewriter_.getSourceMgr().getExpansionRange(range).getAsRange();
 #else
   return rewriter_.getSourceMgr().getExpansionRange(range);
@@ -1410,7 +1410,7 @@ int64_t BTypeVisitor::getFieldValue(VarDecl *Decl, FieldDecl *FDecl, int64_t Ori
   unsigned idx = FDecl->getFieldIndex();
 
   if (auto I = dyn_cast_or_null<InitListExpr>(Decl->getInit())) {
-#if LLVM_MAJOR_VERSION >= 8
+#if LLVM_VERSION_MAJOR >= 8
     Expr::EvalResult res;
     if (I->getInit(idx)->EvaluateAsInt(res, C)) {
       return res.Val.getInt().getExtValue();
@@ -1809,7 +1809,7 @@ void BFrontendAction::DoMiscWorkAround() {
     false);
 
   rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).InsertTextAfter(
-#if LLVM_MAJOR_VERSION >= 12
+#if LLVM_VERSION_MAJOR >= 12
     rewriter_->getSourceMgr().getBufferOrFake(rewriter_->getSourceMgr().getMainFileID()).getBufferSize(),
 #else
     rewriter_->getSourceMgr().getBuffer(rewriter_->getSourceMgr().getMainFileID())->getBufferSize(),
@@ -1823,7 +1823,7 @@ void BFrontendAction::EndSourceFileAction() {
 
   if (flags_ & DEBUG_PREPROCESSOR)
     rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).write(llvm::errs());
-#if LLVM_MAJOR_VERSION >= 9
+#if LLVM_VERSION_MAJOR >= 9
   llvm::raw_string_ostream tmp_os(mod_src_);
   rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID())
       .write(tmp_os);

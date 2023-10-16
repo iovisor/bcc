@@ -36,7 +36,7 @@ class SourceDebugger {
 // on a set of in-memory sections with slightly different interfaces.
 // FIXME: possibly to support 5.x
 //
-#if LLVM_MAJOR_VERSION >= 6
+#if LLVM_VERSION_MAJOR >= 6
   void dump();
 
  private:
