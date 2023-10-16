@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
 // Copyright (c) 2023 Meta Platforms, Inc. and affiliates.
 #include <vmlinux.h>
 #include <bpf/bpf_helpers.h>
@@ -456,4 +456,4 @@ int memleak__percpu_free_percpu(struct trace_event_raw_percpu_free_percpu *ctx)
 	return gen_free_enter(ctx->ptr);
 }
 
-char LICENSE[] SEC("license") = "GPL";
+char LICENSE[] SEC("license") = "Dual BSD/GPL";
