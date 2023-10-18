@@ -542,8 +542,8 @@ def print_outstanding_combined():
                                 sym = bpf.sym(addr, pid,
                                                       show_module=True,
                                                       show_offset=True)
-                                trace.append(sym)
-                        trace = "\n\t\t".join(trace.decode())
+                                trace.append(sym.decode('utf-8'))
+                        trace = "\n\t\t".join(trace)
                 except KeyError:
                         trace = "stack information lost"
 
