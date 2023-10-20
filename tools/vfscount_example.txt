@@ -51,5 +51,5 @@ You can edit the script to customize what kernel functions are matched.
 
 Full usage:
 
-# ./vfsstat -h
-USAGE: ./vfsstat [time]
+# ./vfscount.py -h
+USAGE: ./vfscount.py [time]
