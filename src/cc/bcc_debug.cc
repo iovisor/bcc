@@ -19,6 +19,8 @@
 #include <tuple>
 #include <vector>
 
+#include "bcc_debug.h"
+
 #if LLVM_VERSION_MAJOR >= 15
 #include <llvm/DebugInfo/DWARF/DWARFCompileUnit.h>
 #endif
@@ -40,8 +42,6 @@
 #else
 #include <llvm/Support/TargetRegistry.h>
 #endif
-
-#include "bcc_debug.h"
 
 namespace ebpf {
 
