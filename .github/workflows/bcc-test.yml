@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        os: [{distro: "ubuntu", version: "18.04", nick: bionic, installed_llvm_versions: "11 12"}, {distro: "ubuntu", version: "20.04", nick: focal, installed_llvm_versions: "11 12 15"}]
+        os: [{distro: "ubuntu", version: "18.04", nick: bionic}, {distro: "ubuntu", version: "20.04", nick: focal}]
         llvm_version: [11, 12, 15]
         env:
         - TYPE: Debug
@@ -34,7 +34,7 @@ jobs:
           PYTHON_TEST_LOGFILE: critical.log
           RW_ENGINE_ENABLED: ON
         exclude:
-          - os: {distro: "ubuntu", version: "18.04", nick: bionic, installed_llvm_versions: "11 12"}
+          - os: {distro: "ubuntu", version: "18.04", nick: bionic}
             llvm_version: 15
     steps:
     - uses: actions/checkout@v2
@@ -59,7 +59,7 @@ jobs:
         os_distro: ${{ matrix.os.distro }}
         os_version: ${{ matrix.os.version }}
         os_nick: ${{ matrix.os.nick }}
-        llvm_versions: ${{ matrix.os.installed_llvm_versions }}
+        llvm_versions: ${{ matrix.llvm_version }}
     - name: Tag docker container
       run: |
         docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.os.distro }}-${{ matrix.os.version }} bcc-docker
