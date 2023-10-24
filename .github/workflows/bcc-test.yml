@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        os: [{distro: "ubuntu", version: "18.04", nick: bionic}, {distro: "ubuntu", version: "20.04", nick: focal}]
+        os: [{distro: "ubuntu", version: "20.04", nick: focal}]
         llvm_version: [11, 12, 15]
         env:
         - TYPE: Debug
@@ -33,9 +33,6 @@ jobs:
         - TYPE: Release
           PYTHON_TEST_LOGFILE: critical.log
           RW_ENGINE_ENABLED: ON
-        exclude:
-          - os: {distro: "ubuntu", version: "18.04", nick: bionic}
-            llvm_version: 15
     steps:
     - uses: actions/checkout@v2
     - uses: dorny/paths-filter@v2
