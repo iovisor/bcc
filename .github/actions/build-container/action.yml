@@ -11,6 +11,10 @@ inputs:
   os_nick:
     description: "Nickname of the OS. Ex: focal"
     required: true
+  llvm_versions:
+    description: "Space separated list of llvm versions to install in the container. Only supported for Ubuntu containers."
+    type: string
+    default: "11"
   registry:
     description: "Registry where to push images"
     default: ghcr.io
@@ -42,6 +46,7 @@ runs:
         build-args: |
           VERSION=${{ inputs.os_version }}
           SHORTNAME=${{ inputs.os_nick }}
+          LLVM_VERSION=${{ inputs.llvm_versions }}
         file: docker/build/Dockerfile.${{ inputs.os_distro }}
         tags: ${{ inputs.registry }}/${{ github.repository }}:${{ inputs.os_distro }}-${{ inputs.os_version }}
 
