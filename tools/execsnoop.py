@@ -23,7 +23,6 @@ from __future__ import print_function
 from bcc import BPF
 from bcc.containers import filter_by_containers
 from bcc.utils import ArgString, printb
-import bcc.utils as utils
 import argparse
 import re
 import time
