@@ -9,6 +9,7 @@
  * Based on ext4dist(8) from BCC by Brendan Gregg.
  * 9-Feb-2021   Wenbo Zhang   Created this.
  * 20-May-2021   Hengqi Chen  Migrated to fsdist.
+ * 27-Oct-2023   Pcheng Cui   Add support for F2FS.
  */
 #include <argp.h>
 #include <libgen.h>
@@ -35,6 +36,7 @@ enum fs_type {
 	EXT4,
 	NFS,
 	XFS,
+	F2FS,
 };
 
 static struct fs_config {
@@ -68,6 +70,13 @@ static struct fs_config {
 		[F_OPEN] = "xfs_file_open",
 		[F_FSYNC] = "xfs_file_fsync",
 		[F_GETATTR] = NULL, /* not supported */
+	}},
+	[F2FS] = { "f2fs", {
+		[F_READ] = "f2fs_file_read_iter",
+		[F_WRITE] = "f2fs_file_write_iter",
+		[F_OPEN] = "f2fs_file_open",
+		[F_FSYNC] = "f2fs_sync_file",
+		[F_GETATTR] = "f2fs_getattr",
 	}},
 };
 
@@ -109,7 +118,7 @@ static const struct argp_option opts[] = {
 	{ "timestamp", 'T', NULL, 0, "Print timestamp" },
 	{ "milliseconds", 'm', NULL, 0, "Millisecond histogram" },
 	{ "pid", 'p', "PID", 0, "Process ID to trace" },
-	{ "type", 't', "Filesystem", 0, "Which filesystem to trace, [btrfs/ext4/nfs/xfs]" },
+	{ "type", 't', "Filesystem", 0, "Which filesystem to trace, [btrfs/ext4/nfs/xfs/f2fs]" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
@@ -138,6 +147,8 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			fs_type = NFS;
 		} else if (!strcmp(arg, "xfs")) {
 			fs_type = XFS;
+		} else if (!strcmp(arg, "f2fs")) {
+			fs_type = F2FS;
 		} else {
 			warn("invalid filesystem\n");
 			argp_usage(state);
@@ -192,6 +203,8 @@ static void alias_parse(char *prog)
 		fs_type = NFS;
 	} else if (!strcmp(name, "xfsdist")) {
 		fs_type = XFS;
+	} else if (!strcmp(name, "f2fsdist")){
+		fs_type = F2FS;
 	}
 }
 
