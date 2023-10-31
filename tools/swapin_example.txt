@@ -1,62 +1,65 @@
 Demonstrations of swapin, the Linux BCC/eBPF version.
 
 
-This tool counts swapins by process, to show which process is affected by
+This tool counts swapins and swapouts by process, to show which process is affected by
 swapping. For example:
 
-# swapin.py 
-Counting swap ins. Ctrl-C to end.
-13:36:58
-COMM             PID    COUNT
+# swapin.py
+Counting swap activities. Ctrl-C to end.
+00:10:49
+COMM             PID     |  SWAPIN_COUNT | SWAPOUT_COUNT 
 
-13:36:59
-COMM             PID    COUNT
-gnome-shell      2239   12410
+00:10:50
+COMM             PID     |  SWAPIN_COUNT | SWAPOUT_COUNT
+b'firefox'       4106    |           615 |             0 
+b'DOM Worker'    4323    |          1941 |             0 
+b'WebExtensions' 4323    |         11563 |             0 
 
-13:37:00
-COMM             PID    COUNT
-chrome           4536   14635
-
-13:37:01
-COMM             PID    COUNT
-gnome-shell      2239   14
-cron             1180   23
-
-13:37:02
-COMM             PID    COUNT
-gnome-shell      2239   2496
 [...]
 
-While tracing, this showed that PID 2239 (gnome-shell) and PID 4536 (chrome)
-suffered over ten thousand swapins.
+While tracing, this showed that PID 4106 (firefox) and PID 4323 (WebExtensions)
+suffered over ten thousand swap.
 
 #swapin.py -T
-Counting swap ins. Ctrl-C to end.
-COMM             PID    COUNT
-b'firefox'       60965  4
+Counting swap activities. Ctrl-C to end.
+COMM             PID     |  SWAPIN_COUNT | SWAPOUT_COUNT 
+b'watch'         604819  |             0 |           244 
+b'sh'            604819  |             0 |           223 
+b'free'          604814  |             0 |           213 
+b'gnome-shell'   2970    |             0 |           810 
+b'dd'            604522  |             0 |         11396 
+b'tail'          604524  |             0 |          9948 
+b'kswapd0'       134     |             0 |        171460 
+b'head'          604523  |             0 |          6450 
+b'free'          604811  |             0 |           214 
 
-COMM             PID    COUNT
-b'IndexedDB #1'  60965  1
-b'firefox'       60965  2
-
-COMM             PID    COUNT
-b'StreamTrans #9' 60965  1
-b'firefox'       60965  3
-
-COMM             PID    COUNT
-
-COMM             PID    COUNT
-b'sssd_kcm'      3605   384
-[--]
+[...]
 
 While tracing along with -T flag, it does not show timestamp.
 
+#swapin.py -s
+Counting swap activities. Ctrl-C to end.
+00:02:45
+COMM             PID     |  SWAPIN_COUNT   TIME(ms) | SWAPOUT_COUNT   TIME(ms) 
+b'firefox'       4106    |             0       0.00 |           164       0.34 
+b'pulseaudio'    2741    |             0       0.00 |           199       0.34 
+b'sh'            597079  |             0       0.00 |           210       0.45 
+b'terminator'    4964    |             0       0.00 |           238       0.50 
+b'watch'         597063  |             0       0.00 |           267       1.00 
+b'Xorg'          2835    |             0       0.00 |           745       1.81 
+b'gnome-shell'   2970    |             0       0.00 |          1036       5.29 
+b'head'          596774  |             0       0.00 |         14630      72.91 
+b'dd'            596773  |             0       0.00 |         18395      76.97 
+b'tail'          596775  |             0       0.00 |         18501      68.39 
+b'kswapd0'       134     |             0       0.00 |        115850     246.24 
 
+[...]
+while tracing with -s, it shows time spent in swapping in and swapping out.
 
 USAGE:
 
 # swapin.py -h
-usage: swapin.py [-h] [-T] [interval] [count]
+usage: swapin.py [-h] [-T] [-s] [interval] [count]
 
 Count swapin events by process.
 
@@ -67,3 +70,4 @@ positional arguments:
 optional arguments:
   -h, --help    show this help message and exit
   -T, --notime  do not show the timestamp (HH:MM:SS)
+  -s, --sum     print time spent swap in / swap out per PID
