@@ -10,6 +10,7 @@
 #
 # 08-Nov-2022 Curu. modified from filelife
 # 19-Nov-2022 Rong Tao Check btf struct field instead of KERNEL_VERSION macro.
+# 05-Nov-2023 Rong Tao Support rename/unlink failed situation.
 
 from __future__ import print_function
 from bcc import BPF
@@ -47,11 +48,14 @@ struct data_t {
 };
 
 BPF_PERF_OUTPUT(events);
+BPF_HASH(currdata, u32, struct data_t);
 
 // trace file deletion and output details
 TRACE_VFS_UNLINK_FUNC
 {
-    u32 pid = bpf_get_current_pid_tgid() >> 32;
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 pid = pid_tgid >> 32;
+    u32 tid = (u32)pid_tgid;
 
     FILTER
 
@@ -65,7 +69,7 @@ TRACE_VFS_UNLINK_FUNC
     data.action = 'D';
     bpf_probe_read(&data.fname, sizeof(data.fname), d_name.name);
 
-    events.perf_submit(ctx, &data, sizeof(data));
+    currdata.update(&tid, &data);
 
     return 0;
 }
@@ -73,7 +77,9 @@ TRACE_VFS_UNLINK_FUNC
 // trace file rename
 TRACE_VFS_RENAME_FUNC
 
-    u32 pid = bpf_get_current_pid_tgid() >> 32;
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 pid = pid_tgid >> 32;
+    u32 tid = (u32)pid_tgid;
 
     FILTER
 
@@ -88,8 +94,28 @@ TRACE_VFS_RENAME_FUNC
     data.action = 'R';
     bpf_probe_read(&data.fname, sizeof(data.fname), s_name.name);
     bpf_probe_read(&data.fname2, sizeof(data.fname), d_name.name);
-    events.perf_submit(ctx, &data, sizeof(data));
+    currdata.update(&tid, &data);
 
+    return 0;
+}
+
+int trace_return(struct pt_regs *ctx)
+{
+    struct data_t *data;
+    u32 tid = (u32)bpf_get_current_pid_tgid();
+    int ret = PT_REGS_RC(ctx);
+
+    data = currdata.lookup(&tid);
+    if (data == 0)
+        return 0;
+
+    currdata.delete(&tid);
+
+    /* Skip failed */
+    if (ret)
+        return 0;
+
+    events.perf_submit(ctx, data, sizeof(*data));
     return 0;
 }
 """
@@ -150,6 +176,9 @@ b = BPF(text=bpf_text)
 b.attach_kprobe(event="vfs_unlink", fn_name="trace_unlink")
 b.attach_kprobe(event="vfs_rmdir", fn_name="trace_unlink")
 b.attach_kprobe(event="vfs_rename", fn_name="trace_rename")
+b.attach_kretprobe(event="vfs_unlink", fn_name="trace_return")
+b.attach_kretprobe(event="vfs_rmdir", fn_name="trace_return")
+b.attach_kretprobe(event="vfs_rename", fn_name="trace_return")
 
 # header
 print("%-8s %-7s %-16s %6s %s" % ("TIME", "PID", "COMM", "ACTION", "FILE"))
