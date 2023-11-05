@@ -17,6 +17,7 @@
 # 08-Feb-2015   Brendan Gregg   Created this.
 # 17-Feb-2016   Allan McAleavy updated for BPF_PERF_OUTPUT
 # 13-Nov-2022   Rong Tao        Check btf struct field for CO-RE and add vfs_open()
+# 05-Nov-2023   Rong Tao        Support unlink failed
 
 from __future__ import print_function
 from bcc import BPF
@@ -50,9 +51,12 @@ struct data_t {
     u64 delta;
     char comm[TASK_COMM_LEN];
     char fname[DNAME_INLINE_LEN];
+    /* private */
+    void *dentry;
 };
 
 BPF_HASH(birth, struct dentry *);
+BPF_HASH(unlink_data, u32, struct data_t);
 BPF_PERF_OUTPUT(events);
 
 static int probe_dentry(struct pt_regs *ctx, struct dentry *dentry)
@@ -95,7 +99,9 @@ int trace_open(struct pt_regs *ctx, struct path *path, struct file *file)
 TRACE_UNLINK_FUNC
 {
     struct data_t data = {};
-    u32 pid = bpf_get_current_pid_tgid() >> 32;
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 pid = pid_tgid >> 32;
+    u32 tid = (u32)pid_tgid;
 
     FILTER
 
@@ -106,7 +112,6 @@ TRACE_UNLINK_FUNC
     }
 
     delta = (bpf_ktime_get_ns() - *tsp) / 1000000;
-    birth.delete(&dentry);
 
     struct qstr d_name = dentry->d_name;
     if (d_name.len == 0)
@@ -118,7 +123,32 @@ TRACE_UNLINK_FUNC
         bpf_probe_read_kernel(&data.fname, sizeof(data.fname), d_name.name);
     }
 
-    events.perf_submit(ctx, &data, sizeof(data));
+    /* record dentry, only delete from birth if unlink successful */
+    data.dentry = dentry;
+
+    unlink_data.update(&tid, &data);
+    return 0;
+}
+
+int trace_unlink_ret(struct pt_regs *ctx)
+{
+    int ret = PT_REGS_RC(ctx);
+    struct data_t *data;
+    u32 tid = (u32)bpf_get_current_pid_tgid();
+
+    data = unlink_data.lookup(&tid);
+    if (!data)
+        return 0;
+
+    /* delete it any way */
+    unlink_data.delete(&tid);
+
+    /* Skip failed unlink */
+    if (ret)
+        return 0;
+
+    birth.delete((struct dentry **)&data->dentry);
+    events.perf_submit(ctx, data, sizeof(*data));
 
     return 0;
 }
@@ -178,6 +208,7 @@ b.attach_kprobe(event="vfs_open", fn_name="trace_open")
 if BPF.get_kprobe_functions(b"security_inode_create"):
     b.attach_kprobe(event="security_inode_create", fn_name="trace_security_inode_create")
 b.attach_kprobe(event="vfs_unlink", fn_name="trace_unlink")
+b.attach_kretprobe(event="vfs_unlink", fn_name="trace_unlink_ret")
 
 # header
 print("%-8s %-7s %-16s %-7s %s" % ("TIME", "PID", "COMM", "AGE(s)", "FILE"))
