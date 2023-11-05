@@ -265,6 +265,9 @@ int ClangLoader::parse(
                                    "-Wno-pragma-once-outside-header",
                                    "-Wno-address-of-packed-member",
                                    "-Wno-unknown-warning-option",
+#if defined(__x86_64__) || defined(__i386__)
+                                   "-fcf-protection",
+#endif
                                    "-fno-color-diagnostics",
                                    "-fno-unwind-tables",
                                    "-fno-asynchronous-unwind-tables",
