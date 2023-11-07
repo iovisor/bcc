@@ -39,6 +39,12 @@ def run_command_get_pid(command):
         p = subprocess.Popen(command.split())
         return p.pid
 
+sort_keys = ["size", "count"]
+alloc_sort_map = {sort_keys[0]: lambda a: a.size,
+                  sort_keys[1]: lambda a: a.count};
+combined_sort_map = {sort_keys[0]: lambda a: -a[1].total_size,
+                     sort_keys[1]: lambda a: -a[1].number_of_allocs};
+
 examples = """
 EXAMPLES:
 
@@ -60,6 +66,9 @@ EXAMPLES:
         allocations that are at least one minute (60 seconds) old
 ./memleak -s 5
         Trace roughly every 5th allocation, to reduce overhead
+./memleak --sort count
+        Trace allocations in kernel mode and display a summary of outstanding
+        allocations that are sorted in count order
 """
 
 description = """
@@ -104,6 +113,8 @@ parser.add_argument("--ebpf", action="store_true",
         help=argparse.SUPPRESS)
 parser.add_argument("--percpu", default=False, action="store_true",
         help="trace percpu allocations")
+parser.add_argument("--sort", type=str, default="size",
+        help="report sorted in given key; available key list: size, count")
 
 args = parser.parse_args()
 
@@ -119,6 +130,12 @@ top_stacks = args.top
 min_size = args.min_size
 max_size = args.max_size
 obj = args.obj
+sort_key = args.sort
+
+if sort_key not in sort_keys:
+        print("Given sort_key:", sort_key)
+        print("Supporting sort key list:", sort_keys)
+        exit(1)
 
 if min_size is not None and max_size is not None and min_size > max_size:
         print("min_size (-z) can't be greater than max_size (-Z)")
@@ -522,8 +539,7 @@ def print_outstanding():
                 if args.show_allocs:
                         print("\taddr = %x size = %s" %
                               (address.value, info.size))
-        to_show = sorted(alloc_info.values(),
-                         key=lambda a: a.size)[-top_stacks:]
+        to_show = sorted(alloc_info.values(), key=alloc_sort_map[sort_key])[-top_stacks:]
         for alloc in to_show:
                 print("\t%d bytes in %d allocations from stack\n\t\t%s" %
                       (alloc.size, alloc.count,
@@ -532,7 +548,7 @@ def print_outstanding():
 def print_outstanding_combined():
         stack_traces = bpf["stack_traces"]
         stacks = sorted(bpf["combined_allocs"].items(),
-                        key=lambda a: -a[1].total_size)
+                        key=combined_sort_map[sort_key])
         cnt = 1
         entries = []
         for stack_id, info in stacks:
