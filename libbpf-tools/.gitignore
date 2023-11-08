@@ -19,6 +19,8 @@
 /exitsnoop
 /ext4dist
 /ext4slower
+/f2fsdist
+/f2fsslower
 /filelife
 /filetop
 /fsdist
