@@ -181,7 +181,6 @@ static int trace_return(struct pt_regs *ctx, int type)
     // calculate delta
     u64 ts = bpf_ktime_get_ns();
     u64 delta_us = (ts - valp->ts) / 1000;
-    entryinfo.delete(&id);
     if (FILTER_US)
         return 0;
     // populate output struct
@@ -203,20 +202,25 @@ static int trace_return(struct pt_regs *ctx, int type)
     bpf_probe_read_kernel(&data.file, sizeof(data.file), (void *)qs.name);
     // output
     PERF_OUTPUT_CTX
+    entryinfo.delete(&id);
     return 0;
 }
+
 int trace_read_return(struct pt_regs *ctx)
 {
     return trace_return(ctx, TRACE_READ);
 }
+
 int trace_write_return(struct pt_regs *ctx)
 {
     return trace_return(ctx, TRACE_WRITE);
 }
+
 int trace_open_return(struct pt_regs *ctx)
 {
     return trace_return(ctx, TRACE_OPEN);
 }
+
 int trace_fsync_return(struct pt_regs *ctx)
 {
     return trace_return(ctx, TRACE_FSYNC);
@@ -294,17 +298,15 @@ b = BPF(text=bpf_text)
 # Common file functions. See earlier comment about generic_file_read_iter().
 if BPF.get_kprobe_functions(b'f2fs_file_read_iter'):
     b.attach_kprobe(event="f2fs_file_read_iter", fn_name="trace_read_entry")
-else:
-    b.attach_kprobe(event="generic_file_read_iter", fn_name="trace_read_entry")
-b.attach_kprobe(event="f2fs_file_write_iter", fn_name="trace_write_entry")
-b.attach_kprobe(event="f2fs_file_open", fn_name="trace_open_entry")
-b.attach_kprobe(event="f2fs_sync_file", fn_name="trace_fsync_entry")
-if BPF.get_kprobe_functions(b'f2fs_file_read_iter'):
     b.attach_kretprobe(event="f2fs_file_read_iter",
                        fn_name="trace_read_return")
 else:
+    b.attach_kprobe(event="generic_file_read_iter", fn_name="trace_read_entry")
     b.attach_kretprobe(event="generic_file_read_iter",
                        fn_name="trace_read_return")
+b.attach_kprobe(event="f2fs_file_write_iter", fn_name="trace_write_entry")
+b.attach_kprobe(event="f2fs_file_open", fn_name="trace_open_entry")
+b.attach_kprobe(event="f2fs_sync_file", fn_name="trace_fsync_entry")
 b.attach_kretprobe(event="f2fs_file_write_iter", fn_name="trace_write_return")
 b.attach_kretprobe(event="f2fs_file_open", fn_name="trace_open_return")
 b.attach_kretprobe(event="f2fs_sync_file", fn_name="trace_fsync_return")
