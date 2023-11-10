@@ -125,8 +125,17 @@ static void finish_sscanf(IRBuilder<> &B, vector<Value *> *args, string *fmt,
 
   B.SetInsertPoint(label_false);
   // s = &s[nread];
+#if LLVM_VERSION_MAJOR >= 15
+  // cast `sptr` from `ptr`(an opaque pointer rather than `i8*`) to `i8`, so that
+  // CreateInBoundsGEP can work properly, i.e. the offset is in bytes not in pointer-size
+  B.CreateStore(
+      B.CreateInBoundsGEP(B.getInt8Ty(), createLoad(B, sptr), {createLoad(B, nread, true)}),
+      sptr
+  );
+#else
   B.CreateStore(
       createInBoundsGEP(B, createLoad(B, sptr), {createLoad(B, nread, true)}), sptr);
+#endif
 
   args->resize(2);
   fmt->clear();
