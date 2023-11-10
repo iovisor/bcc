@@ -584,7 +584,7 @@ int test(struct pt_regs *ctx, struct sock *skp) {
 struct sock {
     u32 *sk_daddr;
 };
-int test(struct pt_regs *ctx, struct sock *skp) {
+u32 *test(struct pt_regs *ctx, struct sock *skp) {
     return *(&skp->sk_daddr);
 }
 """
