@@ -5,7 +5,7 @@
 #
 # USAGE: memleak [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND]
 #                [--combined-only] [--wa-missing-free] [-s SAMPLE_RATE]
-#                [-T TOP] [-z MIN_SIZE] [-Z MAX_SIZE] [-O OBJ]
+#                [-T TOP] [-z MIN_SIZE] [-Z MAX_SIZE] [-O OBJ] [--percpu] [-K]
 #                [interval] [count]
 #
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -52,10 +52,10 @@ EXAMPLES:
         every 10 seconds for outstanding allocations
 ./memleak -c "./allocs"
         Run the specified command and trace its allocations
-./memleak
+./memleak -K
         Trace allocations in kernel mode and display a summary of outstanding
         allocations every 5 seconds
-./memleak -o 60000
+./memleak -K -o 60000
         Trace allocations in kernel mode and display a summary of outstanding
         allocations that are at least one minute (60 seconds) old
 ./memleak -s 5
@@ -73,7 +73,7 @@ parser = argparse.ArgumentParser(description=description,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=examples)
 parser.add_argument("-p", "--pid", type=int, default=-1,
-        help="the PID to trace; if not specified, trace kernel allocs")
+        help="the PID to trace")
 parser.add_argument("-t", "--trace", action="store_true",
         help="print trace messages for each alloc/free call")
 parser.add_argument("interval", nargs="?", default=5, type=int,
@@ -104,12 +104,14 @@ parser.add_argument("--ebpf", action="store_true",
         help=argparse.SUPPRESS)
 parser.add_argument("--percpu", default=False, action="store_true",
         help="trace percpu allocations")
+parser.add_argument("-K", "--kernel-trace", action="store_true",
+        help="trace kernel allocs", default=False)
 
 args = parser.parse_args()
 
 pid = args.pid
 command = args.command
-kernel_trace = (pid == -1 and command is None)
+kernel_trace = args.kernel_trace
 trace_all = args.trace
 interval = args.interval
 min_age_ns = 1e6 * args.older
@@ -135,11 +137,13 @@ struct alloc_info_t {
         u64 size;
         u64 timestamp_ns;
         int stack_id;
+        int pid;
 };
 
 struct combined_alloc_info_t {
         u64 total_size;
         u64 number_of_allocs;
+        int pid;
 };
 
 BPF_HASH(sizes, u64);
@@ -151,6 +155,7 @@ BPF_HASH(combined_allocs, u64, struct combined_alloc_info_t, 10240);
 static inline void update_statistics_add(u64 stack_id, u64 sz) {
         struct combined_alloc_info_t *existing_cinfo;
         struct combined_alloc_info_t cinfo = {0};
+        u64 pid = bpf_get_current_pid_tgid();
 
         existing_cinfo = combined_allocs.lookup(&stack_id);
         if (existing_cinfo != 0)
@@ -158,6 +163,7 @@ static inline void update_statistics_add(u64 stack_id, u64 sz) {
 
         cinfo.total_size += sz;
         cinfo.number_of_allocs += 1;
+        cinfo.pid = pid;
 
         combined_allocs.update(&stack_id, &cinfo);
 }
@@ -212,6 +218,7 @@ static inline int gen_alloc_exit2(struct pt_regs *ctx, u64 address) {
         if (address != 0) {
                 info.timestamp_ns = bpf_ktime_get_ns();
                 info.stack_id = stack_traces.get_stackid(ctx, STACK_FLAGS);
+                info.pid = pid;
                 allocs.update(&address, &info);
                 update_statistics_add(info.stack_id, info.size);
         }
@@ -515,7 +522,7 @@ def print_outstanding():
                         stack = list(stack_traces.walk(info.stack_id))
                         combined = []
                         for addr in stack:
-                                combined.append(('0x'+format(addr, '016x')+'\t').encode('utf-8') + bpf.sym(addr, pid,
+                                combined.append(('0x'+format(addr, '016x')+'\t').encode('utf-8') + bpf.sym(addr, info.pid,
                                         show_module=True, show_offset=True))
                         alloc_info[info.stack_id] = Allocation(combined,
                                                                info.size)
@@ -539,7 +546,7 @@ def print_outstanding_combined():
                 try:
                         trace = []
                         for addr in stack_traces.walk(stack_id.value):
-                                sym = bpf.sym(addr, pid,
+                                sym = bpf.sym(addr, info.pid,
                                                       show_module=True,
                                                       show_offset=True)
                                 trace.append(sym.decode('utf-8'))

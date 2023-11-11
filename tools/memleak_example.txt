@@ -60,10 +60,10 @@ Attaching to pid 5193, Ctrl+C to quit.
 
 
 When using the -p switch, memleak traces the libc allocations of a particular
-process. Without this switch, kernel allocations are traced instead.
+process. To trace kernel allocations the -K switch can be used instead.
 For example:
 
-# ./memleak
+# ./memleak -K
 Attaching to kernel allocators, Ctrl+C to quit.
 ...
         248 bytes in 4 allocations from stack
@@ -151,7 +151,7 @@ memleak keeps misjudging memory leak on the complicated environment which has
 the action of free in hard/soft irq.
 Add workaround to alleviate misjudgments when free is missing:
 
-# ./memleak --wa-missing-free
+# ./memleak -K --wa-missing-free
 Attaching to kernel allocators, Ctrl+C to quit.
 ...
         248 bytes in 4 allocations from stack
@@ -172,7 +172,7 @@ USAGE message:
 # ./memleak -h
 usage: memleak.py [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND]
                   [--combined-only] [--wa-missing-free] [-s SAMPLE_RATE]
-                  [-T TOP] [-z MIN_SIZE] [-Z MAX_SIZE] [-O OBJ]
+                  [-T TOP] [-z MIN_SIZE] [-Z MAX_SIZE] [-O OBJ] [--percpu] [-K]
                   [interval] [count]
 
 Trace outstanding memory allocations that weren't freed.
@@ -184,21 +184,17 @@ positional arguments:
   interval              interval in seconds to print outstanding allocations
   count                 number of times to print the report before exiting
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
-  -p PID, --pid PID     the PID to trace; if not specified, trace kernel
-                        allocs
+  -p PID, --pid PID     the PID to trace
   -t, --trace           print trace messages for each alloc/free call
-  -a, --show-allocs     show allocation addresses and sizes as well as call
-                        stacks
+  -a, --show-allocs     show allocation addresses and sizes as well as call stacks
   -o OLDER, --older OLDER
-                        prune allocations younger than this age in
-                        milliseconds
+                        prune allocations younger than this age in milliseconds
   -c COMMAND, --command COMMAND
                         execute and trace the specified command
   --combined-only       show combined allocation statistics only
-  --wa-missing-free     Workaround to alleviate misjudgments when free is
-                        missing
+  --wa-missing-free     Workaround to alleviate misjudgments when free is missing
   -s SAMPLE_RATE, --sample-rate SAMPLE_RATE
                         sample every N-th allocation to decrease the overhead
   -T TOP, --top TOP     display only this many top allocating stacks (by size)
@@ -207,6 +203,8 @@ optional arguments:
   -Z MAX_SIZE, --max-size MAX_SIZE
                         capture only allocations smaller than this size
   -O OBJ, --obj OBJ     attach to allocator functions in the specified object
+  --percpu              trace percpu allocations
+  -K, --kernel-trace    trace kernel allocs
 
 EXAMPLES:
 
@@ -220,10 +218,10 @@ EXAMPLES:
         every 10 seconds for outstanding allocations
 ./memleak -c "./allocs"
         Run the specified command and trace its allocations
-./memleak
+./memleak -K
         Trace allocations in kernel mode and display a summary of outstanding
         allocations every 5 seconds
-./memleak -o 60000
+./memleak -K -o 60000
         Trace allocations in kernel mode and display a summary of outstanding
         allocations that are at least one minute (60 seconds) old
 ./memleak -s 5
