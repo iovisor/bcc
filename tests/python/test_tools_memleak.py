@@ -10,6 +10,8 @@ import tempfile
 
 TOOLS_DIR = "/bcc/tools/"
 
+if not os.path.exists("/bcc/tools/"):
+    TOOLS_DIR = "../../tools/"
 
 class cfg:
     cmd_format = ""

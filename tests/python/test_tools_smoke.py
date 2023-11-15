@@ -10,6 +10,9 @@ from utils import mayFail, kernel_version_ge
 
 TOOLS_DIR = "/bcc/tools/"
 
+if not os.path.exists("/bcc/tools/"):
+    TOOLS_DIR = "../../tools/"
+
 def _helpful_rc_msg(rc, allow_early, kill):
     s = "rc was %d\n" % rc
     if rc == 0:
