@@ -182,7 +182,7 @@ static int trace_return(struct pt_regs *ctx, int type)
     u64 ts = bpf_ktime_get_ns();
     u64 delta_us = (ts - valp->ts) / 1000;
     if (FILTER_US)
-        return 0;
+        goto cleanup;
     // populate output struct
     struct data_t data = {};
     data.type = type;
@@ -197,12 +197,13 @@ static int trace_return(struct pt_regs *ctx, int type)
     struct qstr qs = {};
     de = valp->fp->f_path.dentry;
     qs = de->d_name;
-    entryinfo.delete(&id);
     if (qs.len == 0)
-        return 0;
+        goto cleanup;
     bpf_probe_read_kernel(&data.file, sizeof(data.file), (void *)qs.name);
     // output
     PERF_OUTPUT_CTX
+cleanup:
+    entryinfo.delete(&id);
     return 0;
 }
 
