@@ -6,6 +6,7 @@
  *
  * Based on biotop(8) from BCC by Brendan Gregg.
  * 03-Mar-2022   Francis Laniel   Created this.
+ * 23-Nov-2023   Pcheng Cui       Add PID filter support.
  */
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -83,6 +84,7 @@ static int output_rows = 20;
 static int sort_by = ALL;
 static int interval = 1;
 static int count = 99999999;
+static pid_t target_pid = 0;
 static bool verbose = false;
 
 const char *argp_program_version = "biotop 0.1";
@@ -91,16 +93,18 @@ const char *argp_program_bug_address =
 const char argp_program_doc[] =
 "Trace file reads/writes by process.\n"
 "\n"
-"USAGE: biotop [-h] [interval] [count]\n"
+"USAGE: biotop [-h] [interval] [count] [-p PID]\n"
 "\n"
 "EXAMPLES:\n"
 "    biotop            # file I/O top, refresh every 1s\n"
-"    biotop 5 10       # 5s summaries, 10 times\n";
+"    biotop 5 10       # 5s summaries, 10 times\n"
+"    biotop -p 181     # only trace PID 1216\n";
 
 static const struct argp_option opts[] = {
 	{ "noclear", 'C', NULL, 0, "Don't clear the screen" },
 	{ "sort", 's', "SORT", 0, "Sort columns, default all [all, io, bytes, time]" },
 	{ "rows", 'r', "ROWS", 0, "Maximum rows to print, default 20" },
+	{ "pid", 'p', "PID", 0, "Process ID to trace" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
@@ -108,7 +112,7 @@ static const struct argp_option opts[] = {
 
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
-	long rows;
+	long rows, pid;
 	static int pos_args;
 
 	switch (key) {
@@ -139,6 +143,15 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		output_rows = rows;
 		if (output_rows > OUTPUT_ROWS_LIMIT)
 			output_rows = OUTPUT_ROWS_LIMIT;
+		break;
+	case 'p':
+		errno = 0;
+		pid = strtol(arg, NULL, 10);
+		if (errno || pid <= 0) {
+			warn("Invalid PID: %s\n", arg);
+			argp_usage(state);
+		}
+		target_pid = pid;
 		break;
 	case 'v':
 		verbose = true;
@@ -408,6 +421,8 @@ int main(int argc, char **argv)
 		warn("failed to open BPF object\n");
 		return 1;
 	}
+
+	obj->rodata->target_pid = target_pid;
 
 	parse_disk_stat();
 
