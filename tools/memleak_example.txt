@@ -166,6 +166,20 @@ Attaching to kernel allocators, Ctrl+C to quit.
                  sys_mmap_pgoff [kernel]
                  sys_mmap [kernel]
 
+# ./redis_memleak -p $(pidof allocs) -O '/proc/$(pid)/exe' --symbols-prefix='je_'
+Attaching to pid 2623, Ctrl+C to quit.
+[13:30:16] Top 10 stacks with outstanding allocations:
+	45 bytes in 45 allocations from stack
+		0x0000559b4789639f	zmalloc+0x2f [redis-server]
+		0x0000559b478876ee	serverCron+0x2e [redis-server]
+		0x0000559b47875e1b	processTimeEvents+0x5b [redis-server]
+		0x0000559b47876e60	aeMain+0x1d0 [redis-server]
+		0x0000559b478700b7	main+0x4a7 [redis-server]
+		0x00007fdf47029d90	__libc_start_call_main+0x80 [libc.so.6]
+
+When using the --sysbols-prefix argument, memleak can trace the third-party memory 
+allocations, such as jemalloc whose sysbols are usually identified by the "je_" prefix
+in redis project.
 
 USAGE message:
 
