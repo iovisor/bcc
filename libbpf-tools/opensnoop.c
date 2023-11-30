@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
@@ -199,6 +200,43 @@ static void sig_int(int signo)
 	exiting = 1;
 }
 
+static inline void test_bit_and_set(mode_t mode, mode_t bit, char *p, char c)
+{
+	*p = mode & bit ? c : '-';
+}
+
+static char *mode_to_string(char *ret, mode_t mode)
+{
+	struct bit_data {
+		mode_t bit;
+		char c;
+	};
+
+	struct bit_data bits[9] = {
+		{ S_IRUSR, 'r'},
+		{ S_IWUSR, 'w'},
+		{ S_IXUSR, 'x'},
+		{ S_IRGRP, 'r'},
+		{ S_IWGRP, 'w'},
+		{ S_IXGRP, 'x'},
+		{ S_IROTH, 'r'},
+		{ S_IWOTH, 'w'},
+		{ S_IXOTH, 'x'},
+	};
+
+	/* Deal with rwx for user, group and others. */
+	for (int i = 0; i < sizeof bits / sizeof bits[0]; i++)
+		test_bit_and_set(mode, bits[i].bit, &ret[i + 1], bits[i].c);
+
+	// Particularly deal with S_ISUID, S_ISGID and S_ISVTX.
+	test_bit_and_set(mode, S_ISUID, &ret[0], 'u');
+	test_bit_and_set(mode, S_ISGID, &ret[0], 'g');
+	test_bit_and_set(mode, S_ISVTX, &ret[0], 's');
+
+	return ret;
+}
+
+
 void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	const struct event *e = data;
@@ -250,9 +288,14 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	printf("%-6d %-16s %3d %3d ", e->pid, e->comm, fd, err);
 	sps_cnt += 7 + 17 + 4 + 4;
 	if (env.extended) {
-		printf("%08o ", e->flags);
-		sps_cnt += 9;
+		// 11 due to 3 times "rwx", one for UID/GID or sticky bit and one for '\0'.
+		char ret[11];
+
+		ret[10] = 0;
+		printf("%08o %s ", e->flags, mode_to_string(ret, e->mode));
+		sps_cnt += 21;
 	}
+
 	printf("%s\n", e->fname);
 
 #ifdef USE_BLAZESYM
@@ -345,7 +388,7 @@ int main(int argc, char **argv)
 		printf("%-7s ", "UID");
 	printf("%-6s %-16s %3s %3s ", "PID", "COMM", "FD", "ERR");
 	if (env.extended)
-		printf("%-8s ", "FLAGS");
+		printf("%-8s %-10s ", "FLAGS", "MODE");
 	printf("%s", "PATH");
 #ifdef USE_BLAZESYM
 	if (env.callers)
