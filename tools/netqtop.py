@@ -63,7 +63,8 @@ def print_table(table, qnum):
     tGroup = [0,0,0,0,0]
     tpkt = 0
     tlen = 0
-    for k, v in table.items():
+    for k, v in (table.items_lookup_batch()
+                if htab_batch_ops else table.items()):
         qids += [k.value]
         tlen += v.total_pkt_len
         tpkt += v.num_pkt
@@ -142,14 +143,20 @@ def print_result(b):
     print("TX")
     table = b['tx_q']
     print_table(table, tx_num)
-    b['tx_q'].clear()
+    if htab_batch_ops:
+        b['tx_q'].items_delete_batch()
+    else:
+        b['tx_q'].clear()
 
     # --------- print rx queues ---------------
     print("")
     print("RX")
     table = b['rx_q']
     print_table(table, rx_num)
-    b['rx_q'].clear()
+    if htab_batch_ops:
+        b['rx_q'].items_delete_batch()
+    else:
+        b['rx_q'].clear()
     if args.throughput:
         print("-"*95)
     else:
@@ -205,6 +212,10 @@ if tx_num > MAX_QUEUE_NUM or rx_num > MAX_QUEUE_NUM:
 
 ################## start tracing ##################
 b = BPF(src_file = EBPF_FILE)
+# --- check whether hash table batch ops is supported ---
+htab_batch_ops = True if BPF.kernel_struct_has_field(b'bpf_map_ops',
+        b'map_lookup_and_delete_batch') == 1 else False
+
 # --------- set hash array --------
 devname_map = b['name_map']
 _name = Devname()

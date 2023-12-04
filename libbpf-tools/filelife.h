@@ -10,6 +10,8 @@ struct event {
 	char task[TASK_COMM_LEN];
 	__u64 delta_ns;
 	pid_t tgid;
+	/* private */
+	void *dentry;
 };
 
 #endif /* __FILELIFE_H */

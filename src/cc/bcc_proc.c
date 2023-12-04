@@ -19,6 +19,7 @@
 #include <ctype.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <limits.h>
 #include <math.h>
 #include <stdbool.h>
@@ -172,9 +173,11 @@ int _procfs_maps_each_module(FILE *procmap, int pid,
     enter_ns = 1;
     buf[0] = '\0';
     // From fs/proc/task_mmu.c:show_map_vma
-    if (fscanf(procmap, "%lx-%lx %4s %llx %lx:%lx %lu%[^\n]",
-          &mod.start_addr, &mod.end_addr, perm, &mod.file_offset,
-          &mod.dev_major, &mod.dev_minor, &mod.inode, buf) != 8)
+    if (fscanf(procmap,
+               "%" PRIx64 "-%" PRIx64 " %4s %llx %" PRIx64 ":%" PRIx64
+               " %" PRIu64 "%[^\n]",
+               &mod.start_addr, &mod.end_addr, perm, &mod.file_offset,
+               &mod.dev_major, &mod.dev_minor, &mod.inode, buf) != 8)
       break;
 
     if (perm[2] != 'x')

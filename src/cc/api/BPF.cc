@@ -118,13 +118,14 @@ StatusTuple BPF::init(const std::string& bpf_program,
     }
   }
 
-  auto flags_len = cflags.size();
-  const char* flags[flags_len];
-  for (size_t i = 0; i < flags_len; i++)
-    flags[i] = cflags[i].c_str();
+  std::vector<const char*> flags;
+  for (const auto& c: cflags)
+    flags.push_back(c.c_str());
 
   all_bpf_program_ += bpf_program;
-  if (bpf_module_->load_string(all_bpf_program_, flags, flags_len) != 0) {
+  if (bpf_module_->load_string(all_bpf_program_,
+                               flags.data(),
+                               flags.size()) != 0) {
     init_fail_reset();
     return StatusTuple(-1, "Unable to initialize BPF program");
   }

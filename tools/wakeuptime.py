@@ -214,6 +214,10 @@ if not is_supported_raw_tp:
         print("0 functions traced. Exiting.")
         exit()
 
+# check whether hash table batch ops is supported
+htab_batch_ops = True if BPF.kernel_struct_has_field(b'bpf_map_ops',
+        b'map_lookup_and_delete_batch') == 1 else False
+
 # header
 if not folded:
     print("Tracing blocked time (us) by kernel stack", end="")
@@ -236,7 +240,9 @@ while (1):
     has_enomem = False
     counts = b.get_table("counts")
     stack_traces = b.get_table("stack_traces")
-    for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
+    for k, v in sorted(counts.items_lookup_and_delete_batch()
+                        if htab_batch_ops else counts.items(),
+                        key=lambda counts: counts[1].value):
         # handle get_stackid errors
         # check for an ENOMEM error
         if k.w_k_stack_id == -errno.ENOMEM:
@@ -261,7 +267,9 @@ while (1):
                 printb(b"    %-16x %s" % (addr, b.ksym(addr)))
             printb(b"    %-16s %s" % (b"waker:", k.waker))
             print("        %d\n" % v.value)
-    counts.clear()
+
+    if not htab_batch_ops:
+        counts.clear()
 
     if missing_stacks > 0:
         enomem_str = " Consider increasing --stack-storage-size."

@@ -120,6 +120,8 @@ static int get_libc_path(char *path)
 {
 	FILE *f;
 	char buf[PATH_MAX] = {};
+	char map_fname[PATH_MAX] = {};
+	char proc_path[PATH_MAX] = {};
 	char *filename;
 	float version;
 
@@ -128,7 +130,12 @@ static int get_libc_path(char *path)
 		return 0;
 	}
 
-	f = fopen("/proc/self/maps", "r");
+	if (target_pid == 0) {
+		f = fopen("/proc/self/maps", "r");
+	} else {
+		snprintf(map_fname, sizeof(map_fname), "/proc/%d/maps", target_pid);
+		f = fopen(map_fname, "r");
+	}
 	if (!f)
 		return -errno;
 
@@ -138,7 +145,12 @@ static int get_libc_path(char *path)
 		filename = strrchr(buf, '/') + 1;
 		if (sscanf(filename, "libc-%f.so", &version) == 1 ||
 		    sscanf(filename, "libc.so.%f", &version) == 1) {
-			memcpy(path, buf, strlen(buf));
+			if (target_pid == 0) {
+				memcpy(path, buf, strlen(buf));
+			} else {
+				snprintf(proc_path, sizeof(proc_path), "/proc/%d/root%s", target_pid, buf);
+				memcpy(path, proc_path, strlen(proc_path));
+			}
 			fclose(f);
 			return 0;
 		}

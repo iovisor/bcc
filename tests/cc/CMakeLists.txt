@@ -9,6 +9,7 @@ else()
 include_directories(${PROJECT_SOURCE_DIR}/src/cc/libbpf/include/uapi)
 endif()
 include_directories(${PROJECT_SOURCE_DIR}/tests/python/include)
+include_directories(${LLVM_INCLUDE_DIRS})
 
 add_executable(test_static test_static.c)
 if(NOT CMAKE_USE_LIBBPF_PACKAGE)

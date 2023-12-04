@@ -173,7 +173,7 @@ USAGE message:
 usage: memleak.py [-h] [-p PID] [-t] [-a] [-o OLDER] [-c COMMAND]
                   [--combined-only] [--wa-missing-free] [-s SAMPLE_RATE]
                   [-T TOP] [-z MIN_SIZE] [-Z MAX_SIZE] [-O OBJ]
-                  [interval] [count]
+                  [--sort KEY] [interval] [count]
 
 Trace outstanding memory allocations that weren't freed.
 Supports both user-mode allocations made with libc functions and kernel-mode
@@ -207,6 +207,8 @@ optional arguments:
   -Z MAX_SIZE, --max-size MAX_SIZE
                         capture only allocations smaller than this size
   -O OBJ, --obj OBJ     attach to allocator functions in the specified object
+  --sort KEY            report sorted in given key; available key list: size,
+                        count
 
 EXAMPLES:
 
@@ -228,3 +230,6 @@ EXAMPLES:
         allocations that are at least one minute (60 seconds) old
 ./memleak -s 5
         Trace roughly every 5th allocation, to reduce overhead
+./memleak --sort count
+        Trace allocations in kernel mode and display a summary of outstanding
+        allocations that are sorted in count order

@@ -237,6 +237,10 @@ if args.debug or args.ebpf:
     if args.ebpf:
         exit()
 
+# check whether hash table batch ops is supported
+htab_batch_ops = True if BPF.kernel_struct_has_field(b'bpf_map_ops',
+        b'map_lookup_and_delete_batch') == 1 else False
+
 # load BPF program
 b = BPF(text=bpf_text)
 b.attach_kprobe(event="tcp_rcv_established", fn_name="trace_tcp_rcv")
@@ -274,7 +278,10 @@ while (1):
 
     dist.print_log2_hist(label, section_header=print_header, section_print_fn=print_section)
     dist.clear()
-    lathash.clear()
+    if  htab_batch_ops:
+        lathash.items_delete_batch()
+    else:
+        lathash.clear()
 
     if exiting or seconds >= args.duration:
         exit()

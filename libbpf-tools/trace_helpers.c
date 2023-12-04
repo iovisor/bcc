@@ -7,6 +7,7 @@
 #define _GNU_SOURCE
 #endif
 #include <ctype.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -552,8 +553,9 @@ static int create_tmp_vdso_image(struct dso *dso)
 		return -1;
 
 	while (true) {
-		ret = fscanf(f, "%lx-%lx %*s %*x %*x:%*x %*u%[^\n]",
-			     &start_addr, &end_addr, buf);
+		ret = fscanf(f, "%llx-%llx %*s %*x %*x:%*x %*u%[^\n]",
+			     (long long*)&start_addr, (long long*)&end_addr,
+			     buf);
 		if (ret == EOF && feof(f))
 			break;
 		if (ret != 3)
@@ -669,10 +671,13 @@ struct syms *syms__load_file(const char *fname)
 		goto err_out;
 
 	while (true) {
-		ret = fscanf(f, "%lx-%lx %4s %lx %lx:%lx %lu%[^\n]",
-			     &map.start_addr, &map.end_addr, perm,
-			     &map.file_off, &map.dev_major,
-			     &map.dev_minor, &map.inode, buf);
+		ret = fscanf(f, "%llx-%llx %4s %llx %llx:%llx %llu%[^\n]",
+			     (long long*)&map.start_addr,
+			     (long long*)&map.end_addr, perm,
+			     (long long*)&map.file_off,
+			     (long long*)&map.dev_major,
+			     (long long*)&map.dev_minor,
+			     (long long*)&map.inode, buf);
 		if (ret == EOF && feof(f))
 			break;
 		if (ret != 8)	/* perf-<PID>.map */

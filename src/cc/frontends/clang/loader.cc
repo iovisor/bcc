@@ -179,7 +179,7 @@ static int CreateFromArgs(clang::CompilerInvocation &invocation,
                           const llvm::opt::ArgStringList &ccargs,
                           clang::DiagnosticsEngine &diags)
 {
-#if LLVM_MAJOR_VERSION >= 10
+#if LLVM_VERSION_MAJOR >= 10
   return clang::CompilerInvocation::CreateFromArgs(invocation, ccargs, diags);
 #else
   return clang::CompilerInvocation::CreateFromArgs(
@@ -265,6 +265,9 @@ int ClangLoader::parse(
                                    "-Wno-pragma-once-outside-header",
                                    "-Wno-address-of-packed-member",
                                    "-Wno-unknown-warning-option",
+#if defined(__x86_64__) || defined(__i386__)
+                                   "-fcf-protection",
+#endif
                                    "-fno-color-diagnostics",
                                    "-fno-unwind-tables",
                                    "-fno-asynchronous-unwind-tables",
@@ -284,7 +287,7 @@ int ClangLoader::parse(
   vector<string> kflags;
   if (kbuild_helper.get_flags(un.machine, &kflags))
     return -1;
-#if LLVM_MAJOR_VERSION >= 9
+#if LLVM_VERSION_MAJOR >= 9
   flags_cstr.push_back("-g");
   flags_cstr.push_back("-gdwarf-4");
 #else
@@ -412,7 +415,7 @@ int ClangLoader::do_compile(
   string target_triple = get_clang_target();
   driver::Driver drv("", target_triple, diags);
 
-#if LLVM_MAJOR_VERSION >= 4
+#if LLVM_VERSION_MAJOR >= 4
   if (target_triple == "x86_64-unknown-linux-gnu" || target_triple == "aarch64-unknown-linux-gnu")
     flags_cstr.push_back("-fno-jump-tables");
 #endif

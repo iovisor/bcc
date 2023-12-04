@@ -199,6 +199,9 @@ if debug or args.ebpf:
 
 # initialize BPF
 b = BPF(text=bpf_text)
+# check whether hash table batch ops is supported
+htab_batch_ops = True if BPF.kernel_struct_has_field(b'bpf_map_ops',
+        b'map_lookup_and_delete_batch') == 1 else False
 
 print('Tracing... Output every %d secs. Hit Ctrl-C to end' % interval)
 
@@ -222,14 +225,16 @@ while 1:
     # by-TID output
     counts = b.get_table("counts")
     line = 0
-    for k, v in reversed(sorted(counts.items(),
+    for k, v in reversed(sorted(counts.items_lookup_and_delete_batch()
+                                if htab_batch_ops else counts.items(),
                                 key=lambda counts: counts[1].size)):
         printb(b"%-32s %6d %10d" % (k.name, v.count, v.size))
 
         line += 1
         if line >= maxrows:
             break
-    counts.clear()
+    if not htab_batch_ops:
+        counts.clear()
 
     countdown -= 1
     if exiting or countdown == 0:

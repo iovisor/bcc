@@ -256,12 +256,12 @@ def print_event(cpu, data, size):
 
     if (csv):
         print("%d,%s,%d,%s,%d,%d,%d,%s" % (
-            event.ts_us, event.task, event.pid, type, event.size,
-            event.offset, event.delta_us, event.file))
+            event.ts_us, event.task.decode('utf-8'), event.pid, type, event.size,
+            event.offset, event.delta_us, event.file.decode('utf-8')))
         return
     print("%-8s %-14.14s %-6s %1s %-7s %-8d %7.2f %s" % (strftime("%H:%M:%S"),
-        event.task, event.pid, type, event.size, event.offset / 1024,
-        float(event.delta_us) / 1000, event.file))
+        event.task.decode('utf-8'), event.pid, type, event.size, event.offset / 1024,
+        float(event.delta_us) / 1000, event.file.decode('utf-8')))
 
 # initialize BPF
 b = BPF(text=bpf_text)
