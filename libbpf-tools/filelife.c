@@ -89,17 +89,24 @@ static void sig_int(int signo)
 
 void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
-	const struct event *e = data;
+	struct event e;
 	struct tm *tm;
 	char ts[32];
 	time_t t;
+
+	if (data_sz < sizeof(e)) {
+		printf("Error: packet too small\n");
+		return;
+	}
+	/* Copy data as alignment in the perf buffer isn't guaranteed. */
+	memcpy(&e, data, sizeof(e));
 
 	time(&t);
 	tm = localtime(&t);
 	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
 	printf("%-8s %-6d %-16s %-7.2f %s\n",
-	       ts, e->tgid, e->task, (double)e->delta_ns / 1000000000,
-	       e->file);
+	       ts, e.tgid, e.task, (double)e.delta_ns / 1000000000,
+	       e.file);
 }
 
 void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
