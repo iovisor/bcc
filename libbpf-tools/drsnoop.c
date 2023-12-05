@@ -118,19 +118,26 @@ static void sig_int(int signo)
 
 void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
-	const struct event *e = data;
+	struct event e;
 	struct tm *tm;
 	char ts[32];
 	time_t t;
+
+	if (data_sz < sizeof(e)) {
+		printf("Error: packet too small\n");
+		return;
+	}
+	/* Copy data as alignment in the perf buffer isn't guaranteed. */
+	memcpy(&e, data, sizeof(e));
 
 	time(&t);
 	tm = localtime(&t);
 	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
 	printf("%-8s %-16s %-6d %8.3f %5lld",
-	       ts, e->task, e->pid, e->delta_ns / 1000000.0,
-	       e->nr_reclaimed);
+	       ts, e.task, e.pid, e.delta_ns / 1000000.0,
+	       e.nr_reclaimed);
 	if (env.extended)
-		printf(" %8llu", e->nr_free_pages * page_size / 1024);
+		printf(" %8llu", e.nr_free_pages * page_size / 1024);
 	printf("\n");
 }
 
