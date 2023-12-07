@@ -1294,9 +1294,12 @@ bool BTypeVisitor::checkFormatSpecifiers(const string& fmt, SourceLocation loc) 
       i++;
     } else if (fmt[i] == 'p' || fmt[i] == 's') {
       i++;
+      if (fmt[i-1] == 'p' && fmt[i] == 'S') {
+        i++;
+      }
       if (!isspace(fmt[i]) && !ispunct(fmt[i]) && fmt[i] != 0) {
         warning(loc.getLocWithOffset(i - 2),
-                "only %%d %%u %%x %%ld %%lu %%lx %%lld %%llu %%llx %%p %%s conversion specifiers allowed");
+                "only %%d %%u %%x %%ld %%lu %%lx %%lld %%llu %%llx %%p %%pS %%s conversion specifiers allowed");
         return false;
       }
       if (fmt[i - 1] == 's') {
