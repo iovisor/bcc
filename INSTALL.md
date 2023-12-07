@@ -11,6 +11,7 @@
   - [RHEL](#rhel---binary)
   - [Amazon Linux 1](#amazon-linux-1---binary)
   - [Amazon Linux 2](#amazon-linux-2---binary)
+  - [Alibaba Cloud Linux 3](#alibaba-cloud-linux-3---binary)
   - [Alpine](#alpine---binary)
   - [WSL](#wslwindows-subsystem-for-linux---binary)
 * [Source](#source)
@@ -22,6 +23,7 @@
   - [Centos](#centos---source)
   - [Amazon Linux 1](#amazon-linux-1---source)
   - [Amazon Linux 2](#amazon-linux-2---source)
+  - [Alibaba Cloud Linux 3](#alibaba-cloud-linux-3---source)
   - [Alpine](#alpine---source)
   - [Arch](#arch---source)
 * [Older Instructions](#older-instructions)
@@ -246,6 +248,14 @@ Use case 1. Install BCC for your AMI's default kernel (no reboot required):
    Tested on Amazon Linux AMI release 2021.11 (kernel 5.10.75-79.358.amzn2.x86_64)
 ```
 sudo amazon-linux-extras install BCC
+```
+
+## Alibaba Cloud Linux 3 - Binary
+
+Tested on Alibaba Cloud Linux 3(Linux 5.10.134-14.1.al8.x86_64):
+
+```
+yum install kernel-headers kernel-devel bcc-tools
 ```
 
 ## Alpine - Binary
@@ -689,6 +699,45 @@ sudo mount -t debugfs debugfs /sys/kernel/debug
 ### Test
 ```
 sudo /usr/share/bcc/tools/execsnoop
+```
+
+## Alibaba Cloud Linux 3 - Source
+
+### Install and compile LLVM
+
+You could compile LLVM from source code
+
+```
+curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-10.0.1/llvm-10.0.1.src.tar.xz
+curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-10.0.1/clang-10.0.1.src.tar.xz
+tar -xf clang-10.0.1.src.tar.xz
+tar -xf llvm-10.0.1.src.tar.xz
+
+mkdir clang-build
+mkdir llvm-build
+
+cd llvm-build
+cmake3 -G "Unix Makefiles" -DLLVM_TARGETS_TO_BUILD="BPF;X86" \
+  -DCMAKE_BUILD_TYPE=Release ../llvm-10.0.1.src
+make
+sudo make install
+
+cd ../clang-build
+cmake3 -G "Unix Makefiles" -DLLVM_TARGETS_TO_BUILD="BPF;X86" \
+  -DCMAKE_BUILD_TYPE=Release ../clang-10.0.1.src
+make
+sudo make install
+cd ..
+```
+
+### Install and compile BCC
+
+```
+git clone https://github.com/iovisor/bcc.git
+mkdir bcc/build; cd bcc/build
+cmake3 ..
+make
+sudo make install
 ```
 
 ## Alpine - Source
