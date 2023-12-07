@@ -15,7 +15,7 @@ Source1:        http://llvm.org/releases/%{llvmver}/llvm-%{llvmver}.src.tar.xz
 Source2:        http://llvm.org/releases/%{llvmver}/cfe-%{llvmver}.src.tar.xz
 
 BuildArch:      x86_64
-BuildRequires:  bison, cmake >= 2.8.7, flex, gcc, gcc-c++, libxml2-devel, python2-devel, elfutils-libelf-devel-static
+BuildRequires:  bison, cmake >= 2.8.7, flex, gcc, gcc-c++, libxml2-devel, python3-devel, elfutils-libelf-devel-static
 
 %description
 Python bindings for BPF Compiler Collection (BCC). Control a BPF program from
