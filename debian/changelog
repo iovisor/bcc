@@ -1,3 +1,23 @@
+bcc (0.29.0-1) unstable; urgency=low
+
+  * Support for kernel up to 6.6.
+  * new bcc tools: rdmaucma
+  * new libbpf tools: f2fs, futexctn
+  * bcc tool update: tcpstates, statsnoop, runqlat, bio tools, tcptop, slabratetop, tcprtt, etc.
+  * libbpf tool update: tcprtt, tcppktlat, bio tools, execsnoop, bindsnoop, exitsnoop, etc.
+  * s390x support for libbpf-tools
+  * examples for perf/ipc
+  * expose pid parameter in bpf_open_perf_event
+  * allow for installing python as a non-system package
+  * ci improvement: deprecate ubuntu 18.04 and allow multiple llvm versions
+  * ci improvement: reitre fedora 34/26 and use fedora 38.
+  * fix misaligned pointer accesses in some ringbuf using libbpf-tools
+  * some new  enhancement for powerpc and riscv.
+  * consolidate tools into different categories: filesystem/storage, networking, cpu and scheduling, etc.
+  * doc update, other bug fixes and tools improvement
+
+ -- Yonghong Song <ys114321@gmail.com>  Thu, 6 Dec 2023 17:00:00 +0000
+
 bcc (0.28.0-1) unstable; urgency=low
 
   * Support for kernel up to 6.3.
