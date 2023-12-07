@@ -9,7 +9,7 @@ DEBIAN_REVISION := $(shell dpkg-parsechangelog | sed -rne "s,^Version: ([0-9.]+)
 UPSTREAM_VERSION := $(shell dpkg-parsechangelog | sed -rne "s,^Version: ([0-9.]+)(~|-)(.*),\1,p")
 
 %:
-	dh $@ --buildsystem=cmake --parallel --with python2,python3
+	dh $@ --buildsystem=cmake --parallel --with python3
 
 # tests cannot be run in parallel
 override_dh_auto_test:
@@ -17,4 +17,4 @@ override_dh_auto_test:
 
 # FIXME: LLVM_DEFINITIONS is broken somehow in LLVM cmake upstream
 override_dh_auto_configure:
-	dh_auto_configure -- -DREVISION_LAST=$(UPSTREAM_VERSION) -DREVISION=$(UPSTREAM_VERSION) -DLLVM_DEFINITIONS="-D_GNU_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS" -DPYTHON_CMD="python2;python3"
+	dh_auto_configure -- -DREVISION_LAST=$(UPSTREAM_VERSION) -DREVISION=$(UPSTREAM_VERSION) -DLLVM_DEFINITIONS="-D_GNU_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS" -DPYTHON_CMD="python3"
