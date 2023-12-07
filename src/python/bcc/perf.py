@@ -190,3 +190,9 @@ class Perf(object):
 
                 for cpu in get_online_cpus():
                         Perf._open_for_cpu(cpu, attr)
+
+        @staticmethod
+        def perf_custom_event_open(attr, pid=-1):
+                attr.pid = pid
+                for cpu in get_online_cpus():
+                        Perf._open_for_cpu(cpu, attr)
