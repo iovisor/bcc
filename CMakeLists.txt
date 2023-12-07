@@ -163,6 +163,10 @@ if(NOT PYTHON_ONLY)
       find_library(libclangSupport NAMES clangSupport clang-cpp HINTS ${CLANG_SEARCH})
     endif()
 
+    if(${LLVM_PACKAGE_VERSION} VERSION_EQUAL 18 OR ${LLVM_PACKAGE_VERSION} VERSION_GREATER 18)
+      find_library(libclangAPINotes NAMES clangAPINotes clang-cpp HINTS ${CLANG_SEARCH})
+    endif()
+
     find_library(libclang-shared libclang-cpp.so HINTS ${CLANG_SEARCH})
 
     if(libclangBasic STREQUAL "libclangBasic-NOTFOUND")
