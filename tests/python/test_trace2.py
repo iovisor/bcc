@@ -30,9 +30,9 @@ int count_sched(struct pt_regs *ctx) {
 class TestTracingEvent(TestCase):
     def setUp(self):
         b = BPF(text=text, debug=0)
-        self.stats = b.get_table(b"stats")
-        b.attach_kprobe(event_re=b"^finish_task_switch$|^finish_task_switch\.isra\.\d$",
-                        fn_name=b"count_sched")
+        self.stats = b.get_table(b'stats')
+        b.attach_kprobe(event_re=b'^finish_task_switch$|^finish_task_switch.isra.d$',
+                        fn_name=b'count_sched')
 
     def test_sched1(self):
         for i in range(0, 100):
