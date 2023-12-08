@@ -38,7 +38,7 @@ foreach(PY_CMD ${PYTHON_CMD})
   add_custom_target(bcc_py_${PY_CMD_ESCAPED} ALL DEPENDS ${PIP_INSTALLABLE})
 
   if(NOT PYTHON_PREFIX)
-     set(PYTHON_PREFIX, ${CMAKE_INSTALL_PREFIX} )
+     set(PYTHON_PREFIX ${CMAKE_INSTALL_PREFIX})
   endif()
 
   install(
