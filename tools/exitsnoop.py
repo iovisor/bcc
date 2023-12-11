@@ -204,7 +204,7 @@ def initialize(arg_list = sys.argv[1:]):
         Global.args.timestamp = True
     if not Global.args.ebpf and os.geteuid() != 0:
         return (os.EX_NOPERM, "Need sudo (CAP_SYS_ADMIN) for BPF() system call")
-    if re.match('^3\.10\..*el7.*$', platform.release()): # Centos/Red Hat
+    if re.match(r'^3.10..*el7.*$', platform.release()): # Centos/Red Hat
         Global.args.timespec = True
     for _ in range(2):
         c = _embedded_c(Global.args)

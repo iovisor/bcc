@@ -82,7 +82,11 @@ static void debug_printf(Module *mod, IRBuilder<> &B, const string &fmt, vector<
   args.insert(args.begin(), B.getInt64((uintptr_t)stderr));
   Function *fprintf_fn = mod->getFunction("fprintf");
   if (!fprintf_fn) {
+#if LLVM_VERSION_MAJOR >= 18
+    vector<Type *> fprintf_fn_args({B.getInt64Ty(), B.getPtrTy()});
+#else
     vector<Type *> fprintf_fn_args({B.getInt64Ty(), B.getInt8PtrTy()});
+#endif
     FunctionType *fprintf_fn_type = FunctionType::get(B.getInt32Ty(), fprintf_fn_args, /*isvarArg=*/true);
     fprintf_fn = Function::Create(fprintf_fn_type, GlobalValue::ExternalLinkage, "fprintf", mod);
     fprintf_fn->setCallingConv(CallingConv::C);
@@ -267,7 +271,11 @@ string BPFModule::make_reader(Module *mod, Type *type) {
   IRBuilder<> B(*ctx_);
 
   FunctionType *sscanf_fn_type = FunctionType::get(
+#if LLVM_VERSION_MAJOR >= 18
+      B.getInt32Ty(), {B.getPtrTy(), B.getPtrTy()}, /*isVarArg=*/true);
+#else
       B.getInt32Ty(), {B.getInt8PtrTy(), B.getInt8PtrTy()}, /*isVarArg=*/true);
+#endif
   Function *sscanf_fn = mod->getFunction("sscanf");
   if (!sscanf_fn) {
     sscanf_fn = Function::Create(sscanf_fn_type, GlobalValue::ExternalLinkage,
@@ -277,7 +285,11 @@ string BPFModule::make_reader(Module *mod, Type *type) {
   }
 
   string name = "reader" + std::to_string(readers_.size());
+#if LLVM_VERSION_MAJOR >= 18
+  vector<Type *> fn_args({B.getPtrTy(), PointerType::getUnqual(type)});
+#else
   vector<Type *> fn_args({B.getInt8PtrTy(), PointerType::getUnqual(type)});
+#endif
   FunctionType *fn_type = FunctionType::get(B.getInt32Ty(), fn_args, /*isVarArg=*/false);
   Function *fn =
       Function::Create(fn_type, GlobalValue::ExternalLinkage, name, mod);
@@ -293,7 +305,11 @@ string BPFModule::make_reader(Module *mod, Type *type) {
   B.SetInsertPoint(label_entry);
 
   Value *nread = B.CreateAlloca(B.getInt32Ty());
+#if LLVM_VERSION_MAJOR >= 18
+  Value *sptr = B.CreateAlloca(B.getPtrTy());
+#else
   Value *sptr = B.CreateAlloca(B.getInt8PtrTy());
+#endif
   map<string, Value *> locals{{"nread", nread}, {"sptr", sptr}};
   B.CreateStore(arg_in, sptr);
   vector<Value *> args({nullptr, nullptr});
@@ -337,7 +353,11 @@ string BPFModule::make_writer(Module *mod, Type *type) {
   IRBuilder<> B(*ctx_);
 
   string name = "writer" + std::to_string(writers_.size());
+#if LLVM_VERSION_MAJOR >= 18
+  vector<Type *> fn_args({B.getPtrTy(), B.getInt64Ty(), PointerType::getUnqual(type)});
+#else
   vector<Type *> fn_args({B.getInt8PtrTy(), B.getInt64Ty(), PointerType::getUnqual(type)});
+#endif
   FunctionType *fn_type = FunctionType::get(B.getInt32Ty(), fn_args, /*isVarArg=*/false);
   Function *fn =
       Function::Create(fn_type, GlobalValue::ExternalLinkage, name, mod);
@@ -369,7 +389,11 @@ string BPFModule::make_writer(Module *mod, Type *type) {
   if (0)
     debug_printf(mod, B, "%d %p %p\n", vector<Value *>({arg_len, arg_out, arg_in}));
 
+#if LLVM_VERSION_MAJOR >= 18
+  vector<Type *> snprintf_fn_args({B.getPtrTy(), B.getInt64Ty(), B.getPtrTy()});
+#else
   vector<Type *> snprintf_fn_args({B.getInt8PtrTy(), B.getInt64Ty(), B.getInt8PtrTy()});
+#endif
   FunctionType *snprintf_fn_type = FunctionType::get(B.getInt32Ty(), snprintf_fn_args, /*isVarArg=*/true);
   Function *snprintf_fn = mod->getFunction("snprintf");
   if (!snprintf_fn)

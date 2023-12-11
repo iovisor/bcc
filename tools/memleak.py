@@ -115,6 +115,8 @@ parser.add_argument("--percpu", default=False, action="store_true",
         help="trace percpu allocations")
 parser.add_argument("--sort", type=str, default="size",
         help="report sorted in given key; available key list: size, count")
+parser.add_argument("--symbols-prefix", type=str,
+        help="memory alloctor symbols prefix")
 
 args = parser.parse_args()
 
@@ -464,15 +466,17 @@ bpf = BPF(text=bpf_source)
 if not kernel_trace:
         print("Attaching to pid %d, Ctrl+C to quit." % pid)
 
-        def attach_probes(sym, fn_prefix=None, can_fail=False):
+        def attach_probes(sym, fn_prefix=None, can_fail=False, need_uretprobe=True):
                 if fn_prefix is None:
                         fn_prefix = sym
-
+                if args.symbols_prefix is not None:
+                        sym = args.symbols_prefix + sym
                 try:
                         bpf.attach_uprobe(name=obj, sym=sym,
                                           fn_name=fn_prefix + "_enter",
                                           pid=pid)
-                        bpf.attach_uretprobe(name=obj, sym=sym,
+                        if need_uretprobe:
+                                bpf.attach_uretprobe(name=obj, sym=sym,
                                              fn_name=fn_prefix + "_exit",
                                              pid=pid)
                 except Exception:
@@ -484,16 +488,14 @@ if not kernel_trace:
         attach_probes("malloc")
         attach_probes("calloc")
         attach_probes("realloc")
-        attach_probes("mmap")
+        attach_probes("mmap", can_fail=True) # failed on jemalloc
         attach_probes("posix_memalign")
         attach_probes("valloc", can_fail=True) # failed on Android, is deprecated in libc.so from bionic directory
         attach_probes("memalign")
         attach_probes("pvalloc", can_fail=True) # failed on Android, is deprecated in libc.so from bionic directory
         attach_probes("aligned_alloc", can_fail=True)  # added in C11
-        bpf.attach_uprobe(name=obj, sym="free", fn_name="free_enter",
-                                  pid=pid)
-        bpf.attach_uprobe(name=obj, sym="munmap", fn_name="munmap_enter",
-                                  pid=pid)
+        attach_probes("free", need_uretprobe=False)
+        attach_probes("munmap", can_fail=True, need_uretprobe=False) # failed on jemalloc
 
 else:
         print("Attaching to kernel allocators, Ctrl+C to quit.")

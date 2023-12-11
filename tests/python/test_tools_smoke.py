@@ -64,7 +64,7 @@ class SmokeTests(TestCase):
 
     def kmod_loaded(self, mod):
         with open("/proc/modules", "r") as mods:
-            reg = re.compile("^%s\s" % mod)
+            reg = re.compile(r'^%s\s' % mod)
             for line in mods:
                 if reg.match(line):
                     return 1

@@ -28,6 +28,9 @@ endif()
 if (${LLVM_PACKAGE_VERSION} VERSION_EQUAL 16 OR ${LLVM_PACKAGE_VERSION} VERSION_GREATER 16)
   list(APPEND llvm_raw_libs frontendhlsl)
 endif()
+if (${LLVM_PACKAGE_VERSION} VERSION_EQUAL 18 OR ${LLVM_PACKAGE_VERSION} VERSION_GREATER 18)
+  list(APPEND llvm_raw_libs frontenddriver)
+endif()
 
 llvm_map_components_to_libnames(_llvm_libs ${llvm_raw_libs})
 llvm_expand_dependencies(llvm_libs ${_llvm_libs})
@@ -59,6 +62,10 @@ list(APPEND clang_libs
 # if (${LLVM_PACKAGE_VERSION} VERSION_EQUAL 15 OR ${LLVM_PACKAGE_VERSION} VERSION_GREATER 15)
   list(APPEND clang_libs ${libclangSupport})
 # endif()
+
+if (${LLVM_PACKAGE_VERSION} VERSION_EQUAL 18 OR ${LLVM_PACKAGE_VERSION} VERSION_GREATER 18)
+  list(APPEND clang_libs ${libclangAPINotes})
+endif()
 
 list(APPEND clang_libs
   ${libclangBasic})
