@@ -92,6 +92,7 @@ pair of .c and .py files, and some are directories of files.
 - tools/[criticalstat](tools/criticalstat.py): Trace and report long atomic critical sections in the kernel. [Examples](tools/criticalstat_example.txt)
 - tools/[deadlock](tools/deadlock.py): Detect potential deadlocks on a running process. [Examples](tools/deadlock_example.txt).
 - tools/[drsnoop](tools/drsnoop.py): Trace direct reclaim events with PID and latency. [Examples](tools/drsnoop_example.txt).
+- tools/[dslower](tools/dslower.py): Trace process block on D state time. [Examples](tools/dslower_example.txt).
 - tools/[execsnoop](tools/execsnoop.py): Trace new processes via exec() syscalls. [Examples](tools/execsnoop_example.txt).
 - tools/[exitsnoop](tools/exitsnoop.py): Trace process termination (exit and fatal signals). [Examples](tools/exitsnoop_example.txt).
 - tools/[funccount](tools/funccount.py): Count kernel function calls. [Examples](tools/funccount_example.txt).
