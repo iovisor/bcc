@@ -496,6 +496,56 @@ bool ArgumentParser_s390x::parse(Argument *dest) {
   return true;
 }
 
+
+
+bool ArgumentParser_riscv64::parse(Argument *dest) {
+  if (done())
+    return false;
+
+  bool matched;
+  std::smatch matches;
+  std::string arg_str(&arg_[cur_pos_]);
+  std::regex arg_n_regex("^(\\-?[1248])\\@");
+  // Operands with constants of form NUM
+  std::regex arg_op_regex_const("^(\\-?[0-9]+)( +|$)");
+  std::string reg_str =
+        "((a[0-9])|((s[0-9p])|s1[0-1])|(t[0-6p])|(pc)|(ra)|(fp)|(gp))";
+  // Operands with register only of form REG
+  std::regex arg_op_regex_reg("^" + reg_str + "( +|$)");
+  // Operands with a base register and an offset of form NUM(REG) or -NUM(REG)
+  std::regex arg_op_regex_breg_off("^(\\-?[0-9]+)\\(" + reg_str + "\\)( +|$)");
+
+  matched = std::regex_search(arg_str, matches, arg_n_regex);
+  if (matched) {
+    dest->arg_size_ = stoi(matches.str(1));
+    cur_pos_ += matches.length(0);
+    arg_str = &arg_[cur_pos_];
+    std::string reg_name;
+
+    if (std::regex_search(arg_str, matches, arg_op_regex_const)) {
+      dest->constant_ = (long long)stoull(matches.str(1));
+    } else if (std::regex_search(arg_str, matches, arg_op_regex_reg)) {
+      dest->base_register_name_ = matches.str(1);
+    } else if (std::regex_search(arg_str, matches, arg_op_regex_breg_off)) {
+      dest->deref_offset_ = stoi(matches.str(1));
+      dest->base_register_name_ = matches.str(2);
+    } else {
+        matched = false;
+    }
+  }
+
+  if (!matched) {
+    print_error(cur_pos_);
+    skip_until_whitespace_from(cur_pos_);
+    skip_whitespace_from(cur_pos_);
+    return false;
+  }
+
+  cur_pos_ += matches.length(0);
+  skip_whitespace_from(cur_pos_);
+  return true;
+}
+
 ssize_t ArgumentParser_x64::parse_identifier(ssize_t pos,
                                              optional<std::string> *result) {
   if (isalpha(arg_[pos]) || arg_[pos] == '_') {

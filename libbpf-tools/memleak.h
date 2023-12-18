@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
 #ifndef __MEMLEAK_H
 #define __MEMLEAK_H
 

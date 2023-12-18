@@ -13,13 +13,6 @@
 %bcond_with llvm_shared
 %endif
 
-# Build python3 support for distributions that have it
-%if 0%{?fedora} >= 28 || 0%{?rhel} > 7
-%bcond_without python3
-%else
-%bcond_with python3
-%endif
-
 # Build with debuginfod support for Fedora >= 32
 %if 0%{?fedora} >= 32
 %bcond_without libdebuginfod
@@ -27,15 +20,9 @@
 %bcond_with libdebuginfod
 %endif
 
-%if %{with python3}
-%global __python %{__python3}
-%global python_bcc python3-bcc
-%global python_cmds python2;python3
-%else
-%global __python %{__python2}
-%global python_bcc python2-bcc
-%global python_cmds python2
-%endif
+%global __python3
+%global python_bcc
+%global python_cmds,python3
 
 %define debug_package %{nil}
 %define _unpackaged_files_terminate_build 0
@@ -57,11 +44,7 @@ BuildRequires: gcc gcc-c++ elfutils-libelf-devel-static
 %if %{with libdebuginfod}
 BuildRequires: elfutils-debuginfod-client-devel
 %endif
-%if %{with python3}
 BuildRequires: python3-devel
-%else
-BuildRequires: python2-devel
-%endif
 %if %{with_lua}
 BuildRequires: luajit luajit-devel
 %endif
@@ -116,21 +99,12 @@ Requires: elfutils-debuginfod-client
 %description -n libbcc
 Shared Library for BPF Compiler Collection (BCC)
 
-%package -n python2-bcc
-Summary: Python2 bindings for BPF Compiler Collection (BCC)
-Requires: libbcc = %{version}-%{release}
-%{?python_provide:%python_provide python2-bcc}
-%description -n python2-bcc
-Python bindings for BPF Compiler Collection (BCC)
-
-%if %{with python3}
-%package -n python3-bcc
+%package -n python-bcc
 Summary: Python3 bindings for BPF Compiler Collection (BCC)
 Requires: libbcc = %{version}-%{release}
-%{?python_provide:%python_provide python3-bcc}
-%description -n python3-bcc
+%{?python_provide:%python_provide python-bcc}
+%description -n python-bcc
 Python bindings for BPF Compiler Collection (BCC)
-%endif
 
 %if %{with_lua}
 %package -n bcc-lua
@@ -159,13 +133,8 @@ Command line tools for BPF Compiler Collection (BCC)
 /usr/lib64/*
 /usr/include/bcc/*
 
-%files -n python2-bcc
-%{python2_sitelib}/bcc*
-
-%if %{with python3}
-%files -n python3-bcc
+%files -n python-bcc
 %{python3_sitelib}/bcc*
-%endif
 
 %if %{with_lua}
 %files -n bcc-lua

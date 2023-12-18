@@ -24,10 +24,8 @@ jobs:
     strategy:
       matrix:
         os: [
-          {distro: "ubuntu", version: "18.04", nick: bionic},
-          {distro: "ubuntu", version: "20.04", nick: focal},
-          {distro: "fedora", version: "34", nick: "f34"},
-          {distro: "fedora", version: "36", nick: "f36"}
+          {distro: "ubuntu", version: "20.04", nick: focal, installed_llvm_versions: "11 12 15"},
+          {distro: "fedora", version: "38", nick: "f38", installed_llvm_versions: "this is not used"},
         ]
 
     steps:
@@ -40,5 +38,6 @@ jobs:
         os_distro: ${{ matrix.os.distro }}
         os_version: ${{ matrix.os.version }}
         os_nick: ${{ matrix.os.nick }}
+        llvm_versions: ${{ matrix.os.installed_llvm_versions }}
         password: ${{ secrets.GITHUB_TOKEN }}
         push: true

@@ -132,13 +132,16 @@ static void sig_handler(int sig)
 {
 }
 
-static int init_freqs_mhz(__u32 *freqs_mhz, int nr_cpus)
+static int init_freqs_mhz(__u32 *freqs_mhz, struct bpf_link *links[])
 {
 	char path[64];
 	FILE *f;
 	int i;
 
 	for (i = 0; i < nr_cpus; i++) {
+		if (!links[i]) {
+			continue;
+		}
 		snprintf(path, sizeof(path),
 			"/sys/devices/system/cpu/cpu%d/cpufreq/scaling_cur_freq",
 			i);
@@ -232,12 +235,6 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	err = init_freqs_mhz(obj->bss->freqs_mhz, nr_cpus);
-	if (err) {
-		fprintf(stderr, "failed to init freqs\n");
-		goto cleanup;
-	}
-
 	obj->bss->filter_cg = env.cg;
 
 	/* update cgroup path fd to map */
@@ -258,6 +255,11 @@ int main(int argc, char **argv)
 	err = open_and_attach_perf_event(env.freq, obj->progs.do_sample, links);
 	if (err)
 		goto cleanup;
+	err = init_freqs_mhz(obj->bss->freqs_mhz, links);
+	if (err) {
+		fprintf(stderr, "failed to init freqs\n");
+		goto cleanup;
+	}
 
 	err = cpufreq_bpf__attach(obj);
 	if (err) {

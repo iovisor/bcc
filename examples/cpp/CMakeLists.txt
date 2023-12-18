@@ -4,6 +4,8 @@
 include_directories(${PROJECT_BINARY_DIR}/src/cc)
 include_directories(${PROJECT_SOURCE_DIR}/src/cc)
 include_directories(${PROJECT_SOURCE_DIR}/src/cc/api)
+include_directories(${LLVM_INCLUDE_DIRS})
+
 if (CMAKE_USE_LIBBPF_PACKAGE AND LIBBPF_FOUND)
 include_directories(${PROJECT_SOURCE_DIR}/src/cc/compat)
 else()

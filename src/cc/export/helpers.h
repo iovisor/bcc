@@ -231,6 +231,8 @@ struct _name##_table_t { \
   void (*ringbuf_discard) (void *, u64); \
   /* map.ringbuf_submit(data, flags) */ \
   void (*ringbuf_submit) (void *, u64); \
+  /* map.ringbuf_query(flags) */ \
+  u64 (*ringbuf_query) (u64); \
   u32 max_entries; \
 }; \
 __attribute__((section("maps/ringbuf"))) \
@@ -1006,13 +1008,13 @@ static void (*bpf_ringbuf_submit_dynptr)(struct bpf_dynptr *ptr, __u64 flags) =
   (void *)BPF_FUNC_ringbuf_submit_dynptr;
 static void (*bpf_ringbuf_discard_dynptr)(struct bpf_dynptr *ptr, __u64 flags) =
   (void *)BPF_FUNC_ringbuf_discard_dynptr;
-static long (*bpf_dynptr_read)(void *dst, __u32 len, struct bpf_dynptr *src, __u32 offset,
+static long (*bpf_dynptr_read)(void *dst, __u32 len, const struct bpf_dynptr *src, __u32 offset,
 			       __u64 flags) =
   (void *)BPF_FUNC_dynptr_read;
-static long (*bpf_dynptr_write)(struct bpf_dynptr *dst, __u32 offset, void *src, __u32 len,
+static long (*bpf_dynptr_write)(const struct bpf_dynptr *dst, __u32 offset, void *src, __u32 len,
 				__u64 flags) =
   (void *)BPF_FUNC_dynptr_write;
-static void *(*bpf_dynptr_data)(struct bpf_dynptr *ptr, __u32 offset, __u32 len) =
+static void *(*bpf_dynptr_data)(const struct bpf_dynptr *ptr, __u32 offset, __u32 len) =
   (void *)BPF_FUNC_dynptr_data;
 static __s64 (*bpf_tcp_raw_gen_syncookie_ipv4)(struct iphdr *iph, struct tcphdr *th,
 					       __u32 th_len) =
@@ -1479,10 +1481,16 @@ int name(unsigned long long *ctx)                               \
 static int ____##name(unsigned long long *ctx, ##args)
 
 #define KFUNC_PROBE(event, args...) \
-        BPF_PROG(kfunc__ ## event, ##args)
+        BPF_PROG(kfunc__vmlinux__ ## event, ##args)
 
 #define KRETFUNC_PROBE(event, args...) \
-        BPF_PROG(kretfunc__ ## event, ##args)
+        BPF_PROG(kretfunc__vmlinux__ ## event, ##args)
+
+#define MODULE_KFUNC_PROBE(module, event, args...) \
+        BPF_PROG(kfunc__ ## module ## __ ## event, ##args)
+
+#define MODULE_KRETFUNC_PROBE(module, event, args...) \
+        BPF_PROG(kretfunc__ ## module ## __ ## event, ##args)
 
 #define KMOD_RET(event, args...) \
         BPF_PROG(kmod_ret__ ## event, ##args)

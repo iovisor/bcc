@@ -107,7 +107,7 @@ struct cache_info {
 };
 BPF_PERCPU_ARRAY(pcpu_cache, struct cache_info, 1);
 
-FUNC_KVM_ENTRY {
+TRACEPOINT_PROBE(kvm, kvm_entry) {
     struct exit_count *tmp_exit_count = NULL;
     kvm_exit_t *tmp_kvm_exit = NULL;
     u64 time_hd = 0;
@@ -144,10 +144,10 @@ FUNC_KVM_ENTRY {
     return 0;
 }
 
-FUNC_KVM_EXIT {
+TRACEPOINT_PROBE(kvm, kvm_exit) {
     int cache_miss = 0;
     int zero = 0;
-    u32 er = GET_ER;
+    u32 er = args->exit_reason;
     if (er >= REASON_NUM) {
         return 0;
     }
@@ -306,21 +306,6 @@ try:
 except Exception as e:
     raise Exception("Failed to do precondition check, due to: %s." % e)
 
-try:
-    #if BPF.support_raw_tracepoint_in_module():
-    if 0:
-        # Let's firstly try raw_tracepoint_in_module
-        func_kvm_exit = "RAW_TRACEPOINT_PROBE(kvm_exit)"
-        func_kvm_entry = "RAW_TRACEPOINT_PROBE(kvm_entry)"
-        get_er = "ctx->args[0]"
-    else:
-        # If raw_tp_in_module is not supported, fall back to regular tp
-        func_kvm_exit = "TRACEPOINT_PROBE(kvm, kvm_exit)"
-        func_kvm_entry = "TRACEPOINT_PROBE(kvm, kvm_entry)"
-        get_er = "args->exit_reason"
-except Exception as e:
-    raise Exception("Failed to catch kvm exit reasons due to: %s" % e)
-
 
 def find_tid(tgt_dir, tgt_vcpu):
     for tid in os.listdir(tgt_dir):
@@ -363,10 +348,6 @@ else:
     header_format = "PID      TID      "
 bpf_text = bpf_text.replace('THREAD_FILTER', thread_filter)
 
-# For kernel >= 5.0, use RAW_TRACEPOINT_MODULE for performance consideration
-bpf_text = bpf_text.replace('FUNC_KVM_EXIT', func_kvm_exit)
-bpf_text = bpf_text.replace('FUNC_KVM_ENTRY', func_kvm_entry)
-bpf_text = bpf_text.replace('GET_ER', get_er)
 b = BPF(text=bpf_text)
 
 

@@ -11,6 +11,7 @@
 #
 # 20-Sep-2015   Brendan Gregg   Created this.
 # 31-Mar-2022   Rocky Xing      Added disk filter support.
+# 01-Aug-2023   Jerome Marchand Added support for block tracepoints
 
 from __future__ import print_function
 from bcc import BPF
@@ -72,7 +73,7 @@ bpf_text = """
 #include <linux/blk-mq.h>
 
 typedef struct disk_key {
-    char disk[DISK_NAME_LEN];
+    dev_t dev;
     u64 slot;
 } disk_key_t;
 
@@ -86,26 +87,70 @@ typedef struct ext_val {
     u64 count;
 } ext_val_t;
 
-BPF_HASH(start, struct request *);
+struct tp_args {
+    u64 __unused__;
+    dev_t dev;
+    sector_t sector;
+    unsigned int nr_sector;
+    unsigned int bytes;
+    char rwbs[8];
+    char comm[16];
+    char cmd[];
+};
+
+struct start_key {
+    dev_t dev;
+    u32 _pad;
+    sector_t sector;
+    CMD_FLAGS
+};
+
+BPF_HASH(start, struct start_key);
 STORAGE
 
+static dev_t ddevt(struct gendisk *disk) {
+    return (disk->major  << 20) | disk->first_minor;
+}
+
 // time block I/O
-int trace_req_start(struct pt_regs *ctx, struct request *req)
+static int __trace_req_start(struct start_key key)
 {
     DISK_FILTER
 
     u64 ts = bpf_ktime_get_ns();
-    start.update(&req, &ts);
+    start.update(&key, &ts);
     return 0;
 }
 
+int trace_req_start(struct pt_regs *ctx, struct request *req)
+{
+    struct start_key key = {
+        .dev = ddevt(req->__RQ_DISK__),
+        .sector = req->__sector
+    };
+
+    SET_FLAGS
+
+    return __trace_req_start(key);
+}
+
+int trace_req_start_tp(struct tp_args *args)
+{
+    struct start_key key = {
+        .dev = args->dev,
+        .sector = args->sector
+    };
+
+    return __trace_req_start(key);
+}
+
 // output
-int trace_req_done(struct pt_regs *ctx, struct request *req)
+static int __trace_req_done(struct start_key key)
 {
     u64 *tsp, delta;
 
     // fetch timestamp and calculate delta
-    tsp = start.lookup(&req);
+    tsp = start.lookup(&key);
     if (tsp == 0) {
         return 0;   // missed issue
     }
@@ -116,8 +161,30 @@ int trace_req_done(struct pt_regs *ctx, struct request *req)
     // store as histogram
     STORE
 
-    start.delete(&req);
+    start.delete(&key);
     return 0;
+}
+
+int trace_req_done(struct pt_regs *ctx, struct request *req)
+{
+    struct start_key key = {
+        .dev = ddevt(req->__RQ_DISK__),
+        .sector = req->__sector
+    };
+
+    SET_FLAGS
+
+    return __trace_req_done(key);
+}
+
+int trace_req_done_tp(struct tp_args *args)
+{
+    struct start_key key = {
+        .dev = args->dev,
+        .sector = args->sector
+    };
+
+    return __trace_req_done(key);
 }
 """
 
@@ -134,21 +201,18 @@ store_str = ""
 if args.disks:
     storage_str += "BPF_HISTOGRAM(dist, disk_key_t);"
     disks_str = """
-    disk_key_t key = {.slot = bpf_log2l(delta)};
-    void *__tmp = (void *)req->__RQ_DISK__->disk_name;
-    bpf_probe_read(&key.disk, sizeof(key.disk), __tmp);
-    dist.atomic_increment(key);
+    disk_key_t dkey = {};
+    dkey.dev = key.dev;
+    dkey.slot = bpf_log2l(delta);
+    dist.atomic_increment(dkey);
     """
-    if BPF.kernel_struct_has_field(b'request', b'rq_disk') == 1:
-        store_str += disks_str.replace('__RQ_DISK__', 'rq_disk')
-    else:
-        store_str += disks_str.replace('__RQ_DISK__', 'q->disk')
+    store_str += disks_str
 elif args.flags:
     storage_str += "BPF_HISTOGRAM(dist, flag_key_t);"
     store_str += """
-    flag_key_t key = {.slot = bpf_log2l(delta)};
-    key.flags = req->cmd_flags;
-    dist.atomic_increment(key);
+    flag_key_t fkey = {.slot = bpf_log2l(delta)};
+    fkey.flags = key.flags;
+    dist.atomic_increment(fkey);
     """
 else:
     storage_str += "BPF_HISTOGRAM(dist);"
@@ -161,21 +225,13 @@ if args.disk is not None:
         exit(1)
 
     stat_info = os.stat(disk_path)
-    major = os.major(stat_info.st_rdev)
-    minor = os.minor(stat_info.st_rdev)
-
-    disk_field_str = ""
-    if BPF.kernel_struct_has_field(b'request', b'rq_disk') == 1:
-        disk_field_str = 'req->rq_disk'
-    else:
-        disk_field_str = 'req->q->disk'
+    dev = os.major(stat_info.st_rdev) << 20 | os.minor(stat_info.st_rdev)
 
     disk_filter_str = """
-    struct gendisk *disk = %s;
-    if (!(disk->major == %d && disk->first_minor == %d)) {
+    if(key.dev != %s) {
         return 0;
     }
-    """ % (disk_field_str, major, minor)
+    """ % (dev)
 
     bpf_text = bpf_text.replace('DISK_FILTER', disk_filter_str)
 else:
@@ -194,6 +250,16 @@ if args.extension:
 
 bpf_text = bpf_text.replace("STORAGE", storage_str)
 bpf_text = bpf_text.replace("STORE", store_str)
+if BPF.kernel_struct_has_field(b'request', b'rq_disk') == 1:
+    bpf_text = bpf_text.replace('__RQ_DISK__', 'rq_disk')
+else:
+    bpf_text = bpf_text.replace('__RQ_DISK__', 'q->disk')
+if args.flags:
+    bpf_text = bpf_text.replace('CMD_FLAGS', 'u64 flags;')
+    bpf_text = bpf_text.replace('SET_FLAGS', 'key.flags = req->cmd_flags;')
+else:
+    bpf_text = bpf_text.replace('CMD_FLAGS', '')
+    bpf_text = bpf_text.replace('SET_FLAGS', '')
 
 if debug or args.ebpf:
     print(bpf_text)
@@ -205,25 +271,53 @@ b = BPF(text=bpf_text)
 if args.queued:
     if BPF.get_kprobe_functions(b'__blk_account_io_start'):
         b.attach_kprobe(event="__blk_account_io_start", fn_name="trace_req_start")
-    else:
+    elif BPF.get_kprobe_functions(b'blk_account_io_start'):
         b.attach_kprobe(event="blk_account_io_start", fn_name="trace_req_start")
+    else:
+        if args.flags:
+            # Some flags are accessible in the rwbs field (RAHEAD, SYNC and META)
+            # but other aren't. Disable the -F option for tracepoint for now.
+            print("ERROR: blk_account_io_start probe not available. Can't use -F.")
+            exit()
+        b.attach_tracepoint(tp="block:block_io_start", fn_name="trace_req_start_tp")
 else:
     if BPF.get_kprobe_functions(b'blk_start_request'):
         b.attach_kprobe(event="blk_start_request", fn_name="trace_req_start")
     b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_req_start")
+
 if BPF.get_kprobe_functions(b'__blk_account_io_done'):
     b.attach_kprobe(event="__blk_account_io_done", fn_name="trace_req_done")
-else:
+elif BPF.get_kprobe_functions(b'blk_account_io_done'):
     b.attach_kprobe(event="blk_account_io_done", fn_name="trace_req_done")
+else:
+    if args.flags:
+        print("ERROR: blk_account_io_done probe not available. Can't use -F.")
+        exit()
+    b.attach_tracepoint(tp="block:block_io_done", fn_name="trace_req_done_tp")
+
 
 if not args.json:
     print("Tracing block device I/O... Hit Ctrl-C to end.")
 
-def disk_print(s):
-    disk = s.decode('utf-8', 'replace')
-    if not disk:
-        disk = "<unknown>"
-    return disk
+# cache disk major,minor -> diskname
+diskstats = "/proc/diskstats"
+disklookup = {}
+with open(diskstats) as stats:
+    for line in stats:
+        a = line.split()
+        disklookup[a[0] + "," + a[1]] = a[2]
+
+def disk_print(d):
+    major = d >> 20
+    minor = d & ((1 << 20) - 1)
+
+    disk = str(major) + "," + str(minor)
+    if disk in disklookup:
+        diskname = disklookup[disk]
+    else:
+        diskname = "?"
+
+    return diskname
 
 # see blk_fill_rwbs():
 req_opf = {

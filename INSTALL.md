@@ -290,7 +290,7 @@ apt-get install flex bison libssl-dev libelf-dev dwarves
 First, you will need to checkout the WSL2 Linux kernel git repository:
 ```
 KERNEL_VERSION=$(uname -r | cut -d '-' -f 1)
-git clone --depth 1 git@github.com:microsoft/WSL2-Linux-Kernel.git -b linux-msft-wsl-$KERNEL_VERSION
+git clone --depth 1 https://github.com/microsoft/WSL2-Linux-Kernel.git -b linux-msft-wsl-$KERNEL_VERSION
 cd WSL2-Linux-Kernel
 ```
 
@@ -368,6 +368,7 @@ To build the toolchain from source, one needs:
 * Clang, built from the same tree as LLVM
 * cmake (>=3.1), gcc (>=4.7), flex, bison
 * LuaJIT, if you want Lua support
+* Optional tools used in some examples: arping, netperf, and iperf
 
 ### Install build dependencies
 ```
@@ -380,24 +381,34 @@ wget -O - http://llvm.org/apt/llvm-snapshot.gpg.key | sudo apt-key add -
 sudo apt-get update
 
 # For Bionic (18.04 LTS)
-sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
-  libllvm6.0 llvm-6.0-dev libclang-6.0-dev python zlib1g-dev libelf-dev libfl-dev python3-setuptools
+sudo apt-get -y install zip bison build-essential cmake flex git libedit-dev \
+  libllvm6.0 llvm-6.0-dev libclang-6.0-dev python zlib1g-dev libelf-dev libfl-dev python3-setuptools \
+  liblzma-dev arping netperf iperf
 
 # For Focal (20.04.1 LTS)
-sudo apt install -y bison build-essential cmake flex git libedit-dev \
-  libllvm12 llvm-12-dev libclang-12-dev python zlib1g-dev libelf-dev libfl-dev python3-setuptools
+sudo apt install -y zip bison build-essential cmake flex git libedit-dev \
+  libllvm12 llvm-12-dev libclang-12-dev python zlib1g-dev libelf-dev libfl-dev python3-setuptools \
+  liblzma-dev arping netperf iperf
 
 # For Hirsute (21.04) or Impish (21.10)
-sudo apt install -y bison build-essential cmake flex git libedit-dev \
-libllvm11 llvm-11-dev libclang-11-dev python3 zlib1g-dev libelf-dev libfl-dev python3-setuptools
+sudo apt install -y zip bison build-essential cmake flex git libedit-dev \
+  libllvm11 llvm-11-dev libclang-11-dev python3 zlib1g-dev libelf-dev libfl-dev python3-setuptools \
+  liblzma-dev arping netperf iperf
 
 # For Jammy (22.04)
-sudo apt install -y bison build-essential cmake flex git libedit-dev \
-libllvm14 llvm-14-dev libclang-14-dev python3 zlib1g-dev libelf-dev libfl-dev python3-setuptools
+sudo apt install -y zip bison build-essential cmake flex git libedit-dev \
+  libllvm14 llvm-14-dev libclang-14-dev python3 zlib1g-dev libelf-dev libfl-dev python3-setuptools \
+  liblzma-dev libdebuginfod-dev arping netperf iperf
+  
+# For Lunar Lobster (23.04)
+sudo apt install -y zip bison build-essential cmake flex git libedit-dev \
+  libllvm15 llvm-15-dev libclang-15-dev python3 zlib1g-dev libelf-dev libfl-dev python3-setuptools \
+  liblzma-dev libdebuginfod-dev arping netperf iperf libpolly-15-dev
 
 # For other versions
-sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
-  libllvm3.7 llvm-3.7-dev libclang-3.7-dev python zlib1g-dev libelf-dev python3-setuptools
+sudo apt-get -y install zip bison build-essential cmake flex git libedit-dev \
+  libllvm3.7 llvm-3.7-dev libclang-3.7-dev python zlib1g-dev libelf-dev python3-setuptools \
+  liblzma-dev arping netperf iperf
 
 # For Lua support
 sudo apt-get -y install luajit luajit-5.1-dev
@@ -552,23 +563,23 @@ sudo yum install -y luajit luajit-devel  # for Lua support
 You could compile LLVM from source code
 
 ```
-curl -LO http://releases.llvm.org/10.0.0/llvm-10.0.0.src.tar.xz
-curl -LO http://releases.llvm.org/10.0.0/cfe-10.0.0.src.tar.xz
-tar -xf cfe-10.0.0.src.tar.xz
-tar -xf llvm-10.0.0.src.tar.xz
+curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-10.0.1/llvm-10.0.1.src.tar.xz
+curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-10.0.1/clang-10.0.1.src.tar.xz
+tar -xf clang-10.0.1.src.tar.xz
+tar -xf llvm-10.0.1.src.tar.xz
 
 mkdir clang-build
 mkdir llvm-build
 
 cd llvm-build
 cmake3 -G "Unix Makefiles" -DLLVM_TARGETS_TO_BUILD="BPF;X86" \
-  -DCMAKE_BUILD_TYPE=Release ../llvm-10.0.0.src
+  -DCMAKE_BUILD_TYPE=Release ../llvm-10.0.1.src
 make
 sudo make install
 
 cd ../clang-build
 cmake3 -G "Unix Makefiles" -DLLVM_TARGETS_TO_BUILD="BPF;X86" \
-  -DCMAKE_BUILD_TYPE=Release ../cfe-10.0.0.src
+  -DCMAKE_BUILD_TYPE=Release ../clang-10.0.1.src
 make
 sudo make install
 cd ..

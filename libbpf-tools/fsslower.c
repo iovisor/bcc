@@ -9,6 +9,7 @@
  * Based on xfsslower(8) from BCC by Brendan Gregg & Dina Goldshtein.
  * 9-Mar-2020   Wenbo Zhang   Created this.
  * 27-May-2021  Hengqi Chen   Migrated to fsslower.
+ * 27-Oct-2023  Pcheng Cui   Add support for F2FS.
  */
 #include <argp.h>
 #include <libgen.h>
@@ -38,6 +39,7 @@ enum fs_type {
 	EXT4,
 	NFS,
 	XFS,
+	F2FS,
 };
 
 static struct fs_config {
@@ -67,6 +69,12 @@ static struct fs_config {
 		[F_WRITE] = "xfs_file_write_iter",
 		[F_OPEN] = "xfs_file_open",
 		[F_FSYNC] = "xfs_file_fsync",
+	}},
+	[F2FS] = { "f2fs", {
+		[F_READ] = "f2fs_file_read_iter",
+		[F_WRITE] = "f2fs_file_write_iter",
+		[F_OPEN] = "f2fs_file_open",
+		[F_FSYNC] = "f2fs_sync_file",
 	}},
 };
 
@@ -105,7 +113,7 @@ static const struct argp_option opts[] = {
 	{ "duration", 'd', "DURATION", 0, "Total duration of trace in seconds" },
 	{ "pid", 'p', "PID", 0, "Process ID to trace" },
 	{ "min", 'm', "MIN", 0, "Min latency to trace, in ms (default 10)" },
-	{ "type", 't', "Filesystem", 0, "Which filesystem to trace, [btrfs/ext4/nfs/xfs]" },
+	{ "type", 't', "Filesystem", 0, "Which filesystem to trace, [btrfs/ext4/nfs/xfs/f2fs]" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
@@ -144,6 +152,8 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			fs_type = NFS;
 		} else if (!strcmp(arg, "xfs")) {
 			fs_type = XFS;
+		} else if (!strcmp(arg, "f2fs")) {
+			fs_type = F2FS;
 		} else {
 			warn("invalid filesystem\n");
 			argp_usage(state);
@@ -178,6 +188,8 @@ static void alias_parse(char *prog)
 		fs_type = NFS;
 	} else if (!strcmp(name, "xfsslower")) {
 		fs_type = XFS;
+	} else if (!strcmp(name, "f2fsslower")){
+		fs_type = F2FS;
 	}
 }
 
@@ -316,18 +328,25 @@ static void print_headers()
 
 static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
-	const struct event *e = data;
+	struct event e;
 	struct tm *tm;
 	char ts[32];
 	time_t t;
 
+	if (data_sz < sizeof(e)) {
+   	   	printf("Error: packet too small\n");
+   	   	return;
+	}
+	/* Copy data as alignment in the perf buffer isn't guaranteed. */
+	memcpy(&e, data, sizeof(e));
+
 	if (csv) {
-		printf("%lld,%s,%d,%c,", e->end_ns, e->task, e->pid, file_op[e->op]);
-		if (e->size == LLONG_MAX)
+		printf("%lld,%s,%d,%c,", e.end_ns, e.task, e.pid, file_op[e.op]);
+		if (e.size == LLONG_MAX)
 			printf("LL_MAX,");
 		else
-			printf("%ld,", e->size);
-		printf("%lld,%lld,%s\n", e->offset, e->delta_us, e->file);
+			printf("%zd,", e.size);
+		printf("%lld,%lld,%s\n", e.offset, e.delta_us, e.file);
 		return;
 	}
 
@@ -335,12 +354,12 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	tm = localtime(&t);
 	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
 
-	printf("%-8s %-16s %-7d %c ", ts, e->task, e->pid, file_op[e->op]);
-	if (e->size == LLONG_MAX)
+	printf("%-8s %-16s %-7d %c ", ts, e.task, e.pid, file_op[e.op]);
+	if (e.size == LLONG_MAX)
 		printf("%-7s ", "LL_MAX");
 	else
-		printf("%-7ld ", e->size);
-	printf("%-8lld %7.2f %s\n", e->offset / 1024, (double)e->delta_us / 1000, e->file);
+		printf("%-7zd ", e.size);
+	printf("%-8lld %7.2f %s\n", e.offset / 1024, (double)e.delta_us / 1000, e.file);
 }
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)

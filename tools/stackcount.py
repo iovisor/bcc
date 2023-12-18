@@ -319,6 +319,9 @@ class Tool(object):
             print("Tracing %d functions for \"%s\"... Hit Ctrl-C to end." %
                   (self.probe.matched, self.args.pattern))
         b = self.probe.bpf
+        # check whether hash table batch ops is supported
+        htab_batch_ops = True if BPF.kernel_struct_has_field(b'bpf_map_ops',
+                         b'map_lookup_and_delete_batch') == 1 else False
         exiting = 0 if self.args.interval else 1
         seconds = 0
         while True:
@@ -340,7 +343,8 @@ class Tool(object):
             counts = self.probe.bpf["counts"]
             stack_traces = self.probe.bpf["stack_traces"]
             self.comm_cache = {}
-            for k, v in sorted(counts.items(),
+            for k, v in sorted(counts.items_lookup_and_delete_batch()
+                               if htab_batch_ops else counts.items(),
                                key=lambda counts: counts[1].value):
                 user_stack = [] if k.user_stack_id < 0 else \
                     stack_traces.walk(k.user_stack_id)
@@ -368,7 +372,8 @@ class Tool(object):
                     if not self.args.pid and k.tgid != 0xffffffff:
                         self._print_comm(k.name, k.tgid)
                     print("    %d\n" % v.value)
-            counts.clear()
+            if not htab_batch_ops:
+                counts.clear()
 
             if exiting:
                 if not self.args.folded:

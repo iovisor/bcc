@@ -12,6 +12,7 @@
 #include <bpf/libbpf.h>
 #include <sys/resource.h>
 #include <bpf/bpf.h>
+#include <bpf/btf.h>
 #include "blk_types.h"
 #include "biolatency.h"
 #include "biolatency.skel.h"
@@ -233,6 +234,39 @@ static int print_log2_hists(struct bpf_map *hists, struct partitions *partitions
 	return 0;
 }
 
+/*
+ * BTF has a func proto for each tracepoint, let's check it like
+ *   typedef void (*btf_trace_block_rq_issue)(void *, struct request *);
+ *
+ * Actually it's a typedef for a pointer to the func proto.
+ */
+static bool has_block_rq_issue_single_arg(void)
+{
+	const struct btf *btf = btf__load_vmlinux_btf();
+	const struct btf_type *t1, *t2, *t3;
+	__u32 type_id;
+	bool ret = true;  // assuming recent kernels
+
+	type_id = btf__find_by_name_kind(btf, "btf_trace_block_rq_issue",
+					 BTF_KIND_TYPEDEF);
+	if ((__s32)type_id < 0)
+		return ret;
+
+	t1 = btf__type_by_id(btf, type_id);
+	if (t1 == NULL)
+		return ret;
+
+	t2 = btf__type_by_id(btf, t1->type);
+	if (t2 == NULL || !btf_is_ptr(t2))
+		return ret;
+
+	t3 = btf__type_by_id(btf, t2->type);
+	if (t3 && btf_is_func_proto(t3))
+		ret = (btf_vlen(t3) == 2); // ctx + arg
+
+	return ret;
+}
+
 int main(int argc, char **argv)
 {
 	struct partitions *partitions = NULL;
@@ -283,6 +317,7 @@ int main(int argc, char **argv)
 	obj->rodata->targ_ms = env.milliseconds;
 	obj->rodata->targ_queued = env.queued;
 	obj->rodata->filter_cg = env.cg;
+	obj->rodata->targ_single = has_block_rq_issue_single_arg();
 
 	if (probe_tp_btf("block_rq_insert")) {
 		bpf_program__set_autoload(obj->progs.block_rq_insert, false);

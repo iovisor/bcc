@@ -117,11 +117,16 @@ static __always_inline struct gendisk *get_disk(void *request)
  * way, determine whether there is a `old_mnt_userns` field for `struct
  * renamedata` to decide which input parameter of the vfs_create() to use as
  * `dentry`.
+ * commit abf08576afe3("fs: port vfs_*() helpers to struct mnt_idmap") use
+ * `struct mnt_idmap *new_mnt_idmap` instead of `struct user_namespace *
+ * old_mnt_userns`.
  * see:
  *     https://github.com/torvalds/linux/commit/6521f8917082
+ *     https://github.com/torvalds/linux/commit/abf08576afe3
  */
 struct renamedata___x {
 	struct user_namespace *old_mnt_userns;
+	struct new_mnt_idmap *new_mnt_idmap;
 } __attribute__((preserve_access_index));
 
 static __always_inline bool renamedata_has_old_mnt_userns_field(void)
@@ -129,6 +134,119 @@ static __always_inline bool renamedata_has_old_mnt_userns_field(void)
 	if (bpf_core_field_exists(struct renamedata___x, old_mnt_userns))
 		return true;
 	return false;
+}
+
+static __always_inline bool renamedata_has_new_mnt_idmap_field(void)
+{
+	if (bpf_core_field_exists(struct renamedata___x, new_mnt_idmap))
+		return true;
+	return false;
+}
+
+/**
+ * commit 3544de8ee6e4("mm, tracing: record slab name for kmem_cache_free()")
+ * replaces `trace_event_raw_kmem_free` with `trace_event_raw_kfree` and adds
+ * `tracepoint_kmem_cache_free` to enhance the information recorded for
+ * `kmem_cache_free`.
+ * see:
+ *     https://github.com/torvalds/linux/commit/3544de8ee6e4
+ */
+
+struct trace_event_raw_kmem_free___x {
+	const void *ptr;
+} __attribute__((preserve_access_index));
+
+struct trace_event_raw_kfree___x {
+	const void *ptr;
+} __attribute__((preserve_access_index));
+
+struct trace_event_raw_kmem_cache_free___x {
+	const void *ptr;
+} __attribute__((preserve_access_index));
+
+static __always_inline bool has_kfree()
+{
+	if (bpf_core_type_exists(struct trace_event_raw_kfree___x))
+		return true;
+	return false;
+}
+
+static __always_inline bool has_kmem_cache_free()
+{
+	if (bpf_core_type_exists(struct trace_event_raw_kmem_cache_free___x))
+		return true;
+	return false;
+}
+
+/**
+ * commit 11e9734bcb6a("mm/slab_common: unify NUMA and UMA version of
+ * tracepoints") drops kmem_alloc event class, rename kmem_alloc_node to
+ * kmem_alloc, so `trace_event_raw_kmem_alloc_node` is not existed any more.
+ * see:
+ *    https://github.com/torvalds/linux/commit/11e9734bcb6a
+ */
+struct trace_event_raw_kmem_alloc_node___x {
+	const void *ptr;
+	size_t bytes_alloc;
+} __attribute__((preserve_access_index));
+
+static __always_inline bool has_kmem_alloc_node(void)
+{
+	if (bpf_core_type_exists(struct trace_event_raw_kmem_alloc_node___x))
+		return true;
+	return false;
+}
+
+/**
+ * commit 2c1d697fb8ba("mm/slab_common: drop kmem_alloc & avoid dereferencing
+ * fields when not using") drops kmem_alloc event class. As a result,
+ * `trace_event_raw_kmem_alloc` is removed, `trace_event_raw_kmalloc` and
+ * `trace_event_raw_kmem_cache_alloc` are added.
+ * see:
+ *    https://github.com/torvalds/linux/commit/2c1d697fb8ba
+ */
+struct trace_event_raw_kmem_alloc___x {
+	const void *ptr;
+	size_t bytes_alloc;
+} __attribute__((preserve_access_index));
+
+struct trace_event_raw_kmalloc___x {
+	const void *ptr;
+	size_t bytes_alloc;
+} __attribute__((preserve_access_index));
+
+struct trace_event_raw_kmem_cache_alloc___x {
+	const void *ptr;
+	size_t bytes_alloc;
+} __attribute__((preserve_access_index));
+
+static __always_inline bool has_kmem_alloc(void)
+{
+	if (bpf_core_type_exists(struct trace_event_raw_kmem_alloc___x))
+		return true;
+	return false;
+}
+
+/**
+ * The bpf_get_socket_cookie helper is landed since kernel v4.12，
+ * but only available for tracing programs since kernel v5.12
+ * via commit c5dbb89fc2ac("bpf: Expose bpf_get_socket_cookie to tracing programs").
+ * Since the helper is used to provide a unique socket identifier,
+ * we could use the sock itself as the identifier if the helper is not available.
+ * Here, we use BPF_FUNC_check_mtu to check the availability of the helper
+ * since they are both introduced in v5.12.
+ *
+ * see:
+ *    https://github.com/torvalds/linux/commit/91b8270f2a4d
+ *    https://github.com/torvalds/linux/commit/c5dbb89fc2ac
+ *    https://github.com/torvalds/linux/commit/34b2021cc616
+ */
+static __always_inline __u64 get_sock_ident(struct sock *sk)
+{
+	if (bpf_core_enum_value_exists(enum bpf_func_id, BPF_FUNC_check_mtu)) {
+		return bpf_get_socket_cookie(sk);
+	}
+	return (__u64)sk;
 }
 
 #endif /* __CORE_FIXES_BPF_H */

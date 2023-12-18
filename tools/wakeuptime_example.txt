@@ -466,7 +466,7 @@ optional arguments:
   -f, --folded          output folded format
   --stack-storage-size STACK_STORAGE_SIZE
                         the number of unique stack traces that can be stored
-                        and displayed (default 1024)
+                        and displayed (default 16384)
   -m MIN_BLOCK_TIME, --min-block-time MIN_BLOCK_TIME
                         the amount of time in microseconds over which we store
                         traces (default 1)

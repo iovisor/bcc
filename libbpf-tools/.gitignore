@@ -19,11 +19,14 @@
 /exitsnoop
 /ext4dist
 /ext4slower
+/f2fsdist
+/f2fsslower
 /filelife
 /filetop
 /fsdist
 /fsslower
 /funclatency
+/futexctn
 /gethostlatency
 /hardirqs
 /javagc
@@ -53,6 +56,7 @@
 /tcpconnect
 /tcpconnlat
 /tcplife
+/tcppktlat
 /tcptracer
 /tcprtt
 /tcpstates

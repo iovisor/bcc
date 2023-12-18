@@ -47,9 +47,6 @@ args = parser.parse_args()
 
 # define BPF program
 bpf_text = """
-#ifndef KBUILD_MODNAME
-#define KBUILD_MODNAME "bcc"
-#endif
 #include <linux/virtio.h>
 #include <bcc/proto.h>
 

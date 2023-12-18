@@ -88,7 +88,7 @@ while 1:
         continue
     except KeyboardInterrupt:
         exit()
-    printb("%-18.9f %-16s %-6d %s" % (ts, task, pid, msg))
+    printb(b"%-18.9f %-16s %-6d %s" % (ts, task, pid, msg))
 ```
 
 This is similar to hello_world.py, and traces new processes via sys_clone() again, but has a few more things to learn:
@@ -159,7 +159,7 @@ while 1:
         if start == 0:
             start = ts
         ts = ts - start
-        printb("At time %.2f s: multiple syncs detected, last %s ms ago" % (ts, ms))
+        printb(b"At time %.2f s: multiple syncs detected, last %s ms ago" % (ts, ms))
     except KeyboardInterrupt:
         exit()
 ```

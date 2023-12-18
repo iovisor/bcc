@@ -362,8 +362,8 @@ local function parse_arg(utils)
    program = program:gsub('FILTER_LPORT', '')
 
    if args.wide then
-      header_string = "%-5s %-16.16s %-2s %-26s %-5s %-26s %-5s %6s %6s %s"
-      format_string = "%-5d %-16.16s %-2s %-26s %-5s %-26s %-5d %6d %6d %.2f"
+      header_string = "%-5s %-16.16s %-2s %-39s %-5s %-39s %-5s %6s %6s %s"
+      format_string = "%-5d %-16.16s %-2s %-39s %-5s %-39s %-5d %6d %6d %.2f"
       ip_string = "IP"
       ip_version = true
    end

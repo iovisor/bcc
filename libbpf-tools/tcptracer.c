@@ -167,7 +167,7 @@ static void print_events_header()
 
 static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
-	const struct event *event = data;
+	struct event event;
 	char src[INET6_ADDRSTRLEN];
 	char dst[INET6_ADDRSTRLEN];
 	union {
@@ -176,28 +176,35 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	} s, d;
 	static __u64 start_ts;
 
-	if (event->af == AF_INET) {
-		s.x4.s_addr = event->saddr_v4;
-		d.x4.s_addr = event->daddr_v4;
-	} else if (event->af == AF_INET6) {
-		memcpy(&s.x6.s6_addr, &event->saddr_v6, sizeof(s.x6.s6_addr));
-		memcpy(&d.x6.s6_addr, &event->daddr_v6, sizeof(d.x6.s6_addr));
+	if (data_sz < sizeof(event)) {
+		printf("Error: packet too small\n");
+		return;
+	}
+	/* Copy data as alignment in the perf buffer isn't guaranteed. */
+	memcpy(&event, data, sizeof(event));
+
+	if (event.af == AF_INET) {
+		s.x4.s_addr = event.saddr_v4;
+		d.x4.s_addr = event.daddr_v4;
+	} else if (event.af == AF_INET6) {
+		memcpy(&s.x6.s6_addr, &event.saddr_v6, sizeof(s.x6.s6_addr));
+		memcpy(&d.x6.s6_addr, &event.daddr_v6, sizeof(d.x6.s6_addr));
 	} else {
-		warn("broken event: event->af=%d", event->af);
+		warn("broken event: event.af=%d", event.af);
 		return;
 	}
 
 	if (env.print_timestamp) {
 		if (start_ts == 0)
-			start_ts = event->ts_us;
-		printf("%-9.3f", (event->ts_us - start_ts) / 1000000.0);
+			start_ts = event.ts_us;
+		printf("%-9.3f", (event.ts_us - start_ts) / 1000000.0);
 	}
 
 	if (env.print_uid)
-		printf("%-6d", event->uid);
+		printf("%-6d", event.uid);
 
 	char type = '-';
-	switch (event->type) {
+	switch (event.type) {
 	case TCP_EVENT_TYPE_CONNECT:
 		type = 'C';
 		break;
@@ -210,11 +217,11 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	}
 
 	printf("%c %-6d %-12.12s %-2d %-16s %-16s %-4d %-4d\n",
-	       type, event->pid, event->task,
-	       event->af == AF_INET ? 4 : 6,
-	       inet_ntop(event->af, &s, src, sizeof(src)),
-	       inet_ntop(event->af, &d, dst, sizeof(dst)),
-	       ntohs(event->sport), ntohs(event->dport));
+	       type, event.pid, event.task,
+	       event.af == AF_INET ? 4 : 6,
+	       inet_ntop(event.af, &s, src, sizeof(src)),
+	       inet_ntop(event.af, &d, dst, sizeof(dst)),
+	       ntohs(event.sport), ntohs(event.dport));
 }
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)

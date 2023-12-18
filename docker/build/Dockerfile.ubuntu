@@ -1,10 +1,10 @@
-ARG VERSION="18.04"
+ARG VERSION="20.04"
 FROM ubuntu:${VERSION}
 
 ARG LLVM_VERSION="11"
 ENV LLVM_VERSION=$LLVM_VERSION
 
-ARG SHORTNAME="bionic"
+ARG SHORTNAME="focal"
 
 ARG RUBY_INSTALL_VERSION="0.8.4"
 ENV RUBY_INSTALL_VERSION=$RUBY_INSTALL_VERSION
@@ -12,19 +12,24 @@ ENV RUBY_INSTALL_VERSION=$RUBY_INSTALL_VERSION
 ARG RUBY_VERSION="3.1.2"
 ENV RUBY_VERSION=$RUBY_VERSION
 
-RUN apt-get update && apt-get install -y curl gnupg &&\
+RUN /bin/bash -c 'apt-get update && apt-get install -y curl gnupg &&\
     llvmRepository="\n\
 deb http://apt.llvm.org/${SHORTNAME}/ llvm-toolchain-${SHORTNAME} main\n\
-deb-src http://apt.llvm.org/${SHORTNAME}/ llvm-toolchain-${SHORTNAME} main\n\
-deb http://apt.llvm.org/${SHORTNAME}/ llvm-toolchain-${SHORTNAME}-${LLVM_VERSION} main\n\
-deb-src http://apt.llvm.org/${SHORTNAME}/ llvm-toolchain-${SHORTNAME}-${LLVM_VERSION} main\n" &&\
-    echo $llvmRepository >> /etc/apt/sources.list && \
-    curl -L https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
+deb-src http://apt.llvm.org/${SHORTNAME}/ llvm-toolchain-${SHORTNAME} main\n" && \
+echo -e $llvmRepository >> /etc/apt/sources.list && \
+read -ra versions <<<"${LLVM_VERSION}" && \
+for version in ${versions[@]}; \
+do \
+    llvmRepository="\n\
+deb http://apt.llvm.org/${SHORTNAME}/ llvm-toolchain-${SHORTNAME}-${version} main\n\
+deb-src http://apt.llvm.org/${SHORTNAME}/ llvm-toolchain-${SHORTNAME}-${version} main\n" &&\
+    echo -e $llvmRepository >> /etc/apt/sources.list; done && \
+    curl -L https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -'
 
 ARG DEBIAN_FRONTEND="noninteractive"
 ENV TZ="Etc/UTC"
 
-RUN apt-get update && apt-get install -y \
+RUN /bin/bash -c 'apt-get update && apt-get install -y \
       util-linux \
       bison \
       binutils-dev \
@@ -40,14 +45,6 @@ RUN apt-get update && apt-get install -y \
       liblzma-dev \
       libbfd-dev \
       libedit-dev \
-      clang-${LLVM_VERSION} \
-      libclang-${LLVM_VERSION}-dev \
-      libclang-common-${LLVM_VERSION}-dev \
-      libclang1-${LLVM_VERSION} \
-      llvm-${LLVM_VERSION} \
-      llvm-${LLVM_VERSION}-dev \
-      llvm-${LLVM_VERSION}-runtime \
-      libllvm${LLVM_VERSION} \
       systemtap-sdt-dev \
       sudo \
       iproute2 \
@@ -61,11 +58,27 @@ RUN apt-get update && apt-get install -y \
       bridge-utils \
       libtinfo5 \
       libtinfo-dev \
-      iperf \
-      netperf \
       xz-utils \
       zip && \
-      apt-get -y clean
+      read -ra versions <<<"${LLVM_VERSION}" && \
+for version in ${versions[@]}; \
+do \
+    apt-get install -y \
+      clang-${version} \
+      libclang-${version}-dev \
+      libclang-common-${version}-dev \
+      libclang1-${version} \
+      llvm-${version} \
+      llvm-${version}-dev \
+      llvm-${version}-runtime \
+      libllvm${version} && \
+      if [ "${version}" -ge "15" ]; \
+      then \
+        apt-get install -y libpolly-${version}-dev; \
+      fi; \
+done \ 
+&& \
+      apt-get -y clean'
 
 RUN pip3 install pyroute2==0.5.18 netaddr==0.8.0 dnslib==0.9.14 cachetools==3.1.1
 

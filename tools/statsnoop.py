@@ -74,12 +74,12 @@ static int trace_entry(struct pt_regs *ctx, const char __user *filename)
     return 0;
 };
 
-int stat_entry(struct pt_regs *ctx, const char __user *filename)
+int syscall__stat_entry(struct pt_regs *ctx, const char __user *filename)
 {
     return trace_entry(ctx, filename);
 }
 
-int statx_entry(struct pt_regs *ctx, int dfd, const char __user *filename)
+int syscall__statx_entry(struct pt_regs *ctx, int dfd, const char __user *filename)
 {
     return trace_entry(ctx, filename);
 }
@@ -128,10 +128,10 @@ b = BPF(text=bpf_text)
 def try_attach_syscall_probes(syscall):
     syscall_fnname = b.get_syscall_fnname(syscall)
     if BPF.ksymname(syscall_fnname) != -1:
-        if syscall == "statx":
-            b.attach_kprobe(event=syscall_fnname, fn_name="statx_entry")
+        if syscall in ["statx", "fstatat64", "newfstatat"]:
+            b.attach_kprobe(event=syscall_fnname, fn_name="syscall__statx_entry")
         else:
-            b.attach_kprobe(event=syscall_fnname, fn_name="stat_entry")
+            b.attach_kprobe(event=syscall_fnname, fn_name="syscall__stat_entry")
         b.attach_kretprobe(event=syscall_fnname, fn_name="trace_return")
 
 try_attach_syscall_probes("stat")
@@ -139,6 +139,8 @@ try_attach_syscall_probes("statx")
 try_attach_syscall_probes("statfs")
 try_attach_syscall_probes("newstat")
 try_attach_syscall_probes("newlstat")
+try_attach_syscall_probes("fstatat64")
+try_attach_syscall_probes("newfstatat")
 
 start_ts = 0
 prev_ts = 0

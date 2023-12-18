@@ -39,6 +39,12 @@ def run_command_get_pid(command):
         p = subprocess.Popen(command.split())
         return p.pid
 
+sort_keys = ["size", "count"]
+alloc_sort_map = {sort_keys[0]: lambda a: a.size,
+                  sort_keys[1]: lambda a: a.count};
+combined_sort_map = {sort_keys[0]: lambda a: -a[1].total_size,
+                     sort_keys[1]: lambda a: -a[1].number_of_allocs};
+
 examples = """
 EXAMPLES:
 
@@ -60,6 +66,9 @@ EXAMPLES:
         allocations that are at least one minute (60 seconds) old
 ./memleak -s 5
         Trace roughly every 5th allocation, to reduce overhead
+./memleak --sort count
+        Trace allocations in kernel mode and display a summary of outstanding
+        allocations that are sorted in count order
 """
 
 description = """
@@ -104,6 +113,10 @@ parser.add_argument("--ebpf", action="store_true",
         help=argparse.SUPPRESS)
 parser.add_argument("--percpu", default=False, action="store_true",
         help="trace percpu allocations")
+parser.add_argument("--sort", type=str, default="size",
+        help="report sorted in given key; available key list: size, count")
+parser.add_argument("--symbols-prefix", type=str,
+        help="memory alloctor symbols prefix")
 
 args = parser.parse_args()
 
@@ -119,6 +132,12 @@ top_stacks = args.top
 min_size = args.min_size
 max_size = args.max_size
 obj = args.obj
+sort_key = args.sort
+
+if sort_key not in sort_keys:
+        print("Given sort_key:", sort_key)
+        print("Supporting sort key list:", sort_keys)
+        exit(1)
 
 if min_size is not None and max_size is not None and min_size > max_size:
         print("min_size (-z) can't be greater than max_size (-Z)")
@@ -447,15 +466,17 @@ bpf = BPF(text=bpf_source)
 if not kernel_trace:
         print("Attaching to pid %d, Ctrl+C to quit." % pid)
 
-        def attach_probes(sym, fn_prefix=None, can_fail=False):
+        def attach_probes(sym, fn_prefix=None, can_fail=False, need_uretprobe=True):
                 if fn_prefix is None:
                         fn_prefix = sym
-
+                if args.symbols_prefix is not None:
+                        sym = args.symbols_prefix + sym
                 try:
                         bpf.attach_uprobe(name=obj, sym=sym,
                                           fn_name=fn_prefix + "_enter",
                                           pid=pid)
-                        bpf.attach_uretprobe(name=obj, sym=sym,
+                        if need_uretprobe:
+                                bpf.attach_uretprobe(name=obj, sym=sym,
                                              fn_name=fn_prefix + "_exit",
                                              pid=pid)
                 except Exception:
@@ -467,16 +488,14 @@ if not kernel_trace:
         attach_probes("malloc")
         attach_probes("calloc")
         attach_probes("realloc")
-        attach_probes("mmap")
+        attach_probes("mmap", can_fail=True) # failed on jemalloc
         attach_probes("posix_memalign")
         attach_probes("valloc", can_fail=True) # failed on Android, is deprecated in libc.so from bionic directory
         attach_probes("memalign")
         attach_probes("pvalloc", can_fail=True) # failed on Android, is deprecated in libc.so from bionic directory
         attach_probes("aligned_alloc", can_fail=True)  # added in C11
-        bpf.attach_uprobe(name=obj, sym="free", fn_name="free_enter",
-                                  pid=pid)
-        bpf.attach_uprobe(name=obj, sym="munmap", fn_name="munmap_enter",
-                                  pid=pid)
+        attach_probes("free", need_uretprobe=False)
+        attach_probes("munmap", can_fail=True, need_uretprobe=False) # failed on jemalloc
 
 else:
         print("Attaching to kernel allocators, Ctrl+C to quit.")
@@ -522,8 +541,7 @@ def print_outstanding():
                 if args.show_allocs:
                         print("\taddr = %x size = %s" %
                               (address.value, info.size))
-        to_show = sorted(alloc_info.values(),
-                         key=lambda a: a.size)[-top_stacks:]
+        to_show = sorted(alloc_info.values(), key=alloc_sort_map[sort_key])[-top_stacks:]
         for alloc in to_show:
                 print("\t%d bytes in %d allocations from stack\n\t\t%s" %
                       (alloc.size, alloc.count,
@@ -532,7 +550,7 @@ def print_outstanding():
 def print_outstanding_combined():
         stack_traces = bpf["stack_traces"]
         stacks = sorted(bpf["combined_allocs"].items(),
-                        key=lambda a: -a[1].total_size)
+                        key=combined_sort_map[sort_key])
         cnt = 1
         entries = []
         for stack_id, info in stacks:
@@ -542,8 +560,8 @@ def print_outstanding_combined():
                                 sym = bpf.sym(addr, pid,
                                                       show_module=True,
                                                       show_offset=True)
-                                trace.append(sym)
-                        trace = "\n\t\t".join(trace.decode())
+                                trace.append(sym.decode('utf-8'))
+                        trace = "\n\t\t".join(trace)
                 except KeyError:
                         trace = "stack information lost"
 

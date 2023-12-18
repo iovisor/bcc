@@ -22,6 +22,8 @@
 #include <string>
 #include <vector>
 
+#include <llvm/Config/llvm-config.h>
+
 #include "bcc_exception.h"
 #include "table_storage.h"
 

@@ -13,6 +13,7 @@ const volatile bool filter_cg = false;
 const volatile bool targ_queued = false;
 const volatile bool filter_dev = false;
 const volatile __u32 targ_dev = 0;
+const volatile __u64 min_ns = 0;
 
 extern __u32 LINUX_KERNEL_VERSION __kconfig;
 
@@ -68,6 +69,15 @@ int trace_pid(struct request *rq)
 
 SEC("fentry/blk_account_io_start")
 int BPF_PROG(blk_account_io_start, struct request *rq)
+{
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
+
+	return trace_pid(rq);
+}
+
+SEC("tp_btf/block_io_start")
+int BPF_PROG(block_io_start, struct request *rq)
 {
 	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
 		return 0;
@@ -160,7 +170,7 @@ int BPF_PROG(block_rq_complete, struct request *rq, int error,
 	if (!stagep)
 		return 0;
 	delta = (s64)(ts - stagep->issue);
-	if (delta < 0)
+	if (delta < 0 || delta < min_ns)
 		goto cleanup;
 	piddatap = bpf_map_lookup_elem(&infobyreq, &rq);
 	if (!piddatap) {
@@ -178,9 +188,9 @@ int BPF_PROG(block_rq_complete, struct request *rq, int error,
 			event.qdelta = stagep->issue - stagep->insert;
 	}
 	event.ts = ts;
-	event.sector = rq->__sector;
-	event.len = rq->__data_len;
-	event.cmd_flags = rq->cmd_flags;
+	event.sector = BPF_CORE_READ(rq, __sector);
+	event.len = BPF_CORE_READ(rq, __data_len);
+	event.cmd_flags = BPF_CORE_READ(rq, cmd_flags);
 	event.dev = stagep->dev;
 	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &event,
 			sizeof(event));

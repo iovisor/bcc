@@ -13,11 +13,11 @@
 #
 # 13-Jan-2016	Brendan Gregg	Created this.
 # 27-Mar-2023	Rocky Xing      Added option to show symbol offsets.
+# 04-Apr-2023   Rocky Xing      Updated default stack storage size.
 
 from __future__ import print_function
 from bcc import BPF
 from sys import stderr
-from time import strftime
 import argparse
 import errno
 import signal
@@ -85,10 +85,10 @@ parser.add_argument("-f", "--folded", action="store_true",
     help="output folded format")
 parser.add_argument("-s", "--offset", action="store_true",
     help="show address offsets")
-parser.add_argument("--stack-storage-size", default=1024,
+parser.add_argument("--stack-storage-size", default=16384,
     type=positive_nonzero_int,
     help="the number of unique stack traces that can be stored and "
-         "displayed (default 1024)")
+         "displayed (default 16384)")
 parser.add_argument("duration", nargs="?", default=99999999,
     type=positive_nonzero_int,
     help="duration of trace, in seconds")
@@ -267,7 +267,7 @@ if debug or args.ebpf:
 
 # initialize BPF
 b = BPF(text=bpf_text)
-b.attach_kprobe(event_re="^finish_task_switch$|^finish_task_switch\.isra\.\d$",
+b.attach_kprobe(event_re=r'^finish_task_switch$|^finish_task_switch\.isra\.\d$',
                 fn_name="oncpu")
 matched = b.num_open_kprobes()
 if matched == 0:

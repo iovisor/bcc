@@ -270,7 +270,7 @@ if args.pids or args.tids:
     bpf_text = bpf_text.replace('STORAGE',
         'BPF_HISTOGRAM(dist, pid_key_t);')
     bpf_text = bpf_text.replace('STORE',
-        'pid_key_t key = {.id = ' + pid + ', .slot = bpf_log2l(delta)}; ' +
+        'pid_key_t key = {}; key.id = ' + pid + '; key.slot = bpf_log2l(delta); ' +
         'dist.increment(key);')
 elif args.pidnss:
     section = "pidns"
@@ -294,7 +294,7 @@ b = BPF(text=bpf_text)
 if not is_support_raw_tp:
     b.attach_kprobe(event="ttwu_do_wakeup", fn_name="trace_ttwu_do_wakeup")
     b.attach_kprobe(event="wake_up_new_task", fn_name="trace_wake_up_new_task")
-    b.attach_kprobe(event_re="^finish_task_switch$|^finish_task_switch\.isra\.\d$",
+    b.attach_kprobe(event_re=r'^finish_task_switch$|^finish_task_switch\.isra\.\d$',
                     fn_name="trace_run")
 
 print("Tracing run queue latency... Hit Ctrl-C to end.")
