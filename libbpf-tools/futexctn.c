@@ -4,6 +4,7 @@
 // Based on https://sourceware.org/systemtap/wiki/WSFutexContention
 // 10-Jul-2023   Wenbo Zhang   Created this.
 #include <argp.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -233,7 +234,7 @@ static int print_stack(struct futexctn_bpf *obj, struct hist_key *info)
 			fprintf(stderr, "failed to get syms\n");
 		} else {
 			for (i = 0; i < env.perf_max_stack_depth && ip[i]; i++)
-				printf("    #%-2d 0x%016llx [unknown]\n", idx++, ip[i]);
+				printf("    #%-2d 0x%016" PRIx64 " [unknown]\n", idx++, ip[i]);
 		}
 		goto cleanup;
 	}
@@ -246,7 +247,7 @@ static int print_stack(struct futexctn_bpf *obj, struct hist_key *info)
 				printf("    [unknown]\n");
 		} else {
 			sym = syms__map_addr_dso(syms, ip[i], &dso_name, &dso_offset);
-			printf("    #%-2d 0x%016llx", idx++, ip[i]);
+			printf("    #%-2d 0x%016" PRIx64, idx++, ip[i]);
 			if (sym)
 				printf(" %s+0x%lx", sym->name, sym->offset);
 			if (dso_name)
