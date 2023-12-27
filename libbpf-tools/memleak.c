@@ -766,14 +766,13 @@ void print_stack_frames_by_syms_cache()
 		if (addr == 0)
 			break;
 
-		char *dso_name;
-		uint64_t dso_offset;
-		const struct sym *sym = syms__map_addr_dso(syms, addr, &dso_name, &dso_offset);
-		if (sym) {
-			printf("\t%zu [<%016lx>] %s+0x%lx", i, addr, sym->name, sym->offset);
-			if (dso_name)
-				printf(" [%s]", dso_name);
-			printf("\n");
+		struct sym_info sinfo;
+		int ret = syms__map_addr_dso(syms, addr, &sinfo);
+		if (ret == 0) {
+			printf("\t%zu [<%016lx>]", i, addr);
+			if (sinfo.sym_name)
+				printf(" %s+0x%lx", sinfo.sym_name, sinfo.sym_offset);
+			printf(" [%s]\n", sinfo.dso_name);
 		} else {
 			printf("\t%zu [<%016lx>] <%s>\n", i, addr, "null sym");
 		}
