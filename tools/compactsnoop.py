@@ -207,6 +207,7 @@ RAW_TRACEPOINT_PROBE(mm_compaction_suitable)
 {
     // TP_PROTO(struct zone *zone, int order, int ret)
     struct zone *zone = (struct zone *)ctx->args[0];
+    struct val_t val = { };
     int order = (int)ctx->args[1];
     int ret = (int)ctx->args[2];
     u64 id;
@@ -222,14 +223,13 @@ RAW_TRACEPOINT_PROBE(mm_compaction_suitable)
     if (valp == NULL) {
         // missed entry or order <= PAGE_ALLOC_COSTLY_ORDER, eg:
         // manual trigger echo 1 > /proc/sys/vm/compact_memory
-        struct val_t val = { .fragindex = -1000 };
+        val.fragindex = -1000;
         valp = &val;
-        start.update(&id, valp);
     }
     fill_compact_info(valp, zone, order);
     get_all_wmark_pages(zone, valp);
+    start.update(&id, valp);
 #else
-    struct val_t val = { };
     fill_compact_info(&val, zone, order);
     start.update(&id, &val);
 #endif
