@@ -90,6 +90,11 @@ BPF LSM hook | 5.7 | [`fc611f47f218`](https://github.com/torvalds/linux/commit/f
 BPF iterator | 5.8 | [`180139dca8b3`](https://github.com/torvalds/linux/commit/180139dca8b38c858027b8360ee10064fdb2fbf7)
 BPF socket lookup hook | 5.9 | [`e9ddbb7707ff`](https://github.com/torvalds/linux/commit/e9ddbb7707ff5891616240026062b8c1e29864ca)
 Sleepable BPF programs | 5.10 | [`1e6c62a88215`](https://github.com/torvalds/linux/commit/1e6c62a8821557720a9b2ea9617359b264f2f67c)
+Mixing bpf2bpf function calls and tailcalls (x86\_64) | 5.10 | [`e411901c0b77`](https://github.com/torvalds/linux/commit/e411901c0b775a3ae7f3e2505f8d2d90ac696178)
+Mixing bpf2bpf function calls and tailcalls (arm64) | 6.0 | [`d4609a5d8c70`](https://github.com/torvalds/linux/commit/d4609a5d8c70d21b4a3f801cf896a3c16c613fe1)
+Mixing bpf2bpf function calls and tailcalls (s390) | 6.3 | [`dd691e847d28`](https://github.com/torvalds/linux/commit/dd691e847d28ac5f8b8e3005be44fd0e46722809)
+Mixing bpf2bpf function calls and tailcalls (loongarch) | 6.4 | [`bb035ef0cc91`](https://github.com/torvalds/linux/commit/bb035ef0cc91e115faa80187ac8886a7f1914d06)
+
 
 ### Program types
 
