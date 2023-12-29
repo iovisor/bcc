@@ -205,7 +205,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	struct tm *tm;
 #ifdef USE_BLAZESYM
 	sym_src_cfg cfgs[] = {
-		{ .src_type = SRC_T_PROCESS, .params = { .process = { .pid = e->pid }}},
+		{ .src_type = SRC_T_PROCESS, .params = { .process = { .pid = e.pid }}},
 	};
 	const blazesym_result *result = NULL;
 	const blazesym_csym *sym;
@@ -217,8 +217,8 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	int fd, err;
 
 	if (data_sz < sizeof(e)) {
-   	   	printf("Error: packet too small\n");
-   	   	return;
+		printf("Error: packet too small\n");
+		return;
 	}
 	/* Copy data as alignment in the perf buffer isn't guaranteed. */
 	memcpy(&e, data, sizeof(e));
