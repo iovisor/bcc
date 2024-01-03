@@ -204,9 +204,6 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	struct event e;
 	struct tm *tm;
 #ifdef USE_BLAZESYM
-	sym_src_cfg cfgs[] = {
-		{ .src_type = SRC_T_PROCESS, .params = { .process = { .pid = e.pid }}},
-	};
 	const blazesym_result *result = NULL;
 	const blazesym_csym *sym;
 	int i, j;
@@ -240,6 +237,9 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	}
 
 #ifdef USE_BLAZESYM
+	sym_src_cfg cfgs[] = {
+		{ .src_type = SRC_T_PROCESS, .params = { .process = { .pid = e.pid }}},
+	};
 	if (env.callers)
 		result = blazesym_symbolize(symbolizer, cfgs, 1, (const uint64_t *)&e.callers, 2);
 #endif
