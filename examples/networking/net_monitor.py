@@ -45,6 +45,8 @@ int packet_monitor(struct __sk_buff *skb) {
     
     struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
     struct ip_t *ip = cursor_advance(cursor, sizeof(*ip));
+    if (ip->ver != 4)
+        return 0;
     if (ip->nextp != IP_TCP) 
     {
         if (ip -> nextp != IP_UDP) 
