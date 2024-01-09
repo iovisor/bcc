@@ -78,7 +78,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		target_family = AF_INET6;
 		break;
 	case 'w':
-		column_width = 26;
+		column_width = 39;
 		break;
 	case 'L':
 		target_sports = strdup(arg);
@@ -116,9 +116,16 @@ static void sig_int(int signo)
 static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	char ts[32], saddr[48], daddr[48];
-	struct event *e = data;
+	struct event e;
 	struct tm *tm;
 	time_t t;
+
+	if (data_sz < sizeof(e)) {
+		printf("Error: packet too small\n");
+		return;
+	}
+	/* Copy data as alignment in the perf buffer isn't guaranteed. */
+	memcpy(&e, data, sizeof(e));
 
 	if (emit_timestamp) {
 		time(&t);
@@ -127,12 +134,12 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		printf("%8s ", ts);
 	}
 
-	inet_ntop(e->family, &e->saddr, saddr, sizeof(saddr));
-	inet_ntop(e->family, &e->daddr, daddr, sizeof(daddr));
+	inet_ntop(e.family, &e.saddr, saddr, sizeof(saddr));
+	inet_ntop(e.family, &e.daddr, daddr, sizeof(daddr));
 
 	printf("%-7d %-16s %-*s %-5d %-*s %-5d %-6.2f %-6.2f %-.2f\n",
-	       e->pid, e->comm, column_width, saddr, e->sport, column_width, daddr, e->dport,
-	       (double)e->tx_b / 1024, (double)e->rx_b / 1024, (double)e->span_us / 1000);
+	       e.pid, e.comm, column_width, saddr, e.sport, column_width, daddr, e.dport,
+	       (double)e.tx_b / 1024, (double)e.rx_b / 1024, (double)e.span_us / 1000);
 }
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
@@ -158,7 +165,6 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
-	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
 
 	err = ensure_core_btf(&open_opts);
@@ -184,6 +190,7 @@ int main(int argc, char **argv)
 			obj->rodata->target_sports[i++] = port_num;
 			port = strtok(NULL, ",");
 		}
+		obj->rodata->filter_sport = true;
 	}
 
 	if (target_dports) {
@@ -194,6 +201,7 @@ int main(int argc, char **argv)
 			obj->rodata->target_dports[i++] = port_num;
 			port = strtok(NULL, ",");
 		}
+		obj->rodata->filter_dport = true;
 	}
 
 	err = tcplife_bpf__load(obj);

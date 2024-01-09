@@ -44,7 +44,10 @@ def _get_num_open_probes():
     global _num_open_probes
     return _num_open_probes
 
-TRACEFS = "/sys/kernel/debug/tracing"
+DEBUGFS = "/sys/kernel/debug"
+TRACEFS = os.path.join(DEBUGFS, "tracing")
+if not os.path.exists(TRACEFS):
+    TRACEFS = "/sys/kernel/tracing"
 
 # Debug flags
 
@@ -188,6 +191,7 @@ class BPFProgType:
     SK_MSG = 16
     RAW_TRACEPOINT = 17
     CGROUP_SOCK_ADDR = 18
+    CGROUP_SOCKOPT = 25
     TRACING = 26
     LSM = 29
 
@@ -291,7 +295,7 @@ class BPF(object):
 
     _probe_repl = re.compile(b"[^a-zA-Z0-9_]")
     _sym_caches = {}
-    _bsymcache =  lib.bcc_buildsymcache_new()
+    _bsymcache = lib.bcc_buildsymcache_new()
 
     _auto_includes = {
         "linux/time.h": ["time"],
@@ -685,7 +689,7 @@ class BPF(object):
 
     @staticmethod
     def get_kprobe_functions(event_re):
-        blacklist_file = "%s/../kprobes/blacklist" % TRACEFS
+        blacklist_file = "%s/kprobes/blacklist" % DEBUGFS
         try:
             with open(blacklist_file, "rb") as blacklist_f:
                 blacklist = set([line.rstrip().split()[1] for line in blacklist_f])
@@ -693,6 +697,15 @@ class BPF(object):
             if e.errno != errno.EPERM:
                 raise e
             blacklist = set([])
+
+        avail_filter_file = "%s/tracing/available_filter_functions" % DEBUGFS
+        try:
+            with open(avail_filter_file, "rb") as avail_filter_f:
+                avail_filter = set([line.rstrip().split()[0] for line in avail_filter_f])
+        except IOError as e:
+            if e.errno != errno.EPERM:
+                raise e
+            avail_filter = set([])
 
         fns = []
 
@@ -742,10 +755,11 @@ class BPF(object):
                 elif fn.startswith(b'__SCT__'):
                     continue
                 # Exclude all gcc 8's extra .cold functions
-                elif re.match(b'^.*\.cold(\.\d+)?$', fn):
+                elif re.match(b'^.*.cold(.d+)?$', fn):
                     continue
-                if (t.lower() in [b't', b'w']) and re.match(event_re, fn) \
-                    and fn not in blacklist:
+                if (t.lower() in [b't', b'w']) and re.fullmatch(event_re, fn) \
+                    and fn not in blacklist \
+                    and fn in avail_filter:
                     fns.append(fn)
         return set(fns)     # Some functions may appear more than once
 
@@ -991,7 +1005,7 @@ class BPF(object):
                 if os.path.isdir(evt_dir):
                     tp = ("%s:%s" % (category, event))
                     if re.match(tp_re.decode(), tp):
-                        results.append(tp)
+                        results.append(tp.encode())
         return results
 
     @staticmethod

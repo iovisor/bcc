@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # oomkill   Trace oom_kill_process(). For Linux, uses BCC, eBPF.
 #

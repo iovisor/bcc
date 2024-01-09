@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # mountsnoop Trace mount() and umount syscalls.
 #            For Linux, uses BCC, eBPF. Embedded C.

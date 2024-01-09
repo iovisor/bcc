@@ -195,20 +195,21 @@ USAGE message:
 # ./opensnoop -h
 usage: opensnoop.py [-h] [-T] [-U] [-x] [-p PID] [-t TID]
                     [--cgroupmap CGROUPMAP] [--mntnsmap MNTNSMAP] [-u UID]
-                    [-d DURATION] [-n NAME] [-e] [-f FLAG_FILTER]
+                    [-d DURATION] [-n NAME] [-e] [-f FLAG_FILTER] [-F]
+                    [-b BUFFER_PAGES]
 
 Trace open() syscalls
 
 optional arguments:
   -h, --help            show this help message and exit
   -T, --timestamp       include timestamp on output
-  -U, --print-uid       include UID on output
+  -U, --print-uid       print UID column
   -x, --failed          only show failed opens
   -p PID, --pid PID     trace this PID only
   -t TID, --tid TID     trace this TID only
   --cgroupmap CGROUPMAP
                         trace cgroups in this BPF map only
-  --mntnsmap MNTNSMAP   trace mount namespaces in this BPF map on
+  --mntnsmap MNTNSMAP   trace mount namespaces in this BPF map only
   -u UID, --uid UID     trace this UID only
   -d DURATION, --duration DURATION
                         total duration of trace in seconds
@@ -217,18 +218,23 @@ optional arguments:
                         show extended fields
   -f FLAG_FILTER, --flag_filter FLAG_FILTER
                         filter on flags argument (e.g., O_WRONLY)
+  -F, --full-path       show full path for an open file with relative path
+  -b BUFFER_PAGES, --buffer-pages BUFFER_PAGES
+                        size of the perf ring buffer (must be a power of two
+                        number of pages and defaults to 64)
 
 examples:
-    ./opensnoop           # trace all open() syscalls
-    ./opensnoop -T        # include timestamps
-    ./opensnoop -U        # include UID
-    ./opensnoop -x        # only show failed opens
-    ./opensnoop -p 181    # only trace PID 181
-    ./opensnoop -t 123    # only trace TID 123
-    ./opensnoop -u 1000   # only trace UID 1000
-    ./opensnoop -d 10     # trace for 10 seconds only
-    ./opensnoop -n main   # only print process names containing "main"
-    ./opensnoop -e        # show extended fields
+    ./opensnoop                        # trace all open() syscalls
+    ./opensnoop -T                     # include timestamps
+    ./opensnoop -U                     # include UID
+    ./opensnoop -x                     # only show failed opens
+    ./opensnoop -p 181                 # only trace PID 181
+    ./opensnoop -t 123                 # only trace TID 123
+    ./opensnoop -u 1000                # only trace UID 1000
+    ./opensnoop -d 10                  # trace for 10 seconds only
+    ./opensnoop -n main                # only print process names containing "main"
+    ./opensnoop -e                     # show extended fields
     ./opensnoop -f O_WRONLY -f O_RDWR  # only print calls for writing
-    ./opensnoop --cgroupmap mappath  # only trace cgroups in this BPF map
-    ./opensnoop --mntnsmap mappath   # only trace mount namespaces in the map
+    ./opensnoop -F                     # show full path for an open file with relative path
+    ./opensnoop --cgroupmap mappath    # only trace cgroups in this BPF map
+    ./opensnoop --mntnsmap mappath     # only trace mount namespaces in the map

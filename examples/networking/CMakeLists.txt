@@ -1,5 +1,5 @@
 set(EXAMPLE_FILES simulation.py)
-set(EXAMPLE_PROGRAMS simple_tc.py tc_perf_event.py)
+set(EXAMPLE_PROGRAMS simple_tc.py tc_perf_event.py net_monitor.py sockmap.py)
 install(FILES ${EXAMPLE_FILES} DESTINATION share/bcc/examples/networking)
 install(PROGRAMS ${EXAMPLE_PROGRAMS} DESTINATION share/bcc/examples/networking)
 

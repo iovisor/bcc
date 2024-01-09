@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # tcptop    Summarize TCP send/recv throughput by host.
@@ -166,7 +166,7 @@ static int tcp_sendstat(int size)
     return 0;
 }
 
-int kretprobe__tcp_sendmsg(struct pt_regs *ctx)
+int tcp_send_ret(struct pt_regs *ctx)
 {
     int size = PT_REGS_RC(ctx);
     if (size > 0)
@@ -175,16 +175,7 @@ int kretprobe__tcp_sendmsg(struct pt_regs *ctx)
         return 0;
 }
 
-int kretprobe__tcp_sendpage(struct pt_regs *ctx)
-{
-    int size = PT_REGS_RC(ctx);
-    if (size > 0)
-        return tcp_sendstat(size);
-    else
-        return 0;
-}
-
-static int tcp_send_entry(struct sock *sk)
+int tcp_send_entry(struct pt_regs *ctx, struct sock *sk)
 {
     if (container_should_be_filtered()) {
         return 0;
@@ -198,17 +189,6 @@ static int tcp_send_entry(struct sock *sk)
     return 0;
 }
 
-int kprobe__tcp_sendmsg(struct pt_regs *ctx, struct sock *sk,
-    struct msghdr *msg, size_t size)
-{
-    return tcp_send_entry(sk);
-}
-
-int kprobe__tcp_sendpage(struct pt_regs *ctx, struct sock *sk,
-    struct page *page, int offset, size_t size)
-{
-    return tcp_send_entry(sk);
-}
 /*
  * tcp_recvmsg() would be obvious to trace, but is less suitable because:
  * - we'd need to trace both entry and return, to have both sock and size
@@ -300,6 +280,16 @@ def get_ipv6_session_key(k):
 # initialize BPF
 b = BPF(text=bpf_text)
 
+# check whether hash table batch ops is supported
+htab_batch_ops = True if BPF.kernel_struct_has_field(b'bpf_map_ops',
+        b'map_lookup_and_delete_batch') == 1 else False
+
+b.attach_kprobe(event='tcp_sendmsg', fn_name='tcp_send_entry')
+b.attach_kretprobe(event='tcp_sendmsg', fn_name='tcp_send_ret')
+if BPF.get_kprobe_functions(b'tcp_sendpage'):
+    b.attach_kprobe(event='tcp_sendpage', fn_name='tcp_send_entry')
+    b.attach_kretprobe(event='tcp_sendpage', fn_name='tcp_send_ret')
+
 ipv4_send_bytes = b["ipv4_send_bytes"]
 ipv4_recv_bytes = b["ipv4_recv_bytes"]
 ipv6_send_bytes = b["ipv6_send_bytes"]
@@ -327,15 +317,19 @@ while i != args.count and not exiting:
 
     # IPv4: build dict of all seen keys
     ipv4_throughput = defaultdict(lambda: [0, 0])
-    for k, v in ipv4_send_bytes.items():
+    for k, v in (ipv4_send_bytes.items_lookup_and_delete_batch()
+                if htab_batch_ops else ipv4_send_bytes.items()):
         key = get_ipv4_session_key(k)
         ipv4_throughput[key][0] = v.value
-    ipv4_send_bytes.clear()
+    if not htab_batch_ops:
+        ipv4_send_bytes.clear()
 
-    for k, v in ipv4_recv_bytes.items():
+    for k, v in (ipv4_recv_bytes.items_lookup_and_delete_batch()
+                if htab_batch_ops else ipv4_recv_bytes.items()):
         key = get_ipv4_session_key(k)
         ipv4_throughput[key][1] = v.value
-    ipv4_recv_bytes.clear()
+    if not htab_batch_ops:
+        ipv4_recv_bytes.clear()
 
     if ipv4_throughput:
         print("%-7s %-12s %-21s %-21s %6s %6s" % ("PID", "COMM",
@@ -353,15 +347,19 @@ while i != args.count and not exiting:
 
     # IPv6: build dict of all seen keys
     ipv6_throughput = defaultdict(lambda: [0, 0])
-    for k, v in ipv6_send_bytes.items():
+    for k, v in (ipv6_send_bytes.items_lookup_and_delete_batch()
+                if htab_batch_ops else ipv6_send_bytes.items()):
         key = get_ipv6_session_key(k)
         ipv6_throughput[key][0] = v.value
-    ipv6_send_bytes.clear()
+    if not htab_batch_ops:
+        ipv6_send_bytes.clear()
 
-    for k, v in ipv6_recv_bytes.items():
+    for k, v in (ipv6_recv_bytes.items_lookup_and_delete_batch()
+                if htab_batch_ops else ipv6_recv_bytes.items()):
         key = get_ipv6_session_key(k)
         ipv6_throughput[key][1] = v.value
-    ipv6_recv_bytes.clear()
+    if not htab_batch_ops:
+        ipv6_recv_bytes.clear()
 
     if ipv6_throughput:
         # more than 80 chars, sadly.

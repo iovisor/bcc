@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # swapin        Count swapins by process.
@@ -62,6 +62,10 @@ if debug or args.ebpf:
     if args.ebpf:
         exit()
 
+# check whether hash table batch ops is supported
+htab_batch_ops = True if BPF.kernel_struct_has_field(b'bpf_map_ops',
+        b'map_lookup_and_delete_batch') == 1 else False
+
 print("Counting swap ins. Ctrl-C to end.");
 
 # output
@@ -76,10 +80,12 @@ while 1:
         print(strftime("%H:%M:%S"))
     print("%-16s %-7s %s" % ("COMM", "PID", "COUNT"))
     counts = b.get_table("counts")
-    for k, v in sorted(counts.items(),
+    for k, v in sorted(counts.items_lookup_and_delete_batch()
+                       if htab_batch_ops else counts.items(),
 		       key=lambda counts: counts[1].value):
         print("%-16s %-7d %d" % (k.comm, k.pid, v.value))
-    counts.clear()
+    if not htab_batch_ops:
+        counts.clear()
     print()
 
     countdown -= 1

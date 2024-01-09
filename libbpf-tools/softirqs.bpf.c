@@ -18,38 +18,35 @@ struct {
 } start SEC(".maps");
 
 __u64 counts[NR_SOFTIRQS] = {};
+__u64 time[NR_SOFTIRQS] = {};
 struct hist hists[NR_SOFTIRQS] = {};
 
-SEC("tp_btf/softirq_entry")
-int BPF_PROG(softirq_entry, unsigned int vec_nr)
+static int handle_entry(unsigned int vec_nr)
 {
 	u64 ts = bpf_ktime_get_ns();
 	u32 key = 0;
 
-	bpf_map_update_elem(&start, &key, &ts, 0);
+	bpf_map_update_elem(&start, &key, &ts, BPF_ANY);
 	return 0;
 }
 
-SEC("tp_btf/softirq_exit")
-int BPF_PROG(softirq_exit, unsigned int vec_nr)
+static int handle_exit(unsigned int vec_nr)
 {
+	u64 delta, *tsp;
 	u32 key = 0;
-	s64 delta;
-	u64 *tsp;
 
 	if (vec_nr >= NR_SOFTIRQS)
 		return 0;
 	tsp = bpf_map_lookup_elem(&start, &key);
-	if (!tsp || !*tsp)
+	if (!tsp)
 		return 0;
 	delta = bpf_ktime_get_ns() - *tsp;
-	if (delta < 0)
-		return 0;
 	if (!targ_ns)
 		delta /= 1000U;
 
 	if (!targ_dist) {
-		__sync_fetch_and_add(&counts[vec_nr], delta);
+		__sync_fetch_and_add(&counts[vec_nr], 1);
+		__sync_fetch_and_add(&time[vec_nr], delta);
 	} else {
 		struct hist *hist;
 		u64 slot;
@@ -62,6 +59,30 @@ int BPF_PROG(softirq_exit, unsigned int vec_nr)
 	}
 
 	return 0;
+}
+
+SEC("tp_btf/softirq_entry")
+int BPF_PROG(softirq_entry_btf, unsigned int vec_nr)
+{
+	return handle_entry(vec_nr);
+}
+
+SEC("tp_btf/softirq_exit")
+int BPF_PROG(softirq_exit_btf, unsigned int vec_nr)
+{
+	return handle_exit(vec_nr);
+}
+
+SEC("raw_tp/softirq_entry")
+int BPF_PROG(softirq_entry, unsigned int vec_nr)
+{
+	return handle_entry(vec_nr);
+}
+
+SEC("raw_tp/softirq_exit")
+int BPF_PROG(softirq_exit, unsigned int vec_nr)
+{
+	return handle_exit(vec_nr);
 }
 
 char LICENSE[] SEC("license") = "GPL";

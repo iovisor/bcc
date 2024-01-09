@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # solisten      Trace TCP listen events
 #               For Linux, uses BCC, eBPF. Embedded C.

@@ -1,8 +1,8 @@
 .TH compactsnoop 8  "2019-11-1" "USER COMMANDS"
 .SH NAME
-compactstall \- Trace compact zone events. Uses Linux eBPF/bcc.
+compactsnoop \- Trace compact zone events. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B compactsnoop.py [\-h] [\-T] [\-p PID] [\-d DURATION] [\-K] [\-e]
+.B compactsnoop [\-h] [\-T] [\-p PID] [\-d DURATION] [\-K] [\-e]
 .SH DESCRIPTION
 compactsnoop traces the compact zone events, showing which processes are
 allocing pages with memory compaction. This can be useful for discovering

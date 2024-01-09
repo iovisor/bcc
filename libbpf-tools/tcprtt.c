@@ -21,6 +21,8 @@ static struct env {
 	__u16 rport;
 	__u32 laddr;
 	__u32 raddr;
+	__u8 laddr_v6[IPV6_LEN];
+	__u8 raddr_v6[IPV6_LEN];
 	bool milliseconds;
 	time_t duration;
 	time_t interval;
@@ -77,6 +79,7 @@ static const struct argp_option opts[] = {
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
 	struct in_addr addr;
+	struct in6_addr addr_v6;
 
 	switch (key) {
 	case 'h':
@@ -126,18 +129,34 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		env.rport = htons(env.rport);
 		break;
 	case 'a':
-		if (inet_aton(arg, &addr) < 0) {
-			fprintf(stderr, "invalid local address: %s\n", arg);
-			argp_usage(state);
-		}
-		env.laddr = addr.s_addr;
+                if (strchr(arg, ':')) {
+                        if (inet_pton(AF_INET6, arg, &addr_v6) < 1) {
+                                fprintf(stderr, "invalid local IPv6 address: %s\n", arg);
+                                argp_usage(state);
+                        }
+                        memcpy(env.laddr_v6, &addr_v6, sizeof(env.laddr_v6));
+                } else {
+                        if (inet_pton(AF_INET, arg, &addr) < 0) {
+                                fprintf(stderr, "invalid local address: %s\n", arg);
+                                argp_usage(state);
+                        }
+                        env.laddr = addr.s_addr;
+                }
 		break;
 	case 'A':
-		if (inet_aton(arg, &addr) < 0) {
-			fprintf(stderr, "invalid remote address: %s\n", arg);
-			argp_usage(state);
-		}
-		env.raddr = addr.s_addr;
+                if (strchr(arg, ':')) {
+                        if (inet_pton(AF_INET6, arg, &addr_v6) < 1) {
+                                fprintf(stderr, "invalid remote address: %s\n", arg);
+                                argp_usage(state);
+                        }
+                        memcpy(env.raddr_v6, &addr_v6, sizeof(env.raddr_v6));
+                } else {
+                        if (inet_pton(AF_INET, arg, &addr) < 0) {
+                                fprintf(stderr, "invalid remote address: %s\n", arg);
+                                argp_usage(state);
+                        }
+                        env.raddr = addr.s_addr;
+                }
 		break;
 	case 'b':
 		env.laddr_hist = true;
@@ -169,39 +188,52 @@ static void sig_handler(int sig)
 static int print_map(struct bpf_map *map)
 {
 	const char *units = env.milliseconds ? "msecs" : "usecs";
-	__u64 lookup_key = -1, next_key;
+	struct hist_key *lookup_key = NULL, next_key;
 	int err, fd = bpf_map__fd(map);
 	struct hist hist;
 
-	while (!bpf_map_get_next_key(fd, &lookup_key, &next_key)) {
+	while (!bpf_map_get_next_key(fd, lookup_key, &next_key)) {
 		err = bpf_map_lookup_elem(fd, &next_key, &hist);
 		if (err < 0) {
 			fprintf(stderr, "failed to lookup infos: %d\n", err);
 			return -1;
 		}
 
-		struct in_addr addr = {.s_addr = next_key };
+
 		if (env.laddr_hist)
-			printf("Local Address = %s ", inet_ntoa(addr));
+			printf("Local Address = ");
 		else if (env.raddr_hist)
-			printf("Remote Address = %s ", inet_ntoa(addr));
+			printf("Remote Address = ");
 		else
 			printf("All Addresses = ****** ");
+
+		if (env.laddr_hist || env.raddr_hist) {
+			__u16 family = next_key.family;
+			char str[INET6_ADDRSTRLEN];
+
+			if (!inet_ntop(family, next_key.addr, str, sizeof(str))) {
+				perror("converting IP to string:");
+				return -1;
+			}
+
+			printf("%s ", str);
+		}
+
 		if (env.extended)
 			printf("[AVG %llu]", hist.latency / hist.cnt);
 		printf("\n");
 		print_log2_hist(hist.slots, MAX_SLOTS, units);
-		lookup_key = next_key;
+		lookup_key = &next_key;
 	}
 
-	lookup_key = -1;
-	while (!bpf_map_get_next_key(fd, &lookup_key, &next_key)) {
+	lookup_key = NULL;
+	while (!bpf_map_get_next_key(fd, lookup_key, &next_key)) {
 		err = bpf_map_delete_elem(fd, &next_key);
 		if (err < 0) {
 			fprintf(stderr, "failed to cleanup infos: %d\n", err);
 			return -1;
 		}
-		lookup_key = next_key;
+		lookup_key = &next_key;
 	}
 
 	return 0;
@@ -214,6 +246,7 @@ int main(int argc, char **argv)
 		.parser = parse_arg,
 		.doc = argp_program_doc,
 	};
+	__u8 zero_addr_v6[IPV6_LEN] = {};
 	struct tcprtt_bpf *obj;
 	__u64 time_end = 0;
 	struct tm *tm;
@@ -225,7 +258,12 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
-	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
+	if ((env.laddr || env.raddr)
+		&& (memcmp(env.laddr_v6, zero_addr_v6, sizeof(env.laddr_v6)) || memcmp(env.raddr_v6, zero_addr_v6, sizeof(env.raddr_v6)))) {
+		fprintf(stderr, "It is not permitted to filter by both IPv4 and IPv6\n");
+		return 1;
+	}
+
 	libbpf_set_print(libbpf_print_fn);
 
 	obj = tcprtt_bpf__open();
@@ -241,6 +279,8 @@ int main(int argc, char **argv)
 	obj->rodata->targ_dport = env.rport;
 	obj->rodata->targ_saddr = env.laddr;
 	obj->rodata->targ_daddr = env.raddr;
+	memcpy(obj->rodata->targ_saddr_v6, env.laddr_v6, sizeof(obj->rodata->targ_saddr_v6));
+	memcpy(obj->rodata->targ_daddr_v6, env.raddr_v6, sizeof(obj->rodata->targ_daddr_v6));
 	obj->rodata->targ_ms = env.milliseconds;
 
 	if (fentry_can_attach("tcp_rcv_established", NULL))

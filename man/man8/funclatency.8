@@ -28,6 +28,7 @@ CONFIG_BPF and bcc.
 pattern
 Function name or search pattern. Supports "*" wildcards. See EXAMPLES.
 You can also use \-r for regular expressions.
+.TP
 \-h
 Print usage message.
 .TP
@@ -88,7 +89,7 @@ Time vfs_read(), and print output every 5 seconds, with timestamps:
 .TP
 Time vfs_read() for process ID 181 only:
 #
-.B funclatency \-p 181 vfs_read:
+.B funclatency \-p 181 vfs_read
 .TP
 Time both vfs_fstat() and vfs_fstatat() calls, by use of a wildcard:
 #

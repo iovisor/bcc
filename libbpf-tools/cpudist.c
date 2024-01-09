@@ -208,7 +208,6 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
-	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
 
 	obj = cpudist_bpf__open();
@@ -216,6 +215,11 @@ int main(int argc, char **argv)
 		fprintf(stderr, "failed to open BPF object\n");
 		return 1;
 	}
+
+	if (probe_tp_btf("sched_switch"))
+		bpf_program__set_autoload(obj->progs.sched_switch_tp, false);
+	else
+		bpf_program__set_autoload(obj->progs.sched_switch_btf, false);
 
 	/* initialize global data (filtering options) */
 	obj->rodata->filter_cg = env.cg;

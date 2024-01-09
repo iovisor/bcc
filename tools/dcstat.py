@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # dcstat   Directory entry cache (dcache) stats.
@@ -88,7 +88,7 @@ void count_lookup(struct pt_regs *ctx) {
 
 # load BPF program
 b = BPF(text=bpf_text)
-b.attach_kprobe(event_re="^lookup_fast$|^lookup_fast.constprop.*.\d$", fn_name="count_fast")
+b.attach_kprobe(event_re=r'^lookup_fast$|^lookup_fast.constprop.*.\d$', fn_name="count_fast")
 b.attach_kretprobe(event="d_lookup", fn_name="count_lookup")
 
 # stat column labels and indexes

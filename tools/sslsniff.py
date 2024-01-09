@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # sslsniff  Captures data on read/recv or write/send functions of OpenSSL,
 #           GnuTLS and NSS
@@ -204,7 +204,8 @@ int probe_SSL_do_handshake_enter(struct pt_regs *ctx, void *ssl) {
         u32 pid = pid_tgid >> 32;
         u32 tid = (u32)pid_tgid;
         u64 ts = bpf_ktime_get_ns();
-
+        u32 uid = bpf_get_current_uid_gid();
+        
         PID_FILTER
         UID_FILTER
 

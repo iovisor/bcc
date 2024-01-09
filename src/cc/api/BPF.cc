@@ -118,13 +118,14 @@ StatusTuple BPF::init(const std::string& bpf_program,
     }
   }
 
-  auto flags_len = cflags.size();
-  const char* flags[flags_len];
-  for (size_t i = 0; i < flags_len; i++)
-    flags[i] = cflags[i].c_str();
+  std::vector<const char*> flags;
+  for (const auto& c: cflags)
+    flags.push_back(c.c_str());
 
   all_bpf_program_ += bpf_program;
-  if (bpf_module_->load_string(all_bpf_program_, flags, flags_len) != 0) {
+  if (bpf_module_->load_string(all_bpf_program_,
+                               flags.data(),
+                               flags.size()) != 0) {
     init_fail_reset();
     return StatusTuple(-1, "Unable to initialize BPF program");
   }
@@ -610,7 +611,7 @@ StatusTuple BPF::detach_perf_event_raw(void* perf_event_attr) {
 }
 
 StatusTuple BPF::open_perf_event(const std::string& name, uint32_t type,
-                                 uint64_t config) {
+                                 uint64_t config, int pid) {
   if (perf_event_arrays_.find(name) == perf_event_arrays_.end()) {
     TableStorage::iterator it;
     if (!bpf_module_->table_storage().Find(Path({bpf_module_->id(), name}), it))
@@ -619,7 +620,7 @@ StatusTuple BPF::open_perf_event(const std::string& name, uint32_t type,
     perf_event_arrays_[name] = new BPFPerfEventArray(it->second);
   }
   auto table = perf_event_arrays_[name];
-  TRY2(table->open_all_cpu(type, config));
+  TRY2(table->open_all_cpu(type, config, pid));
   return StatusTuple::OK();
 }
 
@@ -853,6 +854,17 @@ bool BPF::add_module(std::string module)
     false : true;
 }
 
+namespace {
+
+constexpr size_t kEventNameSizeLimit = 224;
+
+std::string shorten_event_name(const std::string& name) {
+  std::string hash = uint_to_hex(std::hash<std::string>{}(name));
+  return name.substr(0, kEventNameSizeLimit - hash.size()) + hash;
+}
+
+} // namespace
+
 std::string BPF::get_uprobe_event(const std::string& binary_path,
                                   uint64_t offset, bpf_probe_attach_type type,
                                   pid_t pid) {
@@ -861,6 +873,9 @@ std::string BPF::get_uprobe_event(const std::string& binary_path,
   res += "_0x" + uint_to_hex(offset);
   if (pid != -1)
     res += "_" + std::to_string(pid);
+  if (res.size() > kEventNameSizeLimit) {
+    return shorten_event_name(res);
+  }
   return res;
 }
 

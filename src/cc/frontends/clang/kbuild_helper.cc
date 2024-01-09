@@ -38,7 +38,7 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
   //uname -m | sed -e s/i.86/x86/ -e s/x86_64/x86/ -e s/sun4u/sparc64/ -e s/arm.*/arm/
   //               -e s/sa110/arm/ -e s/s390x/s390/ -e s/parisc64/parisc/
   //               -e s/ppc.*/powerpc/ -e s/mips.*/mips/ -e s/sh[234].*/sh/
-  //               -e s/aarch64.*/arm64/
+  //               -e s/aarch64.*/arm64/ -e s/loongarch.*/loongarch/
 
   string arch;
   const char *archenv = getenv("ARCH");
@@ -66,6 +66,10 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
     arch = "powerpc";
   } else if (!arch.compare(0, 4, "mips")) {
     arch = "mips";
+  } else if (!arch.compare(0, 5, "riscv")) {
+    arch = "riscv";
+  } else if (!arch.compare(0, 9, "loongarch")) {
+    arch = "loongarch";
   } else if (!arch.compare(0, 2, "sh")) {
     arch = "sh";
   }
@@ -147,6 +151,14 @@ static inline int proc_kheaders_exists(void)
   return file_exists(PROC_KHEADERS_PATH);
 }
 
+static inline const char *get_tmp_dir() {
+  const char *tmpdir = getenv("TMPDIR");
+  if (tmpdir) {
+    return tmpdir;
+  }
+  return "/tmp";
+}
+
 static inline int extract_kheaders(const std::string &dirpath,
                                    const struct utsname &uname_data)
 {
@@ -165,7 +177,8 @@ static inline int extract_kheaders(const std::string &dirpath,
     }
   }
 
-  snprintf(dirpath_tmp, sizeof(dirpath_tmp), "/tmp/kheaders-%s-XXXXXX", uname_data.release);
+  snprintf(dirpath_tmp, sizeof(dirpath_tmp), "%s/kheaders-%s-XXXXXX",
+           get_tmp_dir(), uname_data.release);
   if (mkdtemp(dirpath_tmp) == NULL) {
     ret = -1;
     goto cleanup;
@@ -207,7 +220,8 @@ int get_proc_kheaders(std::string &dirpath)
   if (uname(&uname_data))
     return -errno;
 
-  snprintf(dirpath_tmp, 256, "/tmp/kheaders-%s", uname_data.release);
+  snprintf(dirpath_tmp, 256, "%s/kheaders-%s", get_tmp_dir(),
+           uname_data.release);
   dirpath = std::string(dirpath_tmp);
 
   if (file_exists(dirpath_tmp))

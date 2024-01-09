@@ -315,8 +315,6 @@ static int trace_to_value(struct btf *btf, struct func *func, char *argname,
 		strncpy(val->name, argname, sizeof(val->name));
 
 	for (i = 0; i < MAX_TRACES; i++) {
-		if (!func->args[i].name)
-			continue;
 		if (strcmp(argname, func->args[i].name) != 0)
 			continue;
 		p_debug("setting base arg for val %s to %d", val->name, i);
@@ -464,7 +462,7 @@ static int get_func_ip_mod(struct func *func)
 	f = fopen("/proc/kallsyms", "r");
 	if (!f) {
 		err = errno;
-		p_err("failed to open /proc/kallsyms: %d", strerror(err));
+		p_err("failed to open /proc/kallsyms: %s", strerror(err));
 		return err;
 	}
 
@@ -513,7 +511,6 @@ static int parse_trace(char *str, struct trace *trace)
 	char argname[MAX_NAME], membername[MAX_NAME];
 	char tracestr[MAX_STR], argdata[MAX_STR];
 	struct func *func = &trace->func;
-	struct btf_dump_opts opts = { };
 	char *arg, *saveptr;
 	int ret;
 
@@ -560,10 +557,10 @@ static int parse_trace(char *str, struct trace *trace)
 		      strerror(-ret));
 		return -ENOENT;
 	}
-	trace->dump = btf_dump__new(trace->btf, NULL, &opts, trace_printf);
+	trace->dump = btf_dump__new(trace->btf, trace_printf, NULL, NULL);
 	if (!trace->dump) {
 		ret = -errno;
-		p_err("could not create BTF dump : %n", strerror(-ret));
+		p_err("could not create BTF dump : %s", strerror(-ret));
 		return -EINVAL;
 	}
 
@@ -1005,7 +1002,6 @@ int main(int argc, char *argv[])
 	if (argc < 0)
 		usage();
 
-	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
 
 	return cmd_select(argc, argv);

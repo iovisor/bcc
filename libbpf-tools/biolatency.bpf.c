@@ -4,8 +4,10 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_tracing.h>
+
 #include "biolatency.h"
 #include "bits.bpf.h"
+#include "core_fixes.bpf.h"
 
 #define MAX_ENTRIES	10240
 
@@ -18,10 +20,7 @@ const volatile bool targ_queued = false;
 const volatile bool targ_ms = false;
 const volatile bool filter_dev = false;
 const volatile __u32 targ_dev = 0;
-
-struct request_queue___x {
-	struct gendisk *disk;
-} __attribute__((preserve_access_index));
+const volatile bool targ_single = true;
 
 struct {
 	__uint(type, BPF_MAP_TYPE_CGROUP_ARRAY);
@@ -46,23 +45,21 @@ struct {
 	__type(value, struct hist);
 } hists SEC(".maps");
 
-static __always_inline
-int trace_rq_start(struct request *rq, int issue)
+static int __always_inline trace_rq_start(struct request *rq, int issue)
 {
-	if (issue && targ_queued && BPF_CORE_READ(rq->q, elevator))
+	u64 ts;
+
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
 		return 0;
 
-	u64 ts = bpf_ktime_get_ns();
+	if (issue && targ_queued && BPF_CORE_READ(rq, q, elevator))
+		return 0;
+
+	ts = bpf_ktime_get_ns();
 
 	if (filter_dev) {
-		struct request_queue___x *q = (void *)BPF_CORE_READ(rq, q);
-		struct gendisk *disk;
+		struct gendisk *disk = get_disk(rq);
 		u32 dev;
-
-		if (bpf_core_field_exists(q->disk))
-			disk = BPF_CORE_READ(q, disk);
-		else
-			disk = BPF_CORE_READ(rq, rq_disk);
 
 		dev = disk ? MKDEV(BPF_CORE_READ(disk, major),
 				BPF_CORE_READ(disk, first_minor)) : 0;
@@ -73,73 +70,58 @@ int trace_rq_start(struct request *rq, int issue)
 	return 0;
 }
 
-SEC("tp_btf/block_rq_insert")
-int block_rq_insert(u64 *ctx)
+static int handle_block_rq_insert(__u64 *ctx)
 {
-	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
-		return 0;
-
 	/**
 	 * commit a54895fa (v5.11-rc1) changed tracepoint argument list
 	 * from TP_PROTO(struct request_queue *q, struct request *rq)
 	 * to TP_PROTO(struct request *rq)
 	 */
-	if (LINUX_KERNEL_VERSION < KERNEL_VERSION(5, 11, 0))
+	if (!targ_single)
 		return trace_rq_start((void *)ctx[1], false);
 	else
 		return trace_rq_start((void *)ctx[0], false);
 }
 
-SEC("tp_btf/block_rq_issue")
-int block_rq_issue(u64 *ctx)
+static int handle_block_rq_issue(__u64 *ctx)
 {
-	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
-		return 0;
-
 	/**
 	 * commit a54895fa (v5.11-rc1) changed tracepoint argument list
 	 * from TP_PROTO(struct request_queue *q, struct request *rq)
 	 * to TP_PROTO(struct request *rq)
 	 */
-	if (LINUX_KERNEL_VERSION < KERNEL_VERSION(5, 11, 0))
+	if (!targ_single)
 		return trace_rq_start((void *)ctx[1], true);
 	else
 		return trace_rq_start((void *)ctx[0], true);
 }
 
-SEC("tp_btf/block_rq_complete")
-int BPF_PROG(block_rq_complete, struct request *rq, int error,
-	unsigned int nr_bytes)
+static int handle_block_rq_complete(struct request *rq, int error, unsigned int nr_bytes)
 {
-	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
-		return 0;
-
 	u64 slot, *tsp, ts = bpf_ktime_get_ns();
 	struct hist_key hkey = {};
 	struct hist *histp;
 	s64 delta;
 
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
+
 	tsp = bpf_map_lookup_elem(&start, &rq);
 	if (!tsp)
 		return 0;
+
 	delta = (s64)(ts - *tsp);
 	if (delta < 0)
 		goto cleanup;
 
 	if (targ_per_disk) {
-		struct request_queue___x *q = (void *)BPF_CORE_READ(rq, q);
-		struct gendisk *disk;
-
-		if (bpf_core_field_exists(q->disk))
-			disk = BPF_CORE_READ(q, disk);
-		else
-			disk = BPF_CORE_READ(rq, rq_disk);
+		struct gendisk *disk = get_disk(rq);
 
 		hkey.dev = disk ? MKDEV(BPF_CORE_READ(disk, major),
 					BPF_CORE_READ(disk, first_minor)) : 0;
 	}
 	if (targ_per_flag)
-		hkey.cmd_flags = rq->cmd_flags;
+		hkey.cmd_flags = BPF_CORE_READ(rq, cmd_flags);
 
 	histp = bpf_map_lookup_elem(&hists, &hkey);
 	if (!histp) {
@@ -161,6 +143,42 @@ int BPF_PROG(block_rq_complete, struct request *rq, int error,
 cleanup:
 	bpf_map_delete_elem(&start, &rq);
 	return 0;
+}
+
+SEC("tp_btf/block_rq_insert")
+int block_rq_insert_btf(u64 *ctx)
+{
+	return handle_block_rq_insert(ctx);
+}
+
+SEC("tp_btf/block_rq_issue")
+int block_rq_issue_btf(u64 *ctx)
+{
+	return handle_block_rq_issue(ctx);
+}
+
+SEC("tp_btf/block_rq_complete")
+int BPF_PROG(block_rq_complete_btf, struct request *rq, int error, unsigned int nr_bytes)
+{
+	return handle_block_rq_complete(rq, error, nr_bytes);
+}
+
+SEC("raw_tp/block_rq_insert")
+int BPF_PROG(block_rq_insert)
+{
+	return handle_block_rq_insert(ctx);
+}
+
+SEC("raw_tp/block_rq_issue")
+int BPF_PROG(block_rq_issue)
+{
+	return handle_block_rq_issue(ctx);
+}
+
+SEC("raw_tp/block_rq_complete")
+int BPF_PROG(block_rq_complete, struct request *rq, int error, unsigned int nr_bytes)
+{
+	return handle_block_rq_complete(rq, error, nr_bytes);
 }
 
 char LICENSE[] SEC("license") = "GPL";

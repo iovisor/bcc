@@ -128,6 +128,39 @@ void print_map(struct ksyms *ksyms, struct partitions *partitions, int fd)
 	return;
 }
 
+static bool has_block_io_tracepoints(void)
+{
+	return tracepoint_exists("block", "block_io_start") &&
+		tracepoint_exists("block", "block_io_done");
+}
+
+static void disable_block_io_tracepoints(struct biostacks_bpf *obj)
+{
+	bpf_program__set_autoload(obj->progs.block_io_start, false);
+	bpf_program__set_autoload(obj->progs.block_io_done, false);
+}
+
+static void disable_blk_account_io_fentry(struct biostacks_bpf *obj)
+{
+	bpf_program__set_autoload(obj->progs.blk_account_io_start, false);
+	bpf_program__set_autoload(obj->progs.blk_account_io_done, false);
+}
+
+static void blk_account_io_set_attach_target(struct biostacks_bpf *obj)
+{
+	if (fentry_can_attach("blk_account_io_start", NULL)) {
+		bpf_program__set_attach_target(obj->progs.blk_account_io_start,
+					       0, "blk_account_io_start");
+		bpf_program__set_attach_target(obj->progs.blk_account_io_done,
+					       0, "blk_account_io_done");
+	} else {
+		bpf_program__set_attach_target(obj->progs.blk_account_io_start,
+					       0, "__blk_account_io_start");
+		bpf_program__set_attach_target(obj->progs.blk_account_io_done,
+					       0, "__blk_account_io_done");
+	}
+}
+
 int main(int argc, char **argv)
 {
 	struct partitions *partitions = NULL;
@@ -145,7 +178,6 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
-	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
 
 	obj = biostacks_bpf__open();
@@ -173,17 +205,20 @@ int main(int argc, char **argv)
 
 	obj->rodata->targ_ms = env.milliseconds;
 
-	if (fentry_can_attach("blk_account_io_start", NULL)) {
-		bpf_program__set_attach_target(obj->progs.blk_account_io_start, 0,
-					       "blk_account_io_start");
-		bpf_program__set_attach_target(obj->progs.blk_account_io_done, 0,
-					       "blk_account_io_done");
-	} else {
-		bpf_program__set_attach_target(obj->progs.blk_account_io_start, 0,
-					       "__blk_account_io_start");
-		bpf_program__set_attach_target(obj->progs.blk_account_io_done, 0,
-					       "__blk_account_io_done");
+	if (has_block_io_tracepoints())
+		disable_blk_account_io_fentry(obj);
+	else {
+		disable_block_io_tracepoints(obj);
+		blk_account_io_set_attach_target(obj);
 	}
+
+	ksyms = ksyms__load();
+	if (!ksyms) {
+		fprintf(stderr, "failed to load kallsyms\n");
+		goto cleanup;
+	}
+	if (!ksyms__get_symbol(ksyms, "blk_account_io_merge_bio"))
+		bpf_program__set_autoload(obj->progs.blk_account_io_merge_bio, false);
 
 	err = biostacks_bpf__load(obj);
 	if (err) {
@@ -191,32 +226,9 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	obj->links.blk_account_io_start = bpf_program__attach(obj->progs.blk_account_io_start);
-	if (!obj->links.blk_account_io_start) {
-		err = -errno;
-		fprintf(stderr, "failed to attach blk_account_io_start: %s\n", strerror(-err));
-		goto cleanup;
-	}
-	ksyms = ksyms__load();
-	if (!ksyms) {
-		fprintf(stderr, "failed to load kallsyms\n");
-		goto cleanup;
-	}
-	if (ksyms__get_symbol(ksyms, "blk_account_io_merge_bio")) {
-		obj->links.blk_account_io_merge_bio =
-			bpf_program__attach(obj->progs.blk_account_io_merge_bio);
-		if (!obj->links.blk_account_io_merge_bio) {
-			err = -errno;
-			fprintf(stderr, "failed to attach blk_account_io_merge_bio: %s\n",
-				strerror(-err));
-			goto cleanup;
-		}
-	}
-	obj->links.blk_account_io_done = bpf_program__attach(obj->progs.blk_account_io_done);
-	if (!obj->links.blk_account_io_done) {
-		err = -errno;
-		fprintf(stderr, "failed to attach blk_account_io_done: %s\n",
-			strerror(-err));
+	err = biostacks_bpf__attach(obj);
+	if (err) {
+		fprintf(stderr, "failed to attach BPF programs: %d\n", err);
 		goto cleanup;
 	}
 

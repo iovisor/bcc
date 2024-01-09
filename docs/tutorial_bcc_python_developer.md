@@ -63,6 +63,7 @@ Code:
 
 ```Python
 from bcc import BPF
+from bcc.utils import printb
 
 # define BPF program
 prog = """
@@ -85,7 +86,9 @@ while 1:
         (task, pid, cpu, flags, ts, msg) = b.trace_fields()
     except ValueError:
         continue
-    print("%-18.9f %-16s %-6d %s" % (ts, task, pid, msg))
+    except KeyboardInterrupt:
+        exit()
+    printb(b"%-18.9f %-16s %-6d %s" % (ts, task, pid, msg))
 ```
 
 This is similar to hello_world.py, and traces new processes via sys_clone() again, but has a few more things to learn:
@@ -116,6 +119,7 @@ This program is [examples/tracing/sync_timing.py](../examples/tracing/sync_timin
 ```Python
 from __future__ import print_function
 from bcc import BPF
+from bcc.utils import printb
 
 # load BPF program
 b = BPF(text="""
@@ -150,11 +154,14 @@ print("Tracing for quick sync's... Ctrl-C to end")
 # format output
 start = 0
 while 1:
-    (task, pid, cpu, flags, ts, ms) = b.trace_fields()
-    if start == 0:
-        start = ts
-    ts = ts - start
-    print("At time %.2f s: multiple syncs detected, last %s ms ago" % (ts, ms))
+    try:
+        (task, pid, cpu, flags, ts, ms) = b.trace_fields()
+        if start == 0:
+            start = ts
+        ts = ts - start
+        printb(b"At time %.2f s: multiple syncs detected, last %s ms ago" % (ts, ms))
+    except KeyboardInterrupt:
+        exit()
 ```
 
 Things to learn:
@@ -194,7 +201,7 @@ REQ_WRITE = 1		# from include/linux/blk_types.h
 # load BPF program
 b = BPF(text="""
 #include <uapi/linux/ptrace.h>
-#include <linux/blkdev.h>
+#include <linux/blk-mq.h>
 
 BPF_HASH(start, struct request *);
 
@@ -217,10 +224,13 @@ void trace_completion(struct pt_regs *ctx, struct request *req) {
 	}
 }
 """)
-
-b.attach_kprobe(event="blk_start_request", fn_name="trace_start")
+if BPF.get_kprobe_functions(b'blk_start_request'):
+        b.attach_kprobe(event="blk_start_request", fn_name="trace_start")
 b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_start")
-b.attach_kprobe(event="blk_account_io_done", fn_name="trace_completion")
+if BPF.get_kprobe_functions(b'__blk_account_io_done'):
+    b.attach_kprobe(event="__blk_account_io_done", fn_name="trace_completion")
+else:
+    b.attach_kprobe(event="blk_account_io_done", fn_name="trace_completion")
 [...]
 ```
 

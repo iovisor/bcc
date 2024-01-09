@@ -7,6 +7,7 @@
 #define _GNU_SOURCE
 #endif
 #include <ctype.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -279,6 +280,7 @@ static bool is_file_backed(const char *mapname)
 		STARTS_WITH(mapname, "[stack") ||
 		STARTS_WITH(mapname, "/SYSV") ||
 		STARTS_WITH(mapname, "[heap]") ||
+		STARTS_WITH(mapname, "[uprobes]") ||
 		STARTS_WITH(mapname, "[vsyscall]"));
 }
 
@@ -292,6 +294,11 @@ static bool is_vdso(const char *path)
 	return !strcmp(path, "[vdso]");
 }
 
+static bool is_uprobes(const char *path)
+{
+	return !strcmp(path, "[uprobes]");
+}
+
 static int get_elf_type(const char *path)
 {
 	GElf_Ehdr hdr;
@@ -300,6 +307,8 @@ static int get_elf_type(const char *path)
 	int fd;
 
 	if (is_vdso(path))
+		return -1;
+	if (is_uprobes(path))
 		return -1;
 	e = open_elf(path, &fd);
 	if (!e)
@@ -459,6 +468,7 @@ static int dso__add_sym(struct dso *dso, const char *name, uint64_t start,
 	sym->name = (void*)(unsigned long)off;
 	sym->start = start;
 	sym->size = size;
+	sym->offset = 0;
 
 	return 0;
 }
@@ -579,8 +589,9 @@ static int create_tmp_vdso_image(struct dso *dso)
 		return -1;
 
 	while (true) {
-		ret = fscanf(f, "%lx-%lx %*s %*x %*x:%*x %*u%[^\n]",
-			     &start_addr, &end_addr, buf);
+		ret = fscanf(f, "%llx-%llx %*s %*x %*x:%*x %*u%[^\n]",
+			     (long long*)&start_addr, (long long*)&end_addr,
+			     buf);
 		if (ret == EOF && feof(f))
 			break;
 		if (ret != 3)
@@ -671,8 +682,11 @@ static struct sym *dso__find_sym(struct dso *dso, uint64_t offset)
 			end = mid - 1;
 	}
 
-	if (start == end && dso->syms[start].start <= offset)
+	if (start == end && dso->syms[start].start <= offset &&
+	    offset < dso->syms[start].start + dso->syms[start].size) {
+		(dso->syms[start]).offset = offset - dso->syms[start].start;
 		return &dso->syms[start];
+	}
 	return NULL;
 }
 
@@ -694,10 +708,13 @@ struct syms *syms__load_file(const char *fname)
 		goto err_out;
 
 	while (true) {
-		ret = fscanf(f, "%lx-%lx %4s %lx %lx:%lx %lu%[^\n]",
-			     &map.start_addr, &map.end_addr, perm,
-			     &map.file_off, &map.dev_major,
-			     &map.dev_minor, &map.inode, buf);
+		ret = fscanf(f, "%llx-%llx %4s %llx %llx:%llx %llu%[^\n]",
+			     (long long*)&map.start_addr,
+			     (long long*)&map.end_addr, perm,
+			     (long long*)&map.file_off,
+			     (long long*)&map.dev_major,
+			     (long long*)&map.dev_minor,
+			     (long long*)&map.inode, buf);
 		if (ret == EOF && feof(f))
 			break;
 		if (ret != 8)	/* perf-<PID>.map */
@@ -754,6 +771,22 @@ const struct sym *syms__map_addr(const struct syms *syms, unsigned long addr)
 	dso = syms__find_dso(syms, addr, &offset);
 	if (!dso)
 		return NULL;
+	return dso__find_sym(dso, offset);
+}
+
+const struct sym *syms__map_addr_dso(const struct syms *syms, unsigned long addr,
+				     char **dso_name, unsigned long *dso_offset)
+{
+	struct dso *dso;
+	uint64_t offset;
+
+	dso = syms__find_dso(syms, addr, &offset);
+	if (!dso)
+		return NULL;
+
+	*dso_name = dso->name;
+	*dso_offset = offset;
+
 	return dso__find_sym(dso, offset);
 }
 
@@ -990,6 +1023,8 @@ void print_linear_hist(unsigned int *vals, int vals_size, unsigned int base,
 	printf("     %-13s : count     distribution\n", val_type);
 	for (i = idx_min; i <= idx_max; i++) {
 		val = vals[i];
+		if (!val)
+			continue;
 		printf("        %-10d : %-8d |", base + i * step, val);
 		print_stars(val, val_max, stars_max);
 		printf("|\n");
@@ -1044,10 +1079,8 @@ static bool fentry_try_attach(int id)
 
 	prog_fd = bpf_prog_load(BPF_PROG_TYPE_TRACING, "test", "GPL", insns,
 			sizeof(insns) / sizeof(struct bpf_insn), &opts);
-	if (prog_fd < 0) {
-		fprintf(stderr, "failed to try attaching to fentry: %s\n", error);
+	if (prog_fd < 0)
 		return false;
-	}
 
 	attach_fd = bpf_raw_tracepoint_open(NULL, prog_fd);
 	if (attach_fd >= 0)
@@ -1059,48 +1092,82 @@ static bool fentry_try_attach(int id)
 
 bool fentry_can_attach(const char *name, const char *mod)
 {
-	const char sysfs_vmlinux[] = "/sys/kernel/btf/vmlinux";
-	struct btf *base, *btf = NULL;
-	char sysfs_mod[80];
-	int id = -1, err;
+	struct btf *btf, *vmlinux_btf, *module_btf = NULL;
+	int err, id;
 
-	base = btf__parse(sysfs_vmlinux, NULL);
-	if (!base) {
-		err = -errno;
-		fprintf(stderr, "failed to parse vmlinux BTF at '%s': %s\n",
-			sysfs_vmlinux, strerror(-err));
-		goto err_out;
-	}
-	if (mod && module_btf_exists(mod)) {
-		snprintf(sysfs_mod, sizeof(sysfs_mod), "/sys/kernel/btf/%s", mod);
-		btf = btf__parse_split(sysfs_mod, base);
-		if (!btf) {
-			err = -errno;
-			fprintf(stderr, "failed to load BTF from %s: %s\n",
-				sysfs_mod, strerror(-err));
-			btf = base;
-			base = NULL;
-		}
-	} else {
-		btf = base;
-		base = NULL;
+	vmlinux_btf = btf__load_vmlinux_btf();
+	err = libbpf_get_error(vmlinux_btf);
+	if (err)
+		return false;
+
+	btf = vmlinux_btf;
+
+	if (mod) {
+		module_btf = btf__load_module_btf(mod, vmlinux_btf);
+		err = libbpf_get_error(module_btf);
+		if (!err)
+			btf = module_btf;
 	}
 
 	id = btf__find_by_name_kind(btf, name, BTF_KIND_FUNC);
 
-err_out:
-	btf__free(btf);
-	btf__free(base);
+	btf__free(module_btf);
+	btf__free(vmlinux_btf);
 	return id > 0 && fentry_try_attach(id);
+}
+
+#define DEBUGFS "/sys/kernel/debug/tracing"
+#define TRACEFS "/sys/kernel/tracing"
+
+static bool use_debugfs(void)
+{
+	static int has_debugfs = -1;
+
+	if (has_debugfs < 0)
+		has_debugfs = faccessat(AT_FDCWD, DEBUGFS, F_OK, AT_EACCESS) == 0;
+
+	return has_debugfs == 1;
+}
+
+static const char *tracefs_path(void)
+{
+	return use_debugfs() ? DEBUGFS : TRACEFS;
+}
+
+static const char *tracefs_available_filter_functions(void)
+{
+	return use_debugfs() ? DEBUGFS"/available_filter_functions" :
+			       TRACEFS"/available_filter_functions";
 }
 
 bool kprobe_exists(const char *name)
 {
+	char addr_range[256];
 	char sym_name[256];
 	FILE *f;
 	int ret;
 
-	f = fopen("/sys/kernel/debug/tracing/available_filter_functions", "r");
+	f = fopen("/sys/kernel/debug/kprobes/blacklist", "r");
+	if (!f)
+		goto avail_filter;
+
+	while (true) {
+		ret = fscanf(f, "%s %s%*[^\n]\n", addr_range, sym_name);
+		if (ret == EOF && feof(f))
+			break;
+		if (ret != 2) {
+			fprintf(stderr, "failed to read symbol from kprobe blacklist\n");
+			break;
+		}
+		if (!strcmp(name, sym_name)) {
+			fclose(f);
+			return false;
+		}
+	}
+	fclose(f);
+
+avail_filter:
+	f = fopen(tracefs_available_filter_functions(), "r");
 	if (!f)
 		goto slow_path;
 
@@ -1144,11 +1211,28 @@ slow_path:
 	return false;
 }
 
-bool vmlinux_btf_exists(void)
+bool tracepoint_exists(const char *category, const char *event)
 {
-	if (!access("/sys/kernel/btf/vmlinux", R_OK))
+	char path[PATH_MAX];
+
+	snprintf(path, sizeof(path), "%s/events/%s/%s/format", tracefs_path(), category, event);
+	if (!access(path, F_OK))
 		return true;
 	return false;
+}
+
+bool vmlinux_btf_exists(void)
+{
+	struct btf *btf;
+	int err;
+
+	btf = btf__load_vmlinux_btf();
+	err = libbpf_get_error(btf);
+	if (err)
+		return false;
+
+	btf__free(btf);
+	return true;
 }
 
 bool module_btf_exists(const char *mod)
@@ -1161,4 +1245,32 @@ bool module_btf_exists(const char *mod)
 			return true;
 	}
 	return false;
+}
+
+bool probe_tp_btf(const char *name)
+{
+	LIBBPF_OPTS(bpf_prog_load_opts, opts, .expected_attach_type = BPF_TRACE_RAW_TP);
+	struct bpf_insn insns[] = {
+		{ .code = BPF_ALU64 | BPF_MOV | BPF_K, .dst_reg = BPF_REG_0, .imm = 0 },
+		{ .code = BPF_JMP | BPF_EXIT },
+	};
+	int fd, insn_cnt = sizeof(insns) / sizeof(struct bpf_insn);
+
+	opts.attach_btf_id = libbpf_find_vmlinux_btf_id(name, BPF_TRACE_RAW_TP);
+	fd = bpf_prog_load(BPF_PROG_TYPE_TRACING, NULL, "GPL", insns, insn_cnt, &opts);
+	if (fd >= 0)
+		close(fd);
+	return fd >= 0;
+}
+
+bool probe_ringbuf()
+{
+	int map_fd;
+
+	map_fd = bpf_map_create(BPF_MAP_TYPE_RINGBUF, NULL, 0, 0, getpagesize(), NULL);
+	if (map_fd < 0)
+		return false;
+
+	close(map_fd);
+	return true;
 }

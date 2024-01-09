@@ -16,6 +16,7 @@ const volatile int filter_ports_len = 0;
 const volatile uid_t filter_uid = -1;
 const volatile pid_t filter_pid = 0;
 const volatile bool do_count = 0;
+const volatile bool source_port = 0;
 
 /* Define here, because there are conflicts with include files */
 #define AF_INET		2
@@ -81,7 +82,7 @@ enter_tcp_connect(struct pt_regs *ctx, struct sock *sk)
 	return 0;
 }
 
-static  __always_inline void count_v4(struct sock *sk, __u16 dport)
+static  __always_inline void count_v4(struct sock *sk, __u16 sport, __u16 dport)
 {
 	struct ipv4_flow_key key = {};
 	static __u64 zero;
@@ -89,13 +90,14 @@ static  __always_inline void count_v4(struct sock *sk, __u16 dport)
 
 	BPF_CORE_READ_INTO(&key.saddr, sk, __sk_common.skc_rcv_saddr);
 	BPF_CORE_READ_INTO(&key.daddr, sk, __sk_common.skc_daddr);
+	key.sport = sport;
 	key.dport = dport;
 	val = bpf_map_lookup_or_try_init(&ipv4_count, &key, &zero);
 	if (val)
 		__atomic_add_fetch(val, 1, __ATOMIC_RELAXED);
 }
 
-static __always_inline void count_v6(struct sock *sk, __u16 dport)
+static __always_inline void count_v6(struct sock *sk, __u16 sport, __u16 dport)
 {
 	struct ipv6_flow_key key = {};
 	static const __u64 zero;
@@ -105,6 +107,7 @@ static __always_inline void count_v6(struct sock *sk, __u16 dport)
 			   __sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
 	BPF_CORE_READ_INTO(&key.daddr, sk,
 			   __sk_common.skc_v6_daddr.in6_u.u6_addr32);
+	key.sport = sport;
 	key.dport = dport;
 
 	val = bpf_map_lookup_or_try_init(&ipv6_count, &key, &zero);
@@ -113,7 +116,7 @@ static __always_inline void count_v6(struct sock *sk, __u16 dport)
 }
 
 static __always_inline void
-trace_v4(struct pt_regs *ctx, pid_t pid, struct sock *sk, __u16 dport)
+trace_v4(struct pt_regs *ctx, pid_t pid, struct sock *sk, __u16 sport, __u16 dport)
 {
 	struct event event = {};
 
@@ -123,6 +126,7 @@ trace_v4(struct pt_regs *ctx, pid_t pid, struct sock *sk, __u16 dport)
 	event.ts_us = bpf_ktime_get_ns() / 1000;
 	BPF_CORE_READ_INTO(&event.saddr_v4, sk, __sk_common.skc_rcv_saddr);
 	BPF_CORE_READ_INTO(&event.daddr_v4, sk, __sk_common.skc_daddr);
+	event.sport = sport;
 	event.dport = dport;
 	bpf_get_current_comm(event.task, sizeof(event.task));
 
@@ -131,7 +135,7 @@ trace_v4(struct pt_regs *ctx, pid_t pid, struct sock *sk, __u16 dport)
 }
 
 static __always_inline void
-trace_v6(struct pt_regs *ctx, pid_t pid, struct sock *sk, __u16 dport)
+trace_v6(struct pt_regs *ctx, pid_t pid, struct sock *sk, __u16 sport, __u16 dport)
 {
 	struct event event = {};
 
@@ -143,6 +147,7 @@ trace_v6(struct pt_regs *ctx, pid_t pid, struct sock *sk, __u16 dport)
 			   __sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
 	BPF_CORE_READ_INTO(&event.daddr_v6, sk,
 			   __sk_common.skc_v6_daddr.in6_u.u6_addr32);
+	event.sport = sport;
 	event.dport = dport;
 	bpf_get_current_comm(event.task, sizeof(event.task));
 
@@ -158,6 +163,7 @@ exit_tcp_connect(struct pt_regs *ctx, int ret, int ip_ver)
 	__u32 tid = pid_tgid;
 	struct sock **skpp;
 	struct sock *sk;
+	__u16 sport = 0;
 	__u16 dport;
 
 	skpp = bpf_map_lookup_elem(&sockets, &tid);
@@ -169,20 +175,23 @@ exit_tcp_connect(struct pt_regs *ctx, int ret, int ip_ver)
 
 	sk = *skpp;
 
+	if (source_port)
+		BPF_CORE_READ_INTO(&sport, sk, __sk_common.skc_num);
 	BPF_CORE_READ_INTO(&dport, sk, __sk_common.skc_dport);
+
 	if (filter_port(dport))
 		goto end;
 
 	if (do_count) {
 		if (ip_ver == 4)
-			count_v4(sk, dport);
+			count_v4(sk, sport, dport);
 		else
-			count_v6(sk, dport);
+			count_v6(sk, sport, dport);
 	} else {
 		if (ip_ver == 4)
-			trace_v4(ctx, pid, sk, dport);
+			trace_v4(ctx, pid, sk, sport, dport);
 		else
-			trace_v6(ctx, pid, sk, dport);
+			trace_v6(ctx, pid, sk, sport, dport);
 	}
 
 end:

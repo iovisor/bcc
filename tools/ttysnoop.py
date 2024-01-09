@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # ttysnoop   Watch live output from a tty or pts device.
@@ -13,6 +13,8 @@
 # Idea: from ttywatcher.
 #
 # 15-Oct-2016   Brendan Gregg   Created this.
+# 13-Dec-2022   Rong Tao        Detect whether kfunc is supported.
+# 07-Jan-2023   Rong Tao        Support ITER_UBUF(CO-RE way)
 
 from __future__ import print_function
 from bcc import BPF
@@ -78,7 +80,7 @@ struct data_t {
 };
 
 BPF_ARRAY(data_map, struct data_t, 1);
-BPF_PERF_OUTPUT(events);
+PERF_TABLE
 
 static int do_tty_write(void *ctx, const char __user *buf, size_t count)
 {
@@ -106,7 +108,7 @@ static int do_tty_write(void *ctx, const char __user *buf, size_t count)
             data->count = BUFSIZE;
         else
             data->count = count;
-        events.perf_submit(ctx, data, sizeof(*data));
+        PERF_OUTPUT_CTX
         if (count < BUFSIZE)
             return 0;
         count -= BUFSIZE;
@@ -120,7 +122,7 @@ static int do_tty_write(void *ctx, const char __user *buf, size_t count)
  * commit 9bb48c82aced (v5.11-rc4) tty: implement write_iter
  * changed arguments of tty_write function
  */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 11)
 int kprobe__tty_write(struct pt_regs *ctx, struct file *file,
     const char __user *buf, size_t count)
 {
@@ -130,11 +132,11 @@ int kprobe__tty_write(struct pt_regs *ctx, struct file *file,
     return do_tty_write(ctx, buf, count);
 }
 #else
-KFUNC_PROBE(tty_write, struct kiocb *iocb, struct iov_iter *from)
+PROBE_TTY_WRITE
 {
-    const char __user *buf;
+    const char __user *buf = NULL;
     const struct kvec *kvec;
-    size_t count;
+    size_t count = 0;
 
     if (iocb->ki_filp->f_inode->i_ino != PTS)
         return 0;
@@ -146,21 +148,80 @@ KFUNC_PROBE(tty_write, struct kiocb *iocb, struct iov_iter *from)
     if (from->type != (ITER_IOVEC + WRITE))
         return 0;
 #else
-    if (from->iter_type != ITER_IOVEC)
+    if (ADD_FILTER_ITER_UBUF from->iter_type != ITER_IOVEC)
         return 0;
     if (from->data_source != WRITE)
         return 0;
 #endif
 
-
-    kvec  = from->kvec;
-    buf   = kvec->iov_base;
-    count = kvec->iov_len;
-
-    return do_tty_write(ctx, kvec->iov_base, kvec->iov_len);
+    /* Support 'type' and 'iter_type' field name */
+    switch (from->IOV_ITER_TYPE_NAME) {
+    /**
+     * <  5.14.0: case ITER_IOVEC + WRITE
+     * >= 5.14.0: case ITER_IOVEC
+     */
+    case CASE_ITER_IOVEC_NAME:
+        kvec  = from->kvec;
+        buf   = kvec->iov_base;
+        count = kvec->iov_len;
+        break;
+    CASE_ITER_UBUF_TEXT
+    /* TODO: Support more type */
+    default:
+        break;
+    }
+    return do_tty_write(ctx, buf, count);
 }
 #endif
 """
+
+probe_tty_write_kfunc = """
+KFUNC_PROBE(tty_write, struct kiocb *iocb, struct iov_iter *from)
+"""
+
+probe_tty_write_kprobe = """
+int kprobe__tty_write(struct pt_regs *ctx, struct kiocb *iocb,
+    struct iov_iter *from)
+"""
+
+is_support_kfunc = BPF.support_kfunc()
+if is_support_kfunc:
+    bpf_text = bpf_text.replace('PROBE_TTY_WRITE', probe_tty_write_kfunc)
+else:
+    bpf_text = bpf_text.replace('PROBE_TTY_WRITE', probe_tty_write_kprobe)
+
+if BPF.kernel_struct_has_field(b'iov_iter', b'iter_type') == 1:
+    bpf_text = bpf_text.replace('IOV_ITER_TYPE_NAME', 'iter_type')
+    bpf_text = bpf_text.replace('CASE_ITER_IOVEC_NAME', 'ITER_IOVEC')
+else:
+    bpf_text = bpf_text.replace('IOV_ITER_TYPE_NAME', 'type')
+    bpf_text = bpf_text.replace('CASE_ITER_IOVEC_NAME', 'ITER_IOVEC + WRITE')
+
+case_iter_ubuf_text = """
+    case ITER_UBUF:
+        buf   = from->ubuf;
+        count = from->count;
+        break;
+"""
+
+if BPF.kernel_struct_has_field(b'iov_iter', b'ubuf') == 1:
+    bpf_text = bpf_text.replace('CASE_ITER_UBUF_TEXT', case_iter_ubuf_text)
+    bpf_text = bpf_text.replace('ADD_FILTER_ITER_UBUF', 'from->iter_type != ITER_UBUF &&')
+else:
+    bpf_text = bpf_text.replace('CASE_ITER_UBUF_TEXT', '')
+    bpf_text = bpf_text.replace('ADD_FILTER_ITER_UBUF', '')
+
+if BPF.kernel_struct_has_field(b'bpf_ringbuf', b'waitq') == 1:
+    PERF_MODE = "USE_BPF_RING_BUF"
+    bpf_text = bpf_text.replace('PERF_TABLE',
+                            'BPF_RINGBUF_OUTPUT(events, 64);')
+    bpf_text = bpf_text.replace('PERF_OUTPUT_CTX',
+                            'events.ringbuf_output(data, sizeof(*data), 0);')
+else:
+    PERF_MODE = "USE_BPF_PERF_BUF"
+    bpf_text = bpf_text.replace('PERF_TABLE', 'BPF_PERF_OUTPUT(events);')
+    bpf_text = bpf_text.replace('PERF_OUTPUT_CTX',
+                            'events.perf_submit(ctx, data, sizeof(*data));')
 
 bpf_text = bpf_text.replace('PTS', str(pi.st_ino))
 if debug or args.ebpf:
@@ -184,9 +245,16 @@ def print_event(cpu, data, size):
     sys.stdout.flush()
 
 # loop with callback to print_event
-b["events"].open_perf_buffer(print_event)
+if PERF_MODE == "USE_BPF_RING_BUF":
+    b["events"].open_ring_buffer(print_event)
+else:
+    b["events"].open_perf_buffer(print_event, page_cnt=64)
+
 while 1:
     try:
-        b.perf_buffer_poll()
+        if PERF_MODE == "USE_BPF_RING_BUF":
+            b.ring_buffer_poll()
+        else:
+            b.perf_buffer_poll()
     except KeyboardInterrupt:
         exit()

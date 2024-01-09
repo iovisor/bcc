@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # klockstat traces lock events and display locks statistics.
 #
@@ -20,7 +20,7 @@ examples = """
     klockstat -d 5                      # trace for 5 seconds only
     klockstat -i 5                      # display stats every 5 seconds
     klockstat -p 123                    # trace locks for PID 123
-    klockstat -t 321                    # trace locks for PID 321
+    klockstat -t 321                    # trace locks for TID 321
     klockstat -c pipe_                  # display stats only for lock callers with 'pipe_' substring
     klockstat -S acq_count              # sort lock acquired results on acquired count
     klockstat -S hld_total              # sort lock held results on total held time
@@ -413,7 +413,9 @@ def display(sort, maxs, totals, counts):
     global missing_stacks
     global has_enomem
 
-    for k, v in sorted(sort.items(), key=lambda sort: sort[1].value, reverse=True)[:args.locks]:
+    for k, v in sorted(sort.items_lookup_batch()
+                       if htab_batch_ops else sort.items(),
+                       key=lambda sort: sort[1].value, reverse=True)[:args.locks]:
         missing_stacks += int(stack_id_err(k.value))
         has_enomem      = has_enomem or (k.value == -errno.ENOMEM)
 
@@ -457,6 +459,10 @@ if not is_support_kfunc:
     else:
         b.attach_kretprobe(event="mutex_lock", fn_name="mutex_lock_return")
         b.attach_kprobe(event="mutex_lock", fn_name="mutex_lock_enter")
+
+# check whether hash table batch ops is supported
+htab_batch_ops = True if BPF.kernel_struct_has_field(b'bpf_map_ops',
+        b'map_lookup_and_delete_batch') == 1 else False
 
 enabled = b.get_table("enabled");
 
@@ -508,12 +514,20 @@ while (1):
         break;
 
     stack_traces.clear()
-    aq_counts.clear()
-    aq_maxs.clear()
-    aq_totals.clear()
-    hl_counts.clear()
-    hl_maxs.clear()
-    hl_totals.clear()
+    if htab_batch_ops:
+        aq_counts.items_delete_batch()
+        aq_maxs.items_delete_batch()
+        aq_totals.items_delete_batch()
+        hl_counts.items_delete_batch()
+        hl_maxs.items_delete_batch()
+        hl_totals.items_delete_batch()
+    else:
+        aq_counts.clear()
+        aq_maxs.clear()
+        aq_totals.clear()
+        hl_counts.clear()
+        hl_maxs.clear()
+        hl_totals.clear()
 
 if missing_stacks > 0:
     enomem_str = " Consider increasing --stack-storage-size."

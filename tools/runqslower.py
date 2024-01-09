@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # runqslower    Trace long process scheduling delays.
@@ -52,6 +52,8 @@ parser = argparse.ArgumentParser(
     epilog=examples)
 parser.add_argument("min_us", nargs="?", default='10000',
     help="minimum run queue latency to trace, in us (default 10000)")
+parser.add_argument("-P", "--previous", action="store_true",
+    help="also show previous task name and TID")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 
@@ -60,8 +62,6 @@ thread_group.add_argument("-p", "--pid", metavar="PID", dest="pid",
     help="trace this PID only", type=int)
 thread_group.add_argument("-t", "--tid", metavar="TID", dest="tid",
     help="trace this TID only", type=int)
-thread_group.add_argument("-P", "--previous", action="store_true",
-    help="also show previous task name and TID")
 args = parser.parse_args()
 
 min_us = int(args.min_us)
@@ -74,9 +74,7 @@ bpf_text = """
 #include <linux/nsproxy.h>
 #include <linux/pid_namespace.h>
 
-BPF_HASH(start, u32);
-
-struct rq;
+BPF_ARRAY(start, u64, MAX_PID);
 
 struct data_t {
     u32 pid;
@@ -134,7 +132,7 @@ int trace_run(struct pt_regs *ctx, struct task_struct *prev)
 
     // fetch timestamp and calculate delta
     tsp = start.lookup(&pid);
-    if (tsp == 0) {
+    if ((tsp == 0) || (*tsp == 0)) {
         return 0;   // missed enqueue
     }
     delta_us = (bpf_ktime_get_ns() - *tsp) / 1000;
@@ -152,7 +150,8 @@ int trace_run(struct pt_regs *ctx, struct task_struct *prev)
     // output
     events.perf_submit(ctx, &data, sizeof(data));
 
-    start.delete(&pid);
+    //array map has no delete method, set ts to 0 instead
+    *tsp = 0;
     return 0;
 }
 """
@@ -206,7 +205,7 @@ RAW_TRACEPOINT_PROBE(sched_switch)
 
     // fetch timestamp and calculate delta
     tsp = start.lookup(&pid);
-    if (tsp == 0) {
+    if ((tsp == 0) || (*tsp == 0)) {
         return 0;   // missed enqueue
     }
     delta_us = (bpf_ktime_get_ns() - *tsp) / 1000;
@@ -224,7 +223,8 @@ RAW_TRACEPOINT_PROBE(sched_switch)
     // output
     events.perf_submit(ctx, &data, sizeof(data));
 
-    start.delete(&pid);
+    //array map has no delete method, set ts to 0 instead
+    *tsp = 0;
     return 0;
 }
 """
@@ -264,16 +264,18 @@ if debug or args.ebpf:
 def print_event(cpu, data, size):
     event = b["events"].event(data)
     if args.previous:
-        print("%-8s %-16s %-6s %14s %-16s %-6s" % (strftime("%H:%M:%S"), event.task, event.pid, event.delta_us, event.prev_task, event.prev_pid))
+        print("%-8s %-16s %-6s %14s %-16s %-6s" % (strftime("%H:%M:%S"), event.task.decode('utf-8', 'replace'), event.pid, event.delta_us, event.prev_task.decode('utf-8', 'replace'), event.prev_pid))
     else:
-        print("%-8s %-16s %-6s %14s" % (strftime("%H:%M:%S"), event.task, event.pid, event.delta_us))
+        print("%-8s %-16s %-6s %14s" % (strftime("%H:%M:%S"), event.task.decode('utf-8', 'replace'), event.pid, event.delta_us))
+
+max_pid = int(open("/proc/sys/kernel/pid_max").read())
 
 # load BPF program
-b = BPF(text=bpf_text)
+b = BPF(text=bpf_text, cflags=["-DMAX_PID=%d" % max_pid])
 if not is_support_raw_tp:
     b.attach_kprobe(event="ttwu_do_wakeup", fn_name="trace_ttwu_do_wakeup")
     b.attach_kprobe(event="wake_up_new_task", fn_name="trace_wake_up_new_task")
-    b.attach_kprobe(event_re="^finish_task_switch$|^finish_task_switch\.isra\.\d$",
+    b.attach_kprobe(event_re=r'^finish_task_switch$|^finish_task_switch\.isra\.\d$',
                     fn_name="trace_run")
 
 print("Tracing run queue latency higher than %d us" % min_us)

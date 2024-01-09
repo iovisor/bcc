@@ -29,13 +29,27 @@
 
 class ProcStat {
   std::string procfs_;
+  std::string root_symlink_;
+  std::string mount_ns_symlink_;
+  // file descriptor of /proc/<pid>/root open with O_PATH used to get into root
+  // of process after it exits; unlike a dereferenced root symlink, *at calls
+  // to this use the process's mount namespace
+  int root_fd_ = -1;
+  // store also root path and mount namespace pair to detect its changes
+  std::string root_, mount_ns_;
   ino_t inode_;
-  ino_t getinode_();
+  bool getinode_(ino_t &inode);
 
-public:
+ public:
   ProcStat(int pid);
+  ~ProcStat() {
+    if (root_fd_ > 0)
+      close(root_fd_);
+  }
+  bool refresh_root();
+  int get_root_fd() { return root_fd_; }
   bool is_stale();
-  void reset() { inode_ = getinode_(); }
+  void reset() { getinode_(inode_); }
 };
 
 class SymbolCache {
@@ -111,6 +125,30 @@ class ProcSyms : SymbolCache {
     VDSO
   };
 
+  class ModulePath {
+    // helper class to get a usable module path independent of the running
+    // process by storing a file descriptor created from openat(2) if possible
+    // if openat fails, falls back to process-dependent path with /proc/.../root
+   private:
+    int fd_;
+    std::string proc_root_path_;
+    std::string path_;
+
+   public:
+    ModulePath(const std::string &ns_path, int root_fd, int pid, bool enter_ns);
+    const char *alt_path() { return proc_root_path_.c_str(); }
+    const char *path() {
+      if (path_ == proc_root_path_ || access(proc_root_path_.c_str(), F_OK) < 0)
+        // cannot stat /proc/.../root/<path>, pid might not exist anymore; use /proc/self/fd/...
+        return path_.c_str();
+      return proc_root_path_.c_str();
+    }
+    ~ModulePath() {
+      if (fd_ > 0)
+        close(fd_);
+    }
+  };
+
   struct Module {
     struct Range {
       uint64_t start;
@@ -120,10 +158,11 @@ class ProcSyms : SymbolCache {
           : start(s), end(e), file_offset(f) {}
     };
 
-    Module(const char *name, const char *path, struct bcc_symbol_option *option);
+    Module(const char *name, std::shared_ptr<ModulePath> path,
+           struct bcc_symbol_option *option);
 
     std::string name_;
-    std::string path_;
+    std::shared_ptr<ModulePath> path_;
     std::vector<Range> ranges_;
     bool loaded_;
     bcc_symbol_option *symbol_option_;

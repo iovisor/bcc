@@ -12,6 +12,7 @@
   - [Amazon Linux 1](#amazon-linux-1---binary)
   - [Amazon Linux 2](#amazon-linux-2---binary)
   - [Alpine](#alpine---binary)
+  - [WSL](#wslwindows-subsystem-for-linux---binary)
 * [Source](#source)
   - [libbpf Submodule](#libbpf-submodule)
   - [Debian](#debian---source)
@@ -66,7 +67,14 @@ Kernel compile flags can usually be checked by looking at `/proc/config.gz` or
 
 ## Debian - Binary
 
-`bcc` and its tools are available in the standard Debian main repository, from the source package [bpfcc](https://packages.debian.org/source/sid/bpfcc) under the names `bpfcc-tools`, `python-bpfcc`, `libbpfcc` and `libbpfcc-dev`.
+`bcc` and its tools are available in the standard Debian main repository, from the source package [bpfcc](https://packages.debian.org/source/sid/bpfcc) under the names `bpfcc-tools`, `python3-bpfcc`, `libbpfcc` and `libbpfcc-dev`.
+
+To install:
+
+```bash
+echo deb http://cloudfront.debian.net/debian sid main >> /etc/apt/sources.list
+sudo apt-get install -y bpfcc-tools libbpfcc libbpfcc-dev linux-headers-$(uname -r)
+```
 
 ## Ubuntu - Binary
 
@@ -270,6 +278,44 @@ sudo docker run --rm -it --privileged \
   alpine:3.12
 ```
 
+## WSL(Windows Subsystem for Linux) - Binary
+
+### Install dependencies
+The compiling depends on the headers and lib of linux kernel module which was not found in wsl distribution packages repo. We have to compile the kernel module manually.
+```bash
+apt-get install flex bison libssl-dev libelf-dev dwarves
+```
+### Install packages
+
+First, you will need to checkout the WSL2 Linux kernel git repository:
+```
+KERNEL_VERSION=$(uname -r | cut -d '-' -f 1)
+git clone --depth 1 https://github.com/microsoft/WSL2-Linux-Kernel.git -b linux-msft-wsl-$KERNEL_VERSION
+cd WSL2-Linux-Kernel
+```
+
+Then compile and install:
+```
+cp Microsoft/config-wsl .config
+make oldconfig && make prepare
+make scripts
+make modules
+sudo make modules_install
+````
+
+After install the module you will need to change the name of the directory to remove the '+' at the end
+
+````
+mv /lib/modules/$KERNEL_VERSION-microsoft-standard-WSL2+/ /lib/modules/$KERNEL_VERSION-microsoft-standard-WSL2
+````
+
+Then you can install bcc tools package according your distribution.
+
+If you met some problems, try to 
+```
+sudo mount -t debugfs debugfs /sys/kernel/debug
+```
+
 # Source
 
 ## libbpf Submodule
@@ -303,7 +349,7 @@ sudo apt-get install arping bison clang-format cmake dh-python \
   dpkg-dev pkg-kde-tools ethtool flex inetutils-ping iperf \
   libbpf-dev libclang-dev libclang-cpp-dev libedit-dev libelf-dev \
   libfl-dev libzip-dev linux-libc-dev llvm-dev libluajit-5.1-dev \
-  luajit python3-netaddr python3-pyroute2 python3-distutils python3
+  luajit python3-netaddr python3-pyroute2 python3-setuptools python3
 ```
 
 #### Install and compile BCC
@@ -322,6 +368,7 @@ To build the toolchain from source, one needs:
 * Clang, built from the same tree as LLVM
 * cmake (>=3.1), gcc (>=4.7), flex, bison
 * LuaJIT, if you want Lua support
+* Optional tools used in some examples: arping, netperf, and iperf
 
 ### Install build dependencies
 ```
@@ -334,24 +381,34 @@ wget -O - http://llvm.org/apt/llvm-snapshot.gpg.key | sudo apt-key add -
 sudo apt-get update
 
 # For Bionic (18.04 LTS)
-sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
-  libllvm6.0 llvm-6.0-dev libclang-6.0-dev python zlib1g-dev libelf-dev libfl-dev python3-distutils
+sudo apt-get -y install zip bison build-essential cmake flex git libedit-dev \
+  libllvm6.0 llvm-6.0-dev libclang-6.0-dev python zlib1g-dev libelf-dev libfl-dev python3-setuptools \
+  liblzma-dev arping netperf iperf
 
 # For Focal (20.04.1 LTS)
-sudo apt install -y bison build-essential cmake flex git libedit-dev \
-  libllvm12 llvm-12-dev libclang-12-dev python zlib1g-dev libelf-dev libfl-dev python3-distutils
+sudo apt install -y zip bison build-essential cmake flex git libedit-dev \
+  libllvm12 llvm-12-dev libclang-12-dev python zlib1g-dev libelf-dev libfl-dev python3-setuptools \
+  liblzma-dev arping netperf iperf
 
 # For Hirsute (21.04) or Impish (21.10)
-sudo apt install -y bison build-essential cmake flex git libedit-dev \
-libllvm11 llvm-11-dev libclang-11-dev python3 zlib1g-dev libelf-dev libfl-dev python3-distutils
+sudo apt install -y zip bison build-essential cmake flex git libedit-dev \
+  libllvm11 llvm-11-dev libclang-11-dev python3 zlib1g-dev libelf-dev libfl-dev python3-setuptools \
+  liblzma-dev arping netperf iperf
 
 # For Jammy (22.04)
-sudo apt install -y bison build-essential cmake flex git libedit-dev \
-libllvm14 llvm-14-dev libclang-14-dev python3 zlib1g-dev libelf-dev libfl-dev python3-distutils
+sudo apt install -y zip bison build-essential cmake flex git libedit-dev \
+  libllvm14 llvm-14-dev libclang-14-dev python3 zlib1g-dev libelf-dev libfl-dev python3-setuptools \
+  liblzma-dev libdebuginfod-dev arping netperf iperf
+  
+# For Lunar Lobster (23.04)
+sudo apt install -y zip bison build-essential cmake flex git libedit-dev \
+  libllvm15 llvm-15-dev libclang-15-dev python3 zlib1g-dev libelf-dev libfl-dev python3-setuptools \
+  liblzma-dev libdebuginfod-dev arping netperf iperf libpolly-15-dev
 
 # For other versions
-sudo apt-get -y install bison build-essential cmake flex git libedit-dev \
-  libllvm3.7 llvm-3.7-dev libclang-3.7-dev python zlib1g-dev libelf-dev python3-distutils
+sudo apt-get -y install zip bison build-essential cmake flex git libedit-dev \
+  libllvm3.7 llvm-3.7-dev libclang-3.7-dev python zlib1g-dev libelf-dev python3-setuptools \
+  liblzma-dev arping netperf iperf
 
 # For Lua support
 sudo apt-get -y install luajit luajit-5.1-dev
@@ -506,23 +563,23 @@ sudo yum install -y luajit luajit-devel  # for Lua support
 You could compile LLVM from source code
 
 ```
-curl -LO http://releases.llvm.org/10.0.0/llvm-10.0.0.src.tar.xz
-curl -LO http://releases.llvm.org/10.0.0/cfe-10.0.0.src.tar.xz
-tar -xf cfe-10.0.0.src.tar.xz
-tar -xf llvm-10.0.0.src.tar.xz
+curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-10.0.1/llvm-10.0.1.src.tar.xz
+curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-10.0.1/clang-10.0.1.src.tar.xz
+tar -xf clang-10.0.1.src.tar.xz
+tar -xf llvm-10.0.1.src.tar.xz
 
 mkdir clang-build
 mkdir llvm-build
 
 cd llvm-build
 cmake3 -G "Unix Makefiles" -DLLVM_TARGETS_TO_BUILD="BPF;X86" \
-  -DCMAKE_BUILD_TYPE=Release ../llvm-10.0.0.src
+  -DCMAKE_BUILD_TYPE=Release ../llvm-10.0.1.src
 make
 sudo make install
 
 cd ../clang-build
 cmake3 -G "Unix Makefiles" -DLLVM_TARGETS_TO_BUILD="BPF;X86" \
-  -DCMAKE_BUILD_TYPE=Release ../cfe-10.0.0.src
+  -DCMAKE_BUILD_TYPE=Release ../clang-10.0.1.src
 make
 sudo make install
 cd ..

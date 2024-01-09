@@ -158,7 +158,7 @@ static void print_map(struct bpf_map *map)
 			printf("%-8u ", tid);
 		}
 		printf("%-16s %-4u %12llu %12llu %6.2f%%\n",
-			info.comm, cpu, info.ref, info.miss, 
+			info.comm, cpu, info.ref, info.miss,
 			info.ref > 0 ? hit * 1.0 / info.ref * 100 : 0);
 		total_miss += info.miss;
 		total_ref += info.ref;
@@ -196,7 +196,6 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
-	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
 
 	nr_cpus = libbpf_num_possible_cpus();

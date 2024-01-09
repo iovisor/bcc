@@ -152,9 +152,9 @@ class Perf(object):
         ioctl = libc.ioctl              # not declaring vararg types
 
         @staticmethod
-        def _open_for_cpu(cpu, attr):
+        def _open_for_cpu(cpu, attr, pid=-1):
                 pfd = Perf.syscall(Perf.NR_PERF_EVENT_OPEN, ct.byref(attr),
-                                   attr.pid, cpu, -1,
+                                   pid, cpu, -1,
                                    Perf.PERF_FLAG_FD_CLOEXEC)
                 if pfd < 0:
                         errno_ = ct.get_errno()
@@ -177,7 +177,6 @@ class Perf(object):
                             freq=0):
                 attr = Perf.perf_event_attr()
                 attr.config = tpoint_id
-                attr.pid = pid
                 attr.type = ptype
                 attr.sample_type = Perf.PERF_SAMPLE_RAW
                 if freq > 0:
@@ -189,4 +188,9 @@ class Perf(object):
                 attr.wakeup_events = 9999999                # don't wake up
 
                 for cpu in get_online_cpus():
-                        Perf._open_for_cpu(cpu, attr)
+                        Perf._open_for_cpu(cpu, attr, pid)
+
+        @staticmethod
+        def perf_custom_event_open(attr, pid=-1):
+                for cpu in get_online_cpus():
+                        Perf._open_for_cpu(cpu, attr, pid)

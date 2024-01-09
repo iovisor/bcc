@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # argdist   Trace a function and display a distribution of its
 #           parameter values as a histogram or frequency count.
@@ -21,7 +21,7 @@ import sys
 class Probe(object):
         next_probe_index = 0
         streq_index = 0
-        aliases = {"$PID": "(bpf_get_current_pid_tgid() >> 32)"}
+        aliases = {"$PID": "(bpf_get_current_pid_tgid() >> 32)", "$COMM": "&val.name"}
 
         def _substitute_aliases(self, expr):
                 if expr is None:
@@ -124,6 +124,17 @@ u64 __time = bpf_ktime_get_ns();
                                  self.hashname_prefix + pname)
                         text += "if (%s == 0) { return 0 ; }\n" % val_name
                         self.param_val_names[pname] = val_name
+                return text
+        
+        def _generate_comm_prefix(self):
+                text = """
+struct val_t {
+        u32 pid;
+        char name[sizeof(struct __string_t)];
+};
+struct val_t val = {.pid = (bpf_get_current_pid_tgid() >> 32) };
+bpf_get_current_comm(&val.name, sizeof(val.name));
+        """
                 return text
 
         def _replace_entry_exprs(self):
@@ -397,6 +408,10 @@ DATA_DECL
                         # signatures. Other probes force it to ().
                         signature = ", " + self.signature
 
+                # If COMM is specified prefix with code to get process name
+                if self.exprs.count(self.aliases['$COMM']):
+                        prefix += self._generate_comm_prefix()
+
                 program += probe_text.replace("PROBENAME",
                                               self.probe_func_name)
                 program = program.replace("SIGNATURE", signature)
@@ -455,6 +470,12 @@ DATA_DECL
                         self._attach_k()
                 if self.entry_probe_required:
                         self._attach_entry_probe()
+                # Check whether hash table batch ops is supported
+                if self.type == "freq" and self.bpf.kernel_struct_has_field(
+                        b'bpf_map_ops', b'map_lookup_and_delete_batch') == 1:
+                    self.htab_batch_ops = True
+                else:
+                    self.htab_batch_ops = False
 
         def _v2s(self, v):
                 # Most fields can be converted with plain str(), but strings
@@ -495,7 +516,9 @@ DATA_DECL
                 if self.type == "freq":
                         print(self.label or self.raw_spec)
                         print("\t%-10s %s" % ("COUNT", "EVENT"))
-                        sdata = sorted(data.items(), key=lambda p: p[1].value)
+                        sdata = sorted(data.items_lookup_batch()
+                                if self.htab_batch_ops else data.items(),
+                                key=lambda p: p[1].value)
                         if top is not None:
                                 sdata = sdata[-top:]
                         for key, value in sdata:
@@ -516,6 +539,9 @@ DATA_DECL
                                 if not self.is_default_expr else "retval")
                         data.print_log2_hist(val_type=label)
                 if not self.cumulative:
+                    if self.htab_batch_ops:
+                        data.items_delete_batch()
+                    else:
                         data.clear()
 
         def __str__(self):
@@ -524,7 +550,7 @@ DATA_DECL
 class Tool(object):
         examples = """
 Probe specifier syntax:
-        {p,r,t,u}:{[library],category}:function(signature)[:type[,type...]:expr[,expr...][:filter]][#label]
+        {p,r,t,u}:{[library],category}:function(signature):type[,type...]:expr[,expr...][:filter]][#label]
 Where:
         p,r,t,u    -- probe at function entry, function exit, kernel
                       tracepoint, or USDT probe
@@ -567,6 +593,9 @@ argdist -p 1005 -H 'r:c:read()'
 
 argdist -C 'r::__vfs_read():u32:$PID:$latency > 100000'
         Print frequency of reads by process where the latency was >0.1ms
+
+argdist -C 'r::__vfs_read():u32:$COMM:$latency > 100000'
+        Print frequency of reads by process name where the latency was >0.1ms
 
 argdist -H 'r::__vfs_read(void *file, void *buf, size_t count):size_t:
             $entry(count):$latency > 1000000'
@@ -648,6 +677,8 @@ argdist -I 'kernel/sched/sched.h' \\
                        "as either full path, "
                        "or relative to relative to current working directory, "
                        "or relative to default kernel header search path")
+                parser.add_argument("--ebpf", action="store_true",
+                  help=argparse.SUPPRESS)
                 self.args = parser.parse_args()
                 self.usdt_ctx = None
 
@@ -683,7 +714,10 @@ struct __string_t { char s[%d]; };
                                      for probe in self.probes
                                      if probe.usdt_ctx]:
                             print(text)
-                        print(bpf_source)
+                if self.args.verbose or self.args.ebpf:
+                    print(bpf_source)
+                    if self.args.ebpf:
+                        exit()
                 usdt_contexts = [probe.usdt_ctx
                                  for probe in self.probes if probe.usdt_ctx]
                 self.bpf = BPF(text=bpf_source, usdt_contexts=usdt_contexts)

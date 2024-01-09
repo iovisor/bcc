@@ -1,0 +1,250 @@
+Demonstrations of f2fsslower, the Linux eBPF/bcc version.
+f2fsslower shows f2fs reads, writes, opens, and fsyncs, slower than a threshold.
+For example:
+
+# ./f2fsslower
+Tracing f2fs operations slower than 10 ms
+TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
+07:20:43 StatStore      25169  S 0       0          22.23 com.happyelements.AndroidAnimal_
+07:21:21 binder:912_3   912    R 131112  0          14.66 8.bin
+07:21:40 LazyTaskWriter 912    S 0       0          28.05 112_task.xml.new
+07:22:01 TaskSnapshotPe 912    S 0       0          21.47 112.proto.new
+07:22:11 mobile_log_d.w 1048   W 262137  40198      11.06 main_log_2022_1205_071604.curf
+07:22:15 binder:912_1A  912    R 131108  0          13.92 29.bin
+07:22:18 LazyTaskWriter 912    S 0       0          28.64 112_task.xml.new
+07:22:21 mobile_log_d.w 1048   W 262084  41478      11.88 main_log_2022_1205_071604.curf
+07:22:26 LazyTaskWriter 912    S 0       0          27.75 112_task.xml.new
+07:22:37 binder:912_17  912    R 131108  0          16.16 25.bin
+07:22:39 LazyTaskWriter 912    S 0       0          22.53 112_task.xml.new
+07:22:43 TaskSnapshotPe 912    S 0       0          19.32 112.proto.new
+07:22:47 LazyTaskWriter 912    S 0       0          25.88 112_task.xml.new
+07:22:57 LazyTaskWriter 912    S 0       0          20.77 112_task.xml.new
+07:22:57 LazyTaskWriter 912    S 0       0          11.00 112_task.xml.new
+07:23:06 LazyTaskWriter 912    S 0       0          21.36 112_task.xml.new
+07:23:53 mobile_log_d.w 1048   W 262026  3026       10.28 main_log_2022_1205_072303.curf
+07:24:05 s.AndroidAnima 17273  S 0       0          20.18 tbs_download_config.xml
+07:24:20 GLThread 42    17273  S 0       0          32.27 Cocos2dxPrefsFile.xml
+07:24:23 GLThread 42    17273  S 0       0          19.84 Cocos2dxPrefsFile.xml
+07:24:32 GLThread 42    17273  S 0       0          20.27 Cocos2dxPrefsFile.xml
+07:24:43 StatStore      17273  S 0       0          20.32 com.happyelements.AndroidAnimal_
+07:24:51 StatStore      18046  S 0       0          16.82 com.happyelements.AndroidAnimal_
+07:25:01 s.AndroidAnima 18046  S 0       0          19.61 com.happyelements.AndroidAnimal_
+07:25:06 GLThread 42    18046  S 0       0          21.33 Cocos2dxPrefsFile.xml
+07:25:18 GLThread 42    18046  S 0       0          19.98 Cocos2dxPrefsFile.xml
+07:25:21 GLThread 42    18046  S 0       0          20.57 log_data_19.log
+07:25:34 GLThread 42    18046  S 0       0          21.82 log_data_19.log
+07:26:44 GLThread 42    18046  S 0       0          28.13 Cocos2dxPrefsFile.xml
+07:29:02 GLThread 42    18046  S 0       0          26.31 Cocos2dxPrefsFile.xml
+07:29:07 GLThread 42    18046  S 0       0          21.80 log_data_19.log
+07:29:22 android.bg     912    S 0       0          23.04 mappings.new
+07:30:11 GLThread 42    18046  S 0       0          27.54 Cocos2dxPrefsFile.xml
+07:31:16 GLThread 42    18046  S 0       0          22.04 Cocos2dxPrefsFile.xml
+07:31:59 android.bg     912    S 0       0          40.25 appops
+07:32:35 GLThread 42    18046  S 0       0          25.72 log_data_19.log
+07:33:50 GLThread 42    18046  S 0       0          20.86 log_data_19.log
+07:35:33 GLThread 42    18046  S 0       0          21.47 log_data_19.log
+07:35:47 GLThread 42    18046  S 0       0          28.71 Cocos2dxPrefsFile.xml
+07:35:53 GLThread 42    18046  S 0       0          22.43 log_data_19.log
+07:36:29 StatStore      18046  S 0       0          20.47 com.happyelements.AndroidAnimal_
+07:36:37 LazyTaskWriter 912    S 0       0          22.53 114_task.xml.new
+07:38:02 GLThread 42    18046  S 0       0          25.43 Cocos2dxPrefsFile.xml
+07:39:42 GLThread 42    18046  R 30      118172     23.11 base.apk
+07:39:47 GLThread 42    18046  S 0       0          21.28 log_data_19.log
+07:40:45 GLThread 42    18046  S 0       0          20.56 log_data_19.log
+
+This shows various system tasks reading from f2fs.
+This "latency" is measured from when the operation was issued from the VFS
+interface to the file system, to when it completed. This spans everything:
+block device I/O (disk I/O), file system CPU cycles, file system locks, run
+queue latency, etc. This is a better measure of the latency suffered by
+applications reading from the file system than measuring this down at the
+block device interface.
+
+Note that this only traces the common file system operations previously
+listed: other file system operations (eg, inode operations including
+getattr()) are not traced.
+
+The threshold can be provided as an argument. Eg, I/O slower than 1 ms:
+# ./f2fsslower 1
+Tracing f2fs operations slower than 1 ms
+TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
+03:21:58 mobile_log_d.w 1048   W 261969  15920       2.75 main_log_2022_1208_031540.curf
+03:22:03 mobile_log_d.w 1048   W 247156  22098       1.47 adsp_0_log_2022_1208_030243.curf
+03:22:04 mobile_log_d.w 1048   W 262019  16176       1.56 main_log_2022_1208_031540.curf
+03:22:07 mobile_log_d.w 1048   W 262122  1930        1.62 radio_log_2022_1208_031907.curf
+03:22:07 mobile_log_d.w 1048   W 262114  16432       2.63 main_log_2022_1208_031540.curf
+03:22:09 mobile_log_d.w 1048   W 262036  16688       2.90 main_log_2022_1208_031540.curf
+03:22:11 mobile_log_d.w 1048   W 262002  16944       2.87 main_log_2022_1208_031540.curf
+03:22:12 GLThread 42    18046  S 0       0          26.64 Cocos2dxPrefsFile.xml
+03:22:13 mobile_log_d.w 1048   W 262138  17200       2.85 main_log_2022_1208_031540.curf
+03:22:13 mobile_log_d.w 1048   W 247156  22339       1.70 adsp_0_log_2022_1208_030243.curf
+03:22:15 mobile_log_d.w 1048   W 262127  17456       2.76 main_log_2022_1208_031540.curf
+03:22:17 GLThread 42    18046  S 0       0          20.30 log_data_19.log
+03:22:18 mobile_log_d.w 1048   W 262132  17712       3.00 main_log_2022_1208_031540.curf
+03:22:20 mobile_log_d.w 1048   W 262079  17968       2.88 main_log_2022_1208_031540.curf
+03:22:23 mobile_log_d.w 1048   W 262037  18224       3.06 main_log_2022_1208_031540.curf
+03:22:23 mobile_log_d.w 1048   W 250068  22581       1.54 adsp_0_log_2022_1208_030243.curf
+03:22:23 mobile_log_d.w 1048   W 245760  22825       1.14 adsp_0_log_2022_1208_030243.curf
+03:22:24 mobile_log_d.w 1048   W 261988  18480       3.17 main_log_2022_1208_031540.curf
+03:22:26 mobile_log_d.w 1048   W 262096  18736       2.81 main_log_2022_1208_031540.curf
+03:22:28 mobile_log_d.w 1048   W 262056  2186        2.78 radio_log_2022_1208_031907.curf
+03:22:28 mobile_log_d.w 1048   W 261992  18991       2.69 main_log_2022_1208_031540.curf
+03:22:30 mobile_log_d.w 1048   W 262030  19247       2.97 main_log_2022_1208_031540.curf
+03:22:31 GLThread 42    18046  S 0       0          20.65 log_data_19.log
+03:22:31 mobile_log_d.w 1048   W 262098  19503       2.95 main_log_2022_1208_031540.curf
+03:22:33 mobile_log_d.w 1048   W 261680  19759       2.26 main_log_2022_1208_031540.curf
+03:22:33 mobile_log_d.w 1048   W 242579  23065       1.50 adsp_0_log_2022_1208_030243.curf
+03:22:33 mobile_log_d.w 1048   W 245760  23302       1.16 adsp_0_log_2022_1208_030243.curf
+03:22:35 mobile_log_d.w 1048   W 262030  20015       2.84 main_log_2022_1208_031540.curf
+03:22:37 mobile_log_d.w 1048   W 262011  20271       2.65 main_log_2022_1208_031540.curf
+03:22:38 mobile_log_d.w 1048   W 262089  20526       1.48 main_log_2022_1208_031540.curf
+03:22:39 mobile_log_d.w 1048   W 262127  20782       2.90 main_log_2022_1208_031540.curf
+03:22:40 mobile_log_d.w 1048   W 262081  21038       3.29 main_log_2022_1208_031540.curf
+03:22:41 mobile_log_d.w 1048   W 262069  21294       2.79 main_log_2022_1208_031540.curf
+03:22:42 GLThread 42    18046  S 0       0          20.37 log_data_19.log
+03:22:43 mobile_log_d.w 1048   W 261791  21550       3.30 main_log_2022_1208_031540.curf
+03:22:43 mobile_log_d.w 1048   W 257177  23542       1.17 adsp_0_log_2022_1208_030243.curf
+03:22:43 mobile_log_d.w 1048   W 245760  23793       1.19 adsp_0_log_2022_1208_030243.curf
+03:22:44 mobile_log_d.w 1048   W 262102  21806       2.27 main_log_2022_1208_031540.curf
+03:22:46 mobile_log_d.w 1048   W 167051  22062       1.74 main_log_2022_1208_031540.curf
+03:22:46 mobile_log_d.w 1048   W 224792  2442        2.02 radio_log_2022_1208_031907.curf
+03:22:48 mobile_log_d.w 1048   W 262090  22225       3.00 main_log_2022_1208_031540.curf
+03:22:50 mobile_log_d.w 1048   W 262046  22481       3.89 main_log_2022_1208_031540.curf
+03:22:51 mobile_log_d.w 1048   W 262088  22737       1.35 main_log_2022_1208_031540.curf
+03:22:53 mobile_log_d.w 1048   W 262100  22993       2.82 main_log_2022_1208_031540.curf
+03:22:53 mobile_log_d.w 1048   W 257957  24033       1.50 adsp_0_log_2022_1208_030243.curf
+
+This time a cksum(1) command can be seen reading various files (from /usr/bin).
+
+A threshold of 0 will trace all operations. Warning: the output will be
+verbose, as it will include all file system cache hits.
+
+# ./f2fsslower 0
+Tracing f2fs operations
+TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
+05:56:41 f2fsslowertest 6802   O 0       0           0.01 utf_8.py
+05:56:41 f2fsslowertest 6802   O 0       0           0.00 utf_8.pyc
+05:56:41 f2fsslowertest 6802   R 1950    0           0.01 utf_8.pyc
+05:56:41 f2fsslowertest 6802   R 0       1           0.00 utf_8.pyc
+05:56:41 mobile_log_d.w 1048   W 262035  5842        2.70 main_log_2022_1208_055544.curf
+05:56:42 GLThread 42    18046  R 30      45062       0.03 base.apk
+05:56:42 GLThread 42    18046  R 90      45062       0.01 base.apk
+05:56:44 mobile_log_d.w 1048   W 262027  6098        1.09 main_log_2022_1208_055544.curf
+05:56:45 binder:1035_1  1035   R 2048    53764       0.04 base.apk
+05:56:45 binder:1035_1  1035   R 2048    53766       0.01 base.apk
+05:56:45 binder:1035_1  1035   R 2048    53768       0.01 base.apk
+05:56:45 binder:1035_1  1035   R 2048    53770       0.01 base.apk
+05:56:45 binder:1035_1  1035   R 2048    53772       0.01 base.apk
+05:56:45 binder:1035_1  1035   R 2048    53774       0.00 base.apk
+05:56:45 binder:1035_1  1035   R 2048    53776       0.00 base.apk
+05:56:45 binder:1035_1  1035   R 2048    53778       0.00 base.apk
+05:56:45 binder:1035_1  1035   R 2048    53780       0.00 base.apk
+05:56:45 binder:1035_1  1035   R 2048    53782       0.00 base.apk
+05:56:45 binder:1035_1  1035   R 2048    53784       0.00 base.apk
+05:56:46 GLThread 42    18046  R 30      45062       0.03 base.apk
+05:56:46 GLThread 42    18046  R 90      45062       0.01 base.apk
+05:56:46 mobile_log_d.w 1048   W 233943  6354        2.51 main_log_2022_1208_055544.curf
+05:56:46 mobile_log_d.w 1048   W 756     13956       0.32 events_log_2022_1123_004218.curf
+05:56:46 mobile_log_d.w 1048   W 838     1690        0.08 sys_log_2022_1206_223338.curf
+05:56:46 mobile_log_d.w 1048   W 0       4           0.02 crash_log_2022_1123_004218.curf
+05:56:46 mobile_log_d.w 1048   W 223834  6553        1.39 radio_log_2022_1208_054728.curf
+05:56:46 mobile_log_d.w 1048   W 258381  33557       1.51 adsp_0_log_2022_1208_054540.curf
+05:56:46 mobile_log_d.w 1048   W 245760  33809       1.30 adsp_0_log_2022_1208_054540.curf
+05:56:46 mobile_log_d.w 1048   O 0       0           0.01 mblog_history
+05:56:46 mobile_log_d.w 1048   W 84      0           0.04 mblog_history
+05:56:46 mobile_log_d.w 1048   O 0       0           0.01 mblog_history
+05:56:46 mobile_log_d.w 1048   W 84      4043        0.05 mblog_history
+05:56:47 binder:1035_1  1035   R 2048    53786       0.14 base.apk
+05:56:47 binder:1035_1  1035   R 2048    53788       0.06 base.apk
+05:56:47 binder:1035_1  1035   R 2048    53790       0.05 base.apk
+05:56:47 binder:1035_1  1035   R 2048    53792       0.03 base.apk
+05:56:47 binder:1035_1  1035   R 2048    53794       0.01 base.apk
+05:56:47 binder:1035_1  1035   R 2048    53796       0.01 base.apk
+05:56:47 binder:1035_1  1035   R 2048    53798       0.01 base.apk
+05:56:47 binder:1035_1  1035   R 2048    53800       0.01 base.apk
+05:56:47 binder:1035_1  1035   R 2048    53802       0.01 base.apk
+05:56:47 binder:1035_1  1035   R 2048    53804       0.01 base.apk
+05:56:47 binder:1035_1  1035   R 2048    53806       0.01 base.apk
+05:56:47 binder:1035_1  1035   R 2048    53808       0.09 base.apk
+05:56:47 binder:1035_1  1035   R 2048    53810       0.03 base.apk
+05:56:47 binder:1035_1  1035   R 2048    53812       0.01 base.apk
+05:56:47 binder:1035_1  1035   R 2048    53814       0.01 base.apk
+05:56:47 binder:1035_1  1035   R 2048    53816       0.01 base.apk
+05:56:47 binder:1035_1  1035   R 2048    53818       0.01 base.apk
+05:56:47 binder:1035_1  1035   R 2048    53820       0.01 base.apk
+
+The output now includes open operations ("O"), and writes ("W").
+
+A -s option will print just the fields (parsable output, csv):
+# ./f2fsslower -s 1
+ENDTIME_us,TASK,PID,TYPE,BYTES,OFFSET_b,LATENCY_us,FILE
+1316211823309,mobile_log_d.wr,1048,W,262131,38840382,2661,main_log_2022_1208_061729.curf
+1316212810823,mobile_log_d.wr,1048,W,258559,23600773,1204,adsp_0_log_2022_1208_061547.curf
+1316212872372,mobile_log_d.wr,1048,W,245760,23859332,1005,adsp_0_log_2022_1208_061547.curf
+1316214082932,mobile_log_d.wr,1048,W,262057,39102513,2624,main_log_2022_1208_061729.curf
+1316216669137,mobile_log_d.wr,1048,W,261982,39364570,3118,main_log_2022_1208_061729.curf
+1316218993842,mobile_log_d.wr,1048,W,262089,39626552,1664,main_log_2022_1208_061729.curf
+1316221426544,mobile_log_d.wr,1048,W,262051,39888641,2989,main_log_2022_1208_061729.curf
+1316222951157,mobile_log_d.wr,1048,W,257177,24350852,1658,adsp_0_log_2022_1208_061547.curf
+1316222954073,mobile_log_d.wr,1048,W,245760,24608029,1164,adsp_0_log_2022_1208_061547.curf
+1316223791680,mobile_log_d.wr,1048,W,262069,40150692,2801,main_log_2022_1208_061729.curf
+1316226044789,mobile_log_d.wr,1048,W,262035,40412761,2886,main_log_2022_1208_061729.curf
+1316228166571,mobile_log_d.wr,1048,W,226979,40674796,2374,main_log_2022_1208_061729.curf
+1316228181155,mobile_log_d.wr,1048,W,222758,4736186,1970,radio_log_2022_1208_061707.curf
+1316230622583,mobile_log_d.wr,1048,W,262114,40901775,2776,main_log_2022_1208_061729.curf
+1316233026221,mobile_log_d.wr,1048,W,257601,24853789,1257,adsp_0_log_2022_1208_061547.curf
+1316233029535,mobile_log_d.wr,1048,W,245760,25111390,1561,adsp_0_log_2022_1208_061547.curf
+1316233113497,mobile_log_d.wr,1048,W,261997,41163889,3589,main_log_2022_1208_061729.curf
+1316235354557,mobile_log_d.wr,1048,W,262049,41425886,2787,main_log_2022_1208_061729.curf
+1316238063027,mobile_log_d.wr,1048,W,262069,41687935,2696,main_log_2022_1208_061729.curf
+1316242949074,mobile_log_d.wr,1048,W,262070,42212109,2973,main_log_2022_1208_061729.curf
+1316243120504,mobile_log_d.wr,1048,W,257355,25357150,1507,adsp_0_log_2022_1208_061547.curf
+1316243125525,mobile_log_d.wr,1048,W,245760,25614505,1946,adsp_0_log_2022_1208_061547.curf
+1316245305141,mobile_log_d.wr,1048,W,262032,42474179,3083,main_log_2022_1208_061729.curf
+1316247588708,mobile_log_d.wr,1048,W,262004,42736211,2967,main_log_2022_1208_061729.curf
+1316249295257,mobile_log_d.wr,1048,W,262057,4958944,2578,radio_log_2022_1208_061707.curf
+1316250106164,mobile_log_d.wr,1048,W,262010,42998215,2840,main_log_2022_1208_061729.curf
+1316252410939,mobile_log_d.wr,1048,W,262106,43260225,2628,main_log_2022_1208_061729.curf
+1316253204981,mobile_log_d.wr,1048,W,258381,25860265,1517,adsp_0_log_2022_1208_061547.curf
+1316253208316,mobile_log_d.wr,1048,W,245760,26118646,1503,adsp_0_log_2022_1208_061547.curf
+1316254946402,mobile_log_d.wr,1048,W,262004,43522331,2816,main_log_2022_1208_061729.curf
+1316257209188,mobile_log_d.wr,1048,W,262026,43784335,4450,main_log_2022_1208_061729.curf
+1316259556796,mobile_log_d.wr,1048,W,262032,44046361,2833,main_log_2022_1208_061729.curf
+1316261921117,mobile_log_d.wr,1048,W,262013,44308393,1357,main_log_2022_1208_061729.curf
+1316263243764,mobile_log_d.wr,1048,W,24303,6765649,1016,bsp_log_2022_1208_014047.curf
+1316263251662,mobile_log_d.wr,1048,W,160077,26364406,1244,adsp_0_log_2022_1208_061547.curf
+1316264438110,mobile_log_d.wr,1048,W,262131,44570406,1672,main_log_2022_1208_061729.curf
+1316266865336,mobile_log_d.wr,1048,W,262067,44832537,1692,main_log_2022_1208_061729.curf
+1316269146218,mobile_log_d.wr,1048,W,262023,45094604,3041,main_log_2022_1208_061729.curf
+1316270305799,mobile_log_d.wr,1048,W,262111,5221001,2913,radio_log_2022_1208_061707.curf
+1316271863947,mobile_log_d.wr,1048,W,262071,45356627,2915,main_log_2022_1208_061729.curf
+1316273312225,mobile_log_d.wr,1048,W,255036,26770243,3875,adsp_0_log_2022_1208_061547.curf
+1316273395545,mobile_log_d.wr,1048,W,245760,27025279,6162,adsp_0_log_2022_1208_061547.curf
+1316273398118,mobile_log_d.wr,1048,W,245760,27271039,1846,adsp_0_log_2022_1208_061547.curf
+1316274180566,mobile_log_d.wr,1048,W,262010,45618698,2867,main_log_2022_1208_061729.curf
+
+This may be useful for visualizing with another tool, for example, for
+producing a scatter plot of ENDTIME vs LATENCY, to look for time-based
+patterns.
+
+
+USAGE message:
+# ./f2fsslower -h
+usage: f2fsslower [-h] [-s] [-p PID] [min_ms]
+
+Trace common f2fs file operations slower than a threshold
+
+positional arguments:
+  min_ms             minimum I/O duration to trace, in ms (default 10)
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -s, --csv          just print fields: comma-separated values
+  -p PID, --pid PID  trace this PID only
+
+examples:
+    ./f2fsslower             # trace operations slower than 10 ms (default)
+    ./f2fsslower 1           # trace operations slower than 1 ms
+    ./f2fsslower -s 1        # ... 1 ms, parsable output (csv)
+    ./f2fsslower 0           # trace all operations (warning: verbose)
+    ./f2fsslower -p 185      # trace PID 185 only

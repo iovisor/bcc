@@ -231,6 +231,8 @@ struct _name##_table_t { \
   void (*ringbuf_discard) (void *, u64); \
   /* map.ringbuf_submit(data, flags) */ \
   void (*ringbuf_submit) (void *, u64); \
+  /* map.ringbuf_query(flags) */ \
+  u64 (*ringbuf_query) (u64); \
   u32 max_entries; \
 }; \
 __attribute__((section("maps/ringbuf"))) \
@@ -549,8 +551,8 @@ static int (*bpf_probe_read_str)(void *dst, u64 size, const void *unsafe_ptr) =
   (void *) BPF_FUNC_probe_read_str;
 int bpf_trace_printk(const char *fmt, ...) asm("llvm.bpf.extra");
 static inline __attribute__((always_inline))
-void bpf_tail_call_(u64 map_fd, void *ctx, int index) {
-  ((void (*)(void *, u64, int))BPF_FUNC_tail_call)(ctx, map_fd, index);
+void bpf_tail_call_(void *map_fd, void *ctx, int index) {
+  ((void (*)(void *, u64, int))BPF_FUNC_tail_call)(ctx, (u64)map_fd, index);
 }
 static int (*bpf_clone_redirect)(void *ctx, int ifindex, u32 flags) =
   (void *) BPF_FUNC_clone_redirect;
@@ -989,6 +991,52 @@ static void *(*bpf_kptr_xchg)(void *map_value, void *ptr) = (void *)BPF_FUNC_kpt
 static void *(*bpf_map_lookup_percpu_elem)(void *map, const void *key, __u32 cpu) =
   (void *)BPF_FUNC_map_lookup_percpu_elem;
 
+struct mptcp_sock;
+struct bpf_dynptr;
+struct iphdr;
+struct ipv6hdr;
+struct tcphdr;
+static struct mptcp_sock *(*bpf_skc_to_mptcp_sock)(void *sk) =
+  (void *)BPF_FUNC_skc_to_mptcp_sock;
+static long (*bpf_dynptr_from_mem)(void *data, __u32 size, __u64 flags,
+				   struct bpf_dynptr *ptr) =
+  (void *)BPF_FUNC_dynptr_from_mem;
+static long (*bpf_ringbuf_reserve_dynptr)(void *ringbuf, __u32 size, __u64 flags,
+					  struct bpf_dynptr *ptr) =
+  (void *)BPF_FUNC_ringbuf_reserve_dynptr;
+static void (*bpf_ringbuf_submit_dynptr)(struct bpf_dynptr *ptr, __u64 flags) =
+  (void *)BPF_FUNC_ringbuf_submit_dynptr;
+static void (*bpf_ringbuf_discard_dynptr)(struct bpf_dynptr *ptr, __u64 flags) =
+  (void *)BPF_FUNC_ringbuf_discard_dynptr;
+static long (*bpf_dynptr_read)(void *dst, __u32 len, const struct bpf_dynptr *src, __u32 offset,
+			       __u64 flags) =
+  (void *)BPF_FUNC_dynptr_read;
+static long (*bpf_dynptr_write)(const struct bpf_dynptr *dst, __u32 offset, void *src, __u32 len,
+				__u64 flags) =
+  (void *)BPF_FUNC_dynptr_write;
+static void *(*bpf_dynptr_data)(const struct bpf_dynptr *ptr, __u32 offset, __u32 len) =
+  (void *)BPF_FUNC_dynptr_data;
+static __s64 (*bpf_tcp_raw_gen_syncookie_ipv4)(struct iphdr *iph, struct tcphdr *th,
+					       __u32 th_len) =
+  (void *)BPF_FUNC_tcp_raw_gen_syncookie_ipv4;
+static __s64 (*bpf_tcp_raw_gen_syncookie_ipv6)(struct ipv6hdr *iph, struct tcphdr *th,
+					       __u32 th_len) =
+  (void *)BPF_FUNC_tcp_raw_gen_syncookie_ipv6;
+static long (*bpf_tcp_raw_check_syncookie_ipv4)(struct iphdr *iph, struct tcphdr *th) =
+  (void *)BPF_FUNC_tcp_raw_check_syncookie_ipv4;
+static long (*bpf_tcp_raw_check_syncookie_ipv6)(struct ipv6hdr *iph, struct tcphdr *th) =
+  (void *)BPF_FUNC_tcp_raw_check_syncookie_ipv6;
+
+static __u64 (*bpf_ktime_get_tai_ns)(void) = (void *)BPF_FUNC_ktime_get_tai_ns;
+static long (*bpf_user_ringbuf_drain)(void *map, void *callback_fn, void *ctx, __u64 flags) =
+  (void *)BPF_FUNC_user_ringbuf_drain;
+
+struct cgroup;
+static void *(*bpf_cgrp_storage_get)(void *map, struct cgroup *cgroup, void *value, __u64 flags) =
+  (void *)BPF_FUNC_cgrp_storage_get;
+static long (*bpf_cgrp_storage_delete)(void *map, struct cgroup *cgroup) =
+  (void *)BPF_FUNC_cgrp_storage_delete;
+
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
  */
@@ -1247,6 +1295,12 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 #elif defined(__TARGET_ARCH_mips)
 #define bpf_target_mips
 #define bpf_target_defined
+#elif defined(__TARGET_ARCH_riscv64)
+#define bpf_target_riscv64
+#define bpf_target_defined
+#elif defined(__TARGET_ARCH_loongarch)
+#define bpf_target_loongarch
+#define bpf_target_defined
 #else
 #undef bpf_target_defined
 #endif
@@ -1263,6 +1317,10 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 #define bpf_target_powerpc
 #elif defined(__mips__)
 #define bpf_target_mips
+#elif defined(__riscv) && (__riscv_xlen == 64)
+#define bpf_target_riscv64
+#elif defined(__loongarch__)
+#define bpf_target_loongarch
 #endif
 #endif
 
@@ -1323,6 +1381,32 @@ int bpf_usdt_readarg_p(int argc, struct pt_regs *ctx, void *buf, u64 len) asm("l
 #define PT_REGS_RC(x) ((x)->regs[2])
 #define PT_REGS_SP(x) ((x)->regs[29])
 #define PT_REGS_IP(x) ((x)->cp0_epc)
+#elif defined(bpf_target_riscv64)
+/* riscv64 provides struct user_pt_regs instead of struct pt_regs to userspace */
+#define __PT_REGS_CAST(x) ((const struct user_regs_struct *)(x))
+#define PT_REGS_PARM1(x) (__PT_REGS_CAST(x)->a0)
+#define PT_REGS_PARM2(x) (__PT_REGS_CAST(x)->a1)
+#define PT_REGS_PARM3(x) (__PT_REGS_CAST(x)->a2)
+#define PT_REGS_PARM4(x) (__PT_REGS_CAST(x)->a3)
+#define PT_REGS_PARM5(x) (__PT_REGS_CAST(x)->a4)
+#define PT_REGS_PARM6(x) (__PT_REGS_CAST(x)->a5)
+#define PT_REGS_RET(x) (__PT_REGS_CAST(x)->ra)
+#define PT_REGS_FP(x) (__PT_REGS_CAST(x)->s0) /* Works only with CONFIG_FRAME_POINTER */
+#define PT_REGS_RC(x) (__PT_REGS_CAST(x)->a0)
+#define PT_REGS_SP(x) (__PT_REGS_CAST(x)->sp)
+#define PT_REGS_IP(x) (__PT_REGS_CAST(x)->pc)
+#elif defined(bpf_target_loongarch)
+#define PT_REGS_PARM1(x) ((x)->regs[4])
+#define PT_REGS_PARM2(x) ((x)->regs[5])
+#define PT_REGS_PARM3(x) ((x)->regs[6])
+#define PT_REGS_PARM4(x) ((x)->regs[7])
+#define PT_REGS_PARM5(x) ((x)->regs[8])
+#define PT_REGS_PARM6(x) ((x)->regs[9])
+#define PT_REGS_RET(x) ((x)->regs[1])
+#define PT_REGS_FP(x) ((x)->regs[22]) /* Works only with CONFIG_FRAME_POINTER */
+#define PT_REGS_RC(x) ((x)->regs[4])
+#define PT_REGS_SP(x) ((x)->regs[3])
+#define PT_REGS_IP(x) ((x)->csr_era)
 #else
 #error "bcc does not support this platform yet"
 #endif
@@ -1397,10 +1481,16 @@ int name(unsigned long long *ctx)                               \
 static int ____##name(unsigned long long *ctx, ##args)
 
 #define KFUNC_PROBE(event, args...) \
-        BPF_PROG(kfunc__ ## event, ##args)
+        BPF_PROG(kfunc__vmlinux__ ## event, ##args)
 
 #define KRETFUNC_PROBE(event, args...) \
-        BPF_PROG(kretfunc__ ## event, ##args)
+        BPF_PROG(kretfunc__vmlinux__ ## event, ##args)
+
+#define MODULE_KFUNC_PROBE(module, event, args...) \
+        BPF_PROG(kfunc__ ## module ## __ ## event, ##args)
+
+#define MODULE_KRETFUNC_PROBE(module, event, args...) \
+        BPF_PROG(kretfunc__ ## module ## __ ## event, ##args)
 
 #define KMOD_RET(event, args...) \
         BPF_PROG(kmod_ret__ ## event, ##args)

@@ -10,7 +10,7 @@ struct event {
 	__u32 proto;
 	int backlog;
 	int ret;
-	short port;
+	__u16 port;
 	char task[TASK_COMM_LEN];
 };
 

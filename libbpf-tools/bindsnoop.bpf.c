@@ -5,7 +5,9 @@
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_endian.h>
+
 #include "bindsnoop.h"
+#include "core_fixes.bpf.h"
 
 #define MAX_ENTRIES	10240
 #define MAX_PORTS	1024
@@ -85,9 +87,9 @@ static int probe_exit(struct pt_regs *ctx, short ver)
 	if (filter_by_port && !port)
 		goto cleanup;
 
-	opts.fields.freebind             = BPF_CORE_READ_BITFIELD_PROBED(inet_sock, freebind);
-	opts.fields.transparent          = BPF_CORE_READ_BITFIELD_PROBED(inet_sock, transparent);
-	opts.fields.bind_address_no_port = BPF_CORE_READ_BITFIELD_PROBED(inet_sock, bind_address_no_port);
+	opts.fields.freebind             = get_inet_sock_freebind(inet_sock);
+	opts.fields.transparent          = get_inet_sock_transparent(inet_sock);
+	opts.fields.bind_address_no_port = get_inet_sock_bind_address_no_port(inet_sock);
 	opts.fields.reuseaddress         = BPF_CORE_READ_BITFIELD_PROBED(sock, __sk_common.skc_reuse);
 	opts.fields.reuseport            = BPF_CORE_READ_BITFIELD_PROBED(sock, __sk_common.skc_reuseport);
 	event.opts = opts.data;

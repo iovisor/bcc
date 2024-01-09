@@ -400,7 +400,7 @@ optional arguments:
                         only print the msg of event containing this string
   -B, --bin_cmp         allow to use STRCMP with binary values
   -s SYM_FILE_LIST, --sym_file_list SYM_FILE_LIST
-                        coma separated list of symbol files to use for symbol
+                        comma separated list of symbol files to use for symbol
                         resolution
   -K, --kernel-stack    output kernel stack trace
   -U, --user-stack      output user stack trace

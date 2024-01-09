@@ -26,7 +26,7 @@ TEST_CASE("test bpf table", ebpf::bpf_module_rw_engine_enabled() ? "[bpf_table]"
     BPF_TABLE("hash", int, int, myhash, 128);
   )";
 
-  ebpf::BPF *bpf(new ebpf::BPF);
+  auto bpf = std::make_unique<ebpf::BPF>();
   ebpf::StatusTuple res(0);
   std::vector<std::pair<std::string, std::string>> elements;
   res = bpf->init(BPF_PROGRAM);
@@ -79,7 +79,7 @@ TEST_CASE("test bpf table", ebpf::bpf_module_rw_engine_enabled() ? "[bpf_table]"
   REQUIRE(elements.size() == 0);
 
   // delete bpf_module, call to key/leaf printf/scanf must fail
-  delete bpf;
+  bpf.reset();
 
   res = t.update_value("0x07", "0x42");
   REQUIRE(!res.ok());

@@ -3,6 +3,9 @@
 //
 // Based on filelife(8) from BCC by Brendan Gregg & Allan McAleavy.
 // 20-Mar-2020   Wenbo Zhang   Created this.
+// 13-Nov-2022   Rong Tao      Check btf struct field for CO-RE and add vfs_open()
+// 23-Aug-2023   Rong Tao      Add vfs_* 'struct mnt_idmap' support.(CO-RE)
+// 08-Nov-2023   Rong Tao      Support unlink failed
 #include <argp.h>
 #include <signal.h>
 #include <stdio.h>
@@ -86,17 +89,24 @@ static void sig_int(int signo)
 
 void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
-	const struct event *e = data;
+	struct event e;
 	struct tm *tm;
 	char ts[32];
 	time_t t;
+
+	if (data_sz < sizeof(e)) {
+		printf("Error: packet too small\n");
+		return;
+	}
+	/* Copy data as alignment in the perf buffer isn't guaranteed. */
+	memcpy(&e, data, sizeof(e));
 
 	time(&t);
 	tm = localtime(&t);
 	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
 	printf("%-8s %-6d %-16s %-7.2f %s\n",
-	       ts, e->tgid, e->task, (double)e->delta_ns / 1000000000,
-	       e->file);
+	       ts, e.tgid, e.task, (double)e.delta_ns / 1000000000,
+	       e.file);
 }
 
 void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
@@ -120,7 +130,6 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
-	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
 
 	err = ensure_core_btf(&open_opts);

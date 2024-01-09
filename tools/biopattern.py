@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # biopattern - Identify random/sequential disk access patterns.
@@ -105,6 +105,10 @@ else:
 
 b = BPF(text=bpf_text)
 
+# check whether hash table batch ops is supported
+htab_batch_ops = True if BPF.kernel_struct_has_field(b'bpf_map_ops',
+        b'map_lookup_and_delete_batch') == 1 else False
+
 exiting = 0 if args.interval else 1
 counters = b.get_table("counters")
 
@@ -117,22 +121,25 @@ while True:
     except KeyboardInterrupt:
         exiting = 1
     
-    for k, v in counters.items():
+    for k, v in (counters.items_lookup_and_delete_batch()
+                if htab_batch_ops else counters.items()):
         total = v.random + v.sequential
         if total == 0:
             continue
 
         part_name = partitions.get(k.value, "Unknown")
+        random_percent = int(round(v.random * 100 / total))
 
         print("%-9s %-7s %5d %5d %8d %10d" % (
             strftime("%H:%M:%S"),
             part_name,
-            v.random * 100 / total,
-            v.sequential * 100 / total,
+            random_percent,
+            100 - random_percent,
             total,
             v.bytes / 1024))
 
-    counters.clear()
+    if not htab_batch_ops:
+        counters.clear()
 
     countdown -= 1
     if exiting or countdown == 0:

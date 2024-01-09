@@ -168,9 +168,9 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		i++;
 	}
 	if (e->ver == 4) {
-		inet_ntop(AF_INET, &e->addr, addr, sizeof(addr));
+		inet_ntop(AF_INET, e->addr, addr, sizeof(addr));
 	} else {
-		inet_ntop(AF_INET6, &e->addr, addr, sizeof(addr));
+		inet_ntop(AF_INET6, e->addr, addr, sizeof(addr));
 	}
 	printf("%-7d %-16s %-3d %-5s %-5s %-4d %-5d %-48s\n",
 	       e->pid, e->task, e->ret, proto, opts, e->bound_dev_if, e->port, addr);
@@ -201,7 +201,6 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
-	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
 
 	err = ensure_core_btf(&open_opts);

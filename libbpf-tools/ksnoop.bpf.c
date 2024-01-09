@@ -89,7 +89,11 @@ static struct trace *get_trace(struct pt_regs *ctx, bool entry)
 		return NULL;
 
 	if (entry) {
-		ip = KSNOOP_IP_FIX(PT_REGS_IP_CORE(ctx));
+		if (bpf_core_enum_value_exists(enum bpf_func_id,
+					       BPF_FUNC_get_func_ip))
+			ip = bpf_get_func_ip(ctx);
+		else
+			ip = KSNOOP_IP_FIX(PT_REGS_IP_CORE(ctx));
 		if (stack_depth >= FUNC_MAX_STACK_DEPTH - 1)
 			return NULL;
 		/* verifier doesn't like using "stack_depth - 1" as array index
@@ -357,11 +361,9 @@ static int ksnoop(struct pt_regs *ctx, bool entry)
 			if (currtrace->flags & KSNOOP_F_PTR) {
 				void *dataptr = (void *)data;
 
-				ret = bpf_probe_read(&data, sizeof(data),
-						     dataptr);
+				ret = bpf_probe_read_kernel(&data, sizeof(data), dataptr);
 				if (ret) {
-					currdata->err_type_id =
-						currtrace->type_id;
+					currdata->err_type_id = currtrace->type_id;
 					currdata->err = ret;
 					continue;
 				}
@@ -369,9 +371,7 @@ static int ksnoop(struct pt_regs *ctx, bool entry)
 			} else if (currtrace->size <=
 				   sizeof(currdata->raw_value)) {
 				/* read member value for predicate comparison */
-				bpf_probe_read(&currdata->raw_value,
-					       currtrace->size,
-					       (void*)data);
+				bpf_probe_read_kernel(&currdata->raw_value, currtrace->size, (void*)data);
 			}
 		} else {
 			currdata->raw_value = data;
@@ -424,7 +424,7 @@ static int ksnoop(struct pt_regs *ctx, bool entry)
 		tracesize = currtrace->size;
 		if (tracesize > MAX_TRACE_DATA)
 			tracesize = MAX_TRACE_DATA;
-		ret = bpf_probe_read(buf_offset, tracesize, data_ptr);
+		ret = bpf_probe_read_kernel(buf_offset, tracesize, data_ptr);
 		if (ret < 0) {
 			currdata->err_type_id = currtrace->type_id;
 			currdata->err = ret;
@@ -446,13 +446,13 @@ static int ksnoop(struct pt_regs *ctx, bool entry)
 }
 
 SEC("kprobe/foo")
-int kprobe_entry(struct pt_regs *ctx)
+int BPF_KPROBE(kprobe_entry)
 {
 	return ksnoop(ctx, true);
 }
 
 SEC("kretprobe/foo")
-int kprobe_return(struct pt_regs *ctx)
+int BPF_KRETPROBE(kprobe_return)
 {
 	return ksnoop(ctx, false);
 }

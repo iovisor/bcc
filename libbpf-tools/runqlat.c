@@ -204,7 +204,6 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
 
 	obj = runqlat_bpf__open();
@@ -220,6 +219,16 @@ int main(int argc, char **argv)
 	obj->rodata->targ_ms = env.milliseconds;
 	obj->rodata->targ_tgid = env.pid;
 	obj->rodata->filter_cg = env.cg;
+
+	if (probe_tp_btf("sched_wakeup")) {
+		bpf_program__set_autoload(obj->progs.handle_sched_wakeup, false);
+		bpf_program__set_autoload(obj->progs.handle_sched_wakeup_new, false);
+		bpf_program__set_autoload(obj->progs.handle_sched_switch, false);
+	} else {
+		bpf_program__set_autoload(obj->progs.sched_wakeup, false);
+		bpf_program__set_autoload(obj->progs.sched_wakeup_new, false);
+		bpf_program__set_autoload(obj->progs.sched_switch, false);
+	}
 
 	err = runqlat_bpf__load(obj);
 	if (err) {

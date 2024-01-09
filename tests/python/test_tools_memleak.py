@@ -3,12 +3,15 @@
 from unittest import main, skipUnless, TestCase
 from utils import kernel_version_ge
 import os
+import platform
 import subprocess
 import sys
 import tempfile
 
 TOOLS_DIR = "/bcc/tools/"
 
+if not os.path.exists("/bcc/tools/"):
+    TOOLS_DIR = "../../tools/"
 
 class cfg:
     cmd_format = ""
@@ -102,7 +105,13 @@ class MemleakToolTests(TestCase):
         self.assertEqual(cfg.leaking_amount, self.run_leaker("memalign"))
 
     def test_pvalloc(self):
-        self.assertEqual(cfg.leaking_amount, self.run_leaker("pvalloc"))
+        # pvalloc's implementation for power invokes mmap(), which adjusts the
+        # allocated size to meet pvalloc's constraints. Actual leaked memory
+        # could be more than requested, hence assertLessEqual.
+        if platform.machine() == 'ppc64le':
+            self.assertLessEqual(cfg.leaking_amount, self.run_leaker("pvalloc"))
+        else:
+            self.assertEqual(cfg.leaking_amount, self.run_leaker("pvalloc"))
 
     def test_aligned_alloc(self):
         self.assertEqual(cfg.leaking_amount, self.run_leaker("aligned_alloc"))

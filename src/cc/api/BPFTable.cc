@@ -535,14 +535,15 @@ BPFPerfEventArray::BPFPerfEventArray(const TableDesc& desc)
                                 "' is not a perf event array");
 }
 
-StatusTuple BPFPerfEventArray::open_all_cpu(uint32_t type, uint64_t config) {
+StatusTuple BPFPerfEventArray::open_all_cpu(uint32_t type, uint64_t config,
+                                            int pid) {
   if (cpu_fds_.size() != 0)
     return StatusTuple(-1, "Previously opened perf event not cleaned");
 
   std::vector<int> cpus = get_online_cpus();
 
   for (int i : cpus) {
-    auto res = open_on_cpu(i, type, config);
+    auto res = open_on_cpu(i, type, config, pid);
     if (!res.ok()) {
       TRY2(close_all_cpu());
       return res;
@@ -573,10 +574,10 @@ StatusTuple BPFPerfEventArray::close_all_cpu() {
 }
 
 StatusTuple BPFPerfEventArray::open_on_cpu(int cpu, uint32_t type,
-                                           uint64_t config) {
+                                           uint64_t config, int pid) {
   if (cpu_fds_.find(cpu) != cpu_fds_.end())
     return StatusTuple(-1, "Perf event already open on CPU %d", cpu);
-  int fd = bpf_open_perf_event(type, config, -1, cpu);
+  int fd = bpf_open_perf_event(type, config, pid, cpu);
   if (fd < 0) {
     return StatusTuple(-1, "Error constructing perf event %" PRIu32 ":%" PRIu64,
                        type, config);

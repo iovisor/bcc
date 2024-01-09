@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # funclatency   Time functions and print latency as a histogram.
@@ -92,7 +92,7 @@ elif len(parts) == 2:
     library = libpath
     pattern = parts[1]
 else:
-    bail("unrecognized pattern format '%s'" % pattern)
+    bail("unrecognized pattern format '%s'" % args.pattern)
 
 if not args.regexp:
     pattern = pattern.replace('*', '.*')
@@ -367,9 +367,9 @@ print("Tracing %d functions for \"%s\"... Hit Ctrl-C to end." %
 # output
 def print_section(key):
     if not library:
-        return BPF.sym(key[0], -1)
+        return BPF.sym(key[0], -1).decode('utf-8', 'replace')
     else:
-        return "%s [%d]" % (BPF.sym(key[0], key[1]), key[1])
+        return "%s [%d]" % (BPF.sym(key[0], key[1]).decode('utf-8', 'replace'), key[1])
 
 exiting = 0 if args.interval else 1
 seconds = 0

@@ -31,7 +31,7 @@ const char argp_program_doc[] =
 "USAGE: readahead [--help] [-d DURATION]\n"
 "\n"
 "EXAMPLES:\n"
-"    readahead              # summarize on-CPU time as a histogram"
+"    readahead              # summarize on-CPU time as a histogram\n"
 "    readahead -d 10        # trace for 10 seconds only\n";
 
 static const struct argp_option opts[] = {
@@ -109,7 +109,6 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
-	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
 
 	obj = readahead_bpf__open();

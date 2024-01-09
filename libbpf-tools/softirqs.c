@@ -19,6 +19,7 @@
 struct env {
 	bool distributed;
 	bool nanoseconds;
+	bool count;
 	time_t interval;
 	int times;
 	bool timestamp;
@@ -26,6 +27,7 @@ struct env {
 } env = {
 	.interval = 99999999,
 	.times = 99999999,
+	.count = false,
 };
 
 static volatile bool exiting;
@@ -48,6 +50,7 @@ static const struct argp_option opts[] = {
 	{ "distributed", 'd', NULL, 0, "Show distributions as histograms" },
 	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
 	{ "nanoseconds", 'N', NULL, 0, "Output in nanoseconds" },
+	{ "count", 'C', NULL, 0, "Show event counts with timing" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
@@ -72,6 +75,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'T':
 		env.timestamp = true;
+		break;
+	case 'C':
+		env.count = true;
 		break;
 	case ARGP_KEY_ARG:
 		errno = 0;
@@ -142,16 +148,24 @@ static char *vec_names[] = {
 static int print_count(struct softirqs_bpf__bss *bss)
 {
 	const char *units = env.nanoseconds ? "nsecs" : "usecs";
-	__u64 count;
+	__u64 count, time;
 	__u32 vec;
 
-	printf("%-16s %6s%5s\n", "SOFTIRQ", "TOTAL_", units);
+	printf("%-16s %-6s%-5s  %-11s\n", "SOFTIRQ", "TOTAL_",
+			units, env.count?"TOTAL_count":"");
 
 	for (vec = 0; vec < NR_SOFTIRQS; vec++) {
+		time = __atomic_exchange_n(&bss->time[vec], 0,
+					__ATOMIC_RELAXED);
 		count = __atomic_exchange_n(&bss->counts[vec], 0,
 					__ATOMIC_RELAXED);
-		if (count > 0)
-			printf("%-16s %11llu\n", vec_names[vec], count);
+		if (count > 0) {
+			printf("%-16s %11llu", vec_names[vec], time);
+			if (env.count) {
+				printf("  %11llu", count);
+			}
+			printf("\n");
+		}
 	}
 
 	return 0;
@@ -195,13 +209,20 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
-	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
 
 	obj = softirqs_bpf__open();
 	if (!obj) {
 		fprintf(stderr, "failed to open BPF object\n");
 		return 1;
+	}
+
+	if (probe_tp_btf("softirq_entry")) {
+		bpf_program__set_autoload(obj->progs.softirq_entry, false);
+		bpf_program__set_autoload(obj->progs.softirq_exit, false);
+	} else {
+		bpf_program__set_autoload(obj->progs.softirq_entry_btf, false);
+		bpf_program__set_autoload(obj->progs.softirq_exit_btf, false);
 	}
 
 	/* initialize global data (filtering options) */

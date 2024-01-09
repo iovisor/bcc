@@ -1,0 +1,102 @@
+ARG VERSION="20.04"
+FROM ubuntu:${VERSION}
+
+ARG LLVM_VERSION="11"
+ENV LLVM_VERSION=$LLVM_VERSION
+
+ARG SHORTNAME="focal"
+
+ARG RUBY_INSTALL_VERSION="0.8.4"
+ENV RUBY_INSTALL_VERSION=$RUBY_INSTALL_VERSION
+
+ARG RUBY_VERSION="3.1.2"
+ENV RUBY_VERSION=$RUBY_VERSION
+
+RUN /bin/bash -c 'apt-get update && apt-get install -y curl gnupg &&\
+    llvmRepository="\n\
+deb http://apt.llvm.org/${SHORTNAME}/ llvm-toolchain-${SHORTNAME} main\n\
+deb-src http://apt.llvm.org/${SHORTNAME}/ llvm-toolchain-${SHORTNAME} main\n" && \
+echo -e $llvmRepository >> /etc/apt/sources.list && \
+read -ra versions <<<"${LLVM_VERSION}" && \
+for version in ${versions[@]}; \
+do \
+    llvmRepository="\n\
+deb http://apt.llvm.org/${SHORTNAME}/ llvm-toolchain-${SHORTNAME}-${version} main\n\
+deb-src http://apt.llvm.org/${SHORTNAME}/ llvm-toolchain-${SHORTNAME}-${version} main\n" &&\
+    echo -e $llvmRepository >> /etc/apt/sources.list; done && \
+    curl -L https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -'
+
+ARG DEBIAN_FRONTEND="noninteractive"
+ENV TZ="Etc/UTC"
+
+RUN /bin/bash -c 'apt-get update && apt-get install -y \
+      util-linux \
+      bison \
+      binutils-dev \
+      cmake \
+      flex \
+      g++ \
+      git \
+      kmod \
+      wget \
+      libelf-dev \
+      zlib1g-dev \
+      libiberty-dev \
+      liblzma-dev \
+      libbfd-dev \
+      libedit-dev \
+      systemtap-sdt-dev \
+      sudo \
+      iproute2 \
+      python3 \
+      python3-pip \
+      ethtool \
+      arping \
+      netperf \
+      iperf \
+      iputils-ping \
+      bridge-utils \
+      libtinfo5 \
+      libtinfo-dev \
+      xz-utils \
+      zip && \
+      read -ra versions <<<"${LLVM_VERSION}" && \
+for version in ${versions[@]}; \
+do \
+    apt-get install -y \
+      clang-${version} \
+      libclang-${version}-dev \
+      libclang-common-${version}-dev \
+      libclang1-${version} \
+      llvm-${version} \
+      llvm-${version}-dev \
+      llvm-${version}-runtime \
+      libllvm${version} && \
+      if [ "${version}" -ge "15" ]; \
+      then \
+        apt-get install -y libpolly-${version}-dev; \
+      fi; \
+done \ 
+&& \
+      apt-get -y clean'
+
+RUN pip3 install pyroute2==0.5.18 netaddr==0.8.0 dnslib==0.9.14 cachetools==3.1.1
+
+# FIXME this is faster than building from source, but it seems there is a bug
+# in probing libruby.so rather than ruby binary
+#RUN apt-get update -qq && \
+#    apt-get install -y software-properties-common && \
+#    apt-add-repository ppa:brightbox/ruby-ng && \
+#    apt-get update -qq && apt-get install -y ruby2.6 ruby2.6-dev
+
+RUN wget -O ruby-install-${RUBY_INSTALL_VERSION}.tar.gz \
+         https://github.com/postmodern/ruby-install/archive/v${RUBY_INSTALL_VERSION}.tar.gz && \
+    tar -xzvf ruby-install-${RUBY_INSTALL_VERSION}.tar.gz && \
+    cd ruby-install-${RUBY_INSTALL_VERSION}/ && \
+    make install && \
+    cd .. && \
+    rm -rf ruby-install-${RUBY_INSTALL_VERSION}*
+
+RUN ruby-install --system ruby ${RUBY_VERSION} -c -- --enable-dtrace
+RUN if [ ! -f "/usr/bin/python" ]; then ln -s /bin/python3 /usr/bin/python; fi
+RUN if [ ! -f "/usr/local/bin/python" ]; then ln -s /usr/bin/python3 /usr/local/bin/python; fi

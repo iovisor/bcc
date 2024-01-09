@@ -2,7 +2,8 @@
 // Copyright (c) 2020 Wenbo Zhang
 //
 // Based on numamove(8) from BPF-Perf-Tools-Book by Brendan Gregg.
-// 8-Jun-2020   Wenbo Zhang   Created this.
+//  8-Jun-2020   Wenbo Zhang   Created this.
+// 30-Jan-2023   Rong Tao      Use fentry_can_attach() to decide use fentry/kprobe.
 #include <argp.h>
 #include <signal.h>
 #include <stdio.h>
@@ -80,10 +81,9 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
-	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
 
-	obj = numamove_bpf__open_and_load();
+	obj = numamove_bpf__open();
 	if (!obj) {
 		fprintf(stderr, "failed to open and/or load BPF object\n");
 		return 1;
@@ -91,6 +91,21 @@ int main(int argc, char **argv)
 
 	if (!obj->bss) {
 		fprintf(stderr, "Memory-mapping BPF maps is supported starting from Linux 5.7, please upgrade.\n");
+		goto cleanup;
+	}
+
+	/* It fallbacks to kprobes when kernel does not support fentry. */
+	if (fentry_can_attach("migrate_misplaced_page", NULL)) {
+		bpf_program__set_autoload(obj->progs.kprobe_migrate_misplaced_page, false);
+		bpf_program__set_autoload(obj->progs.kretprobe_migrate_misplaced_page_exit, false);
+	} else {
+		bpf_program__set_autoload(obj->progs.fentry_migrate_misplaced_page, false);
+		bpf_program__set_autoload(obj->progs.fexit_migrate_misplaced_page_exit, false);
+	}
+
+	err = numamove_bpf__load(obj);
+	if (err) {
+		fprintf(stderr, "failed to load BPF skelect: %d\n", err);
 		goto cleanup;
 	}
 

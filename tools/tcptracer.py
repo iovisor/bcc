@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # tcpv4tracer   Trace TCP connections.
 #               For Linux, uses BCC, eBPF. Embedded C.
@@ -668,15 +668,6 @@ else:
           ("T", "PID", "COMM", "IP", "SADDR", "DADDR", "SPORT", "DPORT"))
 
 start_ts = 0
-
-def inet_ntoa(addr):
-    dq = ''
-    for i in range(0, 4):
-        dq = dq + str(addr & 0xff)
-        if (i != 3):
-            dq = dq + '.'
-        addr = addr >> 8
-    return dq
 
 
 b["tcp_ipv4_event"].open_perf_buffer(print_ipv4_event)

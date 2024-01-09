@@ -27,6 +27,7 @@
 #include <bpf/bpf.h>
 #include "klockstat.h"
 #include "klockstat.skel.h"
+#include "compat.h"
 #include "trace_helpers.h"
 
 #define warn(...) fprintf(stderr, __VA_ARGS__)
@@ -83,7 +84,7 @@ static const char program_doc[] =
 "  klockstat -t 181              # trace thread 181 only\n"
 "  klockstat -c pipe_            # print only for lock callers with 'pipe_'\n"
 "                                # prefix\n"
-"  klockstat -L cgroup_mutex     # trace the cgroup_mutex lock only\n"
+"  klockstat -L cgroup_mutex     # trace the cgroup_mutex lock only (accepts addr too)\n"
 "  klockstat -S acq_count        # sort lock acquired results by acquire count\n"
 "  klockstat -S hld_total        # sort lock held results by total held time\n"
 "  klockstat -S acq_count,hld_total  # combination of above\n"
@@ -113,6 +114,27 @@ static const struct argp_option opts[] = {
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
+
+static void *parse_lock_addr(const char *lock_name)
+{
+	unsigned long lock_addr;
+
+	return sscanf(lock_name, "0x%lx", &lock_addr) ? (void*)lock_addr : NULL;
+}
+
+static void *get_lock_addr(struct ksyms *ksyms, const char *lock_name)
+{
+	const struct ksym *ksym = ksyms__get_symbol(ksyms, lock_name);
+
+	return ksym ? (void*)ksym->addr : parse_lock_addr(lock_name);
+}
+
+static const char *get_lock_name(struct ksyms *ksyms, unsigned long addr)
+{
+	const struct ksym *ksym = ksyms__map_addr(ksyms, addr);
+
+	return (ksym && ksym->addr == addr) ? ksym->name : "no-ksym";
+}
 
 static bool parse_one_sort(struct prog_env *env, const char *sort)
 {
@@ -247,10 +269,10 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 				env->interval = env->duration;
 			env->iterations = env->duration / env->interval;
 		}
-                if (env->per_thread && env->nr_stack_entries != 1) {
+		if (env->per_thread && env->nr_stack_entries != 1) {
 			warn("--per-thread and --stacks cannot be used together\n");
 			argp_usage(state);
-                }
+		}
 		break;
 	default:
 		return ARGP_ERR_UNKNOWN;
@@ -400,9 +422,11 @@ static void print_acq_stat(struct ksyms *ksyms, struct stack_stat *ss,
 		printf("%37s\n", symname(ksyms, ss->bt[i], buf, sizeof(buf)));
 	}
 	if (nr_stack_entries > 1 && !env.per_thread)
-		printf("                              Max PID %llu, COMM %s\n",
+		printf("                              Max PID %llu, COMM %s, Lock %s (0x%llx)\n",
 		       ss->ls.acq_max_id >> 32,
-		       ss->ls.acq_max_comm);
+		       ss->ls.acq_max_comm,
+			   get_lock_name(ksyms, ss->ls.acq_max_lock_ptr),
+			   ss->ls.acq_max_lock_ptr);
 }
 
 static void print_acq_task(struct stack_stat *ss)
@@ -451,9 +475,11 @@ static void print_hld_stat(struct ksyms *ksyms, struct stack_stat *ss,
 		printf("%37s\n", symname(ksyms, ss->bt[i], buf, sizeof(buf)));
 	}
 	if (nr_stack_entries > 1 && !env.per_thread)
-		printf("                              Max PID %llu, COMM %s\n",
+		printf("                              Max PID %llu, COMM %s, Lock %s (0x%llx)\n",
 		       ss->ls.hld_max_id >> 32,
-		       ss->ls.hld_max_comm);
+		       ss->ls.hld_max_comm,
+			   get_lock_name(ksyms, ss->ls.hld_max_lock_ptr),
+			   ss->ls.hld_max_lock_ptr);
 }
 
 static void print_hld_task(struct stack_stat *ss)
@@ -490,7 +516,7 @@ static int print_stats(struct ksyms *ksyms, int stack_map, int stat_map)
 	while (bpf_map_get_next_key(stat_map, &lookup_key, &stack_id) == 0) {
 		if (stat_idx == stats_sz) {
 			stats_sz *= 2;
-			stats = reallocarray(stats, stats_sz, sizeof(void *));
+			stats = libbpf_reallocarray(stats, stats_sz, sizeof(void *));
 			if (!stats) {
 				warn("Out of memory\n");
 				return -1;
@@ -501,16 +527,9 @@ static int print_stats(struct ksyms *ksyms, int stack_map, int stat_map)
 			warn("Out of memory\n");
 			return -1;
 		}
-		ss->stack_id = stack_id;
-		if (env.reset) {
-			ret = bpf_map_lookup_and_delete_elem(stat_map,
-							     &stack_id,
-							     &ss->ls);
-			lookup_key = 0;
-		} else {
-			ret = bpf_map_lookup_elem(stat_map, &stack_id, &ss->ls);
-			lookup_key = stack_id;
-		}
+
+		lookup_key = ss->stack_id = stack_id;
+		ret = bpf_map_lookup_elem(stat_map, &stack_id, &ss->ls);
 		if (ret) {
 			free(ss);
 			continue;
@@ -550,18 +569,14 @@ static int print_stats(struct ksyms *ksyms, int stack_map, int stat_map)
 			print_hld_stat(ksyms, stats[i], nr_stack_entries);
 	}
 
-	for (i = 0; i < stat_idx; i++)
+	for (i = 0; i < stat_idx; i++) {
+		if (env.reset)
+			bpf_map_delete_elem(stat_map, &ss->stack_id);
 		free(stats[i]);
+        }
 	free(stats);
 
 	return 0;
-}
-
-static void *get_lock_addr(struct ksyms *ksyms, const char *lock_name)
-{
-	const struct ksym *ksym = ksyms__get_symbol(ksyms, lock_name);
-
-	return ksym ? (void*)ksym->addr : NULL;
 }
 
 static volatile bool exiting;
@@ -578,6 +593,100 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 	if (level == LIBBPF_DEBUG && !env.verbose)
 		return 0;
 	return vfprintf(stderr, format, args);
+}
+
+static void enable_fentry(struct klockstat_bpf *obj)
+{
+	bool debug_lock;
+
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_trylock, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_trylock_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_interruptible, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_interruptible_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_killable, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_killable_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_unlock, false);
+
+	bpf_program__set_autoload(obj->progs.kprobe_down_read, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_read_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_read_trylock, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_read_trylock_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_read_interruptible, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_read_interruptible_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_read_killable, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_read_killable_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_up_read, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_write, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_write_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_write_trylock, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_write_trylock_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_write_killable, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_write_killable_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_up_write, false);
+
+	/* CONFIG_DEBUG_LOCK_ALLOC is on */
+	debug_lock = fentry_can_attach("mutex_lock_nested", NULL);
+	if (!debug_lock)
+		return;
+
+	bpf_program__set_attach_target(obj->progs.mutex_lock, 0,
+				       "mutex_lock_nested");
+	bpf_program__set_attach_target(obj->progs.mutex_lock_exit, 0,
+				       "mutex_lock_nested");
+	bpf_program__set_attach_target(obj->progs.mutex_lock_interruptible, 0,
+				       "mutex_lock_interruptible_nested");
+	bpf_program__set_attach_target(obj->progs.mutex_lock_interruptible_exit, 0,
+				       "mutex_lock_interruptible_nested");
+	bpf_program__set_attach_target(obj->progs.mutex_lock_killable, 0,
+				       "mutex_lock_killable_nested");
+	bpf_program__set_attach_target(obj->progs.mutex_lock_killable_exit, 0,
+				       "mutex_lock_killable_nested");
+
+	bpf_program__set_attach_target(obj->progs.down_read, 0,
+				       "down_read_nested");
+	bpf_program__set_attach_target(obj->progs.down_read_exit, 0,
+				       "down_read_nested");
+	bpf_program__set_attach_target(obj->progs.down_read_killable, 0,
+				       "down_read_killable_nested");
+	bpf_program__set_attach_target(obj->progs.down_read_killable_exit, 0,
+				       "down_read_killable_nested");
+	bpf_program__set_attach_target(obj->progs.down_write, 0,
+				       "down_write_nested");
+	bpf_program__set_attach_target(obj->progs.down_write_exit, 0,
+				       "down_write_nested");
+	bpf_program__set_attach_target(obj->progs.down_write_killable, 0,
+				       "down_write_killable_nested");
+	bpf_program__set_attach_target(obj->progs.down_write_killable_exit, 0,
+				       "down_write_killable_nested");
+}
+
+static void enable_kprobes(struct klockstat_bpf *obj)
+{
+	bpf_program__set_autoload(obj->progs.mutex_lock, false);
+	bpf_program__set_autoload(obj->progs.mutex_lock_exit, false);
+	bpf_program__set_autoload(obj->progs.mutex_trylock_exit, false);
+	bpf_program__set_autoload(obj->progs.mutex_lock_interruptible, false);
+	bpf_program__set_autoload(obj->progs.mutex_lock_interruptible_exit, false);
+	bpf_program__set_autoload(obj->progs.mutex_lock_killable, false);
+	bpf_program__set_autoload(obj->progs.mutex_lock_killable_exit, false);
+	bpf_program__set_autoload(obj->progs.mutex_unlock, false);
+
+	bpf_program__set_autoload(obj->progs.down_read, false);
+	bpf_program__set_autoload(obj->progs.down_read_exit, false);
+	bpf_program__set_autoload(obj->progs.down_read_trylock_exit, false);
+	bpf_program__set_autoload(obj->progs.down_read_interruptible, false);
+	bpf_program__set_autoload(obj->progs.down_read_interruptible_exit, false);
+	bpf_program__set_autoload(obj->progs.down_read_killable, false);
+	bpf_program__set_autoload(obj->progs.down_read_killable_exit, false);
+	bpf_program__set_autoload(obj->progs.up_read, false);
+	bpf_program__set_autoload(obj->progs.down_write, false);
+	bpf_program__set_autoload(obj->progs.down_write_exit, false);
+	bpf_program__set_autoload(obj->progs.down_write_trylock_exit, false);
+	bpf_program__set_autoload(obj->progs.down_write_killable, false);
+	bpf_program__set_autoload(obj->progs.down_write_killable_exit, false);
+	bpf_program__set_autoload(obj->progs.up_write, false);
 }
 
 int main(int argc, char **argv)
@@ -602,7 +711,6 @@ int main(int argc, char **argv)
 
 	sigaction(SIGINT, &sigact, 0);
 
-	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
 
 	ksyms = ksyms__load();
@@ -632,40 +740,11 @@ int main(int argc, char **argv)
 	obj->rodata->targ_lock = lock_addr;
 	obj->rodata->per_thread = env.per_thread;
 
-	if (fentry_can_attach("mutex_lock_nested", NULL)) {
-		bpf_program__set_attach_target(obj->progs.mutex_lock, 0,
-					       "mutex_lock_nested");
-		bpf_program__set_attach_target(obj->progs.mutex_lock_exit, 0,
-					       "mutex_lock_nested");
-		bpf_program__set_attach_target(obj->progs.mutex_lock_interruptible, 0,
-					       "mutex_lock_interruptible_nested");
-		bpf_program__set_attach_target(obj->progs.mutex_lock_interruptible_exit, 0,
-					       "mutex_lock_interruptible_nested");
-		bpf_program__set_attach_target(obj->progs.mutex_lock_killable, 0,
-					       "mutex_lock_killable_nested");
-		bpf_program__set_attach_target(obj->progs.mutex_lock_killable_exit, 0,
-					       "mutex_lock_killable_nested");
-	}
-
-	if (fentry_can_attach("down_read_nested", NULL)) {
-		bpf_program__set_attach_target(obj->progs.down_read, 0,
-					       "down_read_nested");
-		bpf_program__set_attach_target(obj->progs.down_read_exit, 0,
-					       "down_read_nested");
-		bpf_program__set_attach_target(obj->progs.down_read_killable, 0,
-					       "down_read_killable_nested");
-		bpf_program__set_attach_target(obj->progs.down_read_killable_exit, 0,
-					       "down_read_killable_nested");
-
-		bpf_program__set_attach_target(obj->progs.down_write, 0,
-					       "down_write_nested");
-		bpf_program__set_attach_target(obj->progs.down_write_exit, 0,
-					       "down_write_nested");
-		bpf_program__set_attach_target(obj->progs.down_write_killable, 0,
-					       "down_write_killable_nested");
-		bpf_program__set_attach_target(obj->progs.down_write_killable_exit, 0,
-					       "down_write_killable_nested");
-	}
+	if (fentry_can_attach("mutex_lock", NULL) ||
+	    fentry_can_attach("mutex_lock_nested", NULL))
+		enable_fentry(obj);
+	else
+		enable_kprobes(obj);
 
 	err = klockstat_bpf__load(obj);
 	if (err) {

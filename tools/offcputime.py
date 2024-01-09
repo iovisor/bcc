@@ -1,19 +1,23 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # offcputime    Summarize off-CPU time by stack trace
 #               For Linux, uses BCC, eBPF.
 #
-# USAGE: offcputime [-h] [-p PID | -u | -k] [-U | -K] [-f] [duration]
+# USAGE: offcputime [-h] [-p PID | -t TID | -u | -k] [-U | -K] [-d] [-f] [-s]
+#                   [--stack-storage-size STACK_STORAGE_SIZE]
+#                   [-m MIN_BLOCK_TIME] [-M MAX_BLOCK_TIME] [--state STATE]
+#                   [duration]
 #
 # Copyright 2016 Netflix, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 13-Jan-2016	Brendan Gregg	Created this.
+# 27-Mar-2023	Rocky Xing      Added option to show symbol offsets.
+# 04-Apr-2023   Rocky Xing      Updated default stack storage size.
 
 from __future__ import print_function
 from bcc import BPF
 from sys import stderr
-from time import strftime
 import argparse
 import errno
 import signal
@@ -45,6 +49,7 @@ examples = """examples:
     ./offcputime             # trace off-CPU stack time until Ctrl-C
     ./offcputime 5           # trace for 5 seconds only
     ./offcputime -f 5        # 5 seconds, and output in folded format
+    ./offcputime -s 5        # 5 seconds, and show symbol offsets
     ./offcputime -m 1000     # trace only events that last more than 1000 usec
     ./offcputime -M 10000    # trace only events that last less than 10000 usec
     ./offcputime -p 185      # only trace threads for PID 185
@@ -78,10 +83,12 @@ parser.add_argument("-d", "--delimited", action="store_true",
     help="insert delimiter between kernel/user stacks")
 parser.add_argument("-f", "--folded", action="store_true",
     help="output folded format")
-parser.add_argument("--stack-storage-size", default=1024,
+parser.add_argument("-s", "--offset", action="store_true",
+    help="show address offsets")
+parser.add_argument("--stack-storage-size", default=16384,
     type=positive_nonzero_int,
     help="the number of unique stack traces that can be stored and "
-         "displayed (default 1024)")
+         "displayed (default 16384)")
 parser.add_argument("duration", nargs="?", default=99999999,
     type=positive_nonzero_int,
     help="duration of trace, in seconds")
@@ -102,6 +109,10 @@ args = parser.parse_args()
 folded = args.folded
 duration = int(args.duration)
 debug = 0
+
+if args.folded and args.offset:
+    print("ERROR: can only use -f or -s. Exiting.")
+    exit()
 
 # signal handler
 def signal_ignore(signal, frame):
@@ -246,21 +257,22 @@ need_delimiter = args.delimited and not (args.kernel_stacks_only or
 if args.kernel_threads_only and args.user_stacks_only:
     print("ERROR: Displaying user stacks for kernel threads " +
           "doesn't make sense.", file=stderr)
-    exit(1)
+    exit(2)
 
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
-        exit()
+        print("ERROR: Exiting")
+        exit(3)
 
 # initialize BPF
 b = BPF(text=bpf_text)
-b.attach_kprobe(event_re="^finish_task_switch$|^finish_task_switch\.isra\.\d$",
+b.attach_kprobe(event_re=r'^finish_task_switch$|^finish_task_switch\.isra\.\d$',
                 fn_name="oncpu")
 matched = b.num_open_kprobes()
 if matched == 0:
     print("error: 0 functions traced. Exiting.", file=stderr)
-    exit(1)
+    exit(4)
 
 # header
 if not folded:
@@ -294,6 +306,10 @@ except KeyboardInterrupt:
 
 if not folded:
     print()
+
+show_offset = False
+if args.offset:
+    show_offset = True
 
 missing_stacks = 0
 has_enomem = False
@@ -343,7 +359,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
                 print("    [Missed Kernel Stack]")
             else:
                 for addr in kernel_stack:
-                    print("    %s" % b.ksym(addr).decode('utf-8', 'replace'))
+                    print("    %s" % b.ksym(addr, show_offset=show_offset).decode('utf-8', 'replace'))
         if not args.kernel_stacks_only:
             if need_delimiter and k.user_stack_id >= 0 and k.kernel_stack_id >= 0:
                 print("    --")
@@ -351,7 +367,7 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
                 print("    [Missed User Stack]")
             else:
                 for addr in user_stack:
-                    print("    %s" % b.sym(addr, k.tgid).decode('utf-8', 'replace'))
+                    print("    %s" % b.sym(addr, k.tgid, show_offset=show_offset).decode('utf-8', 'replace'))
         print("    %-16s %s (%d)" % ("-", k.name.decode('utf-8', 'replace'), k.pid))
         print("        %d\n" % v.value)
 

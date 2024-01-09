@@ -39,6 +39,11 @@ std::vector<int> get_possible_cpus();
 
 std::string get_pid_exe(pid_t pid);
 
+std::string tracefs_path();
+
+std::string tracepoint_format_file(std::string const& category,
+                                   std::string const& event);
+
 std::string parse_tracepoint(std::istream &input, std::string const& category,
                              std::string const& event);
 }  // namespace ebpf

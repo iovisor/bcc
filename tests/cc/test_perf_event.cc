@@ -59,8 +59,9 @@ TEST_CASE("test read perf event", "[bpf_perf_event]") {
       BPF_PROGRAM,
       {"-DNUM_CPUS=" + std::to_string(sysconf(_SC_NPROCESSORS_ONLN))}, {});
   REQUIRE(res.ok());
+  int pid = getpid();
   res =
-      bpf.open_perf_event("cnt", PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK);
+      bpf.open_perf_event("cnt", PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK, pid);
   REQUIRE(res.ok());
   std::string getuid_fnname = bpf.get_syscall_fnname("getuid");
   res = bpf.attach_kprobe(getuid_fnname, "on_sys_getuid");

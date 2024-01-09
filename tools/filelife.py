@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # filelife    Trace the lifespan of short-lived files.
@@ -16,6 +16,8 @@
 #
 # 08-Feb-2015   Brendan Gregg   Created this.
 # 17-Feb-2016   Allan McAleavy updated for BPF_PERF_OUTPUT
+# 13-Nov-2022   Rong Tao        Check btf struct field for CO-RE and add vfs_open()
+# 05-Nov-2023   Rong Tao        Support unlink failed
 
 from __future__ import print_function
 from bcc import BPF
@@ -24,11 +26,11 @@ from time import strftime
 
 # arguments
 examples = """examples:
-    ./filelife           # trace all stat() syscalls
+    ./filelife           # trace lifecycle of file(create->remove)
     ./filelife -p 181    # only trace PID 181
 """
 parser = argparse.ArgumentParser(
-    description="Trace stat() syscalls",
+    description="Trace lifecycle of file",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
 parser.add_argument("-p", "--pid",
@@ -49,13 +51,15 @@ struct data_t {
     u64 delta;
     char comm[TASK_COMM_LEN];
     char fname[DNAME_INLINE_LEN];
+    /* private */
+    void *dentry;
 };
 
 BPF_HASH(birth, struct dentry *);
+BPF_HASH(unlink_data, u32, struct data_t);
 BPF_PERF_OUTPUT(events);
 
-// trace file creation time
-int trace_create(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
+static int probe_dentry(struct pt_regs *ctx, struct dentry *dentry)
 {
     u32 pid = bpf_get_current_pid_tgid() >> 32;
     FILTER
@@ -64,13 +68,40 @@ int trace_create(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
     birth.update(&dentry, &ts);
 
     return 0;
+}
+
+// trace file creation time
+TRACE_CREATE_FUNC
+{
+    return probe_dentry(ctx, dentry);
+};
+
+// trace file security_inode_create time
+int trace_security_inode_create(struct pt_regs *ctx, struct inode *dir,
+        struct dentry *dentry)
+{
+    return probe_dentry(ctx, dentry);
+};
+
+// trace file open time
+int trace_open(struct pt_regs *ctx, struct path *path, struct file *file)
+{
+    struct dentry *dentry = path->dentry;
+
+    if (!(file->f_mode & FMODE_CREATED)) {
+        return 0;
+    }
+
+    return probe_dentry(ctx, dentry);
 };
 
 // trace file deletion and output details
-int trace_unlink(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
+TRACE_UNLINK_FUNC
 {
     struct data_t data = {};
-    u32 pid = bpf_get_current_pid_tgid() >> 32;
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 pid = pid_tgid >> 32;
+    u32 tid = (u32)pid_tgid;
 
     FILTER
 
@@ -81,7 +112,6 @@ int trace_unlink(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
     }
 
     delta = (bpf_ktime_get_ns() - *tsp) / 1000000;
-    birth.delete(&dentry);
 
     struct qstr d_name = dentry->d_name;
     if (d_name.len == 0)
@@ -93,10 +123,59 @@ int trace_unlink(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
         bpf_probe_read_kernel(&data.fname, sizeof(data.fname), d_name.name);
     }
 
-    events.perf_submit(ctx, &data, sizeof(data));
+    /* record dentry, only delete from birth if unlink successful */
+    data.dentry = dentry;
+
+    unlink_data.update(&tid, &data);
+    return 0;
+}
+
+int trace_unlink_ret(struct pt_regs *ctx)
+{
+    int ret = PT_REGS_RC(ctx);
+    struct data_t *data;
+    u32 tid = (u32)bpf_get_current_pid_tgid();
+
+    data = unlink_data.lookup(&tid);
+    if (!data)
+        return 0;
+
+    /* delete it any way */
+    unlink_data.delete(&tid);
+
+    /* Skip failed unlink */
+    if (ret)
+        return 0;
+
+    birth.delete((struct dentry **)&data->dentry);
+    events.perf_submit(ctx, data, sizeof(*data));
 
     return 0;
 }
+"""
+
+trace_create_text_1="""
+int trace_create(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
+"""
+trace_create_text_2="""
+int trace_create(struct pt_regs *ctx, struct user_namespace *mnt_userns,
+        struct inode *dir, struct dentry *dentry)
+"""
+trace_create_text_3="""
+int trace_create(struct pt_regs *ctx, struct mnt_idmap *idmap,
+        struct inode *dir, struct dentry *dentry)
+"""
+
+trace_unlink_text_1="""
+int trace_unlink(struct pt_regs *ctx, struct inode *dir, struct dentry *dentry)
+"""
+trace_unlink_text_2="""
+int trace_unlink(struct pt_regs *ctx, struct user_namespace *mnt_userns,
+        struct inode *dir, struct dentry *dentry)
+"""
+trace_unlink_text_3="""
+int trace_unlink(struct pt_regs *ctx, struct mnt_idmap *idmap,
+        struct inode *dir, struct dentry *dentry)
 """
 
 if args.pid:
@@ -109,13 +188,27 @@ if debug or args.ebpf:
     if args.ebpf:
         exit()
 
+if BPF.kernel_struct_has_field(b'renamedata', b'new_mnt_idmap') == 1:
+    bpf_text = bpf_text.replace('TRACE_CREATE_FUNC', trace_create_text_3)
+    bpf_text = bpf_text.replace('TRACE_UNLINK_FUNC', trace_unlink_text_3)
+elif BPF.kernel_struct_has_field(b'renamedata', b'old_mnt_userns') == 1:
+    bpf_text = bpf_text.replace('TRACE_CREATE_FUNC', trace_create_text_2)
+    bpf_text = bpf_text.replace('TRACE_UNLINK_FUNC', trace_unlink_text_2)
+else:
+    bpf_text = bpf_text.replace('TRACE_CREATE_FUNC', trace_create_text_1)
+    bpf_text = bpf_text.replace('TRACE_UNLINK_FUNC', trace_unlink_text_1)
+
 # initialize BPF
 b = BPF(text=bpf_text)
 b.attach_kprobe(event="vfs_create", fn_name="trace_create")
+# newer kernels may don't fire vfs_create, call vfs_open instead:
+b.attach_kprobe(event="vfs_open", fn_name="trace_open")
 # newer kernels (say, 4.8) may don't fire vfs_create, so record (or overwrite)
 # the timestamp in security_inode_create():
-b.attach_kprobe(event="security_inode_create", fn_name="trace_create")
+if BPF.get_kprobe_functions(b"security_inode_create"):
+    b.attach_kprobe(event="security_inode_create", fn_name="trace_security_inode_create")
 b.attach_kprobe(event="vfs_unlink", fn_name="trace_unlink")
+b.attach_kretprobe(event="vfs_unlink", fn_name="trace_unlink_ret")
 
 # header
 print("%-8s %-7s %-16s %-7s %s" % ("TIME", "PID", "COMM", "AGE(s)", "FILE"))

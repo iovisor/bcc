@@ -23,6 +23,8 @@ typedef enum {
   BCC_ARCH_S390X,
   BCC_ARCH_ARM64,
   BCC_ARCH_MIPS,
+  BCC_ARCH_RISCV64,
+  BCC_ARCH_LOONGARCH,
   BCC_ARCH_X86
 } bcc_arch_t;
 
@@ -46,6 +48,10 @@ static void *run_arch_callback(arch_callback_t fn, bool for_syscall = false)
     return fn(BCC_ARCH_ARM64, for_syscall);
 #elif defined(__mips__)
     return fn(BCC_ARCH_MIPS, for_syscall);
+#elif defined(__riscv) && (__riscv_xlen == 64)
+    return fn(BCC_ARCH_RISCV64, for_syscall);
+#elif defined(__loongarch__)
+    return fn(BCC_ARCH_LOONGARCH, for_syscall);
 #else
     return fn(BCC_ARCH_X86, for_syscall);
 #endif
@@ -64,6 +70,10 @@ static void *run_arch_callback(arch_callback_t fn, bool for_syscall = false)
     return fn(BCC_ARCH_ARM64, for_syscall);
   } else if (!strcmp(archenv, "mips")) {
     return fn(BCC_ARCH_MIPS, for_syscall);
+  } else if (!strcmp(archenv, "riscv64")) {
+    return fn(BCC_ARCH_RISCV64, for_syscall);
+  } else if (!strcmp(archenv, "loongarch")) {
+    return fn(BCC_ARCH_LOONGARCH, for_syscall);
   } else {
     return fn(BCC_ARCH_X86, for_syscall);
   }

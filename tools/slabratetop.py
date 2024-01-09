@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # slabratetop  Summarize kmem_cache_alloc() calls.
@@ -14,6 +14,9 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 15-Oct-2016   Brendan Gregg   Created this.
+# 23-Jan-2023   Rong Tao        Introduce kernel internal data structure and
+#                               functions to temporarily solve problem for
+#                               >=5.16(TODO: fix this workaround)
 
 from __future__ import print_function
 from bcc import BPF
@@ -65,6 +68,93 @@ bpf_text = """
 // 5.9, but it does not hurt to have it here for versions 5.4 to 5.8.
 struct memcg_cache_params {};
 
+// introduce kernel interval slab structure and slab_address() function, solved
+// 'undefined' error for >=5.16. TODO: we should fix this workaround if BCC
+// framework support BTF/CO-RE.
+struct slab {
+    unsigned long __page_flags;
+
+#if defined(CONFIG_SLAB)
+
+    struct kmem_cache *slab_cache;
+    union {
+        struct {
+            struct list_head slab_list;
+            void *freelist; /* array of free object indexes */
+            void *s_mem;    /* first object */
+        };
+        struct rcu_head rcu_head;
+    };
+    unsigned int active;
+
+#elif defined(CONFIG_SLUB)
+
+    struct kmem_cache *slab_cache;
+    union {
+        struct {
+            union {
+                struct list_head slab_list;
+#ifdef CONFIG_SLUB_CPU_PARTIAL
+                struct {
+                    struct slab *next;
+                        int slabs;      /* Nr of slabs left */
+                };
+#endif
+            };
+            /* Double-word boundary */
+            void *freelist;         /* first free object */
+            union {
+                unsigned long counters;
+                struct {
+                    unsigned inuse:16;
+                    unsigned objects:15;
+                    unsigned frozen:1;
+                };
+            };
+        };
+        struct rcu_head rcu_head;
+    };
+    unsigned int __unused;
+
+#elif defined(CONFIG_SLOB)
+
+    struct list_head slab_list;
+    void *__unused_1;
+    void *freelist;         /* first free block */
+    long units;
+    unsigned int __unused_2;
+
+#else
+#error "Unexpected slab allocator configured"
+#endif
+
+    atomic_t __page_refcount;
+#ifdef CONFIG_MEMCG
+    unsigned long memcg_data;
+#endif
+};
+
+// slab_address() will not be used, and NULL will be returned directly, which
+// can avoid adaptation of different kernel versions
+static inline void *slab_address(const struct slab *slab)
+{
+    return NULL;
+}
+
+#ifdef CONFIG_64BIT
+typedef __uint128_t freelist_full_t;
+#else
+typedef u64 freelist_full_t;
+#endif
+
+typedef union {
+	struct {
+		void *freelist;
+		unsigned long counter;
+	};
+	freelist_full_t full;
+} freelist_aba_t;
+
 #ifdef CONFIG_SLUB
 #include <linux/slub_def.h>
 #else
@@ -109,6 +199,9 @@ if debug or args.ebpf:
 
 # initialize BPF
 b = BPF(text=bpf_text)
+# check whether hash table batch ops is supported
+htab_batch_ops = True if BPF.kernel_struct_has_field(b'bpf_map_ops',
+        b'map_lookup_and_delete_batch') == 1 else False
 
 print('Tracing... Output every %d secs. Hit Ctrl-C to end' % interval)
 
@@ -132,14 +225,16 @@ while 1:
     # by-TID output
     counts = b.get_table("counts")
     line = 0
-    for k, v in reversed(sorted(counts.items(),
+    for k, v in reversed(sorted(counts.items_lookup_and_delete_batch()
+                                if htab_batch_ops else counts.items(),
                                 key=lambda counts: counts[1].size)):
         printb(b"%-32s %6d %10d" % (k.name, v.count, v.size))
 
         line += 1
         if line >= maxrows:
             break
-    counts.clear()
+    if not htab_batch_ops:
+        counts.clear()
 
     countdown -= 1
     if exiting or countdown == 0:

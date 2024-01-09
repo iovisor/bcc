@@ -6,12 +6,23 @@ on:
       - master
   pull_request:
 
+env:
+  # Use docker.io for Docker Hub if empty
+  REGISTRY: ghcr.io
+  # github.repository as <account>/<repo>
+  IMAGE_NAME: ${{ github.repository }}
+
+permissions:
+  contents: read # to fetch code (actions/checkout)
+  pull-requests: read # to read pull requests (dorny/paths-filter)
+
 jobs:
   test_bcc:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        os: [{version: "18.04", nick: bionic}, {version: "20.04", nick: focal}]
+        os: [{distro: "ubuntu", version: "20.04", nick: focal}]
+        llvm_version: [11, 12, 15]
         env:
         - TYPE: Debug
           PYTHON_TEST_LOGFILE: critical.log
@@ -24,17 +35,32 @@ jobs:
           RW_ENGINE_ENABLED: ON
     steps:
     - uses: actions/checkout@v2
+    - uses: dorny/paths-filter@v2
+      id: changes
+      with:
+        filters: |
+          docker:
+            - 'docker/build/**'
     - name: System info
       run: |
         uname -a
         ip addr
-    - name: Build docker container with all deps
+    - name: Pull docker container
+      if: steps.changes.outputs.docker == 'false'
       run: |
-        docker build \
-        --build-arg UBUNTU_VERSION=${{ matrix.os.version }} \
-        --build-arg UBUNTU_SHORTNAME=${{ matrix.os.nick }} \
-        -t bcc-docker -f docker/Dockerfile.tests .
-    - name: Run bcc build
+        docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.os.distro }}-${{ matrix.os.version }}
+    - name: Build docker container
+      if: steps.changes.outputs.docker == 'true'
+      uses: ./.github/actions/build-container
+      with:
+        os_distro: ${{ matrix.os.distro }}
+        os_version: ${{ matrix.os.version }}
+        os_nick: ${{ matrix.os.nick }}
+        llvm_versions: ${{ matrix.llvm_version }}
+    - name: Tag docker container
+      run: |
+        docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.os.distro }}-${{ matrix.os.version }} bcc-docker
+    - name: Run bcc build - llvm-${{ matrix.llvm_version }}
       env: ${{ matrix.env }}
       run: |
         /bin/bash -c \
@@ -48,7 +74,7 @@ jobs:
                    bcc-docker \
                    /bin/bash -c \
                    'mkdir -p /bcc/build && cd /bcc/build && \
-                    cmake -DCMAKE_BUILD_TYPE=${TYPE} -DENABLE_LLVM_NATIVECODEGEN=${RW_ENGINE_ENABLED} .. && make -j9'"
+                    LLVM_ROOT=/usr/lib/llvm-${{ matrix.llvm_version }} cmake -DCMAKE_BUILD_TYPE=${TYPE} -DENABLE_LLVM_NATIVECODEGEN=${RW_ENGINE_ENABLED} .. && make -j9'"
     - name: Run bcc's cc tests
       env: ${{ matrix.env }}
       # tests are wrapped with `script` as a hack to get a TTY as github actions doesn't provide this
@@ -103,6 +129,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
+        os: [{distro: "fedora", version: "38", nick: "f38"}]
         env:
         - TYPE: Debug
           PYTHON_TEST_LOGFILE: critical.log
@@ -110,14 +137,30 @@ jobs:
           PYTHON_TEST_LOGFILE: critical.log
     steps:
     - uses: actions/checkout@v2
+    - uses: dorny/paths-filter@v2
+      id: changes
+      with:
+        filters: |
+          docker:
+            - 'docker/build/**'
     - name: System info
       run: |
         uname -a
         ip addr
-    - name: Build docker container with all deps
+    - name: Pull docker container
+      if: steps.changes.outputs.docker == 'false'
       run: |
-        docker build \
-        -t bcc-docker -f docker/Dockerfile.fedora .
+        docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.os.distro }}-${{ matrix.os.version }}
+    - name: Build docker container
+      if: steps.changes.outputs.docker == 'true'
+      uses: ./.github/actions/build-container
+      with:
+        os_distro: ${{ matrix.os.distro }}
+        os_version: ${{ matrix.os.version }}
+        os_nick: ${{ matrix.os.nick }}
+    - name: Tag docker container
+      run: |
+        docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.os.distro }}-${{ matrix.os.version }} bcc-docker
     - name: Run bcc build
       env: ${{ matrix.env }}
       run: |

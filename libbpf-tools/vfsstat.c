@@ -152,7 +152,6 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
-	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	libbpf_set_print(libbpf_print_fn);
 
 
@@ -169,7 +168,7 @@ int main(int argc, char **argv)
 	}
 
 	/* It fallbacks to kprobes when kernel does not support fentry. */
-	if (vmlinux_btf_exists() && fentry_can_attach("vfs_read", NULL)) {
+	if (fentry_can_attach("vfs_read", NULL)) {
 		bpf_program__set_autoload(skel->progs.kprobe_vfs_read, false);
 		bpf_program__set_autoload(skel->progs.kprobe_vfs_write, false);
 		bpf_program__set_autoload(skel->progs.kprobe_vfs_fsync, false);
