@@ -96,6 +96,7 @@ struct trace {
 	struct btf *btf;
 	struct btf_dump *dump;
 	struct func func;
+	struct bpf_link *links[2];
 	__u8 nr_traces;
 	__u32 filter_pid;
 	__u64 prev_ip; /* these are used in stack-mode tracing */
@@ -112,7 +113,6 @@ struct trace {
 	__u16 buf_len;
 	char buf[MAX_TRACE_BUF];
 	char buf_end[0];
-	struct bpf_link *links[2];
 };
 
 #define PAGES_DEFAULT	16
