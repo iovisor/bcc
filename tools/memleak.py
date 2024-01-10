@@ -169,35 +169,32 @@ BPF_HASH(combined_allocs, u64, struct combined_alloc_info_t, 10240);
 
 static inline void update_statistics_add(u64 stack_id, u64 sz) {
         struct combined_alloc_info_t *existing_cinfo;
-        struct combined_alloc_info_t cinfo = {0};
+        struct combined_alloc_info_t cinfo = {0, 0};
 
         existing_cinfo = combined_allocs.lookup(&stack_id);
-        if (existing_cinfo != 0)
-                cinfo = *existing_cinfo;
-
-        cinfo.total_size += sz;
-        cinfo.number_of_allocs += 1;
-
-        combined_allocs.update(&stack_id, &cinfo);
+        if (!existing_cinfo) {
+                combined_allocs.update(&stack_id, &cinfo);
+                existing_cinfo = combined_allocs.lookup(&stack_id);
+                if (!existing_cinfo)
+                        return;
+        }
+        __sync_fetch_and_add(&existing_cinfo->total_size, sz);
+        __sync_fetch_and_add(&existing_cinfo->number_of_allocs, 1);
 }
 
 static inline void update_statistics_del(u64 stack_id, u64 sz) {
         struct combined_alloc_info_t *existing_cinfo;
-        struct combined_alloc_info_t cinfo = {0};
 
         existing_cinfo = combined_allocs.lookup(&stack_id);
-        if (existing_cinfo != 0)
-                cinfo = *existing_cinfo;
+        if (!existing_cinfo)
+                return;
 
-        if (sz >= cinfo.total_size)
-                cinfo.total_size = 0;
-        else
-                cinfo.total_size -= sz;
-
-        if (cinfo.number_of_allocs > 0)
-                cinfo.number_of_allocs -= 1;
-
-        combined_allocs.update(&stack_id, &cinfo);
+        if (existing_cinfo->number_of_allocs > 1) {
+                __sync_fetch_and_sub(&existing_cinfo->total_size, sz);
+                __sync_fetch_and_sub(&existing_cinfo->number_of_allocs, 1);
+        } else {
+                combined_allocs.delete(&stack_id);
+        }
 }
 
 static inline int gen_alloc_enter(struct pt_regs *ctx, size_t size) {
