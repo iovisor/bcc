@@ -61,10 +61,11 @@ bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/blk-mq.h>
 
-// for saving the timestamp and __data_len of each request
+// for saving the timestamp, __data_len, and cmd_flags of each request
 struct start_req_t {
     u64 ts;
     u64 data_len;
+    u64 cmd_flags;
 };
 
 // for saving process info by request
@@ -161,7 +162,8 @@ int trace_req_start(struct pt_regs *ctx, struct request *req)
     };
     struct start_req_t start_req = {
         .ts = bpf_ktime_get_ns(),
-        .data_len = req->__data_len
+        .data_len = req->__data_len,
+        .cmd_flags = req->cmd_flags
     };
     start.update(&key, &start_req);
     return 0;
@@ -205,13 +207,13 @@ static int __trace_req_completion(struct hash_key key)
  * kernel version tests like this as much as possible: they inflate the code,
  * test, and maintenance burden.
  */
-/*#ifdef REQ_WRITE
-    info.rwflag = !!(req->cmd_flags & REQ_WRITE);
+#ifdef REQ_WRITE
+    info.rwflag = !!(startp->cmd_flags & REQ_WRITE);
 #elif defined(REQ_OP_SHIFT)
-    info.rwflag = !!((req->cmd_flags >> REQ_OP_SHIFT) == REQ_OP_WRITE);
+    info.rwflag = !!((startp->cmd_flags >> REQ_OP_SHIFT) == REQ_OP_WRITE);
 #else
-    info.rwflag = !!((req->cmd_flags & REQ_OP_MASK) == REQ_OP_WRITE);
-#endif*/
+    info.rwflag = !!((startp->cmd_flags & REQ_OP_MASK) == REQ_OP_WRITE);
+#endif
 
     if (whop == 0) {
         // missed pid who, save stats as pid 0
