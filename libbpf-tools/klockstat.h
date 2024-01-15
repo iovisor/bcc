@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause) */
 #ifndef __KLOCKSTAT_H
+#define __KLOCKSTAT_H
 
 #define MAX_ENTRIES 102400
 #define TASK_COMM_LEN 16
