@@ -180,6 +180,26 @@ lib.bpf_poll_ringbuf.restype = ct.c_int
 lib.bpf_poll_ringbuf.argtypes = [ct.c_void_p, ct.c_int]
 lib.bpf_consume_ringbuf.restype = ct.c_int
 lib.bpf_consume_ringbuf.argtypes = [ct.c_void_p]
+class bpf_test_run_opts(ct.Structure):
+    _fields_ = [
+        ('sz', ct.c_size_t),
+        ('data_in', ct.c_void_p),
+        ('data_out', ct.c_void_p),
+        ('data_size_in', ct.c_uint32),
+        ('data_size_out', ct.c_uint32),
+        ('ctx_in', ct.c_void_p),
+        ('ctx_out', ct.c_void_p),
+        ('ctx_size_in', ct.c_uint32),
+        ('ctx_size_out', ct.c_uint32),
+        ('retval', ct.c_uint32),
+        ('repeat', ct.c_int),
+        ('duration', ct.c_uint32),
+        ('flags', ct.c_uint32),
+        ('cpu', ct.c_uint32),
+        ('batch_size', ct.c_uint32),
+    ]
+lib.bpf_prog_test_run_opts.restype = ct.c_int
+lib.bpf_prog_test_run_opts.argtypes = [ct.c_int, ct.POINTER(bpf_test_run_opts)]
 
 # bcc symbol helpers
 class bcc_symbol(ct.Structure):
