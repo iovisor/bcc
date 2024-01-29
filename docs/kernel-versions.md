@@ -241,6 +241,7 @@ Microsoft `hv_netvsc` driver | 5.6 | [`351e1581395f`](https://github.com/torvald
 Amazon `ena` driver | 5.6 | [`838c93dc5449`](https://github.com/torvalds/linux/commit/838c93dc5449e5d6378bae117b0a65a122cf7361)
 `xen-netfront` driver | 5.9 | [`6c5aa6fc4def`](https://github.com/torvalds/linux/commit/6c5aa6fc4defc2a0977a2c59e4710d50fa1e834c)
 Intel `igb` driver | 5.10 | [`9cbc948b5a20`](https://github.com/torvalds/linux/commit/9cbc948b5a20c9c054d9631099c0426c16da546b)
+`bonding` driver | 5.15 | [`9e2ee5c7e7c3`](https://github.com/torvalds/linux/commit/9e2ee5c7e7c35d195e2aa0692a7241d47a433d1e)
 
 ## Helpers
 
