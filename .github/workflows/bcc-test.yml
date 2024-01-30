@@ -22,7 +22,7 @@ jobs:
     strategy:
       matrix:
         os: [{distro: "ubuntu", version: "20.04", nick: focal}]
-        llvm_version: [11, 12, 15]
+        llvm_version: [12, 15]
         env:
         - TYPE: Debug
           PYTHON_TEST_LOGFILE: critical.log
