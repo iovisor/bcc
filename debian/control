@@ -4,10 +4,10 @@ Section: misc
 Priority: optional
 Standards-Version: 3.9.5
 Build-Depends: debhelper (>= 9), cmake,
-    libllvm11,
-    llvm-11-dev,
-    libclang-11-dev,
-    clang-format-11,
+    libllvm12
+    llvm-12-dev,
+    libclang-12-dev,
+    clang-format-12,
     libelf-dev, bison, flex, libfl-dev, libedit-dev, zlib1g-dev, git,
     python3, python3-netaddr, python3-pyroute2, python3-setuptools, python3-pip,
     luajit,

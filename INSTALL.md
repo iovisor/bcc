@@ -372,19 +372,6 @@ To build the toolchain from source, one needs:
 
 ### Install build dependencies
 ```
-# Trusty (14.04 LTS) and older
-VER=trusty
-echo "deb http://llvm.org/apt/$VER/ llvm-toolchain-$VER-3.7 main
-deb-src http://llvm.org/apt/$VER/ llvm-toolchain-$VER-3.7 main" | \
-  sudo tee /etc/apt/sources.list.d/llvm.list
-wget -O - http://llvm.org/apt/llvm-snapshot.gpg.key | sudo apt-key add -
-sudo apt-get update
-
-# For Bionic (18.04 LTS)
-sudo apt-get -y install zip bison build-essential cmake flex git libedit-dev \
-  libllvm6.0 llvm-6.0-dev libclang-6.0-dev python zlib1g-dev libelf-dev libfl-dev python3-setuptools \
-  liblzma-dev arping netperf iperf
-
 # For Focal (20.04.1 LTS)
 sudo apt install -y zip bison build-essential cmake flex git libedit-dev \
   libllvm12 llvm-12-dev libclang-12-dev python zlib1g-dev libelf-dev libfl-dev python3-setuptools \
@@ -392,7 +379,7 @@ sudo apt install -y zip bison build-essential cmake flex git libedit-dev \
 
 # For Hirsute (21.04) or Impish (21.10)
 sudo apt install -y zip bison build-essential cmake flex git libedit-dev \
-  libllvm11 llvm-11-dev libclang-11-dev python3 zlib1g-dev libelf-dev libfl-dev python3-setuptools \
+  libllvm12 llvm-12-dev libclang-12-dev python3 zlib1g-dev libelf-dev libfl-dev python3-setuptools \
   liblzma-dev arping netperf iperf
 
 # For Jammy (22.04)
