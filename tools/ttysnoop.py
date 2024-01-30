@@ -162,8 +162,8 @@ PROBE_TTY_WRITE
      */
     case CASE_ITER_IOVEC_NAME:
         kvec  = from->kvec;
-        buf   = kvec->iov_base;
-        count = kvec->iov_len;
+        bpf_probe_read_kernel(&buf, sizeof(buf), &kvec->iov_base);
+        bpf_probe_read_kernel(&count, sizeof(count), &kvec->iov_len);
         break;
     CASE_ITER_UBUF_TEXT
     /* TODO: Support more type */
