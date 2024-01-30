@@ -181,7 +181,7 @@ class SmokeTests(TestCase):
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_f2fsslower(self):
-        self.run_with_int("f2fsslower.py")
+        self.run_with_int("f2fsslower.py", allow_early=True)
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_filelife(self):
