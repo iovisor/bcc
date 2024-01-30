@@ -14,7 +14,7 @@ inputs:
   llvm_versions:
     description: "Space separated list of llvm versions to install in the container. Only supported for Ubuntu containers."
     type: string
-    default: "11"
+    default: "12"
   registry:
     description: "Registry where to push images"
     default: ghcr.io
