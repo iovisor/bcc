@@ -48,6 +48,7 @@ static const char * const prog_type_strings[] = {
   [BPF_PROG_TYPE_LSM] = "lsm",
   [BPF_PROG_TYPE_SK_LOOKUP] = "sk_lookup",
   [BPF_PROG_TYPE_SYSCALL] = "syscall",
+  [BPF_PROG_TYPE_NETFILTER] = "netfilter",
 };
 
 static const char * const map_type_strings[] = {
