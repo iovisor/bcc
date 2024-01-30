@@ -722,7 +722,7 @@ git clone https://github.com/iovisor/bcc.git
 pushd .
 mkdir bcc/build
 cd bcc/build
-cmake .. -DPYTHON_CMD=python3 # for python3 support
+cmake -DENABLE_LLVM_SHARED=on .. -DPYTHON_CMD=python3 # for python3 support
 make -j$(nproc)
 sudo make install
 cd src/python
