@@ -58,6 +58,7 @@ RUN /bin/bash -c 'apt-get update && apt-get install -y \
       bridge-utils \
       libtinfo5 \
       libtinfo-dev \
+      libzstd-dev \
       xz-utils \
       zip && \
       read -ra versions <<<"${LLVM_VERSION}" && \
