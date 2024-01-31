@@ -76,24 +76,6 @@ static void sig_handler(int sig)
 	exiting = true;
 }
 
-static int readahead__set_attach_target(struct bpf_program *prog)
-{
-	int err;
-
-	err = bpf_program__set_attach_target(prog, 0, "do_page_cache_ra");
-	if (!err)
-		return 0;
-
-	err = bpf_program__set_attach_target(prog, 0,
-					"__do_page_cache_readahead");
-	if (!err)
-		return 0;
-
-	fprintf(stderr, "failed to set attach target for %s: %s\n",
-		bpf_program__name(prog), strerror(-err));
-	return err;
-}
-
 int main(int argc, char **argv)
 {
 	static const struct argp argp = {
@@ -121,12 +103,39 @@ int main(int argc, char **argv)
 	 * Starting from v5.10-rc1 (8238287), __do_page_cache_readahead has
 	 * renamed to do_page_cache_ra. So we specify the function dynamically.
 	 */
-	err = readahead__set_attach_target(obj->progs.do_page_cache_ra);
-	if (err)
-		goto cleanup;
-	err = readahead__set_attach_target(obj->progs.do_page_cache_ra_ret);
-	if (err)
-		goto cleanup;
+	if (fentry_can_attach("mark_page_accessed", NULL)) {
+		bpf_program__set_autoload(obj->progs.kprobe_mark_page_accessed, false);
+		bpf_program__set_autoload(obj->progs.kretprobe_page_cache_alloc, false);
+		bpf_program__set_autoload(obj->progs.kprobe_do_page_cache_ra, false);
+		bpf_program__set_autoload(obj->progs.kretprobe_do_page_cache_ra, false);
+		bpf_program__set_autoload(obj->progs.kprobe___do_page_cache_readahead, false);
+		bpf_program__set_autoload(obj->progs.kretprobe___do_page_cache_readahead, false);
+
+		if (fentry_can_attach("do_page_cache_ra", NULL)) {
+			bpf_program__set_attach_target(obj->progs.fentry_do_page_cache_ra, 0,
+						       "do_page_cache_ra");
+			bpf_program__set_attach_target(obj->progs.fexit_do_page_cache_ra, 0,
+						       "do_page_cache_ra");
+		} else {
+			bpf_program__set_attach_target(obj->progs.fentry_do_page_cache_ra, 0,
+						       "__do_page_cache_readahead");
+			bpf_program__set_attach_target(obj->progs.fexit_do_page_cache_ra, 0,
+						       "__do_page_cache_readahead");
+		}
+	} else {
+		bpf_program__set_autoload(obj->progs.fentry_mark_page_accessed, false);
+		bpf_program__set_autoload(obj->progs.fexit_page_cache_alloc, false);
+		bpf_program__set_autoload(obj->progs.fentry_do_page_cache_ra, false);
+		bpf_program__set_autoload(obj->progs.fexit_do_page_cache_ra, false);
+
+		if (!kprobe_exists("do_page_cache_ra")) {
+			bpf_program__set_autoload(obj->progs.kprobe_do_page_cache_ra, false);
+			bpf_program__set_autoload(obj->progs.kretprobe_do_page_cache_ra, false);
+		} else {
+			bpf_program__set_autoload(obj->progs.kprobe___do_page_cache_readahead, false);
+			bpf_program__set_autoload(obj->progs.kretprobe___do_page_cache_readahead, false);
+		}
+	}
 
 	err = readahead_bpf__load(obj);
 	if (err) {
