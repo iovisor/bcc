@@ -1,0 +1,98 @@
+.TH wqlat 8  "2024-01-29" "USER COMMANDS"
+.SH NAME
+wqlat \- Summarize kernel workqueue latency as a histogram.
+.SH SYNOPSIS
+.B wqlat [\-h] [\-T] [\-N] [\-W] [\-w WQNAME] [interval [count]]
+.SH DESCRIPTION
+wqlat traces  work's waiting on workqueue, and records the distribution
+of work's queuing latency (time). This is printed as a histogram 
+either on Ctrl-C, or after a given interval in seconds.
+
+This tool uses in-kernel eBPF maps for storing timestamps and the histogram,
+for efficiency.
+
+This tool uses the workqueue:workqueue_queue_work and workqueue:workqueue_execute_start
+kernel tracepoints, which is a stable tracing mechanism. Please note BPF programs can 
+attach to tracepoints from Linux 4.7 only, so this tools can only support kernel 4.7 or
+later version.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+\-h
+Print usage message.
+.TP
+\-T
+Include timestamps on output.
+.TP
+\-N
+Output histogram in nanoseconds.
+.TP
+\-W
+Print a histogram per workqueue.
+.TP
+\-w WQNAME
+Trace this workqueue only
+.TP
+interval
+Output interval, in seconds.
+.TP
+count
+Number of outputs.
+.SH EXAMPLES
+.TP
+Summarize kernel workqueue latency as a histogram:
+#
+.B wqlat 
+.TP
+Print 1 second summaries, 10 times:
+#
+.B wqlat 1 10
+.TP
+Print 1 second summaries, using nanoseconds as units for the histogram, and
+include timestamps on output:
+#
+.B wqlat \-NT 1
+.TP
+Print 1 second summaries, 10 times per workqueue:
+#
+.B wqlat \-W 1 10
+.TP
+Print 1 second summaries for workqueue nvmet_tcp_wq:
+#
+.B wqlat \-w nvmet_tcp_wq 1 
+.SH FIELDS
+.TP
+usecs
+Microsecond range
+.TP
+nsecs
+Nanosecond range
+.TP
+count
+How many works into this range
+.TP
+distribution
+An ASCII bar chart to visualize the distribution (count column)
+.SH OVERHEAD
+This traces kernel functions and maintains in-kernel timestamps and a histogram,
+which are asynchronously copied to user-space. This method is very efficient,
+and the overhead for most workqueue scheduling rates (< 100k) should be 
+negligible.If you have a higher workqueue scheduling, please test and quantify 
+the overhead before use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Ping Gan
+.SH SEE ALSO
+biolatency
