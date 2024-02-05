@@ -207,7 +207,7 @@ while (1):
     if args.dist:
         dist.print_log2_hist(label, "softirq", section_print_fn=vec_to_name)
     else:
-        print("%-16s %11s" % ("SOFTIRQ", "TOTAL_" + label))
+        print("%-16s %11s" % ("SOFTIRQ", "TOTAL_" + label.upper()))
         for k, v in sorted(dist.items(), key=lambda dist: dist[1].value):
             print("%-16s %11d" % (vec_to_name(k.vec), v.value / factor))
     dist.clear()
