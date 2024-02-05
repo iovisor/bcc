@@ -33,6 +33,7 @@
 /killsnoop
 /klockstat
 /ksnoop
+/kvmexit
 /llcstat
 /memleak
 /mdflush
