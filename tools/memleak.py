@@ -116,7 +116,7 @@ parser.add_argument("--percpu", default=False, action="store_true",
 parser.add_argument("--sort", type=str, default="size",
         help="report sorted in given key; available key list: size, count")
 parser.add_argument("--symbols-prefix", type=str,
-        help="memory alloctor symbols prefix")
+        help="memory allocator symbols prefix")
 
 args = parser.parse_args()
 
