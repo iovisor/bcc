@@ -738,20 +738,29 @@ const struct sym *syms__map_addr(const struct syms *syms, unsigned long addr)
 	return dso__find_sym(dso, offset);
 }
 
-const struct sym *syms__map_addr_dso(const struct syms *syms, unsigned long addr,
-				     char **dso_name, unsigned long *dso_offset)
+int syms__map_addr_dso(const struct syms *syms, unsigned long addr,
+		       struct sym_info *sinfo)
 {
 	struct dso *dso;
+	struct sym *sym;
 	uint64_t offset;
+
+	memset(sinfo, 0x0, sizeof(struct sym_info));
 
 	dso = syms__find_dso(syms, addr, &offset);
 	if (!dso)
-		return NULL;
+		return -1;
 
-	*dso_name = dso->name;
-	*dso_offset = offset;
+	sinfo->dso_name = dso->name;
+	sinfo->dso_offset = offset;
 
-	return dso__find_sym(dso, offset);
+	sym = dso__find_sym(dso, offset);
+	if (sym) {
+		sinfo->sym_name = sym->name;
+		sinfo->sym_offset = sym->offset;
+	}
+
+	return 0;
 }
 
 struct syms_cache {

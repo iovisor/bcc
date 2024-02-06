@@ -195,8 +195,7 @@ static void print_map(struct ksyms *ksyms, struct syms_cache *syms_cache,
 	int err, i, ifd, sfd;
 	unsigned long *ip;
 	struct val_t val;
-	char *dso_name;
-	unsigned long dso_offset;
+	struct sym_info sinfo;
 	int idx;
 
 	ip = calloc(env.perf_max_stack_depth, sizeof(*ip));
@@ -262,12 +261,13 @@ print_ustack:
 				else
 					printf("    [unknown]\n");
 			} else {
-				sym = syms__map_addr_dso(syms, ip[i], &dso_name, &dso_offset);
 				printf("    #%-2d 0x%016lx", idx++, ip[i]);
-				if (sym)
-					printf(" %s+0x%lx", sym->name, sym->offset);
-				if (dso_name)
-					printf(" (%s+0x%lx)", dso_name, dso_offset);
+				err = syms__map_addr_dso(syms, ip[i], &sinfo);
+				if (err == 0) {
+					if (sinfo.sym_name)
+						printf(" %s+0x%lx", sinfo.sym_name, sinfo.sym_offset);
+					printf(" (%s+0x%lx)", sinfo.dso_name, sinfo.dso_offset);
+				}
 				printf("\n");
 			}
 		}
