@@ -115,6 +115,7 @@ struct data_t {
     u32 pid;  // PID as in the userspace term (i.e. task->tgid in kernel)
     u32 ppid; // Parent PID as in the userspace term (i.e task->real_parent->tgid in kernel)
     u32 uid;
+    u32 cpu;
     char comm[TASK_COMM_LEN];
     enum event_type type;
     char argv[ARGSIZE];
@@ -207,6 +208,7 @@ int do_ret_sys_execve(struct pt_regs *ctx)
     // as the real_parent->tgid.
     // We use the get_ppid function as a fallback in those cases. (#1883)
     data.ppid = task->real_parent->tgid;
+    data.cpu = task->cpu;
 
     PPID_FILTER
 
@@ -251,7 +253,7 @@ if args.timestamp:
     print("%-8s" % ("TIME(s)"), end="")
 if args.print_uid:
     print("%-6s" % ("UID"), end="")
-print("%-16s %-7s %-7s %3s %s" % ("PCOMM", "PID", "PPID", "RET", "ARGS"))
+print("%-16s %-7s %-7s %-4s %3s %s" % ("PCOMM", "PID", "PPID", "CPU", "RET", "ARGS"))
 
 class EventType(object):
     EVENT_ARG = 0
@@ -305,8 +307,8 @@ def print_event(cpu, data, size):
             ppid = event.ppid if event.ppid > 0 else get_ppid(event.pid)
             ppid = b"%d" % ppid if ppid > 0 else b"?"
             argv_text = b' '.join(argv[event.pid]).replace(b'\n', b'\\n')
-            printb(b"%-16s %-7d %-7s %3d %s" % (event.comm, event.pid,
-                   ppid, event.retval, argv_text))
+            printb(b"%-16s %-7d %-7s %-4d %3d %s" % (event.comm, event.pid,
+                   ppid, event.cpu, event.retval, argv_text))
         try:
             del(argv[event.pid])
         except Exception:
