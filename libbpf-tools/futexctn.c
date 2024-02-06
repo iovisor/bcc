@@ -245,6 +245,8 @@ static int print_stack(struct futexctn_bpf *obj, struct hist_key *info)
 			else
 				printf("    [unknown]\n");
 		} else {
+			dso_name = NULL;
+			dso_offset = 0;
 			sym = syms__map_addr_dso(syms, ip[i], &dso_name, &dso_offset);
 			printf("    #%-2d 0x%016lx", idx++, ip[i]);
 			if (sym)
