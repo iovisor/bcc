@@ -198,6 +198,7 @@ static const struct argp_option argp_options[] = {
 	{"max-size", 'Z', "MAX_SIZE", 0, "capture only allocations smaller than this size"},
 	{"obj", 'O', "OBJECT", 0, "attach to allocator functions in the specified object"},
 	{"percpu", 'P', NULL, 0, "trace percpu allocations"},
+	{"verbose", 'v', NULL, 0, "verbose debug output" },
 	{},
 };
 
@@ -540,6 +541,9 @@ error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'P':
 		env.percpu = true;
+		break;
+	case 'v':
+		env.verbose = true;
 		break;
 	case ARGP_KEY_ARG:
 		pos_args++;
