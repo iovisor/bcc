@@ -120,7 +120,7 @@ if args.workqueues:
     typedef struct wq_key {
         char wq_name[WQ_NAME_LEN];
         u64 slot;
-    }wq_key_t;
+    } wq_key_t;
     """
     bpf_storage_text = """
     BPF_HISTOGRAM(dist, wq_key_t);

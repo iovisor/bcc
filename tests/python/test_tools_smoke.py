@@ -426,7 +426,7 @@ class SmokeTests(TestCase):
 
     @skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
     def test_wqlat(self):
-        self.run_with_int("wqlat.py 1 1")
+        self.run_with_int("wqlat.py 1 1", allow_early=True)
 
     def test_xfsdist(self):
         # Doesn't work on build bot because xfs functions not present in the
