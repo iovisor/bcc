@@ -98,6 +98,17 @@ parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
 
+def check_cpu_filed():
+    # Define the bpf program for checking purpose
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,16,0)
+    filed_in_task_struct = True
+#else
+    filed_in_task_struct = False
+#endif
+
+    return filed_in_task_struct
+
+
 # define BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
@@ -208,7 +219,7 @@ int do_ret_sys_execve(struct pt_regs *ctx)
     // as the real_parent->tgid.
     // We use the get_ppid function as a fallback in those cases. (#1883)
     data.ppid = task->real_parent->tgid;
-    data.cpu = task->cpu;
+    data.cpu = CPU_RUNNING_ON;
 
     PPID_FILTER
 
@@ -234,6 +245,14 @@ if args.ppid:
         'if (data.ppid != %s) { return 0; }' % args.ppid)
 else:
     bpf_text = bpf_text.replace('PPID_FILTER', '')
+
+# CPU field moved back into thread_info since commit bcf9033e5449(linux 5.16)
+# Use BTF for CPU field checks if available, otherwise use LINUX_VERSION_CODE checking.
+if BPF.kernel_struct_has_field(b'task_struct', b'cpu') == 1 \
+        or check_cpu_filed():
+    bpf_text = bpf_text.replace('CPU_RUNNING_ON', 'task->cpu')
+else:
+    bpf_text = bpf_text.replace('CPU_RUNNING_ON', 'task->thread_info.cpu')
 
 bpf_text = filter_by_containers(args) + bpf_text
 if args.ebpf:
