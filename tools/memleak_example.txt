@@ -177,8 +177,8 @@ Attaching to pid 2623, Ctrl+C to quit.
 		0x0000559b478700b7	main+0x4a7 [redis-server]
 		0x00007fdf47029d90	__libc_start_call_main+0x80 [libc.so.6]
 
-When using the --sysbols-prefix argument, memleak can trace the third-party memory 
-allocations, such as jemalloc whose sysbols are usually identified by the "je_" prefix
+When using the --symbols-prefix argument, memleak can trace the third-party memory 
+allocations, such as jemalloc whose symbols are usually identified by the "je_" prefix
 in redis project.
 
 USAGE message:
