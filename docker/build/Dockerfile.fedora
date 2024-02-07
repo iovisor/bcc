@@ -59,7 +59,7 @@ RUN dnf -y install \
 	iperf \
 	netperf
 
-RUN pip3 install pyroute2==0.5.18 netaddr==0.8.0 dnslib==0.9.14 cachetools==3.1.1
+RUN pip3 install pyroute2==0.5.18 netaddr==0.8.0 dnslib==0.9.14 cachetools==3.1.1 pyelftools==0.30
 
 RUN wget -O ruby-install-${RUBY_INSTALL_VERSION}.tar.gz \
          https://github.com/postmodern/ruby-install/archive/v${RUBY_INSTALL_VERSION}.tar.gz && \
