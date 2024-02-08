@@ -80,6 +80,7 @@ APPS = \
 	softirqs \
 	solisten \
 	statsnoop \
+	syncsnoop \
 	syscount \
 	tcptracer \
 	tcpconnect \
