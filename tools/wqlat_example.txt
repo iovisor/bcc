@@ -1,0 +1,109 @@
+Demonstrations of wqlat, the Linux eBPF/bcc version.
+
+This tool traces  work's waiting on workqueue, and records the distribution
+of work's queuing latency (time), printing this as a histogram when Ctrl-C 
+is hit.
+
+For example:
+
+./wqlat 
+Tracing work queue request latency time... Hit Ctrl-C to end.
+^C
+     usecs               : count     distribution
+         0 -> 1          : 530      |***************************             |
+         2 -> 3          : 775      |****************************************|
+         4 -> 7          : 387      |*******************                     |
+         8 -> 15         : 194      |**********                              |
+        16 -> 31         : 62       |***                                     |
+        32 -> 63         : 10       |                                        |
+        64 -> 127        : 2        |                                        |
+       128 -> 255        : 0        |                                        |
+       256 -> 511        : 0        |                                        |
+       512 -> 1023       : 0        |                                        |
+      1024 -> 2047       : 0        |                                        |
+      2048 -> 4095       : 0        |                                        |
+      4096 -> 8191       : 1        |                                        |
+
+This example shows all kernel's work waiting latlency on workqueue. The range
+of latency is from 1 millisecond to 8192 milliseconds(8ms). The bulk of
+waiting latency is between 1us and 32us.The highest latency seen while tracing
+is between 4 and 8 ms:the last row printed, for which there is 1 work
+
+We can also specify the per workqueue option (-W), along with interval
+and count parameters. Eg, printing out every 1 second, and including 
+timestamps(-T):
+
+./wqlat -T -W 1 2
+Tracing work queue request latency time... Hit Ctrl-C to end.
+
+06:14:55
+
+wqname = xfs-cil/dm-4
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 1        |****************************************|
+         4 -> 7          : 1        |****************************************|
+         8 -> 15         : 1        |****************************************|
+[...]
+
+06:14:56
+
+wqname = events_power_efficient
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 2        |**************************              |
+         8 -> 15         : 3        |****************************************|
+        16 -> 31         : 1        |*************                           |
+[...]
+
+An tracing one workqueue (-w) can be specified, along with interval
+and count. Eg, printing output every 1 second, and including Timestamps(-T)
+and workqueue nvmet_tcp_wq:
+
+./wqlat -T -w nvmet_tcp_wq 1 2 
+Tracing work queue request latency time... Hit Ctrl-C to end.
+
+06:18:03
+     usecs               : count     distribution
+         0 -> 1          : 245      |*************************               |
+         2 -> 3          : 377      |****************************************|
+         4 -> 7          : 76       |********                                |
+         8 -> 15         : 29       |***                                     |
+        16 -> 31         : 8        |                                        |
+        32 -> 63         : 5        |                                        |
+
+06:18:04
+     usecs               : count     distribution
+         0 -> 1          : 547      |**********************************      |
+         2 -> 3          : 629      |****************************************|
+         4 -> 7          : 83       |*****                                   |
+         8 -> 15         : 23       |*                                       |
+        16 -> 31         : 5        |                                        |
+        32 -> 63         : 4        |                                        |
+
+USAGE message:
+
+./wqlat -h
+usage: wqlat [-h] [-T] [-N] [-W] [-w WQNAME] [interval] [count]
+
+Summarize workqueue request latency as histograms.
+
+positional arguments:
+  interval              output interval, in seconds
+  count                 number of outputs
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -T, --timestamp       include timestamp on output
+  -N, --nanoseconds     output in nanoseconds
+  -W, --workqueues      print a histogram per work queue
+  -w WQNAME, --wqname WQNAME
+                        print this workqueue only
+
+examples:
+    ./wqlat                   # summarize workqueue latency as a histogram
+    ./wqlat 1 10              # print 1 second summaries, 10 times
+    ./wqlat -W 1 10           # print 1 second, 10 times per workqueue
+    ./wqlat -NT 1             # 1s summaries, nanoseconds, and timestamps
+    ./wqlat -w nvmet_tcp_wq 1 # 1s summaries for workqueue nvmet_tcp_wq

@@ -149,6 +149,7 @@ pair of .c and .py files, and some are directories of files.
 - tools/[runqlen](tools/runqlen.py): Run queue length as a histogram. [Examples](tools/runqlen_example.txt).
 - tools/[runqslower](tools/runqslower.py): Trace long process scheduling delays. [Examples](tools/runqslower_example.txt).
 - tools/[wakeuptime](tools/wakeuptime.py): Summarize sleep to wakeup time by waker kernel stack. [Examples](tools/wakeuptime_example.txt).
+- tools/[wqlat](tools/wqlat.py): Summarize work waiting latency on workqueue. [Examples](tools/wqlat_example.txt).
 
 ##### Network and Sockets Tools
 
