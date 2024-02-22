@@ -240,8 +240,23 @@ Marvell `mvneta` driver | 5.5 | [`0db51da7a8e9`](https://github.com/torvalds/lin
 Microsoft `hv_netvsc` driver | 5.6 | [`351e1581395f`](https://github.com/torvalds/linux/commit/351e1581395fcc7fb952bbd7dda01238f69968fd)
 Amazon `ena` driver | 5.6 | [`838c93dc5449`](https://github.com/torvalds/linux/commit/838c93dc5449e5d6378bae117b0a65a122cf7361)
 `xen-netfront` driver | 5.9 | [`6c5aa6fc4def`](https://github.com/torvalds/linux/commit/6c5aa6fc4defc2a0977a2c59e4710d50fa1e834c)
+Marvell `mvpp2` driver | 5.9 | [`07dd0a7aae7f`](https://github.com/torvalds/linux/commit/07dd0a7aae7f72af7cec18909581c2bb570edddc)
 Intel `igb` driver | 5.10 | [`9cbc948b5a20`](https://github.com/torvalds/linux/commit/9cbc948b5a20c9c054d9631099c0426c16da546b)
+Freescale `dpaa` driver | 5.11 | [`86c0c196cbe4`](https://github.com/torvalds/linux/commit/86c0c196cbe48f844721783d9162e46bc35c0c5a)
+Intel `igc` driver | 5.13 | [`26575105d6ed`](https://github.com/torvalds/linux/commit/26575105d6ed8e2a8e43bd008fc7d98b75b90d5c)
+Freescale `enetc` driver | 5.13 | [`d1b15102dd16`](https://github.com/torvalds/linux/commit/d1b15102dd16adc17fd5e4db8a485e6459f98906)
+STMicro `stmmac` driver | 5.13 | [`5fabb01207a2`](https://github.com/torvalds/linux/commit/5fabb01207a2d3439a6abe1d08640de9c942945f)
 `bonding` driver | 5.15 | [`9e2ee5c7e7c3`](https://github.com/torvalds/linux/commit/9e2ee5c7e7c35d195e2aa0692a7241d47a433d1e)
+Marvell `otx2` | 5.16 | [`06059a1a9a4a`](https://github.com/torvalds/linux/commit/06059a1a9a4a58f139352c65b02989ea6077091a)
+Microsoft `mana` driver | 5.17 | [`ed5356b53f07`](https://github.com/torvalds/linux/commit/ed5356b53f070dea5dff5a01b740561cb8222199)
+Fungible `fun` driver | 5.18 | [`db37bc177dae`](https://github.com/torvalds/linux/commit/db37bc177dae89cef6fc37bdbe6b223929f70245)
+Aquantia `atlantic` driver | 5.19 | [`0d14657f4083`](https://github.com/torvalds/linux/commit/0d14657f40830243266f972766f1e4d00436e648)
+Mediatek `mtk` driver | 6.0 | [`7c26c20da5d4`](https://github.com/torvalds/linux/commit/7c26c20da5d420cde55618263be4aa2f6de53056)
+Freescale `fec_enet` driver | 6.2 | [`6d6b39f180b8`](https://github.com/torvalds/linux/commit/6d6b39f180b83dfe1e938382b68dd1e6cb51363c)
+Microchip `lan966x` driver | 6.2 | [`6a2159be7604`](https://github.com/torvalds/linux/commit/6a2159be7604f5cdd7f574f4e0922f61e63c3f16)
+Engleder `tsnep` driver | 6.3 | [`d24bc0bcbbff`](https://github.com/torvalds/linux/commit/d24bc0bcbbfff74c00d92d0630ef99e8d91ef37a)
+Google `gve` driver | 6.4 | [`2e80aeae9f80`](https://github.com/torvalds/linux/commit/2e80aeae9f807ac7e967dea7633abea5829c6531)
+VMware `vmxnet3` driver | 6.6 | [`54f00cce1178`](https://github.com/torvalds/linux/commit/54f00cce11786742bd11e5e68c3bf85e6dc048c9)
 
 ## Helpers
 
