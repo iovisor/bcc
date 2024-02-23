@@ -21,6 +21,7 @@
 from __future__ import print_function
 from bcc import BPF
 import argparse
+import os
 from time import strftime
 from socket import inet_ntop, AF_INET, AF_INET6
 from struct import pack
@@ -44,6 +45,10 @@ group.add_argument("-6", "--ipv6", action="store_true",
     help="trace IPv6 family only")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("--netns-id", type=int,
+    help="the netns id to filter by", default=0)
+parser.add_argument("--pid-netns",
+    help="the pid whose netns to filter by", type=int, default=0)
 args = parser.parse_args()
 debug = 0
 
@@ -120,7 +125,9 @@ static int __trace_tcp_drop(void *ctx, struct sock *sk, struct sk_buff *skb)
     dport = ntohs(dport);
 
     FILTER_FAMILY
-    
+
+    FILTER_NETNS
+
     if (family == AF_INET) {
         struct ipv4_data_t data4 = {};
         data4.pid = pid;
@@ -192,6 +199,19 @@ elif args.ipv6:
         'if (family != AF_INET6) { return 0; }')
 else:
     bpf_text = bpf_text.replace('FILTER_FAMILY', '')
+
+if args.pid_netns != 0:
+    if args.netns_id != 0:
+        print("ERROR: --pid_netns and --netns-id not allowed together")
+        exit()
+    args.netns_id = os.stat('/proc/{}/ns/net'.format(args.pid_netns)).st_ino
+
+if args.netns_id != 0:
+    code = 'if (sk->__sk_common.skc_net.net->ns.inum != {}) {{ return 0; }}'.format(
+        args.netns_id)
+    bpf_text = bpf_text.replace('FILTER_NETNS', code)
+else:
+    bpf_text = bpf_text.replace('FILTER_NETNS', '')
 
 # process event
 def print_ipv4_event(cpu, data, size):
