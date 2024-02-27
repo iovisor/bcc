@@ -68,7 +68,7 @@ cleanup:
 }
 
 SEC("tracepoint/syscalls/sys_enter_kill")
-int kill_entry(struct trace_event_raw_sys_enter *ctx)
+int kill_entry(struct syscall_trace_enter *ctx)
 {
 	pid_t tpid = (pid_t)ctx->args[0];
 	int sig = (int)ctx->args[1];
@@ -77,13 +77,13 @@ int kill_entry(struct trace_event_raw_sys_enter *ctx)
 }
 
 SEC("tracepoint/syscalls/sys_exit_kill")
-int kill_exit(struct trace_event_raw_sys_exit *ctx)
+int kill_exit(struct syscall_trace_exit *ctx)
 {
 	return probe_exit(ctx, ctx->ret);
 }
 
 SEC("tracepoint/syscalls/sys_enter_tkill")
-int tkill_entry(struct trace_event_raw_sys_enter *ctx)
+int tkill_entry(struct syscall_trace_enter *ctx)
 {
 	pid_t tpid = (pid_t)ctx->args[0];
 	int sig = (int)ctx->args[1];
@@ -92,13 +92,13 @@ int tkill_entry(struct trace_event_raw_sys_enter *ctx)
 }
 
 SEC("tracepoint/syscalls/sys_exit_tkill")
-int tkill_exit(struct trace_event_raw_sys_exit *ctx)
+int tkill_exit(struct syscall_trace_exit *ctx)
 {
 	return probe_exit(ctx, ctx->ret);
 }
 
 SEC("tracepoint/syscalls/sys_enter_tgkill")
-int tgkill_entry(struct trace_event_raw_sys_enter *ctx)
+int tgkill_entry(struct syscall_trace_enter *ctx)
 {
 	pid_t tpid = (pid_t)ctx->args[1];
 	int sig = (int)ctx->args[2];
@@ -107,7 +107,7 @@ int tgkill_entry(struct trace_event_raw_sys_enter *ctx)
 }
 
 SEC("tracepoint/syscalls/sys_exit_tgkill")
-int tgkill_exit(struct trace_event_raw_sys_exit *ctx)
+int tgkill_exit(struct syscall_trace_exit *ctx)
 {
 	return probe_exit(ctx, ctx->ret);
 }
