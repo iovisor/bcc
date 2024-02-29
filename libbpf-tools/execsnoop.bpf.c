@@ -36,7 +36,7 @@ static __always_inline bool valid_uid(uid_t uid) {
 }
 
 SEC("tracepoint/syscalls/sys_enter_execve")
-int tracepoint__syscalls__sys_enter_execve(struct trace_event_raw_sys_enter* ctx)
+int tracepoint__syscalls__sys_enter_execve(struct syscall_trace_enter* ctx)
 {
 	u64 id;
 	pid_t pid, tgid;
@@ -112,7 +112,7 @@ int tracepoint__syscalls__sys_enter_execve(struct trace_event_raw_sys_enter* ctx
 }
 
 SEC("tracepoint/syscalls/sys_exit_execve")
-int tracepoint__syscalls__sys_exit_execve(struct trace_event_raw_sys_exit* ctx)
+int tracepoint__syscalls__sys_exit_execve(struct syscall_trace_exit* ctx)
 {
 	u64 id;
 	pid_t pid;

@@ -49,7 +49,7 @@ struct {
 static struct hist initial_hist = {};
 
 SEC("tracepoint/syscalls/sys_enter_futex")
-int futex_enter(struct trace_event_raw_sys_enter *ctx)
+int futex_enter(struct syscall_trace_enter *ctx)
 {
 	struct val_t v = {};
 	u64 pid_tgid;
@@ -73,7 +73,7 @@ int futex_enter(struct trace_event_raw_sys_enter *ctx)
 }
 
 SEC("tracepoint/syscalls/sys_exit_futex")
-int futex_exit(struct trace_event_raw_sys_exit *ctx)
+int futex_exit(struct syscall_trace_exit *ctx)
 {
 	u64 pid_tgid, slot, ts, min, max;
 	struct hist_key hkey = {};

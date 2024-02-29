@@ -68,61 +68,61 @@ static int probe_return(void *ctx, int ret)
 }
 
 SEC("tracepoint/syscalls/sys_enter_statfs")
-int handle_statfs_entry(struct trace_event_raw_sys_enter *ctx)
+int handle_statfs_entry(struct syscall_trace_enter *ctx)
 {
 	return probe_entry(ctx, (const char *)ctx->args[0]);
 }
 
 SEC("tracepoint/syscalls/sys_exit_statfs")
-int handle_statfs_return(struct trace_event_raw_sys_exit *ctx)
+int handle_statfs_return(struct syscall_trace_exit *ctx)
 {
 	return probe_return(ctx, (int)ctx->ret);
 }
 
 SEC("tracepoint/syscalls/sys_enter_newstat")
-int handle_newstat_entry(struct trace_event_raw_sys_enter *ctx)
+int handle_newstat_entry(struct syscall_trace_enter *ctx)
 {
 	return probe_entry(ctx, (const char *)ctx->args[0]);
 }
 
 SEC("tracepoint/syscalls/sys_exit_newstat")
-int handle_newstat_return(struct trace_event_raw_sys_exit *ctx)
+int handle_newstat_return(struct syscall_trace_exit *ctx)
 {
 	return probe_return(ctx, (int)ctx->ret);
 }
 
 SEC("tracepoint/syscalls/sys_enter_statx")
-int handle_statx_entry(struct trace_event_raw_sys_enter *ctx)
+int handle_statx_entry(struct syscall_trace_enter *ctx)
 {
 	return probe_entry(ctx, (const char *)ctx->args[1]);
 }
 
 SEC("tracepoint/syscalls/sys_exit_statx")
-int handle_statx_return(struct trace_event_raw_sys_exit *ctx)
+int handle_statx_return(struct syscall_trace_exit *ctx)
 {
 	return probe_return(ctx, (int)ctx->ret);
 }
 
 SEC("tracepoint/syscalls/sys_enter_newfstatat")
-int handle_newfstatat_entry(struct trace_event_raw_sys_enter *ctx)
+int handle_newfstatat_entry(struct syscall_trace_enter *ctx)
 {
 	return probe_entry(ctx, (const char *)ctx->args[1]);
 }
 
 SEC("tracepoint/syscalls/sys_exit_newfstatat")
-int handle_newfstatat_return(struct trace_event_raw_sys_exit *ctx)
+int handle_newfstatat_return(struct syscall_trace_exit *ctx)
 {
 	return probe_return(ctx, (int)ctx->ret);
 }
 
 SEC("tracepoint/syscalls/sys_enter_newlstat")
-int handle_newlstat_entry(struct trace_event_raw_sys_enter *ctx)
+int handle_newlstat_entry(struct syscall_trace_enter *ctx)
 {
 	return probe_entry(ctx, (const char *)ctx->args[0]);
 }
 
 SEC("tracepoint/syscalls/sys_exit_newlstat")
-int handle_newlstat_return(struct trace_event_raw_sys_exit *ctx)
+int handle_newlstat_return(struct syscall_trace_exit *ctx)
 {
 	return probe_return(ctx, (int)ctx->ret);
 }
