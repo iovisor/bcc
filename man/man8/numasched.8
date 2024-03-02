@@ -1,0 +1,66 @@
+.TH numasched 8  "2022-12-14" "USER COMMANDS"
+.SH NAME
+numasched \- Tracing task switch NUMA. Uses bcc/eBPF.
+.SH SYNOPSIS
+.B numasched
+.SH DESCRIPTION
+numasched tracked task switch of NUMA.
+
+This program is also a basic example of bcc and tracepoint.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-p, --pid PID
+Trace this PID only.
+.TP
+\-t, --tid TID
+Trace this TID only.
+.TP
+\-c, --comm COMM
+Trace this COMM only.
+.SH EXAMPLES
+.TP
+Tracing task switch NUMA:
+#
+.B numasched
+.TP
+Trace PID 181 only:
+#
+.B numasched \-p 181
+.SH FIELDS
+.TP
+TIME
+A timestamp on the output, in "HH:MM:SS" format.
+.TP
+PID
+The process ID.
+.TP
+TID
+The thread ID.
+.TP
+SRC_NID
+Source NUMA ID.
+.TP
+DST_NID
+Target NUMA ID.
+.TP
+COMM
+The process COMM.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file
+containing example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Rong Tao <rongtao@cestc.cn>
+.SH SEE ALSO
+opensnoop(8)
