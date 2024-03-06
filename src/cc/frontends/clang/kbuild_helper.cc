@@ -140,15 +140,22 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
   return 0;
 }
 
-static inline int file_exists(const char *f)
+static inline int file_exists_and_ownedby(const char *f, uid_t uid)
 {
   struct stat buffer;
-  return (stat(f, &buffer) == 0);
+  int ret;
+  if ((ret = stat(f, &buffer)) == 0) {
+    if (buffer.st_uid != uid) {
+      std::cout << "ERROR: header file ownership unexpected: " << std::string(f) << "\n";
+      return -1;
+    }
+  }
+  return ret;
 }
 
 static inline int proc_kheaders_exists(void)
 {
-  return file_exists(PROC_KHEADERS_PATH);
+  return file_exists_and_ownedby(PROC_KHEADERS_PATH, 0);
 }
 
 static inline const char *get_tmp_dir() {
@@ -224,7 +231,7 @@ int get_proc_kheaders(std::string &dirpath)
            uname_data.release);
   dirpath = std::string(dirpath_tmp);
 
-  if (file_exists(dirpath_tmp))
+  if (file_exists_and_ownedby(dirpath_tmp, 0))
     return 0;
 
   // First time so extract it
