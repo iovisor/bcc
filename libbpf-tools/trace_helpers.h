@@ -101,4 +101,6 @@ bool module_btf_exists(const char *mod);
 bool probe_tp_btf(const char *name);
 bool probe_ringbuf();
 
+unsigned int gnu_debuglink_crc32(unsigned int crc, char *buf, size_t len);
+
 #endif /* __TRACE_HELPERS_H */

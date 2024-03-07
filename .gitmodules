@@ -7,3 +7,6 @@
 [submodule "libbpf-tools/blazesym"]
 	path = libbpf-tools/blazesym
 	url = https://github.com/libbpf/blazesym
+[submodule "libbpf-tools/digraph"]
+	path = libbpf-tools/digraph
+	url = https://github.com/grame-cncm/digraph.git

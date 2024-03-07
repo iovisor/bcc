@@ -10,6 +10,7 @@ LIBBPF_OBJ := $(abspath $(OUTPUT)/libbpf.a)
 LIBBLAZESYM_SRC := $(abspath blazesym/target/release/libblazesym.a)
 INCLUDES := -I$(OUTPUT) -I../src/cc/libbpf/include/uapi
 CFLAGS := -g -O2 -Wall
+CXXFLAGS := -g -O2 -Wall
 BPFCFLAGS := -g -O2 -Wall
 INSTALL ?= install
 prefix ?= /usr/local
@@ -95,6 +96,10 @@ APPS = \
 	$(BZ_APPS) \
 	#
 
+APPS_CXX = \
+	deadlock \
+	#
+
 # export variables that are used in Makefile.btfgen as well.
 export OUTPUT BPFTOOL ARCH BTFHUB_ARCHIVE APPS
 
@@ -131,7 +136,7 @@ $(call allow-override,CC,$(CROSS_COMPILE)cc)
 $(call allow-override,LD,$(CROSS_COMPILE)ld)
 
 .PHONY: all
-all: $(APPS) $(APP_ALIASES)
+all: $(APPS) $(APP_ALIASES) $(APPS_CXX)
 
 ifeq ($(V),1)
 Q =
@@ -159,7 +164,7 @@ endif
 .PHONY: clean
 clean:
 	$(call msg,CLEAN)
-	$(Q)rm -rf $(OUTPUT) $(APPS) $(APP_ALIASES)
+	$(Q)rm -rf $(OUTPUT) $(APPS) $(APP_ALIASES) $(APPS_CXX)
 
 $(LIBBLAZESYM_SRC)::
 	$(Q)cd blazesym && cargo build --release --features=cheader
@@ -184,15 +189,24 @@ $(APPS): %: $(OUTPUT)/%.o $(COMMON_OBJ) $(LIBBPF_OBJ) | $(OUTPUT)
 	$(call msg,BINARY,$@)
 	$(Q)$(CC) $(CFLAGS) $^ $(LDFLAGS) -lelf -lz -o $@
 
+$(APPS_CXX): %: $(OUTPUT)/%.o $(COMMON_OBJ) $(LIBBPF_OBJ) | $(OUTPUT)
+	$(call msg,BINARY,$@)
+	$(Q)$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -lelf -lz -o $@
+
 ifeq ($(USE_BLAZESYM),1)
 $(patsubst %,$(OUTPUT)/%.o,$(BZ_APPS)): $(OUTPUT)/blazesym.h
 endif
 
 $(patsubst %,$(OUTPUT)/%.o,$(APPS)): %.o: %.skel.h
+$(patsubst %,$(OUTPUT)/%.o,$(APPS_CXX)): %.o: %.skel.h
 
 $(OUTPUT)/%.o: %.c $(wildcard %.h) $(LIBBPF_OBJ) | $(OUTPUT)
 	$(call msg,CC,$@)
 	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $(filter %.c,$^) -o $@
+
+$(OUTPUT)/%.o: %.cpp $(wildcard %.h) $(LIBBPF_OBJ) | $(OUTPUT)
+	$(call msg,CXX,$@)
+	$(Q)$(CXX) $(CXXFLAGS) $(INCLUDES) -c $(filter %.cpp,$^) -o $@
 
 $(OUTPUT)/%.skel.h: $(OUTPUT)/%.bpf.o | $(OUTPUT) $(BPFTOOL)
 	$(call msg,GEN-SKEL,$@)
