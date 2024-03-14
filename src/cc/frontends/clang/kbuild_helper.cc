@@ -143,8 +143,8 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
 static inline int file_exists_and_ownedby(const char *f, uid_t uid)
 {
   struct stat buffer;
-  int ret;
-  if ((ret = stat(f, &buffer)) == 0) {
+  int ret = stat(f, &buffer) == 0;
+  if (ret) {
     if (buffer.st_uid != uid) {
       std::cout << "ERROR: header file ownership unexpected: " << std::string(f) << "\n";
       return -1;
