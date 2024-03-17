@@ -520,6 +520,27 @@ bool ProbeVisitor::VisitBinaryOperator(BinaryOperator *E) {
   }
   return true;
 }
+
+static std::string FixBTFTypeTag(std::string TypeStr)
+{
+#if LLVM_VERSION_MAJOR == 15
+  std::map<std::string, std::string> TypePair =
+    {{"btf_type_tag(user)", "__attribute__((btf_type_tag(\"user\")))"},
+     {"btf_type_tag(rcu)", "__attribute__((btf_type_tag(\"rcu\")))"},
+     {"btf_type_tag(percpu)", "__attribute__((btf_type_tag(\"percpu\")))"}};
+
+  for (auto T: TypePair) {
+    size_t index;
+    index = TypeStr.find(T.first, 0);
+    if (index != std::string::npos) {
+      TypeStr.replace(index, T.first.size(), T.second);
+      return TypeStr;
+    }
+  }
+#endif
+  return TypeStr;
+}
+
 bool ProbeVisitor::VisitUnaryOperator(UnaryOperator *E) {
   if (E->getOpcode() == UO_AddrOf) {
     addrof_stmt_ = E;
@@ -598,7 +619,7 @@ bool ProbeVisitor::VisitMemberExpr(MemberExpr *E) {
   string rhs = rewriter_.getRewrittenText(expansionRange(SourceRange(rhs_start, GET_ENDLOC(E))));
   string base_type = base->getType()->getPointeeType().getAsString();
   string pre, post;
-  pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
+  pre = "({ typeof(" + FixBTFTypeTag(E->getType().getAsString()) + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
   if (cannot_fall_back_safely)
     pre += " bpf_probe_read_kernel(&_val, sizeof(_val), (void *)&";
   else
@@ -652,7 +673,7 @@ bool ProbeVisitor::VisitArraySubscriptExpr(ArraySubscriptExpr *E) {
   if (rewriter_.getRewrittenText(lbracket_range).size() == 0)
     return true;
 
-  pre = "({ typeof(" + E->getType().getAsString() + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
+  pre = "({ typeof(" + FixBTFTypeTag(E->getType().getAsString()) + ") _val; __builtin_memset(&_val, 0, sizeof(_val));";
   if (cannot_fall_back_safely)
     pre += " bpf_probe_read_kernel(&_val, sizeof(_val), (void *)((";
   else
