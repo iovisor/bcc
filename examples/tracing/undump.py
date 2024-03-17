@@ -14,22 +14,19 @@
 # 27-Aug-2021   Rong Tao   Created this.
 # 17-Sep-2021   Rong Tao   Simplify according to chenhengqi's suggestion
 #                           https://github.com/iovisor/bcc/pull/3615
+# 11-Mar-2024   Rong Tao   Add --hexdump argument
 #
-from __future__ import print_function
 from bcc import BPF
-from bcc.containers import filter_by_containers
-from bcc.utils import printb
 import argparse
-from socket import inet_ntop, ntohs, AF_INET, AF_INET6
-from struct import pack
-from time import sleep
-from datetime import datetime
+import binascii
 import sys
+import textwrap
 
 # arguments
 examples = """examples:
     ./undump           # trace/dump all UNIX packets
     ./undump -p 181    # only trace/dump PID 181
+    ./undump --hexdump # show data as hex instead of trying to decode with %x
 """
 parser = argparse.ArgumentParser(
     description="Dump UNIX socket packets",
@@ -37,7 +34,9 @@ parser = argparse.ArgumentParser(
     epilog=examples)
 
 parser.add_argument("-p", "--pid",
-        help="trace this PID only")
+                    help="trace this PID only")
+parser.add_argument("--hexdump", action="store_true", dest="hexdump",
+                    help="show data as hexdump")
 args = parser.parse_args()
 
 # define BPF program
@@ -108,14 +107,20 @@ def print_recv_pkg(cpu, data, size):
         print("PID \033[1;31m%s\033[m " % args.pid, end="")
     print("Recv \033[1;31m%d\033[m bytes" % event.recv_len)
 
-    print("    ", end="")
-    for i in range(0, event.recv_len):
-        print("%02x " % event.pkt[i], end="")
-        sys.stdout.flush()
-        if (i+1)%16 == 0:
-            print("")
-            print("    ", end="")
-    print("")
+    if args.hexdump:
+        buf = bytearray(event.pkt[:event.recv_len])
+        unwrapped_data = binascii.hexlify(buf)
+        data = textwrap.fill(unwrapped_data.decode('utf-8', 'replace'), width=32)
+        print(data)
+    else:
+        print("    ", end="")
+        for i in range(0, event.recv_len):
+            print("%02x " % event.pkt[i], end="")
+            sys.stdout.flush()
+            if (i+1)%16 == 0:
+                print("")
+                print("    ", end="")
+        print("")
 
 # initialize BPF
 b = BPF(text=bpf_text)
