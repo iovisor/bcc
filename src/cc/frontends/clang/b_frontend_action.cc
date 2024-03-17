@@ -787,7 +787,7 @@ void BTypeVisitor::genParamDirectAssign(FunctionDecl *D, string& preamble,
       arg->addAttr(UnavailableAttr::CreateImplicit(C, "ptregs"));
       size_t d = idx - 1;
       const char *reg = calling_conv_regs[d];
-      preamble += " " + text + " = (" + arg->getType().getAsString() + ")" +
+      preamble += " " + text + " = (" + FixBTFTypeTag(arg->getType().getAsString()) + ")" +
                   fn_args_[0]->getName().str() + "->" + string(reg) + ";";
     }
   }
