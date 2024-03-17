@@ -195,15 +195,15 @@ static void alias_parse(char *prog)
 {
 	char *name = basename(prog);
 
-	if (!strcmp(name, "btrfsdist")) {
+	if (strstr(name, "btrfsdist")) {
 		fs_type = BTRFS;
-	} else if (!strcmp(name, "ext4dist")) {
+	} else if (strstr(name, "ext4dist")) {
 		fs_type = EXT4;
-	} else if (!strcmp(name, "nfsdist")) {
+	} else if (strstr(name, "nfsdist")) {
 		fs_type = NFS;
-	} else if (!strcmp(name, "xfsdist")) {
+	} else if (strstr(name, "xfsdist")) {
 		fs_type = XFS;
-	} else if (!strcmp(name, "f2fsdist")){
+	} else if (strstr(name, "f2fsdist")){
 		fs_type = F2FS;
 	}
 }

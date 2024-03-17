@@ -146,7 +146,7 @@ static void alias_parse(char *prog)
 {
 	char *name = basename(prog);
 
-	if (!strcmp(name, "killsnoop")) {
+	if (strstr(name, "killsnoop")) {
 		kill_only = true;
 	}
 }
