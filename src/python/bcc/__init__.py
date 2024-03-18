@@ -1212,6 +1212,14 @@ class BPF(object):
         field_name = _assert_is_bytes(field_name)
         return lib.kernel_struct_has_field(struct_name, field_name)
 
+    @staticmethod
+    def kernel_struct_field_size_offset(struct_name, field_name):
+        struct_name = _assert_is_bytes(struct_name)
+        field_name = _assert_is_bytes(field_name)
+        # return a ulonglong with bit size (top 32) and bit offset (lower 32).
+        # -1 indicates not finding.
+        return lib.kernel_struct_field_size_offset(struct_name, field_name)
+
     def detach_tracepoint(self, tp=b""):
         """detach_tracepoint(tp="")
 

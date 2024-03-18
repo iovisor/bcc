@@ -1540,6 +1540,34 @@ static int find_member_by_name(struct btf *btf, const struct btf_type *btf_type,
   return 0;
 }
 
+static unsigned long long find_member_size_offset(struct btf *btf, const struct btf_type *btf_type,
+						  const char *field_name) {
+  const struct btf_member *btf_member = btf_members(btf_type);
+  unsigned long long ret;
+  int i;
+
+  for (i = 0; i < btf_vlen(btf_type); i++, btf_member++) {
+    const char *name = btf__name_by_offset(btf, btf_member->name_off);
+    if (!strcmp(name, field_name)) {
+      ret = BTF_MEMBER_BIT_OFFSET(btf_member->offset);
+      if (BTF_MEMBER_BITFIELD_SIZE(btf_member->offset)) {
+        ret |= (unsigned long long)BTF_MEMBER_BITFIELD_SIZE(btf_member->offset) << 32;
+      } else {
+        const struct btf_type *member_type = btf__type_by_id(btf, btf_member->type);
+        if (!member_type)
+          return -1;
+        ret |= ((unsigned long long)member_type->size * 8) << 32;
+      }
+      return ret;
+    } else if (name[0] == '\0') {
+      ret = find_member_size_offset(btf, btf__type_by_id(btf, btf_member->type), field_name);
+      if (ret != -1)
+        return ret;
+    }
+  }
+  return -1;
+}
+
 int kernel_struct_has_field(const char *struct_name, const char *field_name)
 {
   const struct btf_type *btf_type;
@@ -1559,6 +1587,32 @@ int kernel_struct_has_field(const char *struct_name, const char *field_name)
 
   btf_type = btf__type_by_id(btf, btf_id);
   ret = find_member_by_name(btf, btf_type, field_name);
+
+cleanup:
+  btf__free(btf);
+  return ret;
+}
+
+unsigned long long kernel_struct_field_size_offset(const char *struct_name, const char *field_name)
+{
+  const struct btf_type *btf_type;
+  unsigned long long ret;
+  struct btf *btf;
+  int btf_id;
+
+  btf = btf__load_vmlinux_btf();
+  ret = libbpf_get_error(btf);
+  if (ret)
+    return -1;
+
+  btf_id = btf__find_by_name_kind(btf, struct_name, BTF_KIND_STRUCT);
+  if (btf_id < 0) {
+    ret = -1;
+    goto cleanup;
+  }
+
+  btf_type = btf__type_by_id(btf, btf_id);
+  ret = find_member_size_offset(btf, btf_type, field_name);
 
 cleanup:
   btf__free(btf);
