@@ -22,7 +22,7 @@ from __future__ import print_function
 from bcc import BPF
 from bcc.utils import printb
 from time import sleep, strftime
-import argparse
+import argparse, platform
 from subprocess import call
 
 # arguments
@@ -59,6 +59,8 @@ loadavg = "/proc/loadavg"
 # define BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 8, 0)
 #include <linux/mm.h>
 #include <linux/kasan.h>
 
@@ -161,6 +163,11 @@ typedef union {
 #include <linux/slab_def.h>
 #endif
 
+#else
+/* Define the type to avoid compilation failure. */
+struct kmem_cache {};
+#endif
+
 #define CACHE_NAME_SIZE 32
 
 // the key for the output summary
@@ -179,19 +186,57 @@ BPF_HASH(counts, struct info_t, struct val_t);
 int kprobe__kmem_cache_alloc(struct pt_regs *ctx, struct kmem_cache *cachep)
 {
     struct info_t info = {};
-    const char *name = cachep->name;
+    const char *name;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 8, 0)
+    name = cachep->name;
+#else
+    bpf_probe_read_kernel(&name, sizeof(name), (void *)cachep + KMEM_CACHE_NAME_OFF);
+#endif
     bpf_probe_read_kernel(&info.name, sizeof(info.name), name);
 
     struct val_t *valp, zero = {};
     valp = counts.lookup_or_try_init(&info, &zero);
     if (valp) {
         valp->count++;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 8, 0)
         valp->size += cachep->size;
+#else
+        KMEM_CACHE_SIZE_TYPE vsize = 0;
+        bpf_probe_read_kernel(&vsize, sizeof(vsize), (void *)cachep + KMEM_CACHE_SIZE_OFF);
+        valp->size += vsize;
+#endif
     }
 
     return 0;
 }
 """
+
+rel = platform.release().split('.')
+if int(rel[0]) > 6 or (int(rel[0]) == 6 and int(rel[1]) >= 8):
+    name_info = BPF.kernel_struct_field_size_offset(b'kmem_cache', b'name')
+    size_info = BPF.kernel_struct_field_size_offset(b'kmem_cache', b'size')
+    if name_info == 0xffffFFFFffffFFFF or size_info == 0xffffFFFFffffFFFF:
+        print("Not finding BTF or kernel missing struct/fields")
+        exit()
+
+    # in kmem_cache, name/size fields are not bit fields
+    name_off = (name_info & 0xffffffff) >> 3
+    size_off = (size_info & 0xffffffff) >> 3
+    size_size = (size_info >> 32) >> 3
+
+    bpf_text = bpf_text.replace('KMEM_CACHE_NAME_OFF', '%s' % name_off)
+    bpf_text = bpf_text.replace('KMEM_CACHE_SIZE_OFF', '%s' % size_off)
+    # in 6.8, the 'size' field of 'kmem_cache' is 'u32'. I added a check
+    # here in case in the future it may promote to 'u64' but unlikely
+    # to 'u16'/'u8'.
+    if size_size == 4:
+        bpf_text = bpf_text.replace('KMEM_CACHE_SIZE_TYPE', 'u32')
+    elif size_size == 8:
+        bpf_text = bpf_text.replace('KMEM_CACHE_SIZE_TYPE', 'u64')
+    else:
+        print("Please double check kmem_cache.size field")
+        exit()
+
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
