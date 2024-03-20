@@ -79,6 +79,7 @@ APPS = \
 	slabratetop \
 	softirqs \
 	solisten \
+	sslsniff \
 	statsnoop \
 	syscount \
 	tcptracer \
