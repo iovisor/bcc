@@ -38,6 +38,7 @@ except NameError:  # Python 3
 
 _default_probe_limit = 1000
 _num_open_probes = 0
+_tracefile = None
 
 # for tests
 def _get_num_open_probes():
@@ -439,7 +440,6 @@ class BPF(object):
         self.perf_buffers = {}
         self.open_perf_events = {}
         self._ringbuf_manager = None
-        self.tracefile = None
         atexit.register(self.cleanup)
 
         self.debug = debug
@@ -1491,13 +1491,14 @@ class BPF(object):
 
         Open the trace_pipe if not already open
         """
-        if not self.tracefile:
-            self.tracefile = open("%s/trace_pipe" % TRACEFS, "rb")
+        global _tracefile
+        if _tracefile is None:
+            _tracefile = open("%s/trace_pipe" % TRACEFS, "rb")
             if nonblocking:
-                fd = self.tracefile.fileno()
+                fd = _tracefile.fileno()
                 fl = fcntl.fcntl(fd, fcntl.F_GETFL)
                 fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
-        return self.tracefile
+        return _tracefile
 
     def trace_fields(self, nonblocking=False):
         """trace_fields(nonblocking=False)
@@ -1792,9 +1793,10 @@ class BPF(object):
                 del self.tables[key]
         for (ev_type, ev_config) in list(self.open_perf_events.keys()):
             self.detach_perf_event(ev_type, ev_config)
-        if self.tracefile:
-            self.tracefile.close()
-            self.tracefile = None
+        global _tracefile
+        if _tracefile is not None:
+            _tracefile.close()
+            _tracefile = None
 
         self.close()
 
