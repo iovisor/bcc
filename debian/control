@@ -4,7 +4,7 @@ Section: misc
 Priority: optional
 Standards-Version: 3.9.5
 Build-Depends: debhelper (>= 9), cmake,
-    libllvm12
+    libllvm12,
     llvm-12-dev,
     libclang-12-dev,
     clang-format-12,
