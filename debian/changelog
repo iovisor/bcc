@@ -1,3 +1,21 @@
+bcc (0.30.0-1) unstable; urgency=low
+
+  * Support for kernel up to 6.8.
+  * Set minimum supported llvm version to 12, and add llvm17 test.
+  * Add workqueue latency observation tool.
+  * libbpf tool update: f2fsslower, opensnoop, futexctn, bindsnoop, ksnoop, klockstat, offcputime, etc.
+  * bcc tool update: memleak, ttysnoop, bashreadline, tcpdrop, execsnoop, etc.
+  * allow more flexible perf event options with new perf_custom_event_open() python API.
+  * Fix userspace stack unwinding on powerpc.
+  * add bpf_prog_test_run_opts() python API.
+  * several deb package related changes.
+  * Fix btf_type_tag issue with llvm 15.
+  * Fix several flaky tests.
+  * classify tools into different sub-categories.
+  * doc update, other bug fixes and tools improvement.
+
+ -- Yonghong Song <ys114321@gmail.com>  Thu, 24 Mar 2024 17:00:00 +0000
+
 bcc (0.29.1-1) unstable; urgency=low
 
   * Fix Ubuntu 22.04 deb build
