@@ -269,7 +269,9 @@ if debug or args.ebpf:
 # load BPF program
 b = BPF(text=bpf_text)
 if args.queued:
-    if BPF.get_kprobe_functions(b'__blk_account_io_start'):
+    if BPF.tracepoint_exists("block", "block_io_start"):
+        b.attach_tracepoint(tp="block:block_io_start", fn_name="trace_req_start_tp")
+    elif BPF.get_kprobe_functions(b'__blk_account_io_start'):
         b.attach_kprobe(event="__blk_account_io_start", fn_name="trace_req_start")
     elif BPF.get_kprobe_functions(b'blk_account_io_start'):
         b.attach_kprobe(event="blk_account_io_start", fn_name="trace_req_start")
@@ -279,13 +281,14 @@ if args.queued:
             # but other aren't. Disable the -F option for tracepoint for now.
             print("ERROR: blk_account_io_start probe not available. Can't use -F.")
             exit()
-        b.attach_tracepoint(tp="block:block_io_start", fn_name="trace_req_start_tp")
 else:
     if BPF.get_kprobe_functions(b'blk_start_request'):
         b.attach_kprobe(event="blk_start_request", fn_name="trace_req_start")
     b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_req_start")
 
-if BPF.get_kprobe_functions(b'__blk_account_io_done'):
+if BPF.tracepoint_exists("block", "block_io_done"):
+    b.attach_tracepoint(tp="block:block_io_done", fn_name="trace_req_done_tp")
+elif BPF.get_kprobe_functions(b'__blk_account_io_done'):
     b.attach_kprobe(event="__blk_account_io_done", fn_name="trace_req_done")
 elif BPF.get_kprobe_functions(b'blk_account_io_done'):
     b.attach_kprobe(event="blk_account_io_done", fn_name="trace_req_done")
@@ -293,7 +296,6 @@ else:
     if args.flags:
         print("ERROR: blk_account_io_done probe not available. Can't use -F.")
         exit()
-    b.attach_tracepoint(tp="block:block_io_done", fn_name="trace_req_done_tp")
 
 
 if not args.json:
