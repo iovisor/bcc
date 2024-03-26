@@ -20,7 +20,7 @@ Package: libbcc
 Architecture: any
 Provides: libbpfcc, libbpfcc-dev
 Conflicts: libbpfcc, libbpfcc-dev
-Depends: libc6, libstdc++6, libelf1, llvm-12-dev
+Depends: libc6, libstdc++6, libelf1
 # add 'libdebuginfod1' to Depends if built with libdebuginfod support
 Description: Shared Library for BPF Compiler Collection (BCC)
  Shared Library for BPF Compiler Collection to control BPF programs
