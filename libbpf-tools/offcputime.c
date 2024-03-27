@@ -27,6 +27,8 @@ static struct env {
 	long state;
 	int duration;
 	bool verbose;
+	bool scan_stack;
+	int stack_size;
 } env = {
 	.pid = -1,
 	.tid = -1,
@@ -36,6 +38,7 @@ static struct env {
 	.max_block_time = -1,
 	.state = -1,
 	.duration = 99999999,
+	.stack_size = STACK_SIZE,
 };
 
 const char *argp_program_version = "offcputime 0.1";
@@ -60,6 +63,7 @@ const char argp_program_doc[] =
 #define OPT_PERF_MAX_STACK_DEPTH	1 /* --pef-max-stack-depth */
 #define OPT_STACK_STORAGE_SIZE		2 /* --stack-storage-size */
 #define OPT_STATE			3 /* --state */
+#define OPT_STACK_SIZE			4 /* --stack-size */
 
 static const struct argp_option opts[] = {
 	{ "pid", 'p', "PID", 0, "Trace this PID only" },
@@ -77,6 +81,8 @@ static const struct argp_option opts[] = {
 	{ "max-block-time", 'M', "MAX-BLOCK-TIME", 0,
 	  "the amount of time in microseconds under which we store traces (default U64_MAX)" },
 	{ "state", OPT_STATE, "STATE", 0, "filter on this thread state bitmask (eg, 2 == TASK_UNINTERRUPTIBLE) see include/linux/sched.h" },
+	{ "scan-stack", 's', NULL, 0, "show stack trace by scanning stack" },
+	{ "stack-size", OPT_STACK_SIZE, "STACK-SIZE", 0, "the size of dump stack (default 128)" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
@@ -155,6 +161,17 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			argp_usage(state);
 		}
 		break;
+	case 's':
+		env.scan_stack = true;
+		break;
+	case OPT_STACK_SIZE:
+		errno = 0;
+		env.stack_size = strtol(arg, NULL, 10);
+		if (errno) {
+			fprintf(stderr, "invalid stack size: %s\n", arg);
+			argp_usage(state);
+		}
+		break;
 	case ARGP_KEY_ARG:
 		if (pos_args++) {
 			fprintf(stderr,
@@ -192,7 +209,7 @@ static void print_map(struct ksyms *ksyms, struct syms_cache *syms_cache,
 	const struct ksym *ksym;
 	const struct syms *syms;
 	const struct sym *sym;
-	int err, i, ifd, sfd;
+	int err, i, ifd, sfd, scfd = -1;
 	unsigned long *ip;
 	struct val_t val;
 	char *dso_name;
@@ -207,6 +224,8 @@ static void print_map(struct ksyms *ksyms, struct syms_cache *syms_cache,
 
 	ifd = bpf_map__fd(obj->maps.info);
 	sfd = bpf_map__fd(obj->maps.stackmap);
+	if (env.scan_stack)
+		scfd = bpf_map__fd(obj->maps.scan_map);
 	while (!bpf_map_get_next_key(ifd, &lookup_key, &next_key)) {
 		idx = 0;
 
@@ -239,9 +258,16 @@ print_ustack:
 		if (next_key.user_stack_id == -1)
 			goto skip_ustack;
 
-		if (bpf_map_lookup_elem(sfd, &next_key.user_stack_id, ip) != 0) {
-			fprintf(stderr, "    [Missed User Stack]\n");
-			goto skip_ustack;
+		if (env.scan_stack) {
+			if (bpf_map_lookup_elem(scfd, &next_key.user_stack_id, ip) != 0) {
+				fprintf(stderr, "    [Missed User Stack]\n");
+				goto skip_ustack;
+			}
+		} else {
+			if (bpf_map_lookup_elem(sfd, &next_key.user_stack_id, ip) != 0) {
+				fprintf(stderr, "    [Missed User Stack]\n");
+				goto skip_ustack;
+			}
 		}
 
 		syms = syms_cache__get_syms(syms_cache, next_key.tgid);
@@ -327,6 +353,12 @@ int main(int argc, char **argv)
 	bpf_map__set_value_size(obj->maps.stackmap,
 				env.perf_max_stack_depth * sizeof(unsigned long));
 	bpf_map__set_max_entries(obj->maps.stackmap, env.stack_storage_size);
+
+	if (env.scan_stack) {
+		obj->rodata->scan_stack = true;
+		obj->rodata->targ_stack_size = env.stack_size;
+		bpf_map__set_value_size(obj->maps.stack_storage_map, env.stack_size);
+	}
 
 	err = offcputime_bpf__load(obj);
 	if (err) {

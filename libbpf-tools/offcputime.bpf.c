@@ -10,6 +10,8 @@
 #define PF_KTHREAD		0x00200000	/* I am a kernel thread */
 #define MAX_ENTRIES		10240
 
+#include "stackscan.bpf.h"
+
 const volatile bool kernel_threads_only = false;
 const volatile bool user_threads_only = false;
 const volatile __u64 max_block_ns = -1;
@@ -17,6 +19,8 @@ const volatile __u64 min_block_ns = 1;
 const volatile pid_t targ_tgid = -1;
 const volatile pid_t targ_pid = -1;
 const volatile long state = -1;
+const volatile bool scan_stack = false;
+const volatile unsigned long targ_stack_size = STACK_SIZE;
 
 struct internal_key {
 	u64 start_ts;
@@ -74,12 +78,19 @@ int BPF_PROG(sched_switch, bool preempt, struct task_struct *prev, struct task_s
 		i_key.key.tgid = prev->tgid;
 		i_key.start_ts = bpf_ktime_get_ns();
 
-		if (prev->flags & PF_KTHREAD)
+		if (prev->flags & PF_KTHREAD) {
 			i_key.key.user_stack_id = -1;
-		else
-			i_key.key.user_stack_id =
-				bpf_get_stackid(ctx, &stackmap,
-						BPF_F_USER_STACK);
+		} else {
+			if (!scan_stack) {
+				i_key.key.user_stack_id =
+					bpf_get_stackid(ctx, &stackmap,
+							BPF_F_USER_STACK);
+			} else {
+				i_key.key.user_stack_id =
+					get_scan_user_stackid((struct pt_regs*)ctx,
+							targ_stack_size);
+			}
+		}
 		i_key.key.kern_stack_id = bpf_get_stackid(ctx, &stackmap, 0);
 		bpf_map_update_elem(&start, &pid, &i_key, 0);
 		bpf_probe_read_kernel_str(&val.comm, sizeof(prev->comm), prev->comm);
