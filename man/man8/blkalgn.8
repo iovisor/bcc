@@ -1,0 +1,106 @@
+.TH blkalgn 8 "2023-11-06 "USER COMMANDS"
+.SH NAME
+blkalgn \- Observes alignment of block commands.
+.SH SYNOPSIS
+.B blkalgn.py [\-h] [\-d DISK] [\-o OPS] [\--debug] [\--trace]
+.B            [\--interval INTERVAL]
+.SH DESCRIPTION
+blkalgn observes and traces block device commands. The program attaches kprobe
+on `blk_mq_start_request` by default to capture NVMe commands issued to any
+device. If disk and/or operation filters are used, the program will then skip
+capturing for that particular event. If tracing option is passed, then all
+captured events will be printed in a table with the following columns, sorted
+from left to right:
+
+- DISK: Prints the NVMe node (e.g. 'nvme0n9').
+
+- OPS: Prints the NVMe operation (read/write).
+
+- LEN: Prints the length in bytes.
+
+- LBA: Prints the Logical Block Address (LBA).
+
+- PID: Prints the process ID.
+
+- COMM: Prints the process name (command).
+
+- ALGN: Prints the maximum alignment possible in power-of-2 bytes. Example: An
+alignment value of 16384 (16k) indicates the command is aligned in size and LBA
+to 4k, 8k and 16k.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc
+.SH OPTIONS
+.TP
+\-h, --help
+show this help message and exit
+.TP
+\-d DISK, --disk DISK
+If set, the BPF will add a disk name filter to skip block commands that don't
+match the given block device node.
+Example: nvme0n9
+.TP
+\-o OPS, --ops OPS
+If set, the BPF will add a operation filter to skip NVMe commands that don't
+match the given operation. A full list of the operation values can be found at
+the 'enum req_op' in the kernel header 'include/linux/blk_types.h'.
+.TP
+\--debug
+Prints BPF code before capturing.
+.TP
+\--trace
+Prints NVMe captured commands in a table form.
+
+Header: DISK OPS LEN LBA PID COMM ALGN.
+.TP
+\--interval INTERVAL
+Specifies the maximum event polling event interval.
+.SH EXAMPLES
+.TP
+Observe all block commands and print a power-of-2 histogram with the block and \
+alignment sizes at the end.
+#
+.B blkalgn
+.TP
+Observe all block commands issued to the 9th NVMe node and print a power-of-2 \
+histogram with the block and alignment sizes at the end.
+#
+.B blkalgn --disk nvme9n1
+.TP
+Observe and trace all write commands issued to the 9th NVMe node. And print a \
+power-of-2 histogram with the block and alignment sizes at the end.
+#
+.B blkalgn --disk nvme9n1 --ops Write --trace
+.TP
+Print eBPF program before observe starts. Observe and trace all write \
+commands issued to the 9th NVMe node. And print a power-of-2 histogram with \
+the block and alignment sizes at the end.
+#
+.B blkalgn --disk nvme9n1 --ops Write --debug
+.TP
+Observe and trace all write commands issued to the 9th NVMe node. Poll NVMe \
+events from the data ring buffer every 100 ms. And print a power-of-2 \
+histogram with the block and alignment sizes at the end.
+#
+.B blkalgn --disk nvme9n1 --ops Write --interval 0.1
+.SH OVERHEAD
+This traces all block commands issued to any device. The overhead of this can
+be high if the volume of the commands is high. To reduce overhead, add filters
+such as disk  ('--disk') and/or operation ('--ops'). You can also increase the
+polling interval ('--interval') when tracing ('--trace') or if possible, just
+disable tracing completely. You should only run this on a process where the
+slowdown is acceptable.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Daniel Gomez
