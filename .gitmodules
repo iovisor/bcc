@@ -7,3 +7,6 @@
 [submodule "libbpf-tools/blazesym"]
 	path = libbpf-tools/blazesym
 	url = https://github.com/libbpf/blazesym
+[submodule "libbpf-tools/libunwind"]
+	path = libbpf-tools/libunwind
+	url = https://github.com/libunwind/libunwind.git
