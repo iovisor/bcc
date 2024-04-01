@@ -333,21 +333,30 @@ if debug or args.ebpf:
 
 # initialize BPF
 b = BPF(text=bpf_text)
-if BPF.get_kprobe_functions(b'__blk_account_io_start'):
+if BPF.tracepoint_exists("block", "block_io_start"):
+    b.attach_tracepoint(tp="block:block_io_start", fn_name="trace_pid_start_tp")
+elif BPF.get_kprobe_functions(b'__blk_account_io_start'):
     b.attach_kprobe(event="__blk_account_io_start", fn_name="trace_pid_start")
 elif BPF.get_kprobe_functions(b'blk_account_io_start'):
     b.attach_kprobe(event="blk_account_io_start", fn_name="trace_pid_start")
 else:
-    b.attach_tracepoint(tp="block:block_io_start", fn_name="trace_pid_start_tp")
+    print("ERROR: No found any block io start probe/tp.")
+    exit()
+
 if BPF.get_kprobe_functions(b'blk_start_request'):
     b.attach_kprobe(event="blk_start_request", fn_name="trace_req_start")
 b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_req_start")
-if BPF.get_kprobe_functions(b'__blk_account_io_done'):
+
+if BPF.tracepoint_exists("block", "block_io_done"):
+    b.attach_tracepoint(tp="block:block_io_done", fn_name="trace_req_completion_tp")
+elif BPF.get_kprobe_functions(b'__blk_account_io_done'):
     b.attach_kprobe(event="__blk_account_io_done", fn_name="trace_req_completion")
 elif BPF.get_kprobe_functions(b'blk_account_io_done'):
     b.attach_kprobe(event="blk_account_io_done", fn_name="trace_req_completion")
 else:
-    b.attach_tracepoint(tp="block:block_io_done", fn_name="trace_req_completion_tp")
+    print("ERROR: No found any block io done probe/tp.")
+    exit()
+
 
 # header
 print("%-11s %-14s %-7s %-9s %-1s %-10s %-7s" % ("TIME(s)", "COMM", "PID",
