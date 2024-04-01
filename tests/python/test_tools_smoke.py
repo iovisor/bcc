@@ -272,7 +272,7 @@ class SmokeTests(TestCase):
 
     @skipUnless(kernel_version_ge(4,6), "requires kernel >= 4.6")
     def test_offwaketime(self):
-        self.run_with_duration("offwaketime.py 1")
+        self.run_with_duration("offwaketime.py 1", timeout=30)
 
     @skipUnless(kernel_version_ge(4,9), "requires kernel >= 4.9")
     def test_oomkill(self):
