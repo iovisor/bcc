@@ -392,6 +392,11 @@ sudo apt install -y zip bison build-essential cmake flex git libedit-dev \
   libllvm15 llvm-15-dev libclang-15-dev python3 zlib1g-dev libelf-dev libfl-dev python3-setuptools \
   liblzma-dev libdebuginfod-dev arping netperf iperf libpolly-15-dev
 
+# For Mantic Minotaur (23.10)
+sudo apt install -y zip bison build-essential cmake flex git libedit-dev \
+  libllvm16 llvm-16-dev libclang-16-dev python3 zlib1g-dev libelf-dev libfl-dev python3-setuptools \
+  liblzma-dev libdebuginfod-dev arping netperf iperf libpolly-16-dev
+
 # For other versions
 sudo apt-get -y install zip bison build-essential cmake flex git libedit-dev \
   libllvm3.7 llvm-3.7-dev libclang-3.7-dev python zlib1g-dev libelf-dev python3-setuptools \
