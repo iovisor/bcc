@@ -162,37 +162,37 @@ static int gen_free_enter(const void *address)
 }
 
 SEC("uprobe")
-int BPF_KPROBE(malloc_enter, size_t size)
+int BPF_UPROBE(malloc_enter, size_t size)
 {
 	return gen_alloc_enter(size);
 }
 
 SEC("uretprobe")
-int BPF_KRETPROBE(malloc_exit)
+int BPF_URETPROBE(malloc_exit)
 {
 	return gen_alloc_exit(ctx);
 }
 
 SEC("uprobe")
-int BPF_KPROBE(free_enter, void *address)
+int BPF_UPROBE(free_enter, void *address)
 {
 	return gen_free_enter(address);
 }
 
 SEC("uprobe")
-int BPF_KPROBE(calloc_enter, size_t nmemb, size_t size)
+int BPF_UPROBE(calloc_enter, size_t nmemb, size_t size)
 {
 	return gen_alloc_enter(nmemb * size);
 }
 
 SEC("uretprobe")
-int BPF_KRETPROBE(calloc_exit)
+int BPF_URETPROBE(calloc_exit)
 {
 	return gen_alloc_exit(ctx);
 }
 
 SEC("uprobe")
-int BPF_KPROBE(realloc_enter, void *ptr, size_t size)
+int BPF_UPROBE(realloc_enter, void *ptr, size_t size)
 {
 	gen_free_enter(ptr);
 
@@ -200,31 +200,31 @@ int BPF_KPROBE(realloc_enter, void *ptr, size_t size)
 }
 
 SEC("uretprobe")
-int BPF_KRETPROBE(realloc_exit)
+int BPF_URETPROBE(realloc_exit)
 {
 	return gen_alloc_exit(ctx);
 }
 
 SEC("uprobe")
-int BPF_KPROBE(mmap_enter, void *address, size_t size)
+int BPF_UPROBE(mmap_enter, void *address, size_t size)
 {
 	return gen_alloc_enter(size);
 }
 
 SEC("uretprobe")
-int BPF_KRETPROBE(mmap_exit)
+int BPF_URETPROBE(mmap_exit)
 {
 	return gen_alloc_exit(ctx);
 }
 
 SEC("uprobe")
-int BPF_KPROBE(munmap_enter, void *address)
+int BPF_UPROBE(munmap_enter, void *address)
 {
 	return gen_free_enter(address);
 }
 
 SEC("uprobe")
-int BPF_KPROBE(posix_memalign_enter, void **memptr, size_t alignment, size_t size)
+int BPF_UPROBE(posix_memalign_enter, void **memptr, size_t alignment, size_t size)
 {
 	const u64 memptr64 = (u64)(size_t)memptr;
 	const u32 tid = bpf_get_current_pid_tgid();
@@ -234,7 +234,7 @@ int BPF_KPROBE(posix_memalign_enter, void **memptr, size_t alignment, size_t siz
 }
 
 SEC("uretprobe")
-int BPF_KRETPROBE(posix_memalign_exit)
+int BPF_URETPROBE(posix_memalign_exit)
 {
 	u64 *memptr64;
 	void *addr;
@@ -255,49 +255,49 @@ int BPF_KRETPROBE(posix_memalign_exit)
 }
 
 SEC("uprobe")
-int BPF_KPROBE(aligned_alloc_enter, size_t alignment, size_t size)
+int BPF_UPROBE(aligned_alloc_enter, size_t alignment, size_t size)
 {
 	return gen_alloc_enter(size);
 }
 
 SEC("uretprobe")
-int BPF_KRETPROBE(aligned_alloc_exit)
+int BPF_URETPROBE(aligned_alloc_exit)
 {
 	return gen_alloc_exit(ctx);
 }
 
 SEC("uprobe")
-int BPF_KPROBE(valloc_enter, size_t size)
+int BPF_UPROBE(valloc_enter, size_t size)
 {
 	return gen_alloc_enter(size);
 }
 
 SEC("uretprobe")
-int BPF_KRETPROBE(valloc_exit)
+int BPF_URETPROBE(valloc_exit)
 {
 	return gen_alloc_exit(ctx);
 }
 
 SEC("uprobe")
-int BPF_KPROBE(memalign_enter, size_t alignment, size_t size)
+int BPF_UPROBE(memalign_enter, size_t alignment, size_t size)
 {
 	return gen_alloc_enter(size);
 }
 
 SEC("uretprobe")
-int BPF_KRETPROBE(memalign_exit)
+int BPF_URETPROBE(memalign_exit)
 {
 	return gen_alloc_exit(ctx);
 }
 
 SEC("uprobe")
-int BPF_KPROBE(pvalloc_enter, size_t size)
+int BPF_UPROBE(pvalloc_enter, size_t size)
 {
 	return gen_alloc_enter(size);
 }
 
 SEC("uretprobe")
-int BPF_KRETPROBE(pvalloc_exit)
+int BPF_URETPROBE(pvalloc_exit)
 {
 	return gen_alloc_exit(ctx);
 }
