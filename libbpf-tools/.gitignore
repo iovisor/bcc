@@ -53,6 +53,7 @@
 /softirqs
 /solisten
 /statsnoop
+/syncsnoop
 /syscount
 /tcpconnect
 /tcpconnlat
