@@ -43,6 +43,7 @@
 /offcputime
 /oomkill
 /opensnoop
+/pidpersec
 /profile
 /readahead
 /runqlat
