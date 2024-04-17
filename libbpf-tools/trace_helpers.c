@@ -5,6 +5,7 @@
 // 28-Feb-2020   Wenbo Zhang   Created this.
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#include <sched.h>
 #endif
 #include <ctype.h>
 #include <inttypes.h>
@@ -15,6 +16,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/resource.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <bpf/bpf.h>
 #include <bpf/btf.h>
@@ -228,6 +230,7 @@ struct map {
 };
 
 struct syms {
+	struct nsinfo *nsi;
 	struct dso *dsos;
 	int dso_sz;
 };
@@ -318,6 +321,220 @@ static int get_elf_text_scn_info(const char *path, uint64_t *addr,
 err_out:
 	close_elf(e, fd);
 	return err;
+}
+
+/*
+ * The following code related to nsinfo is based on the code of perf, see:
+ * https://github.com/torvalds/linux/commit/843ff37bb59edbe51d64e77ba1b3245a15a4dd9f
+ */
+struct nscookie {
+	int oldns;
+	int newns;
+	char *oldcwd;
+};
+
+struct nsinfo {
+	pid_t			pid;
+	pid_t			tgid;
+	pid_t			nstgid;
+	bool			need_setns;
+	char			*mntns_path;
+};
+
+static pid_t nsinfo__pid(const struct nsinfo  *nsi)
+{
+	return nsi->pid;
+}
+
+static inline void nsinfo__clear_need_setns(struct nsinfo *nsi)
+{
+	nsi->need_setns = false;
+}
+
+static inline bool nsinfo__need_setns(struct nsinfo *nsi)
+{
+	return nsi->need_setns;
+}
+
+static inline const char *nsinfo__mntns_path(const struct nsinfo *nsi)
+{
+	return nsi->mntns_path;
+}
+
+static int nsinfo__get_nspid(pid_t *tgid, pid_t *nstgid, const char *path)
+{
+	FILE *f = NULL;
+	char *statln = NULL;
+	size_t linesz = 0;
+	char *nspid;
+
+	f = fopen(path, "r");
+	if (f == NULL)
+		return -1;
+
+	while (getline(&statln, &linesz, f) != -1) {
+		/* Use tgid if CONFIG_PID_NS is not defined. */
+		if (strstr(statln, "Tgid:") != NULL) {
+			*tgid = (pid_t)strtol(strrchr(statln, '\t'), NULL, 10);
+			*nstgid = *tgid;
+		}
+
+		if (strstr(statln, "NStgid:") != NULL) {
+			nspid = strrchr(statln, '\t');
+			*nstgid = (pid_t)strtol(nspid, NULL, 10);
+			break;
+		}
+	}
+
+	fclose(f);
+	free(statln);
+	return 0;
+}
+
+static int nsinfo__init(struct nsinfo *nsi)
+{
+	char oldns[PATH_MAX];
+	char spath[PATH_MAX];
+	struct stat old_stat;
+	struct stat new_stat;
+	char *newns = NULL;
+	int rv = -1;
+
+	if (snprintf(oldns, PATH_MAX, "/proc/self/ns/mnt") >= PATH_MAX)
+		return rv;
+
+	if (asprintf(&newns, "/proc/%d/ns/mnt", nsi->pid) == -1)
+		return rv;
+
+	if (stat(oldns, &old_stat) < 0)
+		goto out;
+
+	if (stat(newns, &new_stat) < 0)
+		goto out;
+
+	/* Check if the mount namespaces differ, if so then indicate that we
+	 * want to switch as part of looking up dso/map data.
+	 */
+	if (old_stat.st_ino != new_stat.st_ino) {
+		nsi->need_setns = true;
+		nsi->mntns_path = newns;
+		newns = NULL;
+	}
+
+	/* If we're dealing with a process that is in a different PID namespace,
+	 * attempt to work out the innermost tgid for the process.
+	 */
+	if (snprintf(spath, PATH_MAX, "/proc/%d/status", nsinfo__pid(nsi)) >= PATH_MAX)
+		goto out;
+
+	rv = nsinfo__get_nspid(&nsi->tgid, &nsi->nstgid, spath);
+
+out:
+	free(newns);
+	return rv;
+}
+
+static struct nsinfo *nsinfo__new(pid_t pid)
+{
+	struct nsinfo *nsi;
+
+	if (pid == 0)
+		return NULL;
+
+	nsi = calloc(1, sizeof(*nsi));
+	if (!nsi)
+		return NULL;
+	nsi->pid = pid;
+
+	/* Init may fail if the process exits while we're trying to look at its
+	 * proc information. In that case, save the pid but don't try to enter
+	 * the namespace.
+	 */
+	if (nsinfo__init(nsi) < 0) {
+		nsinfo__clear_need_setns(nsi);
+	}
+
+	return nsi;
+}
+
+static void nsinfo__free(struct nsinfo *nsi)
+{
+	if (nsi) {
+		free(nsi->mntns_path);
+		free(nsi);
+	}
+}
+
+static void nsinfo__mountns_enter(struct nsinfo *nsi, struct nscookie *nc)
+{
+	char curpath[PATH_MAX];
+	int oldns = -1;
+	int newns = -1;
+	char *oldcwd = NULL;
+
+	if (nc == NULL)
+		return;
+
+	nc->oldns = -1;
+	nc->newns = -1;
+
+	if (!nsi || !nsinfo__need_setns(nsi))
+		return;
+
+	if (snprintf(curpath, PATH_MAX, "/proc/self/ns/mnt") >= PATH_MAX)
+                return;
+
+	oldcwd = get_current_dir_name();
+	if (!oldcwd)
+		return;
+
+	oldns = open(curpath, O_RDONLY);
+	if (oldns < 0)
+		goto errout;
+
+	newns = open(nsinfo__mntns_path(nsi), O_RDONLY);
+	if (newns < 0)
+		goto errout;
+
+	if (setns(newns, CLONE_NEWNS) < 0)
+		goto errout;
+
+	nc->oldcwd = oldcwd;
+	nc->oldns = oldns;
+        nc->newns = newns;
+
+	return;
+
+errout:
+	free(oldcwd);
+	if (oldns > -1)
+		close(oldns);
+	if (newns > -1)
+		close(newns);
+}
+
+static void nsinfo__mountns_exit(struct nscookie *nc)
+{
+	if (nc == NULL || nc->oldns == -1 || nc->newns == -1 || !nc->oldcwd)
+		return;
+
+	setns(nc->oldns, CLONE_NEWNS);
+
+	if (nc->oldcwd) {
+		chdir(nc->oldcwd);
+                free(nc->oldcwd);
+                nc->oldcwd = NULL;
+	}
+
+	if (nc->oldns > -1) {
+		close(nc->oldns);
+		nc->oldns = -1;
+	}
+
+	if (nc->newns > -1) {
+		close(nc->newns);
+		nc->newns = -1;
+	}
 }
 
 static int syms__add_dso(struct syms *syms, struct map *map, const char *name)
@@ -493,15 +710,19 @@ static void dso__free_fields(struct dso *dso)
 	btf__free(dso->btf);
 }
 
-static int dso__load_sym_table_from_elf(struct dso *dso, int fd)
+static int dso__load_sym_table_from_elf(struct dso *dso, struct nsinfo *nsi, int fd)
 {
 	Elf_Scn *section = NULL;
+	struct nscookie nsc;
 	Elf *e;
 	int i;
 
+	nsinfo__mountns_enter(nsi, &nsc);
 	e = fd > 0 ? open_elf_by_fd(fd) : open_elf(dso->name, &fd);
-	if (!e)
+	if (!e) {
+		nsinfo__mountns_exit(&nsc);
 		return -1;
+	}
 
 	while ((section = elf_nextscn(e, section)) != 0) {
 		GElf_Shdr header;
@@ -527,11 +748,13 @@ static int dso__load_sym_table_from_elf(struct dso *dso, int fd)
 	qsort(dso->syms, dso->syms_sz, sizeof(*dso->syms), sym_cmp);
 
 	close_elf(e, fd);
+	nsinfo__mountns_exit(&nsc);
 	return 0;
 
 err_out:
 	dso__free_fields(dso);
 	close_elf(e, fd);
+	nsinfo__mountns_exit(&nsc);
 	return -1;
 }
 
@@ -608,28 +831,28 @@ static int dso__load_sym_table_from_vdso_image(struct dso *dso)
 
 	if (fd < 0)
 		return -1;
-	return dso__load_sym_table_from_elf(dso, fd);
+	return dso__load_sym_table_from_elf(dso, NULL, fd);
 }
 
-static int dso__load_sym_table(struct dso *dso)
+static int dso__load_sym_table(struct dso *dso, struct nsinfo *nsi)
 {
 	if (dso->type == UNKNOWN)
 		return -1;
 	if (dso->type == PERF_MAP)
 		return dso__load_sym_table_from_perf_map(dso);
 	if (dso->type == EXEC || dso->type == DYN)
-		return dso__load_sym_table_from_elf(dso, 0);
+		return dso__load_sym_table_from_elf(dso, nsi, 0);
 	if (dso->type == VDSO)
 		return dso__load_sym_table_from_vdso_image(dso);
 	return -1;
 }
 
-static struct sym *dso__find_sym(struct dso *dso, uint64_t offset)
+static struct sym *dso__find_sym(struct dso *dso, struct nsinfo *nsi, uint64_t offset)
 {
 	unsigned long sym_addr;
 	int start, end, mid;
 
-	if (!dso->syms && dso__load_sym_table(dso))
+	if (!dso->syms && dso__load_sym_table(dso, nsi))
 		return NULL;
 
 	start = 0;
@@ -706,12 +929,33 @@ err_out:
 	return NULL;
 }
 
+static void fill_map_file_name(char *fname, size_t len, struct nsinfo *nsi)
+{
+	pid_t tgid = nsi->tgid;
+
+	if (nsi->need_setns) {
+		tgid = nsi->nstgid;
+	}
+	snprintf(fname, len, "/proc/%ld/maps", (long)tgid);
+}
+
 struct syms *syms__load_pid(pid_t tgid)
 {
+	struct nscookie nsc;
+	struct nsinfo *nsi;
+	struct syms *syms;
 	char fname[128];
 
-	snprintf(fname, sizeof(fname), "/proc/%ld/maps", (long)tgid);
-	return syms__load_file(fname);
+	nsi = nsinfo__new(tgid);
+	if (!nsi)
+		return NULL;
+
+	nsinfo__mountns_enter(nsi, &nsc);
+	fill_map_file_name(fname,sizeof(fname), nsi);
+	syms = syms__load_file(fname);
+	nsinfo__mountns_exit(&nsc);
+	syms->nsi = nsi;
+	return syms;
 }
 
 void syms__free(struct syms *syms)
@@ -723,6 +967,7 @@ void syms__free(struct syms *syms)
 
 	for (i = 0; i < syms->dso_sz; i++)
 		dso__free_fields(&syms->dsos[i]);
+	nsinfo__free(syms->nsi);
 	free(syms->dsos);
 	free(syms);
 }
@@ -735,7 +980,7 @@ const struct sym *syms__map_addr(const struct syms *syms, unsigned long addr)
 	dso = syms__find_dso(syms, addr, &offset);
 	if (!dso)
 		return NULL;
-	return dso__find_sym(dso, offset);
+	return dso__find_sym(dso, syms->nsi, offset);
 }
 
 const struct sym *syms__map_addr_dso(const struct syms *syms, unsigned long addr,
@@ -751,7 +996,7 @@ const struct sym *syms__map_addr_dso(const struct syms *syms, unsigned long addr
 	*dso_name = dso->name;
 	*dso_offset = offset;
 
-	return dso__find_sym(dso, offset);
+	return dso__find_sym(dso, syms->nsi, offset);
 }
 
 struct syms_cache {
