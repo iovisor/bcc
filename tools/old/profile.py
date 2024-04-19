@@ -341,20 +341,20 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
         # print folded stack output
         user_stack = list(user_stack)
         kernel_stack = list(kernel_stack)
-        line = [k.name.decode('utf-8', 'replace')] + \
+        line = [k.name] + \
             [b.sym(addr, k.pid) for addr in reversed(user_stack)] + \
             (do_delimiter and ["-"] or []) + \
             [aksym(addr) for addr in reversed(kernel_stack)]
-        print("%s %d" % (";".join(line), v.value))
+        print("%s %d" % (b";".join(line).decode("utf-8", "replace"), v.value))
     else:
         # print default multi-line stack output.
         for addr in kernel_stack:
-            print("    %s" % aksym(addr))
+            print("    %s" % aksym(addr).decode("utf-8", "replace"))
         if do_delimiter:
             print("    --")
         for addr in user_stack:
-            print("    %s" % b.sym(addr, k.pid))
-        print("    %-16s %s (%d)" % ("-", k.name, k.pid))
+            print("    %s" % b.sym(addr, k.pid).decode("utf-8", "replace"))
+        print("    %-16s %s (%d)" % ("-", k.name.decode("utf-8", "replace"), k.pid))
         print("        %d\n" % v.value)
 
 # check missing
