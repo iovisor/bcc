@@ -228,6 +228,9 @@ int do_perf_event(struct bpf_perf_event_data *ctx) {
 # pid-namespace translation
 try:
     devinfo = os.stat("/proc/self/ns/pid")
+    version = "".join([ver.zfill(2) for ver in os.uname().release.split(".")])
+    # Need Linux >= 5.7 to have helper bpf_get_ns_current_pid_tgid() available:
+    assert(version[:4] >= "0507")
     bpf_text = bpf_text.replace('USE_PIDNS', "1")
     bpf_text = bpf_text.replace('PIDNS_DEV', str(devinfo.st_dev))
     bpf_text = bpf_text.replace('PIDNS_INO', str(devinfo.st_ino))
