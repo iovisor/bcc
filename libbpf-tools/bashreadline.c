@@ -35,9 +35,9 @@ const char argp_program_doc[] =
 "    bashreadline -s /usr/lib/libreadline.so\n";
 
 static const struct argp_option opts[] = {
-	{ "shared", 's', "PATH", 0, "the location of libreadline.so library" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "shared", 's', "PATH", 0, "the location of libreadline.so library", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 

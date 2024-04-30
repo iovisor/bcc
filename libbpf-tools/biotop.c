@@ -101,12 +101,12 @@ const char argp_program_doc[] =
 "    biotop -p 181     # only trace PID 1216\n";
 
 static const struct argp_option opts[] = {
-	{ "noclear", 'C', NULL, 0, "Don't clear the screen" },
-	{ "sort", 's', "SORT", 0, "Sort columns, default all [all, io, bytes, time]" },
-	{ "rows", 'r', "ROWS", 0, "Maximum rows to print, default 20" },
-	{ "pid", 'p', "PID", 0, "Process ID to trace" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "noclear", 'C', NULL, 0, "Don't clear the screen", 0 },
+	{ "sort", 's', "SORT", 0, "Sort columns, default all [all, io, bytes, time]", 0 },
+	{ "rows", 'r', "ROWS", 0, "Maximum rows to print, default 20", 0 },
+	{ "pid", 'p', "PID", 0, "Process ID to trace", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 

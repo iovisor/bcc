@@ -45,22 +45,22 @@ static const char argp_program_doc[] =
 ;
 
 static const struct argp_option opts[] = {
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ "pid", 'p', "PID", 0, "Process PID to trace" },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ "pid", 'p', "PID", 0, "Process PID to trace", 0 },
 	{ "interval", 'i', "INTERVAL", 0, "Print summary at this interval"
-				" (seconds), 0 for infinite wait (default)" },
-	{ "duration", 'd', "DURATION", 0, "Total tracing duration (seconds)" },
-	{ "top", 'T', "TOP", 0, "Print only the top syscalls (default 10)" },
-	{ "cgroup", 'c', "/sys/fs/cgroup/unified/<CG>", 0, "Trace process in cgroup path"},
-	{ "failures", 'x', NULL, 0, "Trace only failed syscalls" },
-	{ "latency", 'L', NULL, 0, "Collect syscall latency" },
+				" (seconds), 0 for infinite wait (default)", 0 },
+	{ "duration", 'd', "DURATION", 0, "Total tracing duration (seconds)", 0 },
+	{ "top", 'T', "TOP", 0, "Print only the top syscalls (default 10)", 0 },
+	{ "cgroup", 'c', "/sys/fs/cgroup/unified/<CG>", 0, "Trace process in cgroup path", 0 },
+	{ "failures", 'x', NULL, 0, "Trace only failed syscalls", 0 },
+	{ "latency", 'L', NULL, 0, "Collect syscall latency", 0 },
 	{ "milliseconds", 'm', NULL, 0, "Display latency in milliseconds"
-					" (default: microseconds)" },
-	{ "process", 'P', NULL, 0, "Count by process and not by syscall" },
+					" (default: microseconds)", 0 },
+	{ "process", 'P', NULL, 0, "Count by process and not by syscall", 0 },
 	{ "errno", 'e', "ERRNO", 0, "Trace only syscalls that return this error"
-				 "(numeric or EPERM, etc.)" },
-	{ "list", 'l', NULL, 0, "Print list of recognized syscalls and exit" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+				 "(numeric or EPERM, etc.)", 0 },
+	{ "list", 'l', NULL, 0, "Print list of recognized syscalls and exit", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 

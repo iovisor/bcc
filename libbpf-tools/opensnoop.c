@@ -87,19 +87,19 @@ const char argp_program_doc[] =
 "";
 
 static const struct argp_option opts[] = {
-	{ "duration", 'd', "DURATION", 0, "Duration to trace"},
-	{ "extended-fields", 'e', NULL, 0, "Print extended fields"},
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help"},
-	{ "name", 'n', "NAME", 0, "Trace process names containing this"},
-	{ "pid", 'p', "PID", 0, "Process ID to trace"},
-	{ "tid", 't', "TID", 0, "Thread ID to trace"},
-	{ "timestamp", 'T', NULL, 0, "Print timestamp"},
-	{ "uid", 'u', "UID", 0, "User ID to trace"},
-	{ "print-uid", 'U', NULL, 0, "Print UID"},
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ "failed", 'x', NULL, 0, "Failed opens only"},
+	{ "duration", 'd', "DURATION", 0, "Duration to trace", 0 },
+	{ "extended-fields", 'e', NULL, 0, "Print extended fields", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
+	{ "name", 'n', "NAME", 0, "Trace process names containing this", 0 },
+	{ "pid", 'p', "PID", 0, "Process ID to trace", 0 },
+	{ "tid", 't', "TID", 0, "Thread ID to trace", 0 },
+	{ "timestamp", 'T', NULL, 0, "Print timestamp", 0 },
+	{ "uid", 'u', "UID", 0, "User ID to trace", 0 },
+	{ "print-uid", 'U', NULL, 0, "Print UID", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ "failed", 'x', NULL, 0, "Failed opens only", 0 },
 #ifdef USE_BLAZESYM
-	{ "callers", 'c', NULL, 0, "Show calling functions"},
+	{ "callers", 'c', NULL, 0, "Show calling functions", 0 },
 #endif
 	{},
 };

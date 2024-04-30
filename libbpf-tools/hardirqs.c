@@ -50,13 +50,13 @@ const char argp_program_doc[] =
 "    hardirqs -NT 1      # 1s summaries, nanoseconds, and timestamps\n";
 
 static const struct argp_option opts[] = {
-	{ "count", 'C', NULL, 0, "Show event counts instead of timing" },
-	{ "distributed", 'd', NULL, 0, "Show distributions as histograms" },
-	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path" },
-	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
-	{ "nanoseconds", 'N', NULL, 0, "Output in nanoseconds" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "count", 'C', NULL, 0, "Show event counts instead of timing", 0 },
+	{ "distributed", 'd', NULL, 0, "Show distributions as histograms", 0 },
+	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path", 0 },
+	{ "timestamp", 'T', NULL, 0, "Include timestamp on output", 0 },
+	{ "nanoseconds", 'N', NULL, 0, "Output in nanoseconds", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 

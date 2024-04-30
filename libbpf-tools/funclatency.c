@@ -74,18 +74,18 @@ static const char program_doc[] =
 ;
 
 static const struct argp_option opts[] = {
-	{ "milliseconds", 'm', NULL, 0, "Output in milliseconds"},
-	{ "microseconds", 'u', NULL, 0, "Output in microseconds"},
-	{0, 0, 0, 0, ""},
-	{ "pid", 'p', "PID", 0, "Process ID to trace"},
-	{0, 0, 0, 0, ""},
-	{ "interval", 'i', "INTERVAL", 0, "Summary interval in seconds"},
-	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path" },
-	{ "duration", 'd', "DURATION", 0, "Duration to trace"},
-	{ "timestamp", 'T', NULL, 0, "Print timestamp"},
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ "kprobes", 'k', NULL, 0, "Use kprobes instead of fentry" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help"},
+	{ "milliseconds", 'm', NULL, 0, "Output in milliseconds", 0 },
+	{ "microseconds", 'u', NULL, 0, "Output in microseconds", 0 },
+	{0, 0, 0, 0, "", 0 },
+	{ "pid", 'p', "PID", 0, "Process ID to trace", 0 },
+	{0, 0, 0, 0, "", 0 },
+	{ "interval", 'i', "INTERVAL", 0, "Summary interval in seconds", 0 },
+	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path", 0 },
+	{ "duration", 'd', "DURATION", 0, "Duration to trace", 0 },
+	{ "timestamp", 'T', NULL, 0, "Print timestamp", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ "kprobes", 'k', NULL, 0, "Use kprobes instead of fentry", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 

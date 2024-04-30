@@ -47,10 +47,10 @@ const char argp_program_doc[] =
 "    solisten -p 1216   # only trace PID 1216\n";
 
 static const struct argp_option opts[] = {
-	{ "pid", 'p', "PID", 0, "Process ID to trace" },
-	{ "timestamp", 't', NULL, 0, "Include timestamp on output" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "pid", 'p', "PID", 0, "Process ID to trace", 0 },
+	{ "timestamp", 't', NULL, 0, "Include timestamp on output", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 

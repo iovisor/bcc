@@ -57,13 +57,13 @@ const char argp_program_doc[] =
 "    exitsnoop -c CG       # Trace process under cgroupsPath CG\n";
 
 static const struct argp_option opts[] = {
-	{ "timestamp", 't', NULL, 0, "Include timestamp on output" },
-	{ "failed", 'x', NULL, 0, "Trace error exits only." },
-	{ "pid", 'p', "PID", 0, "Process ID to trace" },
-	{ "threaded", 'T', NULL, 0, "Trace by thread." },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
-	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path"},
+	{ "timestamp", 't', NULL, 0, "Include timestamp on output", 0 },
+	{ "failed", 'x', NULL, 0, "Trace error exits only.", 0 },
+	{ "pid", 'p', "PID", 0, "Process ID to trace", 0 },
+	{ "threaded", 'T', NULL, 0, "Trace by thread.", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
+	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path", 0 },
 	{},
 };
 

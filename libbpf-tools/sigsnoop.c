@@ -81,13 +81,13 @@ const char argp_program_doc[] =
 "    sigsnoop -s 9        # only trace signal 9\n";
 
 static const struct argp_option opts[] = {
-	{ "failed", 'x', NULL, 0, "Trace failed signals only." },
-	{ "kill", 'k', NULL, 0, "Trace signals issued by kill syscall only." },
-	{ "pid", 'p', "PID", 0, "Process ID to trace" },
-	{ "signal", 's', "SIGNAL", 0, "Signal to trace." },
-	{ "name", 'n', NULL, 0, "Output signal name instead of signal number." },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "failed", 'x', NULL, 0, "Trace failed signals only.", 0 },
+	{ "kill", 'k', NULL, 0, "Trace signals issued by kill syscall only.", 0 },
+	{ "pid", 'p', "PID", 0, "Process ID to trace", 0 },
+	{ "signal", 's', "SIGNAL", 0, "Signal to trace.", 0 },
+	{ "name", 'n', NULL, 0, "Output signal name instead of signal number.", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 

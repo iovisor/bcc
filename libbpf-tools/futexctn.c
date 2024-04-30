@@ -69,18 +69,18 @@ const char argp_program_doc[] =
 #define OPT_STACK_STORAGE_SIZE		2 /* --stack-storage-size */
 
 static const struct argp_option opts[] = {
-	{ "pid", 'p', "PID", 0, "Trace this PID only" },
-	{ "tid", 't', "TID", 0, "Trace this TID only" },
-	{ "lock", 'l', "LOCK", 0, "Trace this lock only" },
-	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
-	{ "milliseconds", 'm', NULL, 0, "Millisecond histogram" },
+	{ "pid", 'p', "PID", 0, "Trace this PID only", 0 },
+	{ "tid", 't', "TID", 0, "Trace this TID only", 0 },
+	{ "lock", 'l', "LOCK", 0, "Trace this lock only", 0 },
+	{ "timestamp", 'T', NULL, 0, "Include timestamp on output", 0 },
+	{ "milliseconds", 'm', NULL, 0, "Millisecond histogram", 0 },
 	{ "perf-max-stack-depth", OPT_PERF_MAX_STACK_DEPTH,
-	  "PERF-MAX-STACK-DEPTH", 0, "the limit for the stack traces (default 127)" },
+	  "PERF-MAX-STACK-DEPTH", 0, "the limit for the stack traces (default 127)", 0 },
 	{ "stack-storage-size", OPT_STACK_STORAGE_SIZE, "STACK-STORAGE-SIZE", 0,
-	  "the number of unique stack traces that can be stored and displayed (default 1024)" },
-	{ "summary", 's', NULL, 0, "Summary futex contention latency" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	  "the number of unique stack traces that can be stored and displayed (default 1024)", 0 },
+	{ "summary", 's', NULL, 0, "Summary futex contention latency", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 

@@ -64,19 +64,19 @@ const char argp_program_doc[] =
 "   ./execsnoop -c CG     # Trace process under cgroupsPath CG\n";
 
 static const struct argp_option opts[] = {
-	{ "time", 'T', NULL, 0, "include time column on output (HH:MM:SS)" },
-	{ "timestamp", 't', NULL, 0, "include timestamp on output" },
-	{ "fails", 'x', NULL, 0, "include failed exec()s" },
-	{ "uid", 'u', "UID", 0, "trace this UID only" },
-	{ "quote", 'q', NULL, 0, "Add quotemarks (\") around arguments" },
-	{ "name", 'n', "NAME", 0, "only print commands matching this name, any arg" },
-	{ "line", 'l', "LINE", 0, "only print commands where arg contains this line" },
-	{ "print-uid", 'U', NULL, 0, "print UID column" },
+	{ "time", 'T', NULL, 0, "include time column on output (HH:MM:SS)", 0 },
+	{ "timestamp", 't', NULL, 0, "include timestamp on output", 0 },
+	{ "fails", 'x', NULL, 0, "include failed exec()s", 0 },
+	{ "uid", 'u', "UID", 0, "trace this UID only", 0 },
+	{ "quote", 'q', NULL, 0, "Add quotemarks (\") around arguments", 0 },
+	{ "name", 'n', "NAME", 0, "only print commands matching this name, any arg", 0 },
+	{ "line", 'l', "LINE", 0, "only print commands where arg contains this line", 0 },
+	{ "print-uid", 'U', NULL, 0, "print UID column", 0 },
 	{ "max-args", MAX_ARGS_KEY, "MAX_ARGS", 0,
-		"maximum number of arguments parsed and displayed, defaults to 20" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path"},
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+		"maximum number of arguments parsed and displayed, defaults to 20", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 

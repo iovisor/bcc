@@ -60,13 +60,13 @@ const char argp_program_doc[] =
 "    runqlen -f 199  # sample at 199HZ\n";
 
 static const struct argp_option opts[] = {
-	{ "cpus", 'C', NULL, 0, "Print output for each CPU separately" },
-	{ "frequency", 'f', "FREQUENCY", 0, "Sample with a certain frequency" },
-	{ "runqocc", 'O', NULL, 0, "Report run queue occupancy" },
-	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ "host", 'H', NULL, 0, "Report nr_running from host's rq" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "cpus", 'C', NULL, 0, "Print output for each CPU separately", 0 },
+	{ "frequency", 'f', "FREQUENCY", 0, "Sample with a certain frequency", 0 },
+	{ "runqocc", 'O', NULL, 0, "Report run queue occupancy", 0 },
+	{ "timestamp", 'T', NULL, 0, "Include timestamp on output", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ "host", 'H', NULL, 0, "Report nr_running from host's rq", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 

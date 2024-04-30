@@ -109,13 +109,13 @@ const char argp_program_doc[] =
 "    fsslower -t xfs -c -d 1      # trace xfs operations for 1s with csv output\n";
 
 static const struct argp_option opts[] = {
-	{ "csv", 'c', NULL, 0, "Output as csv" },
-	{ "duration", 'd', "DURATION", 0, "Total duration of trace in seconds" },
-	{ "pid", 'p', "PID", 0, "Process ID to trace" },
-	{ "min", 'm', "MIN", 0, "Min latency to trace, in ms (default 10)" },
-	{ "type", 't', "Filesystem", 0, "Which filesystem to trace, [btrfs/ext4/nfs/xfs/f2fs]" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "csv", 'c', NULL, 0, "Output as csv", 0 },
+	{ "duration", 'd', "DURATION", 0, "Total duration of trace in seconds", 0 },
+	{ "pid", 'p', "PID", 0, "Process ID to trace", 0 },
+	{ "min", 'm', "MIN", 0, "Min latency to trace, in ms (default 10)", 0 },
+	{ "type", 't', "Filesystem", 0, "Which filesystem to trace, [btrfs/ext4/nfs/xfs/f2fs]", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 

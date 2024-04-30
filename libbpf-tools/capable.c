@@ -106,18 +106,18 @@ const char argp_program_doc[] =
 #define OPT_STACK_STORAGE_SIZE		2 /* --stack-storage-size */
 
 static const struct argp_option opts[] = {
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ "pid", 'p', "PID", 0, "Trace this PID only" },
-	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path" },
-	{ "kernel-stack", 'K', NULL, 0, "output kernel stack trace" },
-	{ "user-stack", 'U', NULL, 0, "output user stack trace" },
-	{ "extra-fields", 'x', NULL, 0, "extra fields: show TID and INSETID columns" },
-	{ "unique", 'u', "off", 0, "Print unique output for <pid> or <cgroup> (default:off)" },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ "pid", 'p', "PID", 0, "Trace this PID only", 0 },
+	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path", 0 },
+	{ "kernel-stack", 'K', NULL, 0, "output kernel stack trace", 0 },
+	{ "user-stack", 'U', NULL, 0, "output user stack trace", 0 },
+	{ "extra-fields", 'x', NULL, 0, "extra fields: show TID and INSETID columns", 0 },
+	{ "unique", 'u', "off", 0, "Print unique output for <pid> or <cgroup> (default:off)", 0 },
 	{ "perf-max-stack-depth", OPT_PERF_MAX_STACK_DEPTH,
-	  "PERF-MAX-STACK-DEPTH", 0, "the limit for both kernel and user stack traces (default 127)" },
+	  "PERF-MAX-STACK-DEPTH", 0, "the limit for both kernel and user stack traces (default 127)", 0 },
 	{ "stack-storage-size", OPT_STACK_STORAGE_SIZE, "STACK-STORAGE-SIZE", 0,
-	  "the number of unique stack traces that can be stored and displayed (default 1024)" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	  "the number of unique stack traces that can be stored and displayed (default 1024)", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 

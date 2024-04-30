@@ -44,11 +44,11 @@ const char argp_program_doc[] =
 "    cpufreq -f 199  # sample CPU freq at 199HZ\n";
 
 static const struct argp_option opts[] = {
-	{ "duration", 'd', "DURATION", 0, "Duration to sample in seconds" },
-	{ "frequency", 'f', "FREQUENCY", 0, "Sample with a certain frequency" },
-	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "duration", 'd', "DURATION", 0, "Duration to sample in seconds", 0 },
+	{ "frequency", 'f', "FREQUENCY", 0, "Sample with a certain frequency", 0 },
+	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 

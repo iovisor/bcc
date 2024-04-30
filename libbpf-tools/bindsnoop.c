@@ -64,13 +64,13 @@ const char argp_program_doc[] =
 "  SOL_SOCKET SO_REUSEPORT             ....r\n";
 
 static const struct argp_option opts[] = {
-	{ "timestamp", 't', NULL, 0, "Include timestamp on output" },
-	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path" },
-	{ "failed", 'x', NULL, 0, "Include errors on output." },
-	{ "pid", 'p', "PID", 0, "Process ID to trace" },
-	{ "ports", 'P', "PORTS", 0, "Comma-separated list of ports to trace." },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "timestamp", 't', NULL, 0, "Include timestamp on output", 0 },
+	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path", 0 },
+	{ "failed", 'x', NULL, 0, "Include errors on output.", 0 },
+	{ "pid", 'p', "PID", 0, "Process ID to trace", 0 },
+	{ "ports", 'P', "PORTS", 0, "Comma-separated list of ports to trace.", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 

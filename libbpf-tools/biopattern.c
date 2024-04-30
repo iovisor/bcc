@@ -43,10 +43,10 @@ const char argp_program_doc[] =
 "    biopattern -d sdc       # trace sdc only\n";
 
 static const struct argp_option opts[] = {
-	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
-	{ "disk",  'd', "DISK",  0, "Trace this disk only" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "timestamp", 'T', NULL, 0, "Include timestamp on output", 0 },
+	{ "disk",  'd', "DISK",  0, "Trace this disk only", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 

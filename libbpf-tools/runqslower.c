@@ -43,11 +43,11 @@ const char argp_program_doc[] =
 "    runqslower -P      # also show previous task name and TID\n";
 
 static const struct argp_option opts[] = {
-	{ "pid", 'p', "PID", 0, "Process PID to trace"},
-	{ "tid", 't', "TID", 0, "Thread TID to trace"},
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ "previous", 'P', NULL, 0, "also show previous task name and TID" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "pid", 'p', "PID", 0, "Process PID to trace", 0 },
+	{ "tid", 't', "TID", 0, "Thread TID to trace", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ "previous", 'P', NULL, 0, "also show previous task name and TID", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 

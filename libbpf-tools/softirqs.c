@@ -47,12 +47,12 @@ const char argp_program_doc[] =
 "    softirqs -NT 1      # 1s summaries, nanoseconds, and timestamps\n";
 
 static const struct argp_option opts[] = {
-	{ "distributed", 'd', NULL, 0, "Show distributions as histograms" },
-	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
-	{ "nanoseconds", 'N', NULL, 0, "Output in nanoseconds" },
-	{ "count", 'C', NULL, 0, "Show event counts with timing" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "distributed", 'd', NULL, 0, "Show distributions as histograms", 0 },
+	{ "timestamp", 'T', NULL, 0, "Include timestamp on output", 0 },
+	{ "nanoseconds", 'N', NULL, 0, "Output in nanoseconds", 0 },
+	{ "count", 'C', NULL, 0, "Show event counts with timing", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 

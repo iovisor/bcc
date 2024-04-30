@@ -45,10 +45,10 @@ const char argp_program_doc[] =
 "    gethostlatency -p 1216     # only trace PID 1216\n";
 
 static const struct argp_option opts[] = {
-	{ "pid", 'p', "PID", 0, "Process ID to trace" },
-	{ "libc", 'l', "LIBC", 0, "Specify which libc.so to use" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "pid", 'p', "PID", 0, "Process ID to trace", 0 },
+	{ "libc", 'l', "LIBC", 0, "Specify which libc.so to use", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 
