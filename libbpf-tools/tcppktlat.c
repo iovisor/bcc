@@ -48,14 +48,14 @@ const char argp_program_doc[] =
 "    tcppktlat 1000        # filter for latency higher than 1000us";
 
 static const struct argp_option opts[] = {
-	{ "pid", 'p', "PID", 0, "Process PID to trace"},
-	{ "tid", 't', "TID", 0, "Thread TID to trace"},
-	{ "timestamp", 'T', NULL, 0, "include timestamp on output" },
-	{ "lport", 'l', "LPORT", 0, "filter for local port" },
-	{ "rport", 'r', "RPORT", 0, "filter for remote port" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ "wide", 'w', NULL, 0, "Wide column output (fits IPv6 addresses)" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "pid", 'p', "PID", 0, "Process PID to trace", 0 },
+	{ "tid", 't', "TID", 0, "Thread TID to trace", 0 },
+	{ "timestamp", 'T', NULL, 0, "include timestamp on output", 0 },
+	{ "lport", 'l', "LPORT", 0, "filter for local port", 0 },
+	{ "rport", 'r', "RPORT", 0, "filter for remote port", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ "wide", 'w', NULL, 0, "Wide column output (fits IPv6 addresses)", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 

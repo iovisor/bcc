@@ -36,10 +36,10 @@ const char argp_program_doc[] =
 "    biostacks -d sdc       # trace sdc only\n";
 
 static const struct argp_option opts[] = {
-	{ "disk",  'd', "DISK",  0, "Trace this disk only" },
-	{ "milliseconds", 'm', NULL, 0, "Millisecond histogram" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "disk",  'd', "DISK",  0, "Trace this disk only", 0 },
+	{ "milliseconds", 'm', NULL, 0, "Millisecond histogram", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 

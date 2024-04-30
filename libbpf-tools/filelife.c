@@ -43,9 +43,9 @@ const char argp_program_doc[] =
 "    filelife -p 123  # trace pid 123\n";
 
 static const struct argp_option opts[] = {
-	{ "pid", 'p', "PID", 0, "Process PID to trace" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "pid", 'p', "PID", 0, "Process PID to trace", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 

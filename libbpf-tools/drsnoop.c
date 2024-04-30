@@ -45,12 +45,12 @@ const char argp_program_doc[] =
 "    drsnoop -e      # trace all direct reclaim events with extended faileds\n";
 
 static const struct argp_option opts[] = {
-	{ "duration", 'd', "DURATION", 0, "Total duration of trace in seconds" },
-	{ "extended", 'e', NULL, 0, "Extended fields output" },
-	{ "pid", 'p', "PID", 0, "Process PID to trace" },
-	{ "tid", 't', "TID", 0, "Thread TID to trace" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "duration", 'd', "DURATION", 0, "Total duration of trace in seconds", 0 },
+	{ "extended", 'e', NULL, 0, "Extended fields output", 0 },
+	{ "pid", 'p', "PID", 0, "Process PID to trace", 0 },
+	{ "tid", 't', "TID", 0, "Thread TID to trace", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 

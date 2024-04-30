@@ -46,11 +46,11 @@ const char argp_program_doc[] =
 
 
 static const struct argp_option opts[] = {
-	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
-	{ "ipv4", '4', NULL, 0, "Trace IPv4 family only" },
-	{ "ipv6", '6', NULL, 0, "Trace IPv6 family only" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "timestamp", 'T', NULL, 0, "Include timestamp on output", 0 },
+	{ "ipv4", '4', NULL, 0, "Trace IPv4 family only", 0 },
+	{ "ipv6", '6', NULL, 0, "Trace IPv6 family only", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 

@@ -52,18 +52,18 @@ const char argp_program_doc[] =
 #define OPT_STACK_STORAGE_SIZE		2 /* --stack-storage-size */
 
 static const struct argp_option opts[] = {
-	{ "pid", 'p', "PID", 0, "trace this PID only"},
-	{ "verbose", 'v', NULL, 0, "show raw addresses" },
-	{ "user-threads-only", 'u', NULL, 0, "user threads only (no kernel threads)" },
+	{ "pid", 'p', "PID", 0, "trace this PID only", 0 },
+	{ "verbose", 'v', NULL, 0, "show raw addresses", 0 },
+	{ "user-threads-only", 'u', NULL, 0, "user threads only (no kernel threads)", 0 },
 	{ "perf-max-stack-depth", OPT_PERF_MAX_STACK_DEPTH,
-		"PERF-MAX-STACK-DEPTH", 0, "the limit for both kernel and user stack traces (default 127)" },
+		"PERF-MAX-STACK-DEPTH", 0, "the limit for both kernel and user stack traces (default 127)", 0 },
 	{ "stack-storage-size", OPT_STACK_STORAGE_SIZE, "STACK-STORAGE-SIZE", 0,
-		"the number of unique stack traces that can be stored and displayed (default 1024)" },
+		"the number of unique stack traces that can be stored and displayed (default 1024)", 0 },
 	{ "min-block-time", 'm', "MIN-BLOCK-TIME", 0,
-		"the amount of time in microseconds over which we store traces (default 1)" },
+		"the amount of time in microseconds over which we store traces (default 1)", 0 },
 	{ "max-block-time", 'M', "MAX-BLOCK-TIME", 0,
-		"the amount of time in microseconds under which we store traces (default U64_MAX)" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+		"the amount of time in microseconds under which we store traces (default U64_MAX)", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 

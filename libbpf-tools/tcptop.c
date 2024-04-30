@@ -68,16 +68,16 @@ const char argp_program_doc[] =
 "    tcptop 5 10       # 5s summaries, 10 times\n";
 
 static const struct argp_option opts[] = {
-	{ "pid", 'p', "PID", 0, "Process ID to trace" },
-	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path" },
-	{ "ipv4", '4', NULL, 0, "trace IPv4 family only" },
-	{ "ipv6", '6', NULL, 0, "trace IPv6 family only" },
-	{ "nosummary", 'S', NULL, 0, "Skip system summary line"},
-	{ "noclear", 'C', NULL, 0, "Don't clear the screen" },
-	{ "sort", 's', "SORT", 0, "Sort columns, default all [all, sent, received]" },
-	{ "rows", 'r', "ROWS", 0, "Maximum rows to print, default 20" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "pid", 'p', "PID", 0, "Process ID to trace", 0 },
+	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path", 0 },
+	{ "ipv4", '4', NULL, 0, "trace IPv4 family only", 0 },
+	{ "ipv6", '6', NULL, 0, "trace IPv6 family only", 0 },
+	{ "nosummary", 'S', NULL, 0, "Skip system summary line", 0 },
+	{ "noclear", 'C', NULL, 0, "Don't clear the screen", 0 },
+	{ "sort", 's', "SORT", 0, "Sort columns, default all [all, sent, received]", 0 },
+	{ "rows", 'r', "ROWS", 0, "Maximum rows to print, default 20", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 

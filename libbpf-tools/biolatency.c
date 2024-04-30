@@ -58,15 +58,15 @@ const char argp_program_doc[] =
 "    biolatency -c CG        # Trace process under cgroupsPath CG\n";
 
 static const struct argp_option opts[] = {
-	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
-	{ "milliseconds", 'm', NULL, 0, "Millisecond histogram" },
-	{ "queued", 'Q', NULL, 0, "Include OS queued time in I/O time" },
-	{ "disk", 'D', NULL, 0, "Print a histogram per disk device" },
-	{ "flag", 'F', NULL, 0, "Print a histogram per set of I/O flags" },
-	{ "disk",  'd', "DISK",  0, "Trace this disk only" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path"},
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "timestamp", 'T', NULL, 0, "Include timestamp on output", 0 },
+	{ "milliseconds", 'm', NULL, 0, "Millisecond histogram", 0 },
+	{ "queued", 'Q', NULL, 0, "Include OS queued time in I/O time", 0 },
+	{ "disk", 'D', NULL, 0, "Print a histogram per disk device", 0 },
+	{ "flag", 'F', NULL, 0, "Print a histogram per set of I/O flags", 0 },
+	{ "disk",  'd', "DISK",  0, "Trace this disk only", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 
