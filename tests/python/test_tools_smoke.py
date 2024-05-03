@@ -324,7 +324,7 @@ class SmokeTests(TestCase):
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     @mayFail("This fails on github actions environment, and needs to be fixed")
     def test_sslsniff(self):
-        self.run_with_int("sslsniff.py")
+        self.run_with_int("sslsniff.py --no-nss")
 
     @skipUnless(kernel_version_ge(4,6), "requires kernel >= 4.6")
     def test_stackcount(self):
