@@ -744,10 +744,10 @@ struct __string_t { char s[%d]; };
                         count_so_far += 1
                         if self.args.count is not None and \
                            count_so_far >= self.args.count:
-                                exit()
+                                return
                         if self.args.duration and \
                            seconds >= self.args.duration:
-                                exit()
+                                return
 
         def run(self):
                 try:
