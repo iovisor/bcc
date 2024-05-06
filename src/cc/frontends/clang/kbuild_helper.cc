@@ -140,20 +140,26 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
   return 0;
 }
 
-static inline int file_exists_and_ownedby(const char *f, uid_t uid)
+static inline bool file_exists(const char *f)
+{
+  struct stat buffer;
+  return (stat(f, &buffer) == 0);
+}
+
+static inline bool file_exists_and_ownedby(const char *f, uid_t uid)
 {
   struct stat buffer;
   int ret = stat(f, &buffer) == 0;
   if (ret) {
     if (buffer.st_uid != uid) {
       std::cout << "ERROR: header file ownership unexpected: " << std::string(f) << "\n";
-      return -1;
+      return false;
     }
   }
   return ret;
 }
 
-static inline int proc_kheaders_exists(void)
+static inline bool proc_kheaders_exists(void)
 {
   return file_exists_and_ownedby(PROC_KHEADERS_PATH, 0);
 }
@@ -231,8 +237,14 @@ int get_proc_kheaders(std::string &dirpath)
            uname_data.release);
   dirpath = std::string(dirpath_tmp);
 
-  if (file_exists_and_ownedby(dirpath_tmp, 0))
-    return 0;
+  if (file_exists(dirpath_tmp)) {
+    if (file_exists_and_ownedby(dirpath_tmp, 0))
+      return 0;
+    else
+      // The path exists, but is owned by a non-root user
+      // Something fishy is going on
+      return -EEXIST;
+  }
 
   // First time so extract it
   return extract_kheaders(dirpath, uname_data);
