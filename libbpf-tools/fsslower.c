@@ -40,6 +40,7 @@ enum fs_type {
 	NFS,
 	XFS,
 	F2FS,
+	BCACHEFS,
 };
 
 static struct fs_config {
@@ -75,6 +76,12 @@ static struct fs_config {
 		[F_WRITE] = "f2fs_file_write_iter",
 		[F_OPEN] = "f2fs_file_open",
 		[F_FSYNC] = "f2fs_sync_file",
+	}},
+	[BCACHEFS] = { "bcachefs", {
+		[F_READ] = "bch2_read_iter",
+		[F_WRITE] = "bch2_write_iter",
+		[F_OPEN] = "bch2_open",
+		[F_FSYNC] = "bch2_fsync",
 	}},
 };
 
@@ -113,7 +120,7 @@ static const struct argp_option opts[] = {
 	{ "duration", 'd', "DURATION", 0, "Total duration of trace in seconds", 0 },
 	{ "pid", 'p', "PID", 0, "Process ID to trace", 0 },
 	{ "min", 'm', "MIN", 0, "Min latency to trace, in ms (default 10)", 0 },
-	{ "type", 't', "Filesystem", 0, "Which filesystem to trace, [btrfs/ext4/nfs/xfs/f2fs]", 0 },
+	{ "type", 't', "Filesystem", 0, "Which filesystem to trace, [btrfs/ext4/nfs/xfs/f2fs/bcachefs]", 0 },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
@@ -154,6 +161,8 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			fs_type = XFS;
 		} else if (!strcmp(arg, "f2fs")) {
 			fs_type = F2FS;
+		} else if (!strcmp(arg, "bcachefs")) {
+			fs_type = BCACHEFS;
 		} else {
 			warn("invalid filesystem\n");
 			argp_usage(state);
@@ -190,6 +199,8 @@ static void alias_parse(char *prog)
 		fs_type = XFS;
 	} else if (strstr(name, "f2fsslower")){
 		fs_type = F2FS;
+	} else if (strstr(name, "bcachefsslower")){
+		fs_type = BCACHEFS;
 	}
 }
 

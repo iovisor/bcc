@@ -1,6 +1,8 @@
 /.output
 /btfhub-archive
 /bashreadline
+/bcachefsdist
+/bcachefsslower
 /bindsnoop
 /biolatency
 /biopattern
