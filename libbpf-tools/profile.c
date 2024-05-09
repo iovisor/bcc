@@ -32,9 +32,6 @@
 
 #define STACK_ID_ERR(stack_id)		((stack_id < 0) && !STACK_ID_EFAULT(stack_id))
 
-#define NEED_DELIMITER(delimiter, ustack_id, kstack_id) \
-	(delimiter && ustack_id >= 0 && kstack_id >= 0)
-
 /* hash collision (-EEXIST) suggests that stack map size may be too small */
 #define CHECK_STACK_COLLISION(ustack_id, kstack_id)	\
 	(kstack_id == -EEXIST || ustack_id == -EEXIST)
@@ -50,6 +47,21 @@ struct key_ext_t {
 
 typedef const char* (*symname_fn_t)(unsigned long);
 
+/* This structure represents output format-dependent attributes. */
+struct fmt_t {
+	bool folded;
+	char *prefix;
+	char *suffix;
+	char *delim;
+};
+
+struct fmt_t stacktrace_formats[] = {
+	{ false, "    ", "\n", "--" },	/* multi-line */
+	{ true, ";", "", "-" }		/* folded */
+};
+
+#define pr_format(str, fmt)		printf("%s%s%s", fmt->prefix, str, fmt->suffix)
+
 static struct env {
 	pid_t pids[MAX_PID_NR];
 	pid_t tids[MAX_TID_NR];
@@ -64,6 +76,7 @@ static struct env {
 	bool delimiter;
 	bool include_idle;
 	int cpu;
+	bool folded;
 } env = {
 	.stack_storage_size = 1024,
 	.perf_max_stack_depth = 127,
@@ -85,6 +98,7 @@ const char argp_program_doc[] =
 "    profile -F 99       # profile stack traces at 99 Hertz\n"
 "    profile -c 1000000  # profile stack traces every 1 in a million events\n"
 "    profile 5           # profile at 49 Hertz for 5 seconds only\n"
+"    profile -f          # output in folded format for flame graphs\n"
 "    profile -p 185      # only profile process with PID 185\n"
 "    profile -L 185      # only profile thread with TID 185\n"
 "    profile -U          # only show user space stacks (no kernel)\n"
@@ -100,6 +114,7 @@ static const struct argp_option opts[] = {
 	{ "frequency", 'F', "FREQUENCY", 0, "sample frequency, Hertz", 0 },
 	{ "delimited", 'd', NULL, 0, "insert delimiter between kernel/user stacks", 0 },
 	{ "include-idle ", 'I', NULL, 0, "include CPU idle stacks", 0 },
+	{ "folded", 'f', NULL, 0, "output folded format, one line per stack (for flame graphs)", 0 },
 	{ "stack-storage-size", OPT_STACK_STORAGE_SIZE, "STACK-STORAGE-SIZE", 0,
 	  "the number of unique stack traces that can be stored and displayed (default 1024)", 0 },
 	{ "cpu", 'C', "CPU", 0, "cpu number to run profile on", 0 },
@@ -198,6 +213,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			fprintf(stderr, "invalid CPU: %s\n", arg);
 			argp_usage(state);
 		}
+		break;
+	case 'f':
+		env.folded = true;
 		break;
 	case OPT_PERF_MAX_STACK_DEPTH:
 		errno = 0;
@@ -335,15 +353,68 @@ static const char *usymname(unsigned long addr)
 	return sym ? sym->name : "[unknown]";
 }
 
-static void print_stacktrace(unsigned long *ip, symname_fn_t symname)
+static void print_stacktrace(unsigned long *ip, symname_fn_t symname, struct fmt_t *f)
 {
-	for (size_t i = 0; ip[i] && i < env.perf_max_stack_depth; i++)
-		printf("    %s\n", symname(ip[i]));
+	int i;
+
+	if (!f->folded) {
+		for (i = 0; ip[i] && i < env.perf_max_stack_depth; i++)
+			pr_format(symname(ip[i]), f);
+		return;
+	} else {
+		for (i = env.perf_max_stack_depth - 1; i >= 0; i--) {
+			if (!ip[i])
+				continue;
+
+			pr_format(symname(ip[i]), f);
+		}
+	}
 }
 
-static int print_count(struct key_t *event, __u64 count, int stack_map)
+static bool print_user_stacktrace(struct key_t *event, int stack_map,
+				  unsigned long *ip, struct fmt_t *f, bool delim)
+{
+	if (env.kernel_stacks_only || STACK_ID_EFAULT(event->user_stack_id))
+		return false;
+
+	if (delim)
+		pr_format(f->delim, f);
+
+	if (bpf_map_lookup_elem(stack_map, &event->user_stack_id, ip) != 0) {
+		pr_format("[Missed User Stack]", f);
+	} else {
+		syms = syms_cache__get_syms(syms_cache, event->pid);
+		if (!syms && f->folded)
+			fprintf(stderr, "failed to get syms\n");
+		else
+			print_stacktrace(ip, usymname, f);
+	}
+
+	return true;
+}
+
+static bool print_kern_stacktrace(struct key_t *event, int stack_map,
+				  unsigned long *ip, struct fmt_t *f, bool delim)
+{
+	if (env.user_stacks_only || STACK_ID_EFAULT(event->kern_stack_id))
+		return false;
+
+	if (delim)
+		pr_format(f->delim, f);
+
+	if (bpf_map_lookup_elem(stack_map, &event->kern_stack_id, ip) != 0)
+		pr_format("[Missed Kernel Stack]", f);
+	else
+		print_stacktrace(ip, ksymname, f);
+
+	return true;
+}
+
+static int print_count(struct key_t *event, __u64 count, int stack_map, bool folded)
 {
 	unsigned long *ip;
+	int ret;
+	struct fmt_t *fmt = &stacktrace_formats[folded];
 
 	ip = calloc(env.perf_max_stack_depth, sizeof(unsigned long));
 	if (!ip) {
@@ -351,36 +422,19 @@ static int print_count(struct key_t *event, __u64 count, int stack_map)
 		return -ENOMEM;
 	}
 
-	/* kernel stack */
-	if (!env.user_stacks_only && !STACK_ID_EFAULT(event->kern_stack_id)) {
-		if (bpf_map_lookup_elem(stack_map, &event->kern_stack_id, ip) != 0)
-			printf("    [Missed Kernel Stack]\n");
-		else
-			print_stacktrace(ip, ksymname);
+	if (!folded) {
+		/* multi-line stack output */
+		ret = print_kern_stacktrace(event, stack_map, ip, fmt, false);
+		print_user_stacktrace(event, stack_map, ip, fmt, ret && env.delimiter);
+		printf("    %-16s %s (%d)\n", "-", event->name, event->pid);
+		printf("        %lld\n\n", count);
+	} else {
+		/* folded stack output */
+		printf("%s", event->name);
+		ret = print_user_stacktrace(event, stack_map, ip, fmt, false);
+		print_kern_stacktrace(event, stack_map, ip, fmt, ret && env.delimiter);
+		printf(" %lld\n", count);
 	}
-
-	/* user stack */
-	if (!env.kernel_stacks_only && !STACK_ID_EFAULT(event->user_stack_id)) {
-		if (NEED_DELIMITER(env.delimiter, event->user_stack_id,
-				   event->kern_stack_id))
-			printf("    --\n");
-
-		if (bpf_map_lookup_elem(stack_map, &event->user_stack_id, ip) != 0) {
-			printf("    [Missed User Stack]\n");
-		} else {
-			syms = syms_cache__get_syms(syms_cache, event->pid);
-			if (!syms)
-				fprintf(stderr, "failed to get syms\n");
-			else
-				print_stacktrace(ip, usymname);
-		}
-	}
-
-	/* process information */
-	printf("    %-16s %s (%d)\n", "-", event->name, event->pid);
-
-	/* count sampled */
-	printf("        %lld\n\n", count);
 
 	free(ip);
 
@@ -413,7 +467,7 @@ static int print_counts(int counts_map, int stack_map)
 		event = &counts[i].k;
 		count = counts[i].v;
 
-		print_count(event, count, stack_map);
+		print_count(event, count, stack_map, env.folded);
 
 		/* handle stack id errors */
 		nr_missing_stacks += MISSING_STACKS(event->user_stack_id, event->kern_stack_id);
@@ -564,7 +618,8 @@ int main(int argc, char **argv)
 
 	signal(SIGINT, sig_handler);
 
-	print_headers();
+	if (!env.folded)
+		print_headers();
 
 	/*
 	 * We'll get sleep interrupted when someone presses Ctrl-C.
