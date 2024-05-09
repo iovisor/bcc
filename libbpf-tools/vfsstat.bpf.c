@@ -45,6 +45,24 @@ int BPF_KPROBE(kprobe_vfs_create)
 	return inc_stats(S_CREATE);
 }
 
+SEC("kprobe/vfs_unlink")
+int BPF_KPROBE(kprobe_vfs_unlink)
+{
+	return inc_stats(S_UNLINK);
+}
+
+SEC("kprobe/vfs_mkdir")
+int BPF_KPROBE(kprobe_vfs_mkdir)
+{
+	return inc_stats(S_MKDIR);
+}
+
+SEC("kprobe/vfs_rmdir")
+int BPF_KPROBE(kprobe_vfs_rmdir)
+{
+	return inc_stats(S_RMDIR);
+}
+
 SEC("fentry/vfs_read")
 int BPF_PROG(fentry_vfs_read)
 {
@@ -73,6 +91,24 @@ SEC("fentry/vfs_create")
 int BPF_PROG(fentry_vfs_create)
 {
 	return inc_stats(S_CREATE);
+}
+
+SEC("fentry/vfs_unlink")
+int BPF_PROG(fentry_vfs_unlink)
+{
+	return inc_stats(S_UNLINK);
+}
+
+SEC("fentry/vfs_mkdir")
+int BPF_PROG(fentry_vfs_mkdir)
+{
+	return inc_stats(S_MKDIR);
+}
+
+SEC("fentry/vfs_rmdir")
+int BPF_PROG(fentry_vfs_rmdir)
+{
+	return inc_stats(S_RMDIR);
 }
 
 char LICENSE[] SEC("license") = "GPL";

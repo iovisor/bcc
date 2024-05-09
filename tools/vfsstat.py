@@ -13,6 +13,7 @@
 #
 # 14-Aug-2015   Brendan Gregg   Created this.
 # 12-Oct-2022   Rocky Xing      Added PID filter support.
+# 09-May-2024   Rong Tao        Add unlink,mkdir,rmdir stat.
 
 from __future__ import print_function
 from bcc import BPF
@@ -54,6 +55,9 @@ enum stat_types {
     S_FSYNC,
     S_OPEN,
     S_CREATE,
+    S_UNLINK,
+    S_MKDIR,
+    S_RMDIR,
     S_MAXSTAT
 };
 
@@ -71,6 +75,9 @@ void do_write(struct pt_regs *ctx) { stats_try_increment(S_WRITE); }
 void do_fsync(struct pt_regs *ctx) { stats_try_increment(S_FSYNC); }
 void do_open(struct pt_regs *ctx) { stats_try_increment(S_OPEN); }
 void do_create(struct pt_regs *ctx) { stats_try_increment(S_CREATE); }
+void do_unlink(struct pt_regs *ctx) { stats_try_increment(S_UNLINK); }
+void do_mkdir(struct pt_regs *ctx) { stats_try_increment(S_MKDIR); }
+void do_rmdir(struct pt_regs *ctx) { stats_try_increment(S_RMDIR); }
 """
 
 bpf_text_kfunc = """
@@ -79,6 +86,9 @@ KFUNC_PROBE(vfs_write)        { stats_try_increment(S_WRITE); return 0; }
 KFUNC_PROBE(vfs_fsync_range)  { stats_try_increment(S_FSYNC); return 0; }
 KFUNC_PROBE(vfs_open)         { stats_try_increment(S_OPEN); return 0; }
 KFUNC_PROBE(vfs_create)       { stats_try_increment(S_CREATE); return 0; }
+KFUNC_PROBE(vfs_unlink)       { stats_try_increment(S_UNLINK); return 0; }
+KFUNC_PROBE(vfs_mkdir)        { stats_try_increment(S_MKDIR); return 0; }
+KFUNC_PROBE(vfs_rmdir)        { stats_try_increment(S_RMDIR); return 0; }
 """
 
 is_support_kfunc = BPF.support_kfunc()
@@ -109,6 +119,9 @@ if not is_support_kfunc:
     b.attach_kprobe(event="vfs_fsync_range",  fn_name="do_fsync")
     b.attach_kprobe(event="vfs_open",         fn_name="do_open")
     b.attach_kprobe(event="vfs_create",       fn_name="do_create")
+    b.attach_kprobe(event="vfs_unlink",       fn_name="do_unlink")
+    b.attach_kprobe(event="vfs_mkdir",        fn_name="do_mkdir")
+    b.attach_kprobe(event="vfs_rmdir",        fn_name="do_rmdir")
 
 # stat column labels and indexes
 stat_types = {
@@ -116,7 +129,10 @@ stat_types = {
     "WRITE": 2,
     "FSYNC": 3,
     "OPEN": 4,
-    "CREATE": 5
+    "CREATE": 5,
+    "UNLINK": 6,
+    "MKDIR": 7,
+    "RMDIR": 8,
 }
 
 # header
