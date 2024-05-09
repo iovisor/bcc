@@ -161,7 +161,20 @@ struct combined_alloc_info_t {
         u64 number_of_allocs;
 };
 
-BPF_HASH(sizes, u32, u64);
+#define KERNEL 0
+#define MALLOC 1
+#define CALLOC 2
+#define REALLOC 3
+#define MMAP 4
+#define POSIX_MEMALIGN 5
+#define VALLOC 6
+#define MEMALIGN 7
+#define PVALLOC 8
+#define ALIGNED_ALLOC 9
+#define FREE 10
+#define MUNMAP 11
+
+BPF_HASH(sizes, u64, u64);
 BPF_HASH(allocs, u64, struct alloc_info_t, 1000000);
 BPF_HASH(memptrs, u32, u64);
 BPF_STACK_TRACE(stack_traces, 10240);
@@ -197,7 +210,7 @@ static inline void update_statistics_del(u64 stack_id, u64 sz) {
         }
 }
 
-static inline int gen_alloc_enter(struct pt_regs *ctx, size_t size) {
+static inline int gen_alloc_enter(struct pt_regs *ctx, size_t size, u32 type_index) {
         SIZE_FILTER
         if (SAMPLE_EVERY_N > 1) {
                 u64 ts = bpf_ktime_get_ns();
@@ -207,23 +220,25 @@ static inline int gen_alloc_enter(struct pt_regs *ctx, size_t size) {
 
         u32 tid = bpf_get_current_pid_tgid();
         u64 size64 = size;
-        sizes.update(&tid, &size64);
+        u64 key = (uint64_t)type_index << 32 | tid;
+        sizes.update(&key, &size64);
 
         if (SHOULD_PRINT)
                 bpf_trace_printk("alloc entered, size = %u\\n", size);
         return 0;
 }
 
-static inline int gen_alloc_exit2(struct pt_regs *ctx, u64 address) {
+static inline int gen_alloc_exit2(struct pt_regs *ctx, u64 address, u32 type_index) {
         u32 tid = bpf_get_current_pid_tgid();
-        u64* size64 = sizes.lookup(&tid);
+        u64 key = (uint64_t)type_index << 32 | tid;
+        u64* size64 = sizes.lookup(&key);
         struct alloc_info_t info = {0};
 
         if (size64 == 0)
                 return 0; // missed alloc entry
 
         info.size = *size64;
-        sizes.delete(&tid);
+        sizes.delete(&key);
 
         if (address != 0) {
                 info.timestamp_ns = bpf_ktime_get_ns();
@@ -239,8 +254,8 @@ static inline int gen_alloc_exit2(struct pt_regs *ctx, u64 address) {
         return 0;
 }
 
-static inline int gen_alloc_exit(struct pt_regs *ctx) {
-        return gen_alloc_exit2(ctx, PT_REGS_RC(ctx));
+static inline int gen_alloc_exit(struct pt_regs *ctx, u32 type_index) {
+        return gen_alloc_exit2(ctx, PT_REGS_RC(ctx), type_index);
 }
 
 static inline int gen_free_enter(struct pt_regs *ctx, void *address) {
@@ -260,11 +275,11 @@ static inline int gen_free_enter(struct pt_regs *ctx, void *address) {
 }
 
 int malloc_enter(struct pt_regs *ctx, size_t size) {
-        return gen_alloc_enter(ctx, size);
+        return gen_alloc_enter(ctx, size, MALLOC);
 }
 
 int malloc_exit(struct pt_regs *ctx) {
-        return gen_alloc_exit(ctx);
+        return gen_alloc_exit2(ctx, PT_REGS_RC(ctx), MALLOC);
 }
 
 int free_enter(struct pt_regs *ctx, void *address) {
@@ -272,29 +287,29 @@ int free_enter(struct pt_regs *ctx, void *address) {
 }
 
 int calloc_enter(struct pt_regs *ctx, size_t nmemb, size_t size) {
-        return gen_alloc_enter(ctx, nmemb * size);
+        return gen_alloc_enter(ctx, nmemb * size, CALLOC);
 }
 
 int calloc_exit(struct pt_regs *ctx) {
-        return gen_alloc_exit(ctx);
+        return gen_alloc_exit(ctx, CALLOC);
 }
 
 int realloc_enter(struct pt_regs *ctx, void *ptr, size_t size) {
         gen_free_enter(ctx, ptr);
-        return gen_alloc_enter(ctx, size);
+        return gen_alloc_enter(ctx, size, REALLOC);
 }
 
 int realloc_exit(struct pt_regs *ctx) {
-        return gen_alloc_exit(ctx);
+        return gen_alloc_exit(ctx, REALLOC);
 }
 
 int mmap_enter(struct pt_regs *ctx) {
         size_t size = (size_t)PT_REGS_PARM2(ctx);
-        return gen_alloc_enter(ctx, size);
+        return gen_alloc_enter(ctx, size, MMAP);
 }
 
 int mmap_exit(struct pt_regs *ctx) {
-        return gen_alloc_exit(ctx);
+        return gen_alloc_exit(ctx, MMAP);
 }
 
 int munmap_enter(struct pt_regs *ctx, void *address) {
@@ -307,7 +322,7 @@ int posix_memalign_enter(struct pt_regs *ctx, void **memptr, size_t alignment,
         u32 tid = bpf_get_current_pid_tgid();
 
         memptrs.update(&tid, &memptr64);
-        return gen_alloc_enter(ctx, size);
+        return gen_alloc_enter(ctx, size, POSIX_MEMALIGN);
 }
 
 int posix_memalign_exit(struct pt_regs *ctx) {
@@ -324,39 +339,39 @@ int posix_memalign_exit(struct pt_regs *ctx) {
                 return 0;
 
         u64 addr64 = (u64)(size_t)addr;
-        return gen_alloc_exit2(ctx, addr64);
+        return gen_alloc_exit2(ctx, addr64, POSIX_MEMALIGN);
 }
 
 int aligned_alloc_enter(struct pt_regs *ctx, size_t alignment, size_t size) {
-        return gen_alloc_enter(ctx, size);
+        return gen_alloc_enter(ctx, size, ALIGNED_ALLOC);
 }
 
 int aligned_alloc_exit(struct pt_regs *ctx) {
-        return gen_alloc_exit(ctx);
+        return gen_alloc_exit(ctx, ALIGNED_ALLOC);
 }
 
 int valloc_enter(struct pt_regs *ctx, size_t size) {
-        return gen_alloc_enter(ctx, size);
+        return gen_alloc_enter(ctx, size, VALLOC);
 }
 
 int valloc_exit(struct pt_regs *ctx) {
-        return gen_alloc_exit(ctx);
+        return gen_alloc_exit(ctx, VALLOC);
 }
 
 int memalign_enter(struct pt_regs *ctx, size_t alignment, size_t size) {
-        return gen_alloc_enter(ctx, size);
+        return gen_alloc_enter(ctx, size, MEMALIGN);
 }
 
 int memalign_exit(struct pt_regs *ctx) {
-        return gen_alloc_exit(ctx);
+        return gen_alloc_exit(ctx, MEMALIGN);
 }
 
 int pvalloc_enter(struct pt_regs *ctx, size_t size) {
-        return gen_alloc_enter(ctx, size);
+        return gen_alloc_enter(ctx, size, PVALLOC);
 }
 
 int pvalloc_exit(struct pt_regs *ctx) {
-        return gen_alloc_exit(ctx);
+        return gen_alloc_exit(ctx, PVALLOC);
 }
 """
 
@@ -365,15 +380,15 @@ bpf_source_kernel_node = """
 TRACEPOINT_PROBE(kmem, kmalloc_node) {
         if (WORKAROUND_MISSING_FREE)
             gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
-        gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
-        return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
+        gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc, KERNEL);
+        return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr, KERNEL);
 }
 
 TRACEPOINT_PROBE(kmem, kmem_cache_alloc_node) {
         if (WORKAROUND_MISSING_FREE)
             gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
-        gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
-        return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
+        gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc, KERNEL);
+        return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr, KERNEL);
 }
 """
 
@@ -382,8 +397,8 @@ bpf_source_kernel = """
 TRACEPOINT_PROBE(kmem, kmalloc) {
         if (WORKAROUND_MISSING_FREE)
             gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
-        gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
-        return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
+        gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc, KERNEL);
+        return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr, KERNEL);
 }
 
 TRACEPOINT_PROBE(kmem, kfree) {
@@ -393,8 +408,8 @@ TRACEPOINT_PROBE(kmem, kfree) {
 TRACEPOINT_PROBE(kmem, kmem_cache_alloc) {
         if (WORKAROUND_MISSING_FREE)
             gen_free_enter((struct pt_regs *)args, (void *)args->ptr);
-        gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc);
-        return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
+        gen_alloc_enter((struct pt_regs *)args, args->bytes_alloc, KERNEL);
+        return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr, KERNEL);
 }
 
 TRACEPOINT_PROBE(kmem, kmem_cache_free) {
@@ -402,8 +417,8 @@ TRACEPOINT_PROBE(kmem, kmem_cache_free) {
 }
 
 TRACEPOINT_PROBE(kmem, mm_page_alloc) {
-        gen_alloc_enter((struct pt_regs *)args, PAGE_SIZE << args->order);
-        return gen_alloc_exit2((struct pt_regs *)args, args->pfn);
+        gen_alloc_enter((struct pt_regs *)args, PAGE_SIZE << args->order, KERNEL);
+        return gen_alloc_exit2((struct pt_regs *)args, args->pfn, KERNEL);
 }
 
 TRACEPOINT_PROBE(kmem, mm_page_free) {
@@ -414,8 +429,8 @@ TRACEPOINT_PROBE(kmem, mm_page_free) {
 bpf_source_percpu = """
 
 TRACEPOINT_PROBE(percpu, percpu_alloc_percpu) {
-        gen_alloc_enter((struct pt_regs *)args, args->size);
-        return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr);
+        gen_alloc_enter((struct pt_regs *)args, args->size, KERNEL);
+        return gen_alloc_exit2((struct pt_regs *)args, (size_t)args->ptr, KERNEL);
 }
 
 TRACEPOINT_PROBE(percpu, percpu_free_percpu) {
