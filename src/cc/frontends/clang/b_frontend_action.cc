@@ -338,7 +338,11 @@ bool MapVisitor::VisitCallExpr(CallExpr *Call) {
     StringRef memb_name = Memb->getMemberDecl()->getName();
     if (DeclRefExpr *Ref = dyn_cast<DeclRefExpr>(Memb->getBase())) {
       if (SectionAttr *A = Ref->getDecl()->getAttr<SectionAttr>()) {
+#if LLVM_VERSION_MAJOR < 18
         if (!A->getName().startswith("maps"))
+#else
+        if (!A->getName().starts_with("maps"))
+#endif
           return true;
 
         if (memb_name == "update" || memb_name == "insert") {
@@ -390,7 +394,11 @@ bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbDerefs) {
       StringRef memb_name = Memb->getMemberDecl()->getName();
       if (DeclRefExpr *Ref = dyn_cast<DeclRefExpr>(Memb->getBase())) {
         if (SectionAttr *A = Ref->getDecl()->getAttr<SectionAttr>()) {
+#if LLVM_VERSION_MAJOR < 18
           if (!A->getName().startswith("maps"))
+#else
+          if (!A->getName().starts_with("maps"))
+#endif
             return false;
 
           if (memb_name == "lookup" || memb_name == "lookup_or_init" ||
@@ -937,7 +945,11 @@ bool BTypeVisitor::VisitCallExpr(CallExpr *Call) {
     StringRef memb_name = Memb->getMemberDecl()->getName();
     if (DeclRefExpr *Ref = dyn_cast<DeclRefExpr>(Memb->getBase())) {
       if (SectionAttr *A = Ref->getDecl()->getAttr<SectionAttr>()) {
+#if LLVM_VERSION_MAJOR < 18
         if (!A->getName().startswith("maps"))
+#else
+        if (!A->getName().starts_with("maps"))
+#endif
           return true;
 
         string args = rewriter_.getRewrittenText(expansionRange(SourceRange(GET_BEGINLOC(Call->getArg(0)),
@@ -1455,7 +1467,11 @@ int64_t BTypeVisitor::getFieldValue(VarDecl *Decl, FieldDecl *FDecl, int64_t Ori
 bool BTypeVisitor::VisitVarDecl(VarDecl *Decl) {
   const RecordType *R = Decl->getType()->getAs<RecordType>();
   if (SectionAttr *A = Decl->getAttr<SectionAttr>()) {
+#if LLVM_VERSION_MAJOR < 18
     if (!A->getName().startswith("maps"))
+#else
+    if (!A->getName().starts_with("maps"))
+#endif
       return true;
     if (!R) {
       error(GET_ENDLOC(Decl), "invalid type for bpf_table, expect struct");
