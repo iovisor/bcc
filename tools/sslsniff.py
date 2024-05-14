@@ -242,7 +242,7 @@ int probe_SSL_do_handshake_exit(struct pt_regs *ctx) {
         data->pid = pid;
         data->tid = tid;
         data->uid = uid;
-        data->len = ret;
+        data->len = 0;
         data->buf_filled = 0;
         data->rw = 2;
         bpf_get_current_comm(&data->comm, sizeof(data->comm));

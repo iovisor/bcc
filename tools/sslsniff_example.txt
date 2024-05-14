@@ -120,7 +120,7 @@ handshake before secure connection is ready for initial SSL_read or SSL_write.
 
 # ./sslsniff.py -l --handshake
 FUNC         TIME(s)            COMM             PID     LEN    LAT(ms)
-HANDSHAKE    0.000000000        nginx            7081    1      0.699
+HANDSHAKE    0.000000000        nginx            7081    0      0.699
 WRITE/SEND   0.000132180        openssl          14800   1      0.010
 ----- DATA -----
 
@@ -147,7 +147,7 @@ Tracing output of "echo | gnutls-cli -p 443 --insecure localhost":
 
 # ./sslsniff.py -l --handshake
 FUNC         TIME(s)            COMM             PID     LEN    LAT(ms)
-HANDSHAKE    0.000000000        nginx            7081    1      0.710
+HANDSHAKE    0.000000000        nginx            7081    0      0.710
 WRITE/SEND   0.000045126        gnutls-cli       43752   1      0.014
 ----- DATA -----
 
