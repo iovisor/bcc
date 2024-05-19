@@ -1,0 +1,65 @@
+Documentation of tcptop (the Linux BPF CO-RE version).
+It is usually shipped as libbpf-tcptop.
+
+
+Description:
+Trace sending and received operation over IP.
+
+Example output:
+
+# ./tcptop
+12:20:00 loadavg: 0.00 0.00 0.00 1/407 1987822
+
+PID     COMM         LADDR                 RADDR                  RX_KB  TX_KB
+1987802 wget         127.0.0.1:44960       127.0.0.1:443              6      0
+1987815 wget         127.0.0.1:44968       127.0.0.1:443              6      0
+2770    stunnel      127.0.0.1:51460       127.0.0.1:80               4      0
+2770    stunnel      127.0.0.1:51452       127.0.0.1:80               4      0
+1936412 sshd         10.71.56.137:22       10.71.8.14:45682           0      2
+1987805 curl         127.0.0.1:44964       127.0.0.1:443              1      0
+1987818 curl         127.0.0.1:44972       127.0.0.1:443              1      0
+2770    stunnel      127.0.0.1:51456       127.0.0.1:80               0      0
+2770    stunnel      127.0.0.1:51464       127.0.0.1:80               0      0
+1918977 sshd         10.71.56.137:22       10.71.8.14:51046           0      0
+
+PID     COMM         LADDR6                                              RADDR6                                               RX_KB  TX_KB
+2770    stunnel      ::ffff:127.0.0.1:443                                ::ffff:127.0.0.1:44960                                   0      6
+2770    stunnel      ::ffff:127.0.0.1:443                                ::ffff:127.0.0.1:44968                                   0      6
+2158    server       ::ffff:127.0.0.1:80                                 ::ffff:127.0.0.1:51452                                   0      4
+2158    server       ::ffff:127.0.0.1:80                                 ::ffff:127.0.0.1:51460                                   0      4
+2770    stunnel      ::ffff:127.0.0.1:443                                ::ffff:127.0.0.1:44964                                   0      1
+2770    stunnel      ::ffff:127.0.0.1:443                                ::ffff:127.0.0.1:44972                                   0      1
+2158    server       ::ffff:127.0.0.1:80                                 ::ffff:127.0.0.1:51464                                   0      0
+2158    server       ::ffff:127.0.0.1:80                                 ::ffff:127.0.0.1:51456                                   0      0
+
+USAGE message:
+
+# ./tcptop -h
+Trace sending and received operation over IP.
+
+USAGE: tcptop [-h] [-p PID] [interval] [count]
+
+EXAMPLES:
+    tcptop            # TCP top, refresh every 1s
+    tcptop -p 1216    # only trace PID 1216
+    tcptop -c path    # only trace the given cgroup path
+    tcptop 5 10       # 5s summaries, 10 times
+
+  -4, --ipv4                 trace IPv4 family only
+  -6, --ipv6                 trace IPv6 family only
+  -c, --cgroup=/sys/fs/cgroup/unified
+                             Trace process in cgroup path
+  -C, --noclear              Don't clear the screen
+  -p, --pid=PID              Process ID to trace
+  -r, --rows=ROWS            Maximum rows to print, default 20
+  -s, --sort=SORT            Sort columns, default all [all, sent, received]
+  -S, --nosummary            Skip system summary line
+  -v, --verbose              Verbose debug output
+  -?, --help                 Give this help list
+      --usage                Give a short usage message
+  -V, --version              Print program version
+
+Mandatory or optional arguments to long options are also mandatory or optional
+for any corresponding short options.
+
+Report bugs to https://github.com/iovisor/bcc/tree/master/libbpf-tools.
