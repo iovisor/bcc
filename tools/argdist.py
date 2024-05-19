@@ -726,8 +726,8 @@ struct __string_t { char s[%d]; };
                 for probe in self.probes:
                         probe.attach(self.bpf)
                 if self.args.verbose:
-                        print("open uprobes: %s" % list(self.bpf.uprobe_fds.keys()))
-                        print("open kprobes: %s" % list(self.bpf.kprobe_fds.keys()))
+                        print("open uprobes: [%s]" % b", ".join(self.bpf.uprobe_fds.keys()).decode())
+                        print("open kprobes: [%s]" % b", ".join(self.bpf.kprobe_fds.keys()).decode())
 
         def _main_loop(self):
                 count_so_far = 0
