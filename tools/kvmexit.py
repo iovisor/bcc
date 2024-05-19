@@ -81,7 +81,7 @@ duration = int(args.duration)
 bpf_text = """
 #include <linux/delay.h>
 
-#define REASON_NUM 69
+#define REASON_NUM 76
 #define TGID_NUM 1024
 
 struct exit_count {
@@ -234,6 +234,13 @@ exit_reasons = (
     "N/A",
     "UMWAIT",
     "TPAUSE"
+    "N/A",
+    "N/A",
+    "N/A",
+    "N/A",
+    "N/A",
+    "BUS_LOCK",
+    "NOTIFY",
 )
 
 #
