@@ -85,14 +85,12 @@ int dump_hash(int map_fd,
 	if (batch_map_ops) {
 		err = dump_hash_batch(map_fd, keys, key_size,
 				      values, value_size, count);
-		if (err) {
-			if (errno != EINVAL) {
-				return -1;
-
-				/* assume that batch operations are not
-				 * supported and try non-batch mode */
-				batch_map_ops = false;
-			}
+		if (err && errno == EINVAL) {
+			/* assume that batch operations are not
+			 * supported and try non-batch mode */
+			batch_map_ops = false;
+		} else {
+			return err;
 		}
 	}
 
