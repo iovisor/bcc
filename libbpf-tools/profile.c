@@ -51,8 +51,8 @@ struct key_ext_t {
 typedef const char* (*symname_fn_t)(unsigned long);
 
 static struct env {
-	pid_t pid;
-	pid_t tid;
+	pid_t pids[MAX_PID_NR];
+	pid_t tids[MAX_TID_NR];
 	bool user_stacks_only;
 	bool kernel_stacks_only;
 	int stack_storage_size;
@@ -65,8 +65,6 @@ static struct env {
 	bool include_idle;
 	int cpu;
 } env = {
-	.pid = -1,
-	.tid = -1,
 	.stack_storage_size = 1024,
 	.perf_max_stack_depth = 127,
 	.duration = INT_MAX,
@@ -116,9 +114,31 @@ struct ksyms *ksyms;
 struct syms_cache *syms_cache;
 struct syms *syms;
 
+static int split_pidstr(char *s, char* sep, int max_split, pid_t *pids)
+{
+	char *pid;
+	int nr = 0;
+
+	errno = 0;
+	pid = strtok(s, sep);
+	while (pid) {
+		if (nr >= max_split)
+			return -ENOBUFS;
+
+		pids[nr++] = strtol(pid, NULL, 10);
+		if (errno)
+			return -errno;
+
+		pid = strtok(NULL, ",");
+	}
+
+	return 0;
+}
+
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
 	static int pos_args;
+	int ret;
 
 	switch (key) {
 	case 'h':
@@ -128,18 +148,26 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		env.verbose = true;
 		break;
 	case 'p':
-		errno = 0;
-		env.pid = strtol(arg, NULL, 10);
-		if (errno) {
-			fprintf(stderr, "invalid PID: %s\n", arg);
+		ret = split_pidstr(strdup(arg), ",", MAX_PID_NR, env.pids);
+		if (ret) {
+			if (ret == -ENOBUFS)
+				fprintf(stderr, "the number of pid is too big, please "
+					"increase MAX_PID_NR's value and recompile\n");
+			else
+				fprintf(stderr, "invalid PID: %s\n", arg);
+
 			argp_usage(state);
 		}
 		break;
 	case 'L':
-		errno = 0;
-		env.tid = strtol(arg, NULL, 10);
-		if (errno || env.tid <= 0) {
-			fprintf(stderr, "Invalid TID: %s\n", arg);
+		ret = split_pidstr(strdup(arg), ",", MAX_TID_NR, env.tids);
+		if (ret) {
+			if (ret == -ENOBUFS)
+				fprintf(stderr, "the number of tid is too big, please "
+					"increase MAX_TID_NR's value and recompile\n");
+			else
+				fprintf(stderr, "invalid TID: %s\n", arg);
+
 			argp_usage(state);
 		}
 		break;
@@ -406,14 +434,21 @@ cleanup:
 
 static void print_headers()
 {
+	int i;
+
 	printf("Sampling at %d Hertz of", env.sample_freq);
 
-	if (env.pid != -1)
-		printf(" PID %d", env.pid);
-	else if (env.tid != -1)
-		printf(" TID %d", env.tid);
-	else
+	if (env.pids[0]) {
+		printf(" PID [");
+		for (i = 0; i < MAX_PID_NR && env.pids[i]; i++)
+			printf("%d%s", env.pids[i], (i < MAX_PID_NR - 1 && env.pids[i + 1]) ? ", " : "]");
+	} else if (env.tids[0]) {
+		printf(" TID [");
+		for (i = 0; i < MAX_TID_NR && env.tids[i]; i++)
+			printf("%d%s", env.tids[i], (i < MAX_TID_NR - 1 && env.tids[i + 1]) ? ", " : "]");
+	} else {
 		printf(" all threads");
+	}
 
 	if (env.user_stacks_only)
 		printf(" by user");
@@ -440,7 +475,9 @@ int main(int argc, char **argv)
 	};
 	struct bpf_link *links[MAX_CPU_NR] = {};
 	struct profile_bpf *obj;
+	int pids_fd, tids_fd;
 	int err, i;
+	__u8 val = 0;
 
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
 	if (err)
@@ -472,11 +509,13 @@ int main(int argc, char **argv)
 	}
 
 	/* initialize global data (filtering options) */
-	obj->rodata->targ_pid = env.pid;
-	obj->rodata->targ_tid = env.tid;
 	obj->rodata->user_stacks_only = env.user_stacks_only;
 	obj->rodata->kernel_stacks_only = env.kernel_stacks_only;
 	obj->rodata->include_idle = env.include_idle;
+	if (env.pids[0])
+		obj->rodata->filter_by_pid = true;
+	else if (env.tids[0])
+		obj->rodata->filter_by_tid = true;
 
 	bpf_map__set_value_size(obj->maps.stackmap,
 				env.perf_max_stack_depth * sizeof(unsigned long));
@@ -486,6 +525,25 @@ int main(int argc, char **argv)
 	if (err) {
 		fprintf(stderr, "failed to load BPF programs\n");
 		goto cleanup;
+	}
+
+	if (env.pids[0]) {
+		pids_fd = bpf_map__fd(obj->maps.pids);
+		for (i = 0; i < MAX_PID_NR && env.pids[i]; i++) {
+			if (bpf_map_update_elem(pids_fd, &(env.pids[i]), &val, BPF_ANY) != 0) {
+				fprintf(stderr, "failed to init pids map: %s\n", strerror(errno));
+				goto cleanup;
+			}
+		}
+	}
+	else if (env.tids[0]) {
+		tids_fd = bpf_map__fd(obj->maps.tids);
+		for (i = 0; i < MAX_TID_NR && env.tids[i]; i++) {
+			if (bpf_map_update_elem(tids_fd, &(env.tids[i]), &val, BPF_ANY) != 0) {
+				fprintf(stderr, "failed to init tids map: %s\n", strerror(errno));
+				goto cleanup;
+			}
+		}
 	}
 
 	ksyms = ksyms__load();
