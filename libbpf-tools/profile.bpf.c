@@ -15,8 +15,8 @@
 const volatile bool kernel_stacks_only = false;
 const volatile bool user_stacks_only = false;
 const volatile bool include_idle = false;
-const volatile pid_t targ_pid = -1;
-const volatile pid_t targ_tid = -1;
+const volatile bool filter_by_pid = false;
+const volatile bool filter_by_tid = false;
 
 struct {
 	__uint(type, BPF_MAP_TYPE_STACK_TRACE);
@@ -29,6 +29,20 @@ struct {
 	__type(value, u64);
 	__uint(max_entries, MAX_ENTRIES);
 } counts SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, u32);
+	__type(value, u8);
+	__uint(max_entries, MAX_PID_NR);
+} pids SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, u32);
+	__type(value, u8);
+	__uint(max_entries, MAX_TID_NR);
+} tids SEC(".maps");
 
 SEC("perf_event")
 int do_perf_event(struct bpf_perf_event_data *ctx)
@@ -43,10 +57,10 @@ int do_perf_event(struct bpf_perf_event_data *ctx)
 	if (!include_idle && tid == 0)
 		return 0;
 
-	if (targ_pid != -1 && targ_pid != pid)
+	if (filter_by_pid && !bpf_map_lookup_elem(&pids, &pid))
 		return 0;
 
-	if (targ_tid != -1 && targ_tid != tid)
+	if (filter_by_tid && !bpf_map_lookup_elem(&tids, &tid))
 		return 0;
 
 	key.pid = pid;
