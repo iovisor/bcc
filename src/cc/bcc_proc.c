@@ -510,7 +510,7 @@ static bool which_so_in_process(const char* libname, int pid, char* libpath) {
   return found;
 }
 
-static bool which_so_in_ldconfig_cache(const char* libname, int pid, char* libpath) {
+static bool which_so_in_ldconfig_cache(const char* libname, char* libpath) {
   const size_t soname_len = strlen(libname) + strlen("lib.so");
   char soname[soname_len + 1];
   int i;

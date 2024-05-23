@@ -55,7 +55,7 @@ TEST_CASE("shared object resolution", "[c_api]") {
 }
 
 TEST_CASE("shared object resolution with general function", "[c_api]") {
-  char *libm = bcc_procutils_which_so("m");
+  char *libm = bcc_procutils_which_so("m", 0);
   REQUIRE(libm);
   REQUIRE(libm[0] == '/');
   REQUIRE(string(libm).find("libm.so") != string::npos);
