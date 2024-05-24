@@ -495,7 +495,7 @@ static bool which_so_in_process(const char* libname, int pid, char* libpath) {
 
     if (strstr(mapname, ".so") && (strstr(mapname, search1) ||
                                    strstr(mapname, search2))) {
-      const int mapnamelen = strlen(mapname);
+      const size_t mapnamelen = strlen(mapname);
       if (mapnamelen >= PATH_MAX) {
         fprintf(stderr, "Found mapped library path is too long\n");
         break;
@@ -530,7 +530,7 @@ static bool which_so_in_ldconfig_cache(const char* libname, char* libpath) {
         match_so_flags(lib_cache[i].flags)) {
       
       const char* path = lib_cache[i].path;
-      const int pathlen = strlen(path);
+      const size_t pathlen = strlen(path);
       if (pathlen >= PATH_MAX) {
         fprintf(stderr, "Found library path is too long\n");
         return false;
