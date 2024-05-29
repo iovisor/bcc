@@ -17,6 +17,7 @@
 
 #include <fcntl.h>
 #include <linux/bpf.h>
+#include <llvm/Config/llvm-config.h>
 #if LLVM_VERSION_MAJOR <= 16
 #include <llvm-c/Transforms/IPO.h>
 #endif
