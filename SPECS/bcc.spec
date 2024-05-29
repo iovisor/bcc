@@ -56,7 +56,6 @@ BuildRequires: llvm-static
 %endif
 %endif
 BuildRequires: pkgconfig ncurses-devel
-Requires: llvm-devel
 
 %description
 Python bindings for BPF Compiler Collection (BCC). Control a BPF program from
