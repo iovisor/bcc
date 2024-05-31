@@ -65,6 +65,7 @@ APPS = \
 	klockstat \
 	ksnoop \
 	llcstat \
+	lsan \
 	mdflush \
 	mountsnoop \
 	numamove \
