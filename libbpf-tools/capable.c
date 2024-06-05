@@ -195,6 +195,8 @@ static void print_map(struct ksyms *ksyms, struct syms_cache *syms_cache)
 	const struct ksym *ksym;
 	const struct syms *syms;
 	const struct sym *sym;
+	struct sym_info sinfo;
+	int idx;
 	int err, i;
 	unsigned long *ip;
 	struct cap_event val;
@@ -206,6 +208,8 @@ static void print_map(struct ksyms *ksyms, struct syms_cache *syms_cache)
 	}
 
 	while (!bpf_map_get_next_key(ifd, &lookup_key, &next_key)) {
+		idx = 0;
+
 		err = bpf_map_lookup_elem(ifd, &next_key, &val);
 		if (err < 0) {
 			fprintf(stderr, "failed to lookup info: %d\n", err);
@@ -218,7 +222,14 @@ static void print_map(struct ksyms *ksyms, struct syms_cache *syms_cache)
 				fprintf(stderr, "    [Missed Kernel Stack]\n");
 			for (i = 0; i < env.perf_max_stack_depth && ip[i]; i++) {
 				ksym = ksyms__map_addr(ksyms, ip[i]);
-				printf("    %s\n", ksym ? ksym->name : "Unknown");
+				if (!env.verbose) {
+					printf("    %s\n", ksym ? ksym->name : "Unknown");
+				} else {
+					if (ksym)
+						printf("    #%-2d 0x%lx %s+0x%lx\n", idx++, ip[i], ksym->name, ip[i] - ksym->addr);
+					else
+						printf("    #%-2d 0x%lx [unknown]\n", idx++, ip[i]);
+				}
 			}
 		}
 
@@ -237,11 +248,22 @@ static void print_map(struct ksyms *ksyms, struct syms_cache *syms_cache)
 				goto skip_ustack;
 			}
 			for (i = 0; i < env.perf_max_stack_depth && ip[i]; i++) {
-				sym = syms__map_addr(syms, ip[i]);
-				if (sym)
-					printf("    %s\n", sym->name);
-				else
-					printf("    [unknown]\n");
+				if (!env.verbose) {
+					sym = syms__map_addr(syms, ip[i]);
+					if (sym)
+						printf("    %s\n", sym->name);
+					else
+						printf("    [unknown]\n");
+				} else {
+					err = syms__map_addr_dso(syms, ip[i], &sinfo);
+					printf("    #%-2d 0x%016lx", idx++, ip[i]);
+					if (err == 0) {
+						if (sinfo.sym_name)
+							printf(" %s+0x%lx", sinfo.sym_name, sinfo.sym_offset);
+						printf(" (%s+0x%lx)", sinfo.dso_name, sinfo.dso_offset);
+					}
+					printf("\n");
+				}
 			}
 		}
 
