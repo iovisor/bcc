@@ -211,6 +211,8 @@ bool ArgumentParser_aarch64::parse_mem(ssize_t pos, ssize_t &new_pos,
       dest->scale_ = 1;
       dest->deref_offset_ = 0;
     }
+  } else if (arg_[new_pos] == ']') {
+    dest->deref_offset_ = 0;
   }
   if (arg_[new_pos] != ']')
     return error_return(new_pos, new_pos);
