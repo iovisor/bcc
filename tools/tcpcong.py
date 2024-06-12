@@ -15,7 +15,6 @@ from bcc import BPF
 from time import sleep, strftime
 from struct import pack
 from socket import inet_ntop, AF_INET, AF_INET6
-from struct import pack
 import argparse
 
 examples = """examples:
