@@ -570,8 +570,10 @@ static int print_stats(struct ksyms *ksyms, int stack_map, int stat_map)
 	}
 
 	for (i = 0; i < stat_idx; i++) {
-		if (env.reset)
+		if (env.reset) {
+			ss = stats[i];
 			bpf_map_delete_elem(stat_map, &ss->stack_id);
+		}	
 		free(stats[i]);
         }
 	free(stats);
