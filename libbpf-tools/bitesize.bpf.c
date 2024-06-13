@@ -27,7 +27,7 @@ static __always_inline bool comm_allowed(const char *comm)
 {
 	int i;
 
-	for (i = 0; targ_comm[i] != '\0' && i < TASK_COMM_LEN; i++) {
+	for (i = 0; i < TASK_COMM_LEN && targ_comm[i] != '\0'; i++) {
 		if (comm[i] != targ_comm[i])
 			return false;
 	}
