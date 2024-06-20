@@ -190,11 +190,11 @@ while (1):
             dist.print_log2_hist(label, "softirq", section_print_fn=b.ksym)
     else:
         if args.bycpu:
-            print("%-26s %11s %11s" % ("SOFTIRQ", "CPU", "TOTAL_" + label))
+            print("%-26s %11s %11s" % ("SOFTIRQ", "CPU", "TOTAL_" + label.upper()))
             for k, v in sorted(dist.items(), key=lambda dist: dist[1].value):
                 print("%-26s %11d %11d" % (b.ksym(k.ip), k.cpu, v.value / factor))
         else:
-            print("%-26s %11s" % ("SOFTIRQ", "TOTAL_" + label))
+            print("%-26s %11s" % ("SOFTIRQ", "TOTAL_" + label.upper()))
             for k, v in sorted(dist.items(), key=lambda dist: dist[1].value):
                 print("%-26s %11d" % (b.ksym(k.ip), v.value / factor))
     dist.clear()
