@@ -55,6 +55,7 @@ examples = """examples:
     ./execsnoop -P 181               # only trace new processes whose parent PID is 181
     ./execsnoop -U                   # include UID
     ./execsnoop -C                   # include CPU
+    ./execsnoop -M                   # include PCOMM
     ./execsnoop -u 1000              # only trace UID 1000
     ./execsnoop -u user              # get user UID and trace only them
     ./execsnoop -t                   # include timestamps
@@ -93,6 +94,8 @@ parser.add_argument("-U", "--print-uid", action="store_true",
     help="print UID column")
 parser.add_argument("-C", "--print-cpu", action="store_true",
     help="print CPU column")
+parser.add_argument("-M", "--print-pcomm", action="store_true",
+    help="print parent command")
 parser.add_argument("--max-args", default="20",
     help="maximum number of arguments parsed and displayed, defaults to 20")
 parser.add_argument("-P", "--ppid",
@@ -131,6 +134,7 @@ struct data_t {
     u32 uid;
     u32 cpu;
     char comm[TASK_COMM_LEN];
+    char pcomm[TASK_COMM_LEN];
     enum event_type type;
     char argv[ARGSIZE];
     int retval;
@@ -180,6 +184,7 @@ int syscall__execve(struct pt_regs *ctx,
     // as the real_parent->tgid.
     // We use the get_ppid function as a fallback in those cases. (#1883)
     data.ppid = task->real_parent->tgid;
+    bpf_probe_read_kernel_str(&data.pcomm, sizeof(data.pcomm), task->real_parent->comm);
 
     PPID_FILTER
 
@@ -222,6 +227,7 @@ int do_ret_sys_execve(struct pt_regs *ctx)
     // as the real_parent->tgid.
     // We use the get_ppid function as a fallback in those cases. (#1883)
     data.ppid = task->real_parent->tgid;
+    bpf_probe_read_kernel_str(&data.pcomm, sizeof(data.pcomm), task->real_parent->comm);
     data.cpu = CPU_RUNNING_ON;
 
     PPID_FILTER
@@ -275,10 +281,13 @@ if args.timestamp:
     print("%-8s" % ("TIME(s)"), end="")
 if args.print_uid:
     print("%-6s" % ("UID"), end="")
+print("%-16s %-7s " % ("COMM", "PID"), end="")
+if args.print_pcomm:
+    print("%-16s " % ("PCOMM"), end="")
+print("%-7s " % ("PPID"), end="")
 if args.print_cpu:
-    print("%-16s %-7s %-7s %-4s %3s %s" % ("PCOMM", "PID", "PPID", "CPU", "RET", "ARGS"))
-else:
-    print("%-16s %-7s %-7s %3s %s" % ("PCOMM", "PID", "PPID", "RET", "ARGS"))
+    print("%-4s " % ("CPU"), end="")
+print("%3s %s" % ("RET", "ARGS"))
 
 class EventType(object):
     EVENT_ARG = 0
@@ -332,12 +341,13 @@ def print_event(cpu, data, size):
             ppid = event.ppid if event.ppid > 0 else get_ppid(event.pid)
             ppid = b"%d" % ppid if ppid > 0 else b"?"
             argv_text = b' '.join(argv[event.pid]).replace(b'\n', b'\\n')
+            printb(b"%-16s %-7d " % (event.comm, event.pid), nl="")
+            if args.print_pcomm:
+                printb(b"%-16s " % (event.pcomm), nl="")
+            printb(b"%-7s " % (ppid), nl="")
             if args.print_cpu:
-                printb(b"%-16s %-7d %-7s %-4d %3d %s" % (event.comm, event.pid,
-                   ppid, event.cpu, event.retval, argv_text))
-            else:
-                printb(b"%-16s %-7d %-7s %3d %s" % (event.comm, event.pid,
-                    ppid, event.retval, argv_text))
+                printb(b"%-4d " % (event.cpu), nl="")
+            printb(b"%3d %s" % (event.retval, argv_text))
         try:
             del(argv[event.pid])
         except Exception:
