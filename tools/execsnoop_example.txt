@@ -5,7 +5,7 @@ execsnoop traces new processes. For example, tracing the commands invoked when
 running "man ls":
 
 # ./execsnoop
-PCOMM            PID    RET ARGS
+COMM             PID    RET ARGS
 bash             15887    0 /usr/bin/man ls
 preconv          15894    0 /usr/bin/preconv -e UTF-8
 man              15896    0 /usr/bin/tbl
@@ -16,8 +16,8 @@ nroff            15901    0 /usr/bin/groff -mtty-char -Tutf8 -mandoc -rLL=169n -
 groff            15902    0 /usr/bin/troff -mtty-char -mandoc -rLL=169n -rLT=169n -Tutf8
 groff            15903    0 /usr/bin/grotty
 
-The output shows the parent process/command name (PCOMM), the PID, the return
-value of the exec() (RET), and the filename with arguments (ARGS).
+The output shows the process/command name (COMM), the PID, the return value of
+the exec() (RET), and the filename with arguments (ARGS).
 
 This works by traces the execve() system call (commonly used exec() variant),
 and shows details of the arguments and return value. This catches new processes
@@ -29,7 +29,7 @@ processes, which won't be included in the execsnoop output.
 The -x option can be used to include failed exec()s. For example:
 
 # ./execsnoop -x
-PCOMM            PID    RET ARGS
+COMM             PID    RET ARGS
 supervise        9660     0 ./run
 supervise        9661     0 ./run
 mkdir            9662     0 /bin/mkdir -p ./main
@@ -57,7 +57,7 @@ are allowed.
 For example, matching commands containing "mount":
 
 # ./execsnoop -Ttn mount
-TIME     TIME(s) PCOMM            PID    PPID  RET ARGS
+TIME     TIME(s) COMM             PID    PPID  RET ARGS
 14:08:23 2.849   mount            18049  1045    0 /bin/mount -p
 
 The -l option can be used to only show command where one of the arguments
@@ -66,7 +66,7 @@ arguments of the command. For example, matching all command where one of the arg
 is "testpkg":
 
 # ./execsnoop.py -l testpkg
-PCOMM            PID    PPID   RET ARGS
+COMM             PID    PPID   RET ARGS
 service          3344535 4146419   0 /usr/sbin/service testpkg status
 systemctl        3344535 4146419   0 /bin/systemctl status testpkg.service
 yum              3344856 4146419   0 /usr/local/bin/yum remove testpkg
@@ -89,7 +89,7 @@ The -U option include UID on output:
 
 # ./execsnoop -U
 
-UID   PCOMM            PID    PPID   RET ARGS
+UID   COMM             PID    PPID   RET ARGS
 1000  ls               171318 133702   0 /bin/ls --color=auto
 1000  w                171322 133702   0 /usr/bin/w
 
@@ -97,7 +97,7 @@ The -u options filters output based process UID. You also can use username as
 argument, in that cause UID will be looked up using getpwnam (see man 3 getpwnam).
 
 # ./execsnoop -Uu 1000
-UID   PCOMM            PID    PPID   RET ARGS
+UID   COMM             PID    PPID   RET ARGS
 1000  ls               171335 133702   0 /bin/ls --color=auto
 1000  man              171340 133702   0 /usr/bin/man getpwnam
 1000  bzip2            171341 171340   0 /bin/bzip2 -dc
