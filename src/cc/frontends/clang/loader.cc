@@ -266,6 +266,7 @@ int ClangLoader::parse(
                                    "-Wno-address-of-packed-member",
                                    "-Wno-unknown-warning-option",
 #if defined(__x86_64__) || defined(__i386__)
+                                   "-Wno-duplicate-decl-specifier",
                                    "-fcf-protection",
 #endif
                                    "-fno-color-diagnostics",
