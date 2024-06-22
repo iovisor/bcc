@@ -983,9 +983,23 @@ class BPF(object):
         return module_path, new_addr
 
     @staticmethod
-    def find_library(libname):
+    def find_library(libname, pid=0):
+        """
+        Find the full path to the shared library whose name starts with "lib{libname}".
+
+        If non-zero pid is given, search only the shared libraries mapped by the process with this pid.
+        Otherwise, search the global ldconfig cache at /etc/ld.so.cache.
+
+        Examples:
+            BPF.find_library(b"c", pid=12345)  # returns b"/usr/lib/x86_64-linux-gnu/libc.so.6"
+            BPF.find_library(b"pthread")       # returns b"/lib/x86_64-linux-gnu/libpthread.so.0"
+            BPF.find_library(b"nonexistent")   # returns None
+        """
         libname = _assert_is_bytes(libname)
-        res = lib.bcc_procutils_which_so(libname, 0)
+        if pid:
+            res = lib.bcc_procutils_which_so_in_process(libname, pid)
+        else:
+            res = lib.bcc_procutils_which_so(libname, 0)
         if not res:
             return None
         libpath = ct.cast(res, ct.c_char_p).value
