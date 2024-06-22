@@ -68,7 +68,25 @@ int trace_pid(struct request *rq)
 }
 
 SEC("fentry/blk_account_io_start")
-int BPF_PROG(blk_account_io_start, struct request *rq)
+int BPF_PROG(fentry_blk_account_io_start, struct request *rq)
+{
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
+
+	return trace_pid(rq);
+}
+
+SEC("kprobe/blk_account_io_start")
+int BPF_KPROBE(kprobe_blk_account_io_start, struct request *rq)
+{
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
+
+	return trace_pid(rq);
+}
+
+SEC("kprobe/__blk_account_io_start")
+int BPF_KPROBE(kprobe___blk_account_io_start, struct request *rq)
 {
 	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
 		return 0;
