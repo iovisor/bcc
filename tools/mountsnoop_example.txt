@@ -11,16 +11,27 @@ running the following series of commands produces this output:
 
 # ./mountsnoop.py
 COMM             PID     TID     MNT_NS      CALL
-mount            710     710     4026531840  mount("/mnt", "/mnt", "", MS_MGC_VAL|MS_BIND, "") = 0
-umount           714     714     4026531840  umount("/mnt", 0x0) = 0
-unshare          717     717     4026532160  mount("none", "/", "", MS_REC|MS_PRIVATE, "") = 0
-mount            725     725     4026532160  mount("/mnt", "/mnt", "", MS_MGC_VAL|MS_BIND, "") = 0
-umount           728     728     4026532160  umount("/mnt", 0x0) = 0
+mount            13207   13207   4026531841  mount("/dev/loop0", "tmp-dir/", "ext4", 0x0, "") = 0
+mount            13207   13207   4026531841  umount("tmp-dir/", 0x0) = 0
+fsmount          13224   13224   4026531841  fsopen("ext4", 0x0) = 5
+fsmount          13224   13224   4026531841  fsconfig(5, FSCONFIG_SET_FLAG, "rw", "", 0) = 0
+fsmount          13224   13224   4026531841  fsconfig(5, FSCONFIG_SET_STRING, "source", "/dev/loop0", 0) = 0
+fsmount          13224   13224   4026531841  fsconfig(5, FSCONFIG_CMD_CREATE, "", "", 0) = 0
+fsmount          13224   13224   4026531841  fsmount(5, 0x0, MOUNT_ATTR_RDONLY) = 6
+fsmount          13224   13224   4026531841  move_mount(6, "", AT_FDCWD, "./tmp-dir/", MOVE_MOUNT_F_EMPTY_PATH) = 0
+fsmount          13224   13224   4026531841  umount("./tmp-dir/", 0x0) = 0
 
 # ./mountsnoop.py -P
 COMM             PID     TID     PCOMM            PPID    MNT_NS      CALL
-mount            51526   51526   bash             49313   3222937920  mount("/mnt", "/mnt", "", MS_MGC_VAL|MS_BIND, "", "") = 0
-umount           51613   51613   bash             49313   3222937920  umount("/mnt", 0x0) = 0
+mount            13393   13393   bash             13392   4026531841  mount("/dev/loop0", "tmp-dir/", "ext4", 0x0, "") = 0
+mount            13393   13393   bash             13392   4026531841  umount("tmp-dir/", 0x0) = 0
+fsmount          13409   13409   bash             13408   4026531841  fsopen("ext4", 0x0) = 5
+fsmount          13409   13409   bash             13408   4026531841  fsconfig(5, FSCONFIG_SET_FLAG, "rw", "", 0) = 0
+fsmount          13409   13409   bash             13408   4026531841  fsconfig(5, FSCONFIG_SET_STRING, "source", "/dev/loop0", 0) = 0
+fsmount          13409   13409   bash             13408   4026531841  fsconfig(5, FSCONFIG_CMD_CREATE, "", "", 0) = 0
+fsmount          13409   13409   bash             13408   4026531841  fsmount(5, 0x0, MOUNT_ATTR_RDONLY) = 6
+fsmount          13409   13409   bash             13408   4026531841  move_mount(6, "", AT_FDCWD, "./tmp-dir/", MOVE_MOUNT_F_EMPTY_PATH) = 0
+fsmount          13409   13409   bash             13408   4026531841  umount("./tmp-dir/", 0x0) = 0
 
 The output shows the calling command, its process ID and thread ID, the mount
 namespace the call was made in, and the call itself.
