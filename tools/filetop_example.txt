@@ -130,10 +130,29 @@ socket I/O from an sshd process, showing up as non-regular file types (the "O"
 for other, and "S" for socket, in the type column: "T").
 
 
+# ./filetop 10 -wo -C
+Tracing... Output every 10 secs. Hit Ctrl-C to end
+
+08:56:49 loadavg: 0.00 0.00 0.00 1/248 775686
+
+TID     COMM             READS  WRITES R_Kb    W_Kb    T FILE
+638295  gomon            0      1      0       0       R monitoring.log
+
+08:56:59 loadavg: 0.00 0.00 0.00 2/246 775686
+
+TID     COMM             READS  WRITES R_Kb    W_Kb    T FILE
+
+08:57:09 loadavg: 0.00 0.00 0.00 1/246 775686
+
+TID     COMM             READS  WRITES R_Kb    W_Kb    T FILE
+
+In this example only write operations are traced
+
+
 USAGE message:
 
 # ./filetop -h
-usage: filetop.py [-h] [-a] [-C] [-r MAXROWS] [-p PID] [interval] [count]
+usage: filetop.py [-h] [-a] [-C] [-r MAXROWS] [-p PID] [-rev] [-ro] [-wo] [interval] [count]
 
 File reads and writes by process
 
@@ -150,6 +169,9 @@ optional arguments:
   -s {reads,writes,rbytes,wbytes}, --sort {reads,writes,rbytes,wbytes}
                         sort column, default rbytes
   -p PID, --pid PID     trace this PID only
+  -rev, --reverse       reverse the sorting order
+  -ro, --readonly       trace read operations only
+  -wo, --writeonly      trace write operations only
 
 examples:
     ./filetop            # file I/O top, 1 second refresh
@@ -157,3 +179,6 @@ examples:
     ./filetop -p 181     # PID 181 only
     ./filetop 5          # 5 second summaries
     ./filetop 5 10       # 5 second summaries, 10 times only
+    ./filetop 5 -rev     # 5 second summaries, sorted in reverse order
+    ./filetop 5 -ro      # 5 second summaries, only read operations traced
+    ./filetop 5 -wo      # 5 second summaries, only write operations traced
