@@ -275,6 +275,8 @@ if args.queued:
         b.attach_kprobe(event="__blk_account_io_start", fn_name="trace_req_start")
     elif BPF.get_kprobe_functions(b'blk_account_io_start'):
         b.attach_kprobe(event="blk_account_io_start", fn_name="trace_req_start")
+    elif BPF.tracepoint_exists("block", "block_bio_queue"):
+        b.attach_tracepoint(tp="block:block_bio_queue", fn_name="trace_req_start_tp")
     else:
         if args.flags:
             # Some flags are accessible in the rwbs field (RAHEAD, SYNC and META)
@@ -292,6 +294,8 @@ elif BPF.get_kprobe_functions(b'__blk_account_io_done'):
     b.attach_kprobe(event="__blk_account_io_done", fn_name="trace_req_done")
 elif BPF.get_kprobe_functions(b'blk_account_io_done'):
     b.attach_kprobe(event="blk_account_io_done", fn_name="trace_req_done")
+elif BPF.tracepoint_exists("block", "block_rq_complete"):
+    b.attach_tracepoint(tp="block:block_rq_complete", fn_name="trace_req_done_tp")
 else:
     if args.flags:
         print("ERROR: blk_account_io_done probe not available. Can't use -F.")
