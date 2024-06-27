@@ -186,7 +186,10 @@ static void print_map(struct ksyms *ksyms, struct wakeuptime_bpf *obj)
 		}
 		for (i = 0; i < env.perf_max_stack_depth && ip[i]; i++) {
 			ksym = ksyms__map_addr(ksyms, ip[i]);
-			printf("	%-16lx %s\n", ip[i], ksym ? ksym->name: "Unknown");
+			if (ksym)
+				printf("	%-16lx %s+0x%lx\n", ip[i], ksym->name, ip[i] - ksym->addr);
+			else
+				printf("	%-16lx Unknown\n", ip[i]);
 		}
 		printf("	%16s %s\n","waker:", next_key.waker);
 		/*to convert val in microseconds*/
