@@ -283,7 +283,7 @@ sudo docker run --rm -it --privileged \
 ### Install dependencies
 The compiling depends on the headers and lib of linux kernel module which was not found in wsl distribution packages repo. We have to compile the kernel module manually.
 ```bash
-apt-get install flex bison libssl-dev libelf-dev dwarves
+apt-get install flex bison libssl-dev libelf-dev dwarves bc
 ```
 ### Install packages
 
