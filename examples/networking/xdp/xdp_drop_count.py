@@ -11,6 +11,7 @@ from bcc import BPF
 import pyroute2
 import time
 import sys
+import ctypes
 
 flags = 0
 def usage():
@@ -41,7 +42,7 @@ if len(sys.argv) == 3:
     if "-H" in sys.argv:
         # XDP_FLAGS_HW_MODE
         maptype = "array"
-        offload_device = device
+        offload_device = ctypes.c_char_p(device.encode('utf-8'))
         flags |= BPF.XDP_FLAGS_HW_MODE
 
 mode = BPF.XDP
