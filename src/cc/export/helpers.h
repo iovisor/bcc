@@ -188,11 +188,21 @@ BPF_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries); \
 __attribute__((section("maps/export"))) \
 struct _name##_table_t __##_name
 
-// define a table that is shared across the programs in the same namespace
-#define BPF_TABLE_SHARED(_table_type, _key_type, _leaf_type, _name, _max_entries) \
-BPF_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries); \
+#define BPF_TABLE_SHARED6(_table_type, _key_type, _leaf_type, _name, _max_entries, _flags) \
+BPF_F_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries, _flags); \
 __attribute__((section("maps/shared"))) \
 struct _name##_table_t __##_name
+
+#define BPF_TABLE_SHARED5(_table_type, _key_type, _leaf_type, _name, _max_entries) \
+BPF_F_TABLE(_table_type, _key_type, _leaf_type, _name, _max_entries, 0); \
+__attribute__((section("maps/shared"))) \
+struct _name##_table_t __##_name
+
+#define BPF_TABLE_SHAREDX(_1, _2, _3, _4, _5, _6, NAME, ...) NAME
+
+// define a table that is shared across the programs in the same namespace with optional flags
+#define BPF_TABLE_SHARED(...) \
+  BPF_TABLE_SHAREDX(__VA_ARGS__, BPF_TABLE_SHARED6, BPF_TABLE_SHARED5)(__VA_ARGS__)
 
 // Identifier for current CPU used in perf_submit and perf_read
 // Prefer BPF_F_CURRENT_CPU flag, falls back to call helper for older kernel
