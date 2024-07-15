@@ -2097,7 +2097,7 @@ These are equivalent.
 
 ### 2. open_perf_buffer()
 
-Syntax: ```table.open_perf_buffers(callback, page_cnt=N, lost_cb=None)```
+Syntax: ```table.open_perf_buffer(callback, page_cnt=N, lost_cb=None)```
 
 This operates on a table as defined in BPF as BPF_PERF_OUTPUT(), and associates the callback Python function ```callback``` to be called when data is available in the perf ring buffer. This is part of the recommended mechanism for transferring per-event data from kernel to user space. The size of the perf ring buffer can be specified via the ```page_cnt``` parameter, which must be a power of two number of pages and defaults to 8. If the callback is not processing data fast enough, some submitted data may be lost. ```lost_cb``` will be called to log / monitor the lost count. If ```lost_cb``` is the default ```None``` value, it will just print a line of message to ```stderr```.
 
