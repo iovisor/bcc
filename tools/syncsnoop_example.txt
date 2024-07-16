@@ -1,14 +1,58 @@
 Demonstrations of syncsnoop, the Linux eBPF/bcc version.
 
+This program traces calls to the kernel sync(),fsync(),fdatasync(),syncfs(),
+sync_file_range(),msync() routine, with basic timestamps:
 
-This program traces calls to the kernel sync() routine, with basic timestamps:
-
-# ./syncsnoop
-TIME(s)            CALL
-16458148.611952    sync()
-16458151.533709    sync()
+$ sudo ./syncsnoop.py
+TIME(s)            COMM             CALL
+1173253.856512000  worker           fdatasync
+1173253.858791000  worker           fdatasync
+1173260.193706000  sync             sync
+1173261.478894000  syncfs           syncfs
+1173264.231075000  fsync            fsync
+1173264.297788000  fsync            fdatasync
+1173266.303600000  fdatasync        fsync
+1173266.372047000  fdatasync        fdatasync
+1173284.063700000  worker           fdatasync
+1173284.089607000  worker           fdatasync
+1173288.229822000  mkfs.ext4        fsync
+1173288.304501000  mkfs.ext4        fsync
+1173288.308225000  mkfs.ext4        fsync
+1173288.315048000  mkfs.ext4        fsync
+1173304.818227000  worker           fdatasync
+1173304.885796000  worker           fdatasync
+1173304.890055000  worker           fdatasync
+1173304.893487000  worker           fdatasync
+1173305.351074000  worker           fdatasync
+1173305.359278000  worker           fdatasync
+1173314.272416000  worker           fdatasync
+1173314.301972000  worker           fdatasync
+1173315.065319000  journal-offline  fsync
+1173315.065367000  journal-offline  fsync
+1173315.107918000  journal-offline  fsync
+1173315.117972000  journal-offline  fsync
+1173330.613072000  vim              fsync
+1173337.763989000  vim              fsync
+1173343.513054000  vim              fsync
+1173344.479574000  worker           fdatasync
+1173344.484815000  worker           fdatasync
+1173345.040061000  systemd-journal  fsync
+1173374.477736000  vim              fsync
+1173374.688049000  worker           fdatasync
+1173374.696112000  worker           fdatasync
+1173391.717910000  vim              fsync
+1173400.458152000  vim              fsync
+1173404.895497000  worker           fdatasync
+1173404.920379000  worker           fdatasync
+1173404.946869000  worker           fdatasync
+1173416.849539000  vim              fsync
+1173422.885377000  vim              fsync
+1173427.481849000  sync_file_range  sync_file_range
+1173435.104840000  worker           fdatasync
+1173435.131895000  worker           fdatasync
+1173435.158102000  worker           fdatasync
+1173449.246568000  vim              fsync
 ^C
 
-While tracing, the "sync" command was executed in another server session.
-
-This can be useful to identify that sync() is being called, and its frequency.
+This can be useful to identify that sync(),fsync(),fdatasync(),syncfs(),
+sync_file_range(),msync() is being called, and its frequency.
