@@ -3,6 +3,7 @@
 //
 // Based on syncsnoop(8) from BCC by Brendan Gregg.
 // 08-Feb-2024   Tiago Ilieve   Created this.
+// 19-Jul-2024   Rong Tao       Support more sync syscalls
 #include <argp.h>
 #include <signal.h>
 #include <stdio.h>
@@ -69,7 +70,8 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	/* Copy data as alignment in the perf buffer isn't guaranteed. */
 	memcpy(&e, data, sizeof(e));
 
-	printf("%-18.9f sync()\n", (float) e.ts_us  / 1000000);
+	printf("%-18.9f %-16s %-16s\n", (float) e.ts_us  / 1000000, e.comm,
+	       sys_names[e.sys]);
 }
 
 void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
@@ -126,7 +128,7 @@ int main(int argc, char **argv)
 	}
 
 	/* print header */
-	printf("%-18s %s\n", "TIME(s)", "CALL");
+	printf("%-18s %-16s %s\n", "TIME(s)", "COMM", "CALL");
 
 	while (!exiting) {
 		err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS);
