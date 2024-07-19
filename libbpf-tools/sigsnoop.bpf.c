@@ -7,7 +7,7 @@
 #define MAX_ENTRIES	10240
 
 const volatile pid_t filtered_pid = 0;
-const volatile int target_signal = 0;
+const volatile int target_signals = 0;
 const volatile bool failed_only = false;
 
 struct {
@@ -23,17 +23,27 @@ struct {
 	__uint(value_size, sizeof(__u32));
 } events SEC(".maps");
 
+static __always_inline bool is_target_signal(int sig) {
+  if (target_signals == 0)
+    return true;
+
+  if ((target_signals & (1 << (sig - 1))) == 0)
+    return false;
+
+  return true;
+}
+
 static int probe_entry(pid_t tpid, int sig)
 {
 	struct event event = {};
 	__u64 pid_tgid;
 	__u32 pid, tid;
 
-	if (target_signal && sig != target_signal)
-		return 0;
+        if (!is_target_signal(sig))
+          return 0;
 
-	pid_tgid = bpf_get_current_pid_tgid();
-	pid = pid_tgid >> 32;
+        pid_tgid = bpf_get_current_pid_tgid();
+        pid = pid_tgid >> 32;
 	tid = (__u32)pid_tgid;
 	if (filtered_pid && pid != filtered_pid)
 		return 0;
@@ -124,11 +134,10 @@ int sig_trace(struct trace_event_raw_signal_generate *ctx)
 
 	if (failed_only && ret == 0)
 		return 0;
+        if (!is_target_signal(sig))
+          return 0;
 
-	if (target_signal && sig != target_signal)
-		return 0;
-
-	pid_tgid = bpf_get_current_pid_tgid();
+        pid_tgid = bpf_get_current_pid_tgid();
 	pid = pid_tgid >> 32;
 	if (filtered_pid && pid != filtered_pid)
 		return 0;
