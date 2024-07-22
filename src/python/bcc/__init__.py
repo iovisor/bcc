@@ -313,6 +313,7 @@ class BPF(object):
         b"__arm64_sys_",
         b"__s390x_sys_",
         b"__s390_sys_",
+        b"__riscv_sys_",
     ]
 
     # BPF timestamps come from the monotonic clock. To be able to filter
