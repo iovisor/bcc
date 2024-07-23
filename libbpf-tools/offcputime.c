@@ -349,6 +349,11 @@ int main(int argc, char **argv)
 
 	signal(SIGINT, sig_handler);
 
+	printf("Tracing off-CPU time (us)");
+	if (env.duration < 99999999)
+		printf(" for %d secs.\n", env.duration);
+	else
+		printf("... Hit Ctrl-C to end.\n");
 	/*
 	 * We'll get sleep interrupted when someone presses Ctrl-C (which will
 	 * be "handled" with noop by sig_handler).
