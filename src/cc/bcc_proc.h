@@ -48,10 +48,6 @@ typedef void (*bcc_procutils_ksymcb)(const char *, const char *, uint64_t, void 
 // among the shared libraries mapped by the process with this pid.
 char *bcc_procutils_which_so_in_process(const char *libname, int pid);
 
-// Find the full path to the shared library whose name starts with "lib{libname}"
-// in /etc/ld.so.cache.
-char *bcc_procutils_which_so_in_ldconfig_cache(const char *libname);
-
 // Find the full path to the shared library whose name starts with "lib{libname}".
 // If non-zero pid is given, first search the shared libraries mapped by the process with this pid.
 char *bcc_procutils_which_so(const char *libname, int pid);

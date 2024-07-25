@@ -565,13 +565,6 @@ char *bcc_procutils_which_so_in_process(const char *libname, int pid) {
   return NULL;
 }
 
-char *bcc_procutils_which_so_in_ldconfig_cache(const char *libname) {
-  char libpath[PATH_MAX];
-  if (which_so_in_ldconfig_cache(libname, libpath))
-    return strdup(libpath);
-  return NULL;
-}
-
 void bcc_procutils_free(const char *ptr) {
   free((void *)ptr);
 }

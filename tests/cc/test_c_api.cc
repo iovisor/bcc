@@ -46,14 +46,6 @@ TEST_CASE("language detection", "[c_api]") {
   REQUIRE(string(c).compare("c") == 0);
 }
 
-TEST_CASE("shared object resolution", "[c_api]") {
-  char *libm = bcc_procutils_which_so_in_ldconfig_cache("m");
-  REQUIRE(libm);
-  REQUIRE(libm[0] == '/');
-  REQUIRE(string(libm).find("libm.so") != string::npos);
-  free(libm);
-}
-
 TEST_CASE("shared object resolution with general function", "[c_api]") {
   char *libm = bcc_procutils_which_so("m", 0);
   REQUIRE(libm);
