@@ -587,7 +587,6 @@ const char *bcc_procutils_language(int pid) {
         return languages[i];
   }
 
-
   snprintf(procfilename, sizeof(procfilename), "/proc/%ld/maps", (long)pid);
   procfile = fopen(procfilename, "r");
   if (!procfile)

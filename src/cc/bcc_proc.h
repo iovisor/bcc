@@ -52,7 +52,6 @@ char *bcc_procutils_which_so_in_process(const char *libname, int pid);
 // If non-zero pid is given, first search the shared libraries mapped by the process with this pid.
 char *bcc_procutils_which_so(const char *libname, int pid);
 
-
 char *bcc_procutils_which(const char *binpath);
 int bcc_mapping_is_file_backed(const char *mapname);
 // Iterate over all executable memory mapping sections of a Process.
