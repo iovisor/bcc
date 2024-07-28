@@ -1,3 +1,18 @@
+bcc (0.31.0-1) unstable; urgency=low
+
+  * Support for kernel up to 6.9.
+  * Add support for bcachefs to fsdist and fsslower tools
+  * libbpf tool update: memleak, syncsnoop, numamove, syscount, vfsstat, tcptop, capable, syncsnoop, sigsnoop, etc.
+  * bcc tool update: biolatency, biosnoop, biotop, vfsstat, kvmexit, sslsniff, swapin, etc.
+  * build: Remove llvm-dev dependency from libbcc
+  * build: Remove dependency on LLVM header from libbcc packages
+  * usdt: Fix bare register dereference on aarch64
+  * Extend `bcc_proc` API which allows to limit search to specific pid
+  * Fix several flaky tests.
+  * doc update, other bug fixes and tools improvement.
+
+ -- Yonghong Song <ys114321@gmail.com>  Sat, 27 Jul 2024 17:00:00 +0000
+
 bcc (0.30.0-1) unstable; urgency=low
 
   * Support for kernel up to 6.8.
