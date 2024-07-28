@@ -231,6 +231,8 @@ class bcc_symbol_option(ct.Structure):
             ('use_symbol_type', ct.c_uint),
         ]
 
+lib.bcc_procutils_which_so_in_process.restype = ct.POINTER(ct.c_char)
+lib.bcc_procutils_which_so_in_process.argtypes = [ct.c_char_p, ct.c_int]
 lib.bcc_procutils_which_so.restype = ct.POINTER(ct.c_char)
 lib.bcc_procutils_which_so.argtypes = [ct.c_char_p, ct.c_int]
 lib.bcc_procutils_free.restype = None
