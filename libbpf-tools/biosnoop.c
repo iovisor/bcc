@@ -219,14 +219,26 @@ void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 	fprintf(stderr, "lost %llu events on CPU #%d\n", lost_cnt, cpu);
 }
 
-static void blk_account_io_set_attach_target(struct biosnoop_bpf *obj)
+static void blk_account_io_set_attach_target(struct biosnoop_bpf *obj, struct ksyms *ksyms)
 {
-	if (fentry_can_attach("blk_account_io_start", NULL))
-		bpf_program__set_attach_target(obj->progs.blk_account_io_start,
+	if (fentry_can_attach("blk_account_io_start", NULL)) {
+		bpf_program__set_autoload(obj->progs.kprobe_blk_account_io_start, false);
+		bpf_program__set_autoload(obj->progs.kprobe___blk_account_io_start, false);
+
+		if (!ksyms__get_symbol(ksyms, "__blk_account_io_start"))
+			bpf_program__set_attach_target(obj->progs.fentry_blk_account_io_start,
 					       0, "blk_account_io_start");
-	else
-		bpf_program__set_attach_target(obj->progs.blk_account_io_start,
+		else
+			bpf_program__set_attach_target(obj->progs.fentry_blk_account_io_start,
 					       0, "__blk_account_io_start");
+	} else {
+		bpf_program__set_autoload(obj->progs.fentry_blk_account_io_start, false);
+
+		if (!ksyms__get_symbol(ksyms, "__blk_account_io_start"))
+			bpf_program__set_autoload(obj->progs.kprobe___blk_account_io_start, false);
+		else
+			bpf_program__set_autoload(obj->progs.kprobe_blk_account_io_start, false);
+	}
 }
 
 int main(int argc, char **argv)
@@ -257,6 +269,12 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	ksyms = ksyms__load();
+	if (!ksyms) {
+		fprintf(stderr, "failed to load kallsyms\n");
+		goto cleanup;
+	}
+
 	partitions = partitions__load();
 	if (!partitions) {
 		fprintf(stderr, "failed to load partitions info\n");
@@ -277,18 +295,15 @@ int main(int argc, char **argv)
 	obj->rodata->filter_cg = env.cg;
 	obj->rodata->min_ns = env.min_lat_ms * 1000000;
 
-	if (tracepoint_exists("block", "block_io_start"))
-		bpf_program__set_autoload(obj->progs.blk_account_io_start, false);
-	else {
+	if (tracepoint_exists("block", "block_io_start")) {
+		bpf_program__set_autoload(obj->progs.fentry_blk_account_io_start, false);
+		bpf_program__set_autoload(obj->progs.kprobe_blk_account_io_start, false);
+		bpf_program__set_autoload(obj->progs.kprobe___blk_account_io_start, false);
+	} else {
 		bpf_program__set_autoload(obj->progs.block_io_start, false);
-		blk_account_io_set_attach_target(obj);
+		blk_account_io_set_attach_target(obj, ksyms);
 	}
 
-	ksyms = ksyms__load();
-	if (!ksyms) {
-		fprintf(stderr, "failed to load kallsyms\n");
-		goto cleanup;
-	}
 	if (!ksyms__get_symbol(ksyms, "blk_account_io_merge_bio"))
 		bpf_program__set_autoload(obj->progs.blk_account_io_merge_bio, false);
 
