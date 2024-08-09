@@ -384,10 +384,10 @@ static bool print_user_stacktrace(struct key_t *event, int stack_map,
 		pr_format("[Missed User Stack]", f);
 	} else {
 		syms = syms_cache__get_syms(syms_cache, event->pid);
-		if (!syms && f->folded)
-			fprintf(stderr, "failed to get syms\n");
-		else
+		if (syms)
 			print_stacktrace(ip, usymname, f);
+		else if (!f->folded)
+			fprintf(stderr, "failed to get syms\n");
 	}
 
 	return true;
