@@ -24,6 +24,8 @@
 #define OPT_PERF_MAX_STACK_DEPTH	1 /* --perf-max-stack-depth */
 #define OPT_STACK_STORAGE_SIZE		2 /* --stack-storage-size */
 
+#define SYM_INFO_LEN			2048
+
 /*
  * -EFAULT in get_stackid normally means the stack-trace is not available,
  * such as getting kernel stack trace in user mode
@@ -128,6 +130,7 @@ static const struct argp_option opts[] = {
 struct ksyms *ksyms;
 struct syms_cache *syms_cache;
 struct syms *syms;
+static char syminfo[SYM_INFO_LEN];
 
 static int split_pidstr(char *s, char* sep, int max_split, pid_t *pids)
 {
@@ -343,14 +346,50 @@ static const char *ksymname(unsigned long addr)
 {
 	const struct ksym *ksym = ksyms__map_addr(ksyms, addr);
 
-	return ksym ? ksym->name : "[unknown]";
+	if (!env.verbose)
+		return ksym ? ksym->name : "[unknown]";
+
+	if (ksym)
+		snprintf(syminfo, SYM_INFO_LEN, "0x%lx %s+0x%lx", addr,
+			 ksym->name, addr - ksym->addr);
+	else
+		snprintf(syminfo, SYM_INFO_LEN, "0x%lx [unknown]", addr);
+
+	return syminfo;
+}
+
+static const char *usyminfo(unsigned long addr)
+{
+	struct sym_info sinfo;
+	int err;
+	int c;
+
+	c = snprintf(syminfo, SYM_INFO_LEN, "0x%016lx", addr);
+
+	err = syms__map_addr_dso(syms, addr, &sinfo);
+	if (err == 0) {
+		if (sinfo.sym_name) {
+			c += snprintf(syminfo + c, SYM_INFO_LEN - c, " %s+0x%lx",
+				      sinfo.sym_name, sinfo.sym_offset);
+		}
+
+		snprintf(syminfo + c, SYM_INFO_LEN - c, " (%s+0x%lx)",
+			 sinfo.dso_name, sinfo.dso_offset);
+	}
+
+	return syminfo;
 }
 
 static const char *usymname(unsigned long addr)
 {
-	const struct sym *sym = syms__map_addr(syms, addr);
+	const struct sym *sym;
 
-	return sym ? sym->name : "[unknown]";
+	if (!env.verbose) {
+		sym = syms__map_addr(syms, addr);
+		return sym ? sym->name : "[unknown]";
+	}
+
+	return usyminfo(addr);
 }
 
 static void print_stacktrace(unsigned long *ip, symname_fn_t symname, struct fmt_t *f)
