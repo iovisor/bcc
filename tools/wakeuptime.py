@@ -264,7 +264,7 @@ while (1):
             # print default multi-line stack output
             printb(b"    %-16s %s" % (b"target:", k.target))
             for addr in waker_kernel_stack:
-                printb(b"    %-16x %s" % (addr, b.ksym(addr)))
+                printb(b"    %-16x %s" % (addr, b.ksym(addr, False, True)))
             printb(b"    %-16s %s" % (b"waker:", k.waker))
             print("        %d\n" % v.value)
 
