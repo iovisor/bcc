@@ -430,6 +430,31 @@ class BPF(object):
 
         assert not (text and src_file)
 
+        # Fix 'larchintrin.h' file not found error for loongarch64
+        architecture = platform.machine()
+        if architecture == 'loongarch64':
+            # get clang include path
+            try:
+                clang_include_path_output = subprocess.check_output(['clang', '-print-file-name=include'], stderr=subprocess.STDOUT)
+                clang_include_path_str = clang_include_path_output.decode('utf-8').strip('\n')
+                if not os.path.exists(clang_include_path_str):
+                    clang_include_path_str = False
+            except Exception as e:
+                clang_include_path_str = False
+            # get gcc include path
+            try:
+                gcc_include_path_output = subprocess.check_output(['gcc', '-print-file-name=include'], stderr=subprocess.STDOUT)
+                gcc_include_path_str = gcc_include_path_output.decode('utf-8').strip('\n')
+                if not os.path.exists(gcc_include_path_str):
+                    gcc_include_path_str = False
+            except Exception as e:
+                gcc_include_path_str = False
+            # add clang and gcc include path for cflags
+            if clang_include_path_str:
+                cflags.append("-I" + clang_include_path_str)
+            if gcc_include_path_str:
+                cflags.append("-I" + gcc_include_path_str)
+
         self.kprobe_fds = {}
         self.uprobe_fds = {}
         self.tracepoint_fds = {}
