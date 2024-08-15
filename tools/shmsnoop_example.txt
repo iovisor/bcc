@@ -10,7 +10,7 @@ PID    COMM                SYS              RET ARGs
 19816  client            SHMAT     7f4fd8ee7000 shmid: 0x10000, shmaddr: 0x0, shmflg: 0x0
 19816  client            SHMDT                0 shmaddr: 0x7f4fd8ee7000
 19813  server            SHMDT                0 shmaddr: 0x7f1cf8b1f000
-19813  server           SHMCTL                0 shmid: 0x10000, cmd: 0, buf: 0x0
+19813  server           SHMCTL                0 shmid: 0x10000, cmd: 0 (IPC_RMID), buf: 0x0
 
 
 Every call the shm* syscall (SHM column) is displayed
@@ -32,7 +32,7 @@ containing "server" with timestamps:
 # ./shmsnoop.py -T -n server
 TIME(s)       PID    COMM                SYS              RET ARGs
 0.563194000   19825  server            SHMDT                0 shmaddr: 0x7f74362e4000
-0.563237000   19825  server           SHMCTL                0 shmid: 0x18000, cmd: 0, buf: 0x0
+0.563237000   19825  server           SHMCTL                0 shmid: 0x18000, cmd: 0 (IPC_RMID), buf: 0x0
 
 
 A -p option can be used to trace only selected process:
@@ -40,7 +40,7 @@ A -p option can be used to trace only selected process:
 # ./shmsnoop.py -p 19855
 PID    COMM                SYS              RET ARGs
 19855  server            SHMDT                0 shmaddr: 0x7f4329ff8000
-19855  server           SHMCTL                0 shmid: 0x20000, cmd: 0, buf: 0x0
+19855  server           SHMCTL                0 shmid: 0x20000, cmd: 0 (IPC_RMID), buf: 0x0
 
 USAGE message:
 # ./shmsnoop.py -h
