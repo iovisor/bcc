@@ -149,6 +149,14 @@ KRETFUNC_PROBE(__page_cache_alloc, gfp_t gfp, struct page *retval)
 bpf_text_kfunc_cache_alloc_ret_folio = """
 KRETFUNC_PROBE(filemap_alloc_folio, gfp_t gfp, unsigned int order,
     struct folio *retval)
+"""
+# In kernel commit b951aaff5035 ("mm: enable page allocation tagging"), add
+# _noprof suffix to filemap_alloc_folio.
+bpf_text_kfunc_cache_alloc_ret_folio_noprof = """
+KRETFUNC_PROBE(filemap_alloc_folio_noprof, gfp_t gfp, unsigned int order,
+    struct folio *retval)
+"""
+bpf_text_kfunc_cache_alloc_ret_folio_func_body = """
 {
     u64 ts;
     u32 zero = 0; // static key for accessing pages[0]
@@ -179,7 +187,14 @@ if BPF.support_kfunc():
     if BPF.get_kprobe_functions(b"__page_cache_alloc"):
         bpf_text += bpf_text_kfunc_cache_alloc_ret_page
     else:
-        bpf_text += bpf_text_kfunc_cache_alloc_ret_folio
+        if BPF.get_kprobe_functions(b"filemap_alloc_folio"):
+            bpf_text += bpf_text_kfunc_cache_alloc_ret_folio
+        elif BPF.get_kprobe_functions(b"filemap_alloc_folio_noprof"):
+            bpf_text += bpf_text_kfunc_cache_alloc_ret_folio_noprof
+        else:
+            print("ERROR: No cache alloc function found. Exiting.")
+            exit()
+        bpf_text += bpf_text_kfunc_cache_alloc_ret_folio_func_body
     b = BPF(text=bpf_text)
 else:
     bpf_text += bpf_text_kprobe
@@ -196,8 +211,15 @@ else:
         cache_func = "__page_cache_alloc"
         bpf_text = bpf_text.replace('GET_RETVAL_PAGE', 'PT_REGS_RC(ctx)')
     else:
-        cache_func = "filemap_alloc_folio"
+        if BPF.get_kprobe_functions(b"filemap_alloc_folio"):
+            cache_func = "filemap_alloc_folio"
+        elif BPF.get_kprobe_functions(b"filemap_alloc_folio_noprof"):
+            cache_func = "filemap_alloc_folio_noprof"
+        else:
+            print("ERROR: No cache alloc function found. Exiting.")
+            exit()
         bpf_text = bpf_text.replace('GET_RETVAL_PAGE', 'folio_page((struct folio *)PT_REGS_RC(ctx), 0)')
+
     b = BPF(text=bpf_text)
     b.attach_kprobe(event=ra_event, fn_name="entry__do_page_cache_readahead")
     b.attach_kretprobe(event=ra_event, fn_name="exit__do_page_cache_readahead")
