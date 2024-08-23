@@ -106,6 +106,33 @@ static int readahead__set_attach_target(struct bpf_program *prog)
 	return err;
 }
 
+static int attach_alloc_ret(struct readahead_bpf *obj)
+{
+	bpf_program__set_autoload(obj->progs.page_cache_alloc_ret, false);
+	bpf_program__set_autoload(obj->progs.filemap_alloc_folio_ret, false);
+	bpf_program__set_autoload(obj->progs.filemap_alloc_folio_noprof_ret, false);
+
+	/*
+	 * b951aaff5035 ("mm: enable page allocation tagging") in v6.10
+	 * renamed filemap_alloc_folio to filemap_alloc_folio_noprof
+	 */
+	if (fentry_can_attach("filemap_alloc_folio_noprof", NULL))
+		return bpf_program__set_autoload(obj->progs.filemap_alloc_folio_noprof_ret, true);
+
+	/*
+	 * bb3c579e25e5 ("mm/filemap: Add filemap_alloc_folio") in v5.16
+	 * changed __page_cache_alloc to be a wrapper of filemap_alloc_folio
+	 */
+	if (fentry_can_attach("filemap_alloc_folio", NULL))
+		return bpf_program__set_autoload(obj->progs.filemap_alloc_folio_ret, true);
+
+	if (fentry_can_attach("__page_cache_alloc", NULL))
+		return bpf_program__set_autoload(obj->progs.page_cache_alloc_ret, true);
+
+	fprintf(stderr, "failed to attach to alloc functions\n");
+	return -1;
+}
+
 int main(int argc, char **argv)
 {
 	static const struct argp argp = {
@@ -129,15 +156,9 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	/*
-	 * bb3c579e25e5 ("mm/filemap: Add filemap_alloc_folio") in v5.16
-	 * changed __page_cache_alloc to be a wrapper of filemap_alloc_folio
-	 */
-	if (fentry_can_attach("filemap_alloc_folio", NULL))
-		bpf_program__set_autoload(obj->progs.page_cache_alloc_ret, false);
-	else
-		bpf_program__set_autoload(obj->progs.filemap_alloc_folio_ret, false);
-
+	err = attach_alloc_ret(obj);
+	if (err)
+		goto cleanup;
 	err = readahead__set_attach_target(obj->progs.do_page_cache_ra);
 	if (err)
 		goto cleanup;

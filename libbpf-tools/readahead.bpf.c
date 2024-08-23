@@ -64,6 +64,12 @@ int BPF_PROG(filemap_alloc_folio_ret, gfp_t gfp, unsigned int order,
 	return alloc_done(&ret->page);
 }
 
+SEC("fexit/filemap_alloc_folio_noprof")
+int BPF_PROG(filemap_alloc_folio_noprof_ret, gfp_t gfp, unsigned int order,
+	struct folio *ret)
+{
+	return alloc_done(&ret->page);
+}
 
 SEC("fexit/do_page_cache_ra")
 int BPF_PROG(do_page_cache_ra_ret)
