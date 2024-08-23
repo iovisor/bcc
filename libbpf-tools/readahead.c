@@ -80,6 +80,18 @@ static int readahead__set_attach_target(struct bpf_program *prog)
 {
 	int err;
 
+	/*
+	 * 56a4d67c264e ("mm/readahead: Switch to page_cache_ra_order") in v5.18
+	 * renamed do_page_cache_ra to page_cache_ra_order
+	 */
+	err = bpf_program__set_attach_target(prog, 0, "page_cache_ra_order");
+	if (!err)
+		return 0;
+
+	/*
+	 * 8238287eadb2 ("mm/readahead: make do_page_cache_ra take a readahead_control")
+	 * in v5.10 renamed __do_page_cache_readahead to do_page_cache_ra
+	*/
 	err = bpf_program__set_attach_target(prog, 0, "do_page_cache_ra");
 	if (!err)
 		return 0;
@@ -118,9 +130,14 @@ int main(int argc, char **argv)
 	}
 
 	/*
-	 * Starting from v5.10-rc1 (8238287), __do_page_cache_readahead has
-	 * renamed to do_page_cache_ra. So we specify the function dynamically.
+	 * bb3c579e25e5 ("mm/filemap: Add filemap_alloc_folio") in v5.16
+	 * changed __page_cache_alloc to be a wrapper of filemap_alloc_folio
 	 */
+	if (fentry_can_attach("filemap_alloc_folio", NULL))
+		bpf_program__set_autoload(obj->progs.page_cache_alloc_ret, false);
+	else
+		bpf_program__set_autoload(obj->progs.filemap_alloc_folio_ret, false);
+
 	err = readahead__set_attach_target(obj->progs.do_page_cache_ra);
 	if (err)
 		goto cleanup;
