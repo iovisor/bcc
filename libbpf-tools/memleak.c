@@ -685,7 +685,7 @@ pid_t fork_sync_exec(const char *command, int fd)
 	return pid;
 }
 
-#if USE_BLAZESYM
+#ifdef USE_BLAZESYM
 void print_stack_frame_by_blazesym(size_t frame, uint64_t addr, const blazesym_csym *sym)
 {
 	if (!sym)
