@@ -9,8 +9,8 @@ LIBBPF_SRC := $(abspath ../src/cc/libbpf/src)
 LIBBPF_OBJ := $(abspath $(OUTPUT)/libbpf.a)
 LIBBLAZESYM_SRC := $(abspath blazesym/target/release/libblazesym.a)
 INCLUDES := -I$(OUTPUT) -I../src/cc/libbpf/include/uapi
-CFLAGS := -g -O2 -Wall -Wmissing-field-initializers -Werror
-BPFCFLAGS := -g -O2 -Wall
+CFLAGS := -g -O2 -Wall -Wmissing-field-initializers -Werror -Werror=undef
+BPFCFLAGS := -g -O2 -Wall -Werror=undef
 INSTALL ?= install
 prefix ?= /usr/local
 bindir := $(prefix)/bin
