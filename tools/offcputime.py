@@ -23,6 +23,16 @@ import errno
 import signal
 
 # arg validation
+def positive_ints(val):
+    try:
+        ivals = [int(i) for i in val.split(',')]
+        for i in ivals:
+            if i < 0:
+               raise argparse.ArgumentTypeError("must be positive ingegers")
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"must be integers")
+    return ivals
+
 def positive_int(val):
     try:
         ival = int(val)
@@ -52,8 +62,8 @@ examples = """examples:
     ./offcputime -s 5        # 5 seconds, and show symbol offsets
     ./offcputime -m 1000     # trace only events that last more than 1000 usec
     ./offcputime -M 10000    # trace only events that last less than 10000 usec
-    ./offcputime -p 185      # only trace threads for PID 185
-    ./offcputime -t 188      # only trace thread 188
+    ./offcputime -p 185,175,165 # only trace threads for PID 185,175,165
+    ./offcputime -t 188,120,134 # only trace threads 188,120,134
     ./offcputime -u          # only trace user threads (no kernel)
     ./offcputime -k          # only trace kernel threads (no user)
     ./offcputime -U          # only show user space stacks (no kernel)
@@ -66,10 +76,10 @@ parser = argparse.ArgumentParser(
 thread_group = parser.add_mutually_exclusive_group()
 # Note: this script provides --pid and --tid flags but their arguments are
 # referred to internally using kernel nomenclature: TGID and PID.
-thread_group.add_argument("-p", "--pid", metavar="PID", dest="tgid",
-    help="trace this PID only", type=positive_int)
-thread_group.add_argument("-t", "--tid", metavar="TID", dest="pid",
-    help="trace this TID only", type=positive_int)
+thread_group.add_argument("-p", "--pid", metavar="PID", dest="tgids",
+    help="trace these PIDs only, comma separated list", type=positive_ints)
+thread_group.add_argument("-t", "--tid", metavar="TID", dest="pids",
+    help="trace these TIDs only, comma separated list", type=positive_ints)
 thread_group.add_argument("-u", "--user-threads-only", action="store_true",
     help="user threads only (no kernel threads)")
 thread_group.add_argument("-k", "--kernel-threads-only", action="store_true",
@@ -200,12 +210,12 @@ int oncpu(struct pt_regs *ctx, struct task_struct *prev) {
 
 # set thread filter
 thread_context = ""
-if args.tgid is not None:
-    thread_context = "PID %d" % args.tgid
-    thread_filter = 'tgid == %d' % args.tgid
-elif args.pid is not None:
-    thread_context = "TID %d" % args.pid
-    thread_filter = 'pid == %d' % args.pid
+if args.tgids is not None:
+    thread_context = "PIDs %s" % ','.join([str(tgid) for tgid in args.tgids])
+    thread_filter = ' || '.join(['tgid == %d' % tgid for tgid in args.tgids])
+elif args.pids is not None:
+    thread_context = "TIDs %s" % ','.join([str(pid) for pid in args.pids])
+    thread_filter = ' || '.join(['pid == %d' % pid for pid in args.pids])
 elif args.user_threads_only:
     thread_context = "user threads"
     thread_filter = '!(prev->flags & PF_KTHREAD)'
