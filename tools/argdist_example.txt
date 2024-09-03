@@ -166,7 +166,7 @@ r:c:gets():char*:$retval:$retval!=0
 
 Similarly, we could get a histogram of the error codes returned by read():
 
-# ./argdist -i 10 -c 1 -H 'r:c:read()'
+# ./argdist -i 10 -c -H 'r:c:read()'
 [02:15:36]
 r:c:read()
      retval              : count     distribution
@@ -337,7 +337,7 @@ specific file, run this:
 Here's a final example that finds how many write() system calls are performed
 by each process on the system:
 
-# argdist -c -C 'p:c:write():int:$PID;write per process' -n 2
+# argdist -c -C 'p:c:write():int:$PID#write per process' -n 2
 [06:47:18]
 write by process
         COUNT      EVENT
