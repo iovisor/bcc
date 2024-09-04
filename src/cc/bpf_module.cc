@@ -574,6 +574,7 @@ int BPFModule::finalize() {
   builder.setMCJITMemoryManager(
       ebpf::make_unique<MyMemoryManager>(sections_p, &*prog_func_info_));
   builder.setMArch("bpf");
+  builder.setMCPU("v1");
 #if LLVM_VERSION_MAJOR <= 11
   builder.setUseOrcMCJITReplacement(false);
 #endif
