@@ -237,6 +237,9 @@ void SourceDebugger::dump() {
 #else
             (uint64_t)FuncStart + Index,
 #endif
+#if LLVM_VERSION_MAJOR >= 20
+            false,
+#endif
             CU->getCompilationDir(),
             DILineInfoSpecifier::FileLineInfoKind::AbsoluteFilePath, LineInfo);
 
