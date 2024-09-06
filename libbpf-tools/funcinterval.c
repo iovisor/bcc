@@ -14,6 +14,7 @@
 #include "funcinterval.h"
 #include "trace_helpers.h"
 #include "uprobe_helpers.h"
+#include "btf_helpers.h"
 
 static volatile sig_atomic_t exiting;
 const char *attach_type[] = {"KPROBE", "UPROBE", "TRACEPOINT"};
@@ -281,6 +282,7 @@ static int attach_tracepoint(struct funcinterval_bpf *obj, const char *library,
 
 int main(int argc, char *argv[])
 {
+	LIBBPF_OPTS(bpf_object_open_opts, open_opts);
 	static const struct argp argp = {
 		.options = opts,
 		.parser = parse_arg,
@@ -297,7 +299,13 @@ int main(int argc, char *argv[])
 
 	libbpf_set_print(libbpf_print_fn);
 
-	obj = funcinterval_bpf__open();
+	err = ensure_core_btf(&open_opts);
+	if (err) {
+		fprintf(stderr, "failed to fetch necessary BTF for CO-RE: %s\n", strerror(-err));
+		return 1;
+	}
+
+	obj = funcinterval_bpf__open_opts(&open_opts);
 	if (!obj) {
 		fprintf(stderr, "Failed to open BPF object\n");
 		return 1;
@@ -386,6 +394,7 @@ int main(int argc, char *argv[])
 
 cleanup:
 	funcinterval_bpf__destroy(obj);
+	cleanup_core_btf(&open_opts);
 
 	return err != 0;
 }
