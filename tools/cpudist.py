@@ -194,11 +194,11 @@ try:
     pid_store = """ns_pid.update(&pid, &ns.pid);
         ns_pid.update(&tgid, &ns.tgid);"""
     pid_translate = """
-        u32 *ns_pid = ns_pid.lookup(&prev_pid);
-        u32 *ns_tgid = ns_pid.lookup(&prev_tgid);
-        if (ns_pid && ns_tgid) {
-            prev_pid = *ns_pid;
-            prev_tgid = *ns_tgid;
+        u32 *ns_pid_val = ns_pid.lookup(&prev_pid);
+        u32 *ns_tgid_val = ns_pid.lookup(&prev_tgid);
+        if (ns_pid_val && ns_tgid_val) {
+            prev_pid = *ns_pid_val;
+            prev_tgid = *ns_tgid_val;
         }
     """
 except:
