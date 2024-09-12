@@ -20,7 +20,6 @@
 #include <iomanip>
 #include <string>
 
-#include <error.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
