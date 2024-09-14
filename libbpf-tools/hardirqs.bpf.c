@@ -14,6 +14,7 @@ const volatile bool filter_cg = false;
 const volatile bool targ_dist = false;
 const volatile bool targ_ns = false;
 const volatile bool do_count = false;
+const volatile int targ_cpu = -1;
 
 struct {
 	__uint(type, BPF_MAP_TYPE_CGROUP_ARRAY);
@@ -38,9 +39,18 @@ struct {
 
 static struct info zero;
 
+static __always_inline bool is_target_cpu() {
+	if (targ_cpu < 0)
+		return true;
+
+	return targ_cpu == bpf_get_smp_processor_id();
+}
+
 static int handle_entry(int irq, struct irqaction *action)
 {
 	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
+	if (!is_target_cpu())
 		return 0;
 
 	if (do_count) {
@@ -74,6 +84,9 @@ static int handle_exit(int irq, struct irqaction *action)
 	u64 *tsp;
 
 	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
+
+	if (!is_target_cpu())
 		return 0;
 
 	tsp = bpf_map_lookup_elem(&start, &key);
