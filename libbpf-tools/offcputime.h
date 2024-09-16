@@ -3,6 +3,8 @@
 #define __OFFCPUTIME_H
 
 #define TASK_COMM_LEN		16
+#define MAX_PID_NR		30
+#define MAX_TID_NR		30
 
 struct key_t {
 	__u32 pid;

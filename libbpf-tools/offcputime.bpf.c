@@ -14,8 +14,8 @@ const volatile bool kernel_threads_only = false;
 const volatile bool user_threads_only = false;
 const volatile __u64 max_block_ns = -1;
 const volatile __u64 min_block_ns = 1;
-const volatile pid_t targ_tgid = -1;
-const volatile pid_t targ_pid = -1;
+const volatile bool filter_by_tgid = false;
+const volatile bool filter_by_pid = false;
 const volatile long state = -1;
 
 struct internal_key {
@@ -42,11 +42,28 @@ struct {
 	__uint(max_entries, MAX_ENTRIES);
 } info SEC(".maps");
 
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, u32);
+	__type(value, u8);
+	__uint(max_entries, MAX_PID_NR);
+} tgids SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, u32);
+	__type(value, u8);
+	__uint(max_entries, MAX_TID_NR);
+} pids SEC(".maps");
+
 static bool allow_record(struct task_struct *t)
 {
-	if (targ_tgid != -1 && targ_tgid != t->tgid)
+	u32 tgid = t->tgid;
+	u32 pid = t->pid;
+
+	if (filter_by_tgid && !bpf_map_lookup_elem(&tgids, &tgid))
 		return false;
-	if (targ_pid != -1 && targ_pid != t->pid)
+	if (filter_by_pid && !bpf_map_lookup_elem(&pids, &pid))
 		return false;
 	if (user_threads_only && t->flags & PF_KTHREAD)
 		return false;
