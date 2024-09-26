@@ -1247,3 +1247,45 @@ bool probe_ringbuf()
 	close(map_fd);
 	return true;
 }
+
+int split_convert(char *s, const char* delim, void *elems, size_t elems_size,
+		  size_t elem_size, convert_fn_t convert)
+{
+	char *token;
+	int ret;
+	char *pos = (char *)elems;
+
+	if (!s || !delim || !elems)
+		return -EINVAL;
+
+	token = strtok(s, delim);
+	while (token) {
+		if (pos + elem_size > (char*)elems + elems_size)
+			return -ENOBUFS;
+
+		ret = convert(token, pos);
+		if (ret)
+			return -ret;
+
+		pos += elem_size;
+		token = strtok(NULL, delim);
+	}
+
+	return 0;
+}
+
+int str_to_int(const char *src, void *dest)
+{
+	errno = 0;
+	*(int*)dest = strtol(src, NULL, 10);
+
+	return errno;
+}
+
+int str_to_long(const char *src, void *dest)
+{
+	errno = 0;
+	*(long*)dest = strtol(src, NULL, 10);
+
+	return errno;
+}
