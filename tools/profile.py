@@ -90,9 +90,9 @@ parser = argparse.ArgumentParser(
     epilog=examples)
 thread_group = parser.add_mutually_exclusive_group()
 thread_group.add_argument("-p", "--pid", type=positive_int_list,
-    help="profile process with one or more comma separated PIDs only")
+    help="profile processes with one or more comma-separated PIDs only")
 thread_group.add_argument("-L", "--tid", type=positive_int_list,
-    help="profile thread with one or more comma separated TIDs only")
+    help="profile threads with one or more comma-separated TIDs only")
 # TODO: add options for user/kernel threads only
 stack_group = parser.add_mutually_exclusive_group()
 stack_group.add_argument("-U", "--user-stacks-only", action="store_true",

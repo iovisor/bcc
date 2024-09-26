@@ -107,8 +107,8 @@ const char argp_program_doc[] =
 "    profile -K          # only show kernel space stacks (no user)\n";
 
 static const struct argp_option opts[] = {
-	{ "pid", 'p', "PID", 0, "profile process with this PID only", 0 },
-	{ "tid", 'L', "TID", 0, "profile thread with this TID only", 0 },
+	{ "pid", 'p', "PID", 0, "profile processes with one or more comma-separated PIDs only", 0 },
+	{ "tid", 'L', "TID", 0, "profile threads with one or more comma-separated TIDs only", 0 },
 	{ "user-stacks-only", 'U', NULL, 0,
 	  "show stacks from user space only (no kernel space stacks)", 0 },
 	{ "kernel-stacks-only", 'K', NULL, 0,
