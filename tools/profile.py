@@ -30,6 +30,7 @@
 from __future__ import print_function
 from bcc import BPF, PerfType, PerfSWConfig
 from bcc.containers import filter_by_containers
+from bcc.utils import printb
 from sys import stderr
 from time import sleep
 import argparse
@@ -130,6 +131,8 @@ parser.add_argument("--cgroupmap",
     help="trace cgroups in this BPF map only")
 parser.add_argument("--mntnsmap",
     help="trace mount namespaces in this BPF map only")
+parser.add_argument("-v", "--verbose", action="store_true",
+    help="show raw addresses")
 
 # option logic
 args = parser.parse_args()
@@ -393,7 +396,11 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
                 print("    [Missed Kernel Stack]")
             else:
                 for addr in kernel_stack:
-                    print("    %s" % aksym(addr).decode('utf-8', 'replace'))
+                    if args.verbose:
+                        printb(b"    0x%-16x %s" % (addr, b.ksym(addr, show_offset=True)))
+                    else:
+                        print("    %s" % aksym(addr).decode('utf-8', 'replace'))
+
         if not args.kernel_stacks_only:
             if need_delimiter and k.user_stack_id >= 0 and k.kernel_stack_id >= 0:
                 print("    --")
@@ -401,7 +408,10 @@ for k, v in sorted(counts.items(), key=lambda counts: counts[1].value):
                 print("    [Missed User Stack]")
             else:
                 for addr in user_stack:
-                    print("    %s" % b.sym(addr, k.pid).decode('utf-8', 'replace'))
+                    if args.verbose:
+                        printb(b"    0x%016x %s" % (addr, b.sym(addr, k.pid, True, True)))
+                    else:
+                        print("    %s" % b.sym(addr, k.pid).decode('utf-8', 'replace'))
         print("    %-16s %s (%d)" % ("-", k.name.decode('utf-8', 'replace'), k.pid))
         print("        %d\n" % v.value)
 
