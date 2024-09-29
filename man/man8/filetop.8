@@ -8,9 +8,11 @@ This is top for files.
 
 This traces file reads and writes, and prints a per-file summary every interval
 (by default, 1 second). By default the summary is sorted on the highest read
-throughput (Kbytes). Sorting order can be changed via -s option. By default only
-IO on regular files is shown. The -a option will list all file types (sockets,
-FIFOs, etc).
+throughput (Kbytes). Sorting order can be changed via -s option and reversed
+via -rev option. By default only IO on regular files is shown. The -a option
+will list all file types (sockets, FIFOs, etc). Only read or only write
+operations can be traced using -ro or -wo options respectively. By default 
+both are traced.
 
 This uses in-kernel eBPF maps to store per process summaries for efficiency.
 
@@ -45,6 +47,15 @@ Sort column. Default is rbytes (read throughput).
 .TP
 \-p PID
 Trace this PID only.
+.TP
+\-rev
+Reverse the sorting order
+.TP
+\-ro
+Trace read operations only
+.TP
+\-wo
+Trace write operations only
 .TP
 interval
 Interval between updates, seconds.
