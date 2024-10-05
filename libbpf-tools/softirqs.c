@@ -24,10 +24,12 @@ struct env {
 	int times;
 	bool timestamp;
 	bool verbose;
+	int targ_cpu;
 } env = {
 	.interval = 99999999,
 	.times = 99999999,
 	.count = false,
+	.targ_cpu = -1,
 };
 
 static volatile bool exiting;
@@ -43,6 +45,7 @@ const char argp_program_doc[] =
 "EXAMPLES:\n"
 "    softirqs            # sum soft irq event time\n"
 "    softirqs -d         # show soft irq event time as histograms\n"
+"    softirqs -c 1       # show soft irq event time on cpu 1\n"
 "    softirqs 1 10       # print 1 second summaries, 10 times\n"
 "    softirqs -NT 1      # 1s summaries, nanoseconds, and timestamps\n";
 
@@ -51,6 +54,7 @@ static const struct argp_option opts[] = {
 	{ "timestamp", 'T', NULL, 0, "Include timestamp on output", 0 },
 	{ "nanoseconds", 'N', NULL, 0, "Output in nanoseconds", 0 },
 	{ "count", 'C', NULL, 0, "Show event counts with timing", 0 },
+	{ "cpu", 'c', "CPU", 0, "Trace this cpu only", 0 },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
@@ -78,6 +82,14 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'C':
 		env.count = true;
+		break;
+	case 'c':
+		errno = 0;
+		env.targ_cpu = atoi(arg);
+		if (errno || env.targ_cpu < 0) {
+			fprintf(stderr, "invalid cpu: %s\n", arg);
+			argp_usage(state);
+		}
 		break;
 	case ARGP_KEY_ARG:
 		errno = 0;
@@ -228,6 +240,7 @@ int main(int argc, char **argv)
 	/* initialize global data (filtering options) */
 	obj->rodata->targ_dist = env.distributed;
 	obj->rodata->targ_ns = env.nanoseconds;
+	obj->rodata->targ_cpu = env.targ_cpu;
 
 	err = softirqs_bpf__load(obj);
 	if (err) {

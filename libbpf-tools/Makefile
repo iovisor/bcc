@@ -11,6 +11,7 @@ LIBBLAZESYM_SRC := $(abspath blazesym/target/release/libblazesym.a)
 INCLUDES := -I$(OUTPUT) -I../src/cc/libbpf/include/uapi
 CFLAGS := -g -O2 -Wall -Wmissing-field-initializers -Werror -Werror=undef
 BPFCFLAGS := -g -O2 -Wall -Werror=undef
+BPFCFLAGS_softirqs := $(BPFCFLAGS) -mcpu=v3
 INSTALL ?= install
 prefix ?= /usr/local
 bindir := $(prefix)/bin
@@ -198,6 +199,8 @@ $(OUTPUT)/%.o: %.c $(wildcard %.h) $(LIBBPF_OBJ) | $(OUTPUT)
 $(OUTPUT)/%.skel.h: $(OUTPUT)/%.bpf.o | $(OUTPUT) $(BPFTOOL)
 	$(call msg,GEN-SKEL,$@)
 	$(Q)$(BPFTOOL) gen skeleton $< > $@
+
+$(OUTPUT)/softirqs.bpf.o: BPFCFLAGS = $(BPFCFLAGS_softirqs)
 
 $(OUTPUT)/%.bpf.o: %.bpf.c $(LIBBPF_OBJ) $(wildcard %.h) $(ARCH)/vmlinux.h | $(OUTPUT)
 	$(call msg,BPF,$@)
