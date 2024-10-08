@@ -257,7 +257,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 
 static int nr_cpus;
 
-static int open_and_attach_perf_event(int freq, struct bpf_program *prog,
+static int open_and_attach_perf_event(struct bpf_program *prog,
 				      struct bpf_link *links[])
 {
 	struct perf_event_attr attr = {
@@ -651,7 +651,7 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	err = open_and_attach_perf_event(env.freq, obj->progs.do_perf_event, links);
+	err = open_and_attach_perf_event(obj->progs.do_perf_event, links);
 	if (err)
 		goto cleanup;
 
