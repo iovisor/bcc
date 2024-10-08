@@ -584,9 +584,9 @@ int main(int argc, char **argv)
 	libbpf_set_print(libbpf_print_fn);
 
 	nr_cpus = libbpf_num_possible_cpus();
-	if (nr_cpus < 0) {
+	if (nr_cpus <= 0) {
 		printf("failed to get # of possible cpus: '%s'!\n",
-		       strerror(-nr_cpus));
+		       nr_cpus ? strerror(-nr_cpus) : "# of possible cpu is zero");
 		return 1;
 	}
 	if (nr_cpus > MAX_CPU_NR) {
