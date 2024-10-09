@@ -16,8 +16,8 @@
 #include "trace_helpers.h"
 
 static struct env {
-	pid_t pid;
-	pid_t tid;
+	pid_t pids[MAX_PID_NR];
+	pid_t tids[MAX_TID_NR];
 	bool user_threads_only;
 	bool kernel_threads_only;
 	int stack_storage_size;
@@ -28,8 +28,6 @@ static struct env {
 	int duration;
 	bool verbose;
 } env = {
-	.pid = -1,
-	.tid = -1,
 	.stack_storage_size = 1024,
 	.perf_max_stack_depth = 127,
 	.min_block_time = 1,
@@ -52,8 +50,8 @@ const char argp_program_doc[] =
 "    offcputime 5           # trace for 5 seconds only\n"
 "    offcputime -m 1000     # trace only events that last more than 1000 usec\n"
 "    offcputime -M 10000    # trace only events that last less than 10000 usec\n"
-"    offcputime -p 185      # only trace threads for PID 185\n"
-"    offcputime -t 188      # only trace thread 188\n"
+"    offcputime -p 185,175,165 # only trace threads for PID 185,175,165\n"
+"    offcputime -t 188,120,134 # only trace threads 188,120,134\n"
 "    offcputime -u          # only trace user threads (no kernel)\n"
 "    offcputime -k          # only trace kernel threads (no user)\n";
 
@@ -62,8 +60,8 @@ const char argp_program_doc[] =
 #define OPT_STATE			3 /* --state */
 
 static const struct argp_option opts[] = {
-	{ "pid", 'p', "PID", 0, "Trace this PID only", 0 },
-	{ "tid", 't', "TID", 0, "Trace this TID only", 0 },
+	{ "pid", 'p', "PID", 0, "Trace these PIDs only, comma-separated list", 0 },
+	{ "tid", 't', "TID", 0, "Trace these TIDs only, comma-separated list", 0 },
 	{ "user-threads-only", 'u', NULL, 0,
 	  "User threads only (no kernel threads)", 0 },
 	{ "kernel-threads-only", 'k', NULL, 0,
@@ -85,6 +83,7 @@ static const struct argp_option opts[] = {
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
 	static int pos_args;
+	int ret;
 
 	switch (key) {
 	case 'h':
@@ -94,18 +93,28 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		env.verbose = true;
 		break;
 	case 'p':
-		errno = 0;
-		env.pid = strtol(arg, NULL, 10);
-		if (errno) {
-			fprintf(stderr, "invalid PID: %s\n", arg);
+		ret = split_convert(strdup(arg), ",", env.pids, sizeof(env.pids),
+				    sizeof(pid_t), str_to_int);
+		if (ret) {
+			if (ret == -ENOBUFS)
+				fprintf(stderr, "the number of pid is too big, please "
+					"increase MAX_PID_NR's value and recompile\n");
+			else
+				fprintf(stderr, "invalid PID: %s\n", arg);
+
 			argp_usage(state);
 		}
 		break;
 	case 't':
-		errno = 0;
-		env.tid = strtol(arg, NULL, 10);
-		if (errno || env.tid <= 0) {
-			fprintf(stderr, "Invalid TID: %s\n", arg);
+		ret = split_convert(strdup(arg), ",", env.tids, sizeof(env.tids),
+				    sizeof(pid_t), str_to_int);
+		if (ret) {
+			if (ret == -ENOBUFS)
+				fprintf(stderr, "the number of tid is too big, please "
+					"increase MAX_TID_NR's value and recompile\n");
+			else
+				fprintf(stderr, "invalid TID: %s\n", arg);
+
 			argp_usage(state);
 		}
 		break;
@@ -281,6 +290,41 @@ cleanup:
 	free(ip);
 }
 
+static bool print_header_threads()
+{
+	int i;
+	bool printed = false;
+
+	if (env.pids[0]) {
+		printf(" PID [");
+		for (i = 0; i < MAX_PID_NR && env.pids[i]; i++)
+			printf("%d%s", env.pids[i], (i < MAX_PID_NR - 1 && env.pids[i + 1]) ? ", " : "]");
+		printed = true;
+	}
+
+	if (env.tids[0]) {
+		printf(" TID [");
+		for (i = 0; i < MAX_TID_NR && env.tids[i]; i++)
+			printf("%d%s", env.tids[i], (i < MAX_TID_NR - 1 && env.tids[i + 1]) ? ", " : "]");
+		printed = true;
+	}
+
+	return printed;
+}
+
+static void print_headers()
+{
+	printf("Tracing off-CPU time (us) of");
+
+	if (!print_header_threads())
+		printf(" all threads");
+
+	if (env.duration < 99999999)
+		printf(" for %d secs.\n", env.duration);
+	else
+		printf("... Hit Ctrl-C to end.\n");
+}
+
 int main(int argc, char **argv)
 {
 	static const struct argp argp = {
@@ -291,7 +335,9 @@ int main(int argc, char **argv)
 	struct syms_cache *syms_cache = NULL;
 	struct ksyms *ksyms = NULL;
 	struct offcputime_bpf *obj;
-	int err;
+	int pids_fd, tids_fd;
+	int err, i;
+	__u8 val = 0;
 
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
 	if (err)
@@ -314,13 +360,17 @@ int main(int argc, char **argv)
 	}
 
 	/* initialize global data (filtering options) */
-	obj->rodata->targ_tgid = env.pid;
-	obj->rodata->targ_pid = env.tid;
 	obj->rodata->user_threads_only = env.user_threads_only;
 	obj->rodata->kernel_threads_only = env.kernel_threads_only;
 	obj->rodata->state = env.state;
 	obj->rodata->min_block_ns = env.min_block_time;
 	obj->rodata->max_block_ns = env.max_block_time;
+
+	/* User space PID and TID correspond to TGID and PID in the kernel, respectively */
+	if (env.pids[0])
+		obj->rodata->filter_by_tgid = true;
+	if (env.tids[0])
+		obj->rodata->filter_by_pid = true;
 
 	bpf_map__set_value_size(obj->maps.stackmap,
 				env.perf_max_stack_depth * sizeof(unsigned long));
@@ -331,6 +381,28 @@ int main(int argc, char **argv)
 		fprintf(stderr, "failed to load BPF programs\n");
 		goto cleanup;
 	}
+
+	if (env.pids[0]) {
+		/* User pids_fd points to the tgids map in the BPF program */
+		pids_fd = bpf_map__fd(obj->maps.tgids);
+		for (i = 0; i < MAX_PID_NR && env.pids[i]; i++) {
+			if (bpf_map_update_elem(pids_fd, &(env.pids[i]), &val, BPF_ANY) != 0) {
+				fprintf(stderr, "failed to init pids map: %s\n", strerror(errno));
+				goto cleanup;
+			}
+		}
+	}
+	if (env.tids[0]) {
+		/* User tids_fd points to the pids map in the BPF program */
+		tids_fd = bpf_map__fd(obj->maps.pids);
+		for (i = 0; i < MAX_TID_NR && env.tids[i]; i++) {
+			if (bpf_map_update_elem(tids_fd, &(env.tids[i]), &val, BPF_ANY) != 0) {
+				fprintf(stderr, "failed to init tids map: %s\n", strerror(errno));
+				goto cleanup;
+			}
+		}
+	}
+
 	ksyms = ksyms__load();
 	if (!ksyms) {
 		fprintf(stderr, "failed to load kallsyms\n");
@@ -349,11 +421,8 @@ int main(int argc, char **argv)
 
 	signal(SIGINT, sig_handler);
 
-	printf("Tracing off-CPU time (us)");
-	if (env.duration < 99999999)
-		printf(" for %d secs.\n", env.duration);
-	else
-		printf("... Hit Ctrl-C to end.\n");
+	print_headers();
+
 	/*
 	 * We'll get sleep interrupted when someone presses Ctrl-C (which will
 	 * be "handled" with noop by sig_handler).

@@ -108,4 +108,16 @@ bool module_btf_exists(const char *mod);
 bool probe_tp_btf(const char *name);
 bool probe_ringbuf();
 
+typedef int (*convert_fn_t)(const char *src, void *dest);
+int split_convert(char *s, const char* delim, void *elems, size_t elems_size,
+		  size_t elem_size, convert_fn_t convert);
+/*
+ * Implementations of convert_fn_t.
+ * This can be replaced with a user-defined callback function.
+ */
+/* converts a string to an integer */
+int str_to_int(const char *src, void *dest);
+/* converts a string to a long integer */
+int str_to_long(const char *src, void *dest);
+
 #endif /* __TRACE_HELPERS_H */

@@ -132,27 +132,6 @@ struct syms_cache *syms_cache;
 struct syms *syms;
 static char syminfo[SYM_INFO_LEN];
 
-static int split_pidstr(char *s, char* sep, int max_split, pid_t *pids)
-{
-	char *pid;
-	int nr = 0;
-
-	errno = 0;
-	pid = strtok(s, sep);
-	while (pid) {
-		if (nr >= max_split)
-			return -ENOBUFS;
-
-		pids[nr++] = strtol(pid, NULL, 10);
-		if (errno)
-			return -errno;
-
-		pid = strtok(NULL, ",");
-	}
-
-	return 0;
-}
-
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
 	static int pos_args;
@@ -166,7 +145,8 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		env.verbose = true;
 		break;
 	case 'p':
-		ret = split_pidstr(strdup(arg), ",", MAX_PID_NR, env.pids);
+		ret = split_convert(strdup(arg), ",", env.pids, sizeof(env.pids),
+				    sizeof(pid_t), str_to_int);
 		if (ret) {
 			if (ret == -ENOBUFS)
 				fprintf(stderr, "the number of pid is too big, please "
@@ -178,7 +158,8 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		}
 		break;
 	case 'L':
-		ret = split_pidstr(strdup(arg), ",", MAX_TID_NR, env.tids);
+		ret = split_convert(strdup(arg), ",", env.tids, sizeof(env.tids),
+				    sizeof(pid_t), str_to_int);
 		if (ret) {
 			if (ret == -ENOBUFS)
 				fprintf(stderr, "the number of tid is too big, please "
