@@ -55,6 +55,7 @@ APPS = \
 	execsnoop \
 	exitsnoop \
 	filelife \
+	filegone \
 	filetop \
 	fsdist \
 	fsslower \
