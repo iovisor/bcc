@@ -124,12 +124,11 @@ static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 
 static int get_libc_path(char *path)
 {
-	FILE *f;
+	char proc_path[PATH_MAX + 32] = {};
 	char buf[PATH_MAX] = {};
-	char map_fname[PATH_MAX] = {};
-	char proc_path[PATH_MAX] = {};
 	char *filename;
 	float version;
+	FILE *f;
 
 	if (libc_path) {
 		memcpy(path, libc_path, strlen(libc_path));
@@ -139,8 +138,8 @@ static int get_libc_path(char *path)
 	if (target_pid == 0) {
 		f = fopen("/proc/self/maps", "r");
 	} else {
-		snprintf(map_fname, sizeof(map_fname), "/proc/%d/maps", target_pid);
-		f = fopen(map_fname, "r");
+		snprintf(buf, sizeof(buf), "/proc/%d/maps", target_pid);
+		f = fopen(buf, "r");
 	}
 	if (!f)
 		return -errno;
