@@ -58,24 +58,23 @@ struct {
 
 static bool allow_record(struct task_struct *t)
 {
-	u32 tgid = t->tgid;
-	u32 pid = t->pid;
+	u32 tgid = BPF_CORE_READ(t, tgid);
+	u32 pid = BPF_CORE_READ(t, pid);
 
 	if (filter_by_tgid && !bpf_map_lookup_elem(&tgids, &tgid))
 		return false;
 	if (filter_by_pid && !bpf_map_lookup_elem(&pids, &pid))
 		return false;
-	if (user_threads_only && t->flags & PF_KTHREAD)
+	if (user_threads_only && (BPF_CORE_READ(t, flags) & PF_KTHREAD))
 		return false;
-	else if (kernel_threads_only && !(t->flags & PF_KTHREAD))
+	else if (kernel_threads_only && !(BPF_CORE_READ(t, flags) & PF_KTHREAD))
 		return false;
 	if (state != -1 && get_task_state(t) != state)
 		return false;
 	return true;
 }
 
-SEC("tp_btf/sched_switch")
-int BPF_PROG(sched_switch, bool preempt, struct task_struct *prev, struct task_struct *next)
+static int handle_sched_switch(void *ctx, bool preempt, struct task_struct *prev, struct task_struct *next)
 {
 	struct internal_key *i_keyp, i_key;
 	struct val_t *valp, val;
@@ -83,28 +82,26 @@ int BPF_PROG(sched_switch, bool preempt, struct task_struct *prev, struct task_s
 	u32 pid;
 
 	if (allow_record(prev)) {
-		pid = prev->pid;
+		pid = BPF_CORE_READ(prev, pid);
 		/* To distinguish idle threads of different cores */
 		if (!pid)
 			pid = bpf_get_smp_processor_id();
 		i_key.key.pid = pid;
-		i_key.key.tgid = prev->tgid;
+		i_key.key.tgid = BPF_CORE_READ(prev, tgid);
 		i_key.start_ts = bpf_ktime_get_ns();
 
-		if (prev->flags & PF_KTHREAD)
+		if (BPF_CORE_READ(prev, flags) & PF_KTHREAD)
 			i_key.key.user_stack_id = -1;
 		else
-			i_key.key.user_stack_id =
-				bpf_get_stackid(ctx, &stackmap,
-						BPF_F_USER_STACK);
+			i_key.key.user_stack_id = bpf_get_stackid(ctx, &stackmap, BPF_F_USER_STACK);
 		i_key.key.kern_stack_id = bpf_get_stackid(ctx, &stackmap, 0);
 		bpf_map_update_elem(&start, &pid, &i_key, 0);
-		bpf_probe_read_kernel_str(&val.comm, sizeof(prev->comm), prev->comm);
+		bpf_probe_read_kernel_str(&val.comm, sizeof(prev->comm), BPF_CORE_READ(prev, comm));
 		val.delta = 0;
 		bpf_map_update_elem(&info, &i_key.key, &val, BPF_NOEXIST);
 	}
 
-	pid = next->pid;
+	pid = BPF_CORE_READ(next, pid);
 	i_keyp = bpf_map_lookup_elem(&start, &pid);
 	if (!i_keyp)
 		return 0;
@@ -122,6 +119,18 @@ int BPF_PROG(sched_switch, bool preempt, struct task_struct *prev, struct task_s
 cleanup:
 	bpf_map_delete_elem(&start, &pid);
 	return 0;
+}
+
+SEC("tp_btf/sched_switch")
+int BPF_PROG(sched_switch, bool preempt, struct task_struct *prev, struct task_struct *next)
+{
+	return handle_sched_switch(ctx, preempt, prev, next);
+}
+
+SEC("raw_tp/sched_switch")
+int BPF_PROG(sched_switch_raw, bool preempt, struct task_struct *prev, struct task_struct *next)
+{
+	return handle_sched_switch(ctx, preempt, prev, next);
 }
 
 char LICENSE[] SEC("license") = "GPL";

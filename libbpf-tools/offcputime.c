@@ -376,6 +376,11 @@ int main(int argc, char **argv)
 				env.perf_max_stack_depth * sizeof(unsigned long));
 	bpf_map__set_max_entries(obj->maps.stackmap, env.stack_storage_size);
 
+	if (!probe_tp_btf("sched_switch"))
+		bpf_program__set_autoload(obj->progs.sched_switch, false);
+	else
+		bpf_program__set_autoload(obj->progs.sched_switch_raw, false);
+
 	err = offcputime_bpf__load(obj);
 	if (err) {
 		fprintf(stderr, "failed to load BPF programs\n");
