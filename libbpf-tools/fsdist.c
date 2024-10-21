@@ -38,6 +38,7 @@ enum fs_type {
 	XFS,
 	F2FS,
 	BCACHEFS,
+	ZFS,
 };
 
 static struct fs_config {
@@ -86,6 +87,13 @@ static struct fs_config {
 		[F_FSYNC] = "bch2_fsync",
 		[F_GETATTR] = "bch2_getattr",
 	}},
+	[ZFS] = { "zfs", {
+		[F_READ] = "zpl_iter_read",
+		[F_WRITE] = "zpl_iter_write",
+		[F_OPEN] = "zpl_open",
+		[F_FSYNC] = "zpl_fsync",
+		[F_GETATTR] = NULL, /* not supported */
+	}},
 };
 
 static char *file_op_names[] = {
@@ -126,7 +134,7 @@ static const struct argp_option opts[] = {
 	{ "timestamp", 'T', NULL, 0, "Print timestamp", 0 },
 	{ "milliseconds", 'm', NULL, 0, "Millisecond histogram", 0 },
 	{ "pid", 'p', "PID", 0, "Process ID to trace", 0 },
-	{ "type", 't', "Filesystem", 0, "Which filesystem to trace, [btrfs/ext4/nfs/xfs/f2fs/bcachefs]", 0 },
+	{ "type", 't', "Filesystem", 0, "Which filesystem to trace, [btrfs/ext4/nfs/xfs/f2fs/bcachefs/zfs]", 0 },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
@@ -159,6 +167,8 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			fs_type = F2FS;
 		} else if (!strcmp(arg, "bcachefs")) {
 			fs_type = BCACHEFS;
+		} else if (!strcmp(arg, "zfs")) {
+			fs_type = ZFS;
 		} else {
 			warn("invalid filesystem\n");
 			argp_usage(state);
@@ -217,6 +227,8 @@ static void alias_parse(char *prog)
 		fs_type = F2FS;
 	} else if (strstr(name, "bcachefsdist")){
 		fs_type = BCACHEFS;
+	} else if (strstr(name, "zfsdist")) {
+		fs_type = ZFS;
 	}
 }
 
