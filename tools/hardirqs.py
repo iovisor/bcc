@@ -244,7 +244,7 @@ while (1):
     if args.dist:
         dist.print_log2_hist(label, "hardirq", section_print_fn=bytes.decode)
     else:
-        print("%-26s %11s" % ("HARDIRQ", "TOTAL_" + label))
+        print("%-26s %11s" % ("HARDIRQ", "TOTAL_" + label.upper()))
         for k, v in sorted(dist.items(), key=lambda dist: dist[1].value):
             print("%-26s %11d" % (k.name.decode('utf-8', 'replace'), v.value / factor))
     dist.clear()
