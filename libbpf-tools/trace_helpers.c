@@ -233,6 +233,23 @@ struct syms {
 	int dso_sz;
 };
 
+const char* elf_type_to_string(enum elf_type type) {
+    switch (type) {
+        case EXEC:
+            return "EXEC";
+        case DYN:
+            return "DYN";
+        case PERF_MAP:
+            return "PERF_MAP";
+        case VDSO:
+            return "VDSO";
+        case UNKNOWN:
+            return "UNKNOWN";
+        default:
+            return "INVALID";
+    }
+}
+
 static bool is_file_backed(const char *mapname)
 {
 #define STARTS_WITH(mapname, prefix) \
@@ -934,6 +951,32 @@ static void print_stars(unsigned int val, unsigned int val_max, int width)
 		printf(" ");
 	if (need_plus)
 		printf("+");
+}
+
+static void print_dso_info(struct dso *dso) {
+	printf("path = \"%s\", pid = %ld, ranges = [", dso->name, (long)dso->tgid);
+
+	for (int i = 0; i < dso->range_sz; i++) {
+		struct load_range *range = &dso->ranges[i];
+		printf("{start = 0x%lx, end = 0x%lx, file_off = 0x%lx}",
+				range->start, range->end, range->file_off);
+		if (i < dso->range_sz - 1) {
+			printf(", ");
+		}
+	}
+	printf("], range_sz = %d, sh_addr = 0x%lx, sh_offset = 0x%lx, type = %s\n",
+			dso->range_sz, dso->sh_addr, dso->sh_offset, elf_type_to_string(dso->type));
+}
+
+void print_dsos_info(struct syms_cache *syms_cache) {
+	for (int i = 0; i < syms_cache->nr; i++) {
+		struct syms *syms = syms_cache->data[i].syms;
+		if (!syms)
+			continue;
+		for (int j = 0; j < syms->dso_sz; j++) {
+			print_dso_info(&syms->dsos[j]);
+		}
+	}
 }
 
 void print_log2_hist(unsigned int *vals, int vals_size, const char *val_type)

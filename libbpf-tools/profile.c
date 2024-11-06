@@ -70,6 +70,7 @@ static struct env {
 	pid_t tids[MAX_TID_NR];
 	bool user_stacks_only;
 	bool kernel_stacks_only;
+	bool addrs_only;
 	bool refresh_dsos;
 	int stack_storage_size;
 	int perf_max_stack_depth;
@@ -106,6 +107,7 @@ const char argp_program_doc[] =
 "    profile -p 185      # only profile process with PID 185\n"
 "    profile -L 185      # only profile thread with TID 185\n"
 "    profile -U          # only show user space stacks (no kernel)\n"
+"    profile -A          # only output addresses\n"
 "    profile -R          # refresh DSO list during profiling execution\n"
 "    profile -K          # only show kernel space stacks (no user)\n";
 
@@ -116,6 +118,8 @@ static const struct argp_option opts[] = {
 	  "show stacks from user space only (no kernel space stacks)", 0 },
 	{ "kernel-stacks-only", 'K', NULL, 0,
 	  "show stacks from kernel space only (no user space stacks)", 0 },
+	{ "addrs-only", 'A', NULL, 0,
+	  "output addresses only on final charts (no symbol resolution), also appending extra DSO info section", 0 },
 	{ "refresh-dsos", 'R', NULL, 0,
 	  "refresh DSO list during profiling execution, not just at its end "
 	  "(to catch short-lived processes)", 0 },
@@ -182,6 +186,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'K':
 		env.kernel_stacks_only = true;
+		break;
+	case 'A':
+		env.addrs_only = true;
 		break;
 	case 'R':
 		env.refresh_dsos = true;
@@ -336,6 +343,13 @@ static int read_counts_map(int fd, struct key_ext_t *items, __u32 *count)
 
 static const char *ksymname(unsigned long addr)
 {
+	static char addr_str[32];
+
+	if (env.addrs_only) {
+		snprintf(addr_str, sizeof(addr_str), "[0x%lx]", addr);
+		return addr_str;
+	}
+
 	const struct ksym *ksym = ksyms__map_addr(ksyms, addr);
 
 	if (!env.verbose)
@@ -375,6 +389,12 @@ static const char *usyminfo(unsigned long addr)
 static const char *usymname(unsigned long addr)
 {
 	const struct sym *sym;
+	static char addr_str[32];
+
+	if (env.addrs_only) {
+		snprintf(addr_str, sizeof(addr_str), "[0x%lx]", addr);
+		return addr_str;
+	}
 
 	if (!env.verbose) {
 		sym = syms__map_addr(syms, addr);
@@ -555,6 +575,15 @@ static int print_counts(int counts_map, int stack_map)
 		/* handle stack id errors */
 		nr_missing_stacks += MISSING_STACKS(event->user_stack_id, event->kern_stack_id);
 		has_collision = CHECK_STACK_COLLISION(event->user_stack_id, event->kern_stack_id);
+	}
+
+
+	if (env.addrs_only) {
+		//separator into next section
+		printf("==========\n");
+		print_dsos_info(syms_cache);
+		//separator again (to accomodate kernel symbols)
+		printf("==========\n");
 	}
 
 	if (nr_missing_stacks > 0) {
