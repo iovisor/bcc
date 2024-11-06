@@ -70,6 +70,7 @@ static struct env {
 	pid_t tids[MAX_TID_NR];
 	bool user_stacks_only;
 	bool kernel_stacks_only;
+	bool refresh_dsos;
 	int stack_storage_size;
 	int perf_max_stack_depth;
 	int duration;
@@ -105,6 +106,7 @@ const char argp_program_doc[] =
 "    profile -p 185      # only profile process with PID 185\n"
 "    profile -L 185      # only profile thread with TID 185\n"
 "    profile -U          # only show user space stacks (no kernel)\n"
+"    profile -R          # refresh DSO list during profiling execution\n"
 "    profile -K          # only show kernel space stacks (no user)\n";
 
 static const struct argp_option opts[] = {
@@ -114,6 +116,9 @@ static const struct argp_option opts[] = {
 	  "show stacks from user space only (no kernel space stacks)", 0 },
 	{ "kernel-stacks-only", 'K', NULL, 0,
 	  "show stacks from kernel space only (no user space stacks)", 0 },
+	{ "refresh-dsos", 'R', NULL, 0,
+	  "refresh DSO list during profiling execution, not just at its end "
+	  "(to catch short-lived processes)", 0 },
 	{ "frequency", 'F', "FREQUENCY", 0, "sample frequency, Hertz", 0 },
 	{ "delimited", 'd', NULL, 0, "insert delimiter between kernel/user stacks", 0 },
 	{ "include-idle ", 'I', NULL, 0, "include CPU idle stacks", 0 },
@@ -132,6 +137,7 @@ struct ksyms *ksyms;
 struct syms_cache *syms_cache;
 struct syms *syms;
 static char syminfo[SYM_INFO_LEN];
+volatile bool keep_running = true;
 
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
@@ -176,6 +182,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'K':
 		env.kernel_stacks_only = true;
+		break;
+	case 'R':
+		env.refresh_dsos = true;
 		break;
 	case 'F':
 		errno = 0;
@@ -288,6 +297,7 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 
 static void sig_handler(int sig)
 {
+	keep_running = false;
 }
 
 static int cmp_counts(const void *a, const void *b)
@@ -460,6 +470,58 @@ static int print_count(struct key_t *event, __u64 count, int stack_map, bool fol
 	free(ip);
 
 	return 0;
+}
+
+static void bump_dso(struct key_t *event, int stack_map, unsigned long *ip)
+{
+	if (bpf_map_lookup_elem(stack_map, &event->user_stack_id, ip) != 0) {
+		return;
+	} else {
+		syms_cache__get_syms(syms_cache, event->pid);
+	}
+}
+
+static int refresh_dso(struct key_t *event, int stack_map)
+{
+	unsigned long *ip;
+
+	ip = calloc(env.perf_max_stack_depth, sizeof(unsigned long));
+	if (!ip) {
+		fprintf(stderr, "failed to alloc ip\n");
+		return -ENOMEM;
+	}
+
+	bump_dso(event, stack_map, ip);
+
+	free(ip);
+
+	return 0;
+}
+
+static int refresh_dsos(int counts_map, int stack_map)
+{
+	struct key_ext_t *counts;
+	__u32 nr_count = MAX_ENTRIES;
+	int i, ret = 0;
+
+	counts = calloc(MAX_ENTRIES, sizeof(struct key_ext_t));
+	if (!counts) {
+		fprintf(stderr, "Out of memory\n");
+		return -ENOMEM;
+	}
+
+	ret = read_counts_map(counts_map, counts, &nr_count);
+	if (ret)
+		goto cleanup;
+
+	for (i = 0; i < nr_count; i++) {
+		refresh_dso(&counts[i].k, stack_map);
+	}
+
+cleanup:
+	free(counts);
+
+	return ret;
 }
 
 static int print_counts(int counts_map, int stack_map)
@@ -659,15 +721,24 @@ int main(int argc, char **argv)
 		goto cleanup;
 
 	signal(SIGINT, sig_handler);
-
-	if (!env.folded)
-		print_headers();
+	signal(SIGALRM, sig_handler);
 
 	/*
 	 * We'll get sleep interrupted when someone presses Ctrl-C.
 	 * (which will be "handled" with noop by sig_handler)
 	 */
-	sleep(env.duration);
+	if (env.refresh_dsos) {
+		alarm(env.duration);
+		while (keep_running) {
+			refresh_dsos(bpf_map__fd(obj->maps.counts),
+				     bpf_map__fd(obj->maps.stackmap));
+			usleep(100000);
+		}
+	} else
+		sleep(env.duration);
+
+	if (!env.folded)
+		print_headers();
 
 	print_counts(bpf_map__fd(obj->maps.counts),
 		     bpf_map__fd(obj->maps.stackmap));
