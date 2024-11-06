@@ -198,6 +198,7 @@ enum elf_type {
 
 struct dso {
 	char *name;
+	pid_t tgid;
 	struct load_range *ranges;
 	int range_sz;
 	/* Dyn's first text section virtual addr at execution */
@@ -320,7 +321,7 @@ err_out:
 	return err;
 }
 
-static int syms__add_dso(struct syms *syms, struct map *map, const char *name)
+static int syms__add_dso(struct syms *syms, struct map *map, const char *name, pid_t tgid)
 {
 	struct dso *dso = NULL;
 	int i, type;
@@ -348,6 +349,7 @@ static int syms__add_dso(struct syms *syms, struct map *map, const char *name)
 	tmp = realloc(dso->ranges, (dso->range_sz + 1) * sizeof(*dso->ranges));
 	if (!tmp)
 		return -1;
+	dso->tgid = tgid;
 	dso->ranges = tmp;
 	dso->ranges[dso->range_sz].start = map->start_addr;
 	dso->ranges[dso->range_sz].end = map->end_addr;
@@ -654,7 +656,7 @@ static struct sym *dso__find_sym(struct dso *dso, uint64_t offset)
 	return NULL;
 }
 
-struct syms *syms__load_file(const char *fname)
+struct syms *syms__load_file(const char *fname, pid_t tgid)
 {
 	char buf[PATH_MAX], perm[5];
 	struct syms *syms;
@@ -693,7 +695,7 @@ struct syms *syms__load_file(const char *fname)
 		if (!is_file_backed(name))
 			continue;
 
-		if (syms__add_dso(syms, &map, name))
+		if (syms__add_dso(syms, &map, name, tgid))
 			goto err_out;
 	}
 
@@ -711,7 +713,7 @@ struct syms *syms__load_pid(pid_t tgid)
 	char fname[128];
 
 	snprintf(fname, sizeof(fname), "/proc/%ld/maps", (long)tgid);
-	return syms__load_file(fname);
+	return syms__load_file(fname, tgid);
 }
 
 void syms__free(struct syms *syms)

@@ -37,7 +37,7 @@ struct sym_info {
 struct syms;
 
 struct syms *syms__load_pid(int tgid);
-struct syms *syms__load_file(const char *fname);
+struct syms *syms__load_file(const char *fname, pid_t tgid);
 void syms__free(struct syms *syms);
 const struct sym *syms__map_addr(const struct syms *syms, unsigned long addr);
 int syms__map_addr_dso(const struct syms *syms, unsigned long addr,
