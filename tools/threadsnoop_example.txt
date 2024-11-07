@@ -25,3 +25,16 @@ The output shows a dockerd process creating several threads with the start
 routine threadentry(), and docker-containe (truncated) and systemd-journal
 also starting threads: in their cases, the function had no symbol information
 available, so their addresses are printed in hex.
+
+USAGE message:
+
+# ./threadsnoop.py -h
+usage: threadsnoop.py [-h]
+
+List new thread creation.
+
+options:
+  -h, --help  show this help message and exit
+
+examples:
+    ./threadsnoop        # list new thread creation
