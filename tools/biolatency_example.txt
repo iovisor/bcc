@@ -201,7 +201,7 @@ and 32 ms, whereas xvdc is usually between 0.2 ms and 4 ms.
 The -F option prints a separate histogram for each unique set of request
 flags. For example:
 
-./biolatency.py -Fm
+# ./biolatency.py -Fm
 Tracing block device I/O... Hit Ctrl-C to end.
 ^C
 
