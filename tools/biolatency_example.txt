@@ -194,7 +194,7 @@ Bucket disk = 'xvda1'
      16384 -> 32767      : 20       |***********                             |
      32768 -> 65535      : 7        |***                                     |
 
-This output sows that xvda1 has much higher latency, usually between 0.5 ms
+This output shows that xvda1 has much higher latency, usually between 0.5 ms
 and 32 ms, whereas xvdc is usually between 0.2 ms and 4 ms.
 
 
