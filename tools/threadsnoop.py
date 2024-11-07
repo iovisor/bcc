@@ -14,6 +14,20 @@
 
 from __future__ import print_function
 from bcc import BPF
+import argparse
+
+examples = """examples:
+    ./threadsnoop        # list new thread creation
+"""
+
+description = """
+List new thread creation.
+"""
+
+parser = argparse.ArgumentParser(description=description,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=examples)
+args = parser.parse_args()
 
 # load BPF program
 b = BPF(text="""
