@@ -289,7 +289,7 @@ flags = Priority-Metadata-Write
      msecs               : count     distribution
          0 -> 1          : 9        |****************************************|
 
-These can be handled differently by the storage device, and this mode lets us
+These can be handled differently by the request flags, and this mode lets us
 examine their performance in isolation.
 
 
