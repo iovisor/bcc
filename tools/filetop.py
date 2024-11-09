@@ -171,11 +171,11 @@ if debug or args.ebpf:
 
 # initialize BPF
 b = BPF(text=bpf_text)
-if args.readonly and args.writeonly:
+if args.read_only and args.write_only:
     raise Exception("Both read-only and write-only flags passed")
-elif args.readonly:
+elif args.read_only:
     b.attach_kprobe(event="vfs_read", fn_name="trace_read_entry")
-elif args.writeonly:
+elif args.write_only:
     b.attach_kprobe(event="vfs_write", fn_name="trace_write_entry")
 else:
     b.attach_kprobe(event="vfs_read", fn_name="trace_read_entry")
