@@ -4,6 +4,7 @@
 
 #define ALLOCS_MAX_ENTRIES 1000000
 #define COMBINED_ALLOCS_MAX_ENTRIES 10240
+#define MAP_FAILED -1
 
 struct alloc_info {
 	__u64 size;
