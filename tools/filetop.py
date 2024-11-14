@@ -4,7 +4,8 @@
 # filetop  file reads and writes by process.
 #          For Linux, uses BCC, eBPF.
 #
-# USAGE: filetop.py [-h] [-C] [-r MAXROWS] [interval] [count]
+# USAGE: filetop.py [-h] [-a] [-C] [-r MAXROWS] [-p PID] [--read-only]
+#                   [--write-only] [interval] [count]
 #
 # This uses in-kernel eBPF maps to store per process summaries for efficiency.
 #
@@ -21,11 +22,13 @@ from subprocess import call
 
 # arguments
 examples = """examples:
-    ./filetop            # file I/O top, 1 second refresh
-    ./filetop -C         # don't clear the screen
-    ./filetop -p 181     # PID 181 only
-    ./filetop 5          # 5 second summaries
-    ./filetop 5 10       # 5 second summaries, 10 times only
+    ./filetop                 # file I/O top, 1 second refresh
+    ./filetop -C              # don't clear the screen
+    ./filetop -p 181          # PID 181 only
+    ./filetop 5               # 5 second summaries
+    ./filetop 5 10            # 5 second summaries, 10 times only
+    ./filetop 5 --read-only   # 5 second summaries, only read operations traced
+    ./filetop 5 --write-only  # 5 second summaries, only write operations traced
 """
 parser = argparse.ArgumentParser(
     description="File reads and writes by process",
@@ -42,6 +45,10 @@ parser.add_argument("-s", "--sort", default="all",
     help="sort column, default all")
 parser.add_argument("-p", "--pid", type=int, metavar="PID", dest="tgid",
     help="trace this PID only")
+parser.add_argument("--read-only", action="store_true",
+    help="trace only reads")
+parser.add_argument("--write-only", action="store_true",
+    help="trace only writes")
 parser.add_argument("interval", nargs="?", default=1,
     help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
@@ -164,8 +171,16 @@ if debug or args.ebpf:
 
 # initialize BPF
 b = BPF(text=bpf_text)
-b.attach_kprobe(event="vfs_read", fn_name="trace_read_entry")
-b.attach_kprobe(event="vfs_write", fn_name="trace_write_entry")
+if args.read_only and args.write_only:
+    raise Exception("Both read-only and write-only flags passed")
+elif args.read_only:
+    b.attach_kprobe(event="vfs_read", fn_name="trace_read_entry")
+elif args.write_only:
+    b.attach_kprobe(event="vfs_write", fn_name="trace_write_entry")
+else:
+    b.attach_kprobe(event="vfs_read", fn_name="trace_read_entry")
+    b.attach_kprobe(event="vfs_write", fn_name="trace_write_entry")
+    
 
 # check whether hash table batch ops is supported
 htab_batch_ops = True if BPF.kernel_struct_has_field(b'bpf_map_ops',
