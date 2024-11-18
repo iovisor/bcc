@@ -35,7 +35,7 @@ static struct env {
 	bool trace_all;
 	bool show_allocs;
 	bool combined_only;
-	int min_age_ns;
+	long min_age_ns;
 	uint64_t sample_rate;
 	int top_stacks;
 	size_t min_size;
@@ -508,10 +508,11 @@ long argp_parse_long(int key, const char *arg, struct argp_state *state)
 error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 {
 	static int pos_args = 0;
+	long age_ms;
 
 	switch (key) {
 	case 'p':
-		env.pid = atoi(arg);
+		env.pid = argp_parse_long(key, arg, state);
 		break;
 	case 't':
 		env.trace_all = true;
@@ -520,7 +521,12 @@ error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 		env.show_allocs = true;
 		break;
 	case 'o':
-		env.min_age_ns = 1e6 * atoi(arg);
+		age_ms = argp_parse_long(key, arg, state);
+		if (age_ms > (LONG_MAX / 1e6) || age_ms < (LONG_MIN / 1e6)) {
+			fprintf(stderr, "invalid AGE_MS: %s\n", arg);
+			argp_usage(state);
+		}
+		env.min_age_ns = age_ms * 1e6;
 		break;
 	case 'c':
 		strncpy(env.command, arg, sizeof(env.command) - 1);
@@ -538,7 +544,7 @@ error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 		strncpy(env.symbols_prefix, arg, sizeof(env.symbols_prefix) - 1);
 		break;
 	case 'T':
-		env.top_stacks = atoi(arg);
+		env.top_stacks = argp_parse_long(key, arg, state);
 		break;
 	case 'z':
 		env.min_size = argp_parse_long(key, arg, state);
