@@ -281,7 +281,6 @@ int main(int argc, char *argv[])
 	printf("using page size: %ld\n", env.page_size);
 
 	env.kernel_trace = env.pid < 0 && !strlen(env.command);
-	printf("tracing kernel: %s\n", env.kernel_trace ? "true" : "false");
 
 	// if specific userspace program was specified,
 	// create the child process and use an eventfd to synchronize the call to exec()
@@ -389,12 +388,15 @@ int main(int argc, char *argv[])
 
 	// if userspace oriented, attach uprobes
 	if (!env.kernel_trace) {
+		printf("Attaching to pid %d, Ctrl+C to quit.\n", env.pid);
 		ret = attach_uprobes(skel);
 		if (ret) {
 			fprintf(stderr, "failed to attach uprobes\n");
 
 			goto cleanup;
 		}
+	} else {
+		printf("Attaching to kernel allocators, Ctrl+C to quit.\n");
 	}
 
 	ret = memleak_bpf__attach(skel);
@@ -445,8 +447,6 @@ int main(int argc, char *argv[])
 		print_stack_frames_func = print_stack_frames_by_syms_cache;
 	}
 #endif
-
-	printf("Tracing outstanding memory allocs...  Hit Ctrl-C to end\n");
 
 	// main loop
 	while (!exiting && env.nr_intervals) {
