@@ -59,6 +59,7 @@ APPS = \
 	filetop \
 	fsdist \
 	fsslower \
+	funcinterval \
 	funclatency \
 	gethostlatency \
 	hardirqs \
