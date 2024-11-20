@@ -17,6 +17,9 @@ const volatile bool user_stacks_only = false;
 const volatile bool include_idle = false;
 const volatile bool filter_by_pid = false;
 const volatile bool filter_by_tid = false;
+const volatile bool use_pidns = false;
+const volatile __u64 pidns_dev = 0;
+const volatile __u64 pidns_ino = 0;
 
 struct {
 	__uint(type, BPF_MAP_TYPE_STACK_TRACE);
@@ -47,12 +50,23 @@ struct {
 SEC("perf_event")
 int do_perf_event(struct bpf_perf_event_data *ctx)
 {
-	u64 id = bpf_get_current_pid_tgid();
-	u32 pid = id >> 32;
-	u32 tid = id;
 	u64 *valp;
 	static const u64 zero;
 	struct key_t key = {};
+	u64 id;
+	u32 pid;
+	u32 tid;
+	struct bpf_pidns_info ns = {};
+
+	if (use_pidns && !bpf_get_ns_current_pid_tgid(pidns_dev, pidns_ino, &ns,
+						      sizeof(ns))) {
+		pid = ns.tgid;
+		tid = ns.pid;
+	} else {
+		id = bpf_get_current_pid_tgid();
+		pid = id >> 32;
+		tid = id;
+	}
 
 	if (!include_idle && tid == 0)
 		return 0;
