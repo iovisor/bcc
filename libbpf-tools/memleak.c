@@ -1060,9 +1060,15 @@ int attach_uprobes(struct memleak_bpf *skel)
 	if (strlen(env.symbols_prefix)) {
 		ATTACH_UPROBE(skel, mmap, mmap_enter);
 		ATTACH_URETPROBE(skel, mmap, mmap_exit);
+
+		ATTACH_UPROBE(skel, mremap, mmap_enter);
+		ATTACH_URETPROBE(skel, mremap, mmap_exit);
 	} else {
 		ATTACH_UPROBE_CHECKED(skel, mmap, mmap_enter);
 		ATTACH_URETPROBE_CHECKED(skel, mmap, mmap_exit);
+
+		ATTACH_UPROBE_CHECKED(skel, mremap, mremap_enter);
+		ATTACH_URETPROBE_CHECKED(skel, mremap, mremap_exit);
 	}
 
 	ATTACH_UPROBE_CHECKED(skel, posix_memalign, posix_memalign_enter);
