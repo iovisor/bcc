@@ -511,6 +511,9 @@ static int set_pidns(const struct profile_bpf *obj)
 {
 	struct stat statbuf;
 
+	if (!probe_bpf_ns_current_pid_tgid())
+		return -EPERM;
+
 	if (stat("/proc/self/ns/pid", &statbuf) == -1)
 		return -errno;
 
