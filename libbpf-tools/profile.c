@@ -66,7 +66,7 @@ struct fmt_t stacktrace_formats[] = {
 	{ true, ";", "", "-" }		/* folded */
 };
 
-#define pr_format(str, fmt)		printf("%s%s%s", fmt->prefix, str, fmt->suffix)
+#define pr_format(fd, str, fmt)		dprintf(fd, "%s%s%s", fmt->prefix, str, fmt->suffix)
 
 #define DSO_TIMER_INTERVAL_MS 100
 
@@ -93,6 +93,7 @@ int poll_fds[POLL_FD_COUNT];
 static struct env {
 	pid_t pids[MAX_PID_NR];
 	pid_t tids[MAX_TID_NR];
+	char *output_path;
 	bool user_stacks_only;
 	bool kernel_stacks_only;
 	bool addrs_only;
@@ -131,6 +132,7 @@ const char argp_program_doc[] =
 "    profile 5           # profile at 49 Hertz for 5 seconds only\n"
 "    profile -f          # output in folded format for flame graphs\n"
 "    profile -P          # run in an infinite loop, triggered by PSI watermarks\n"
+"    profile -o /tmp/f   # save output to that file (not stdout)\n"
 "    profile -p 185      # only profile process with PID 185\n"
 "    profile -L 185      # only profile thread with TID 185\n"
 "    profile -U          # only show user space stacks (no kernel)\n"
@@ -154,7 +156,10 @@ static const struct argp_option opts[] = {
 	{ "delimited", 'd', NULL, 0, "insert delimiter between kernel/user stacks", 0 },
 	{ "include-idle ", 'I', NULL, 0, "include CPU idle stacks", 0 },
 	{ "folded", 'f', NULL, 0, "output folded format, one line per stack (for flame graphs)", 0 },
-	{ "psi-trigger", 'P', "PERCENT", 0, "run [duration] profiling burts in an infinite loop, triggered by this PSI watermark (percentage stalled I/O or memory or CPU access over a 1s time window--0 means unset)", 0 },
+	{ "psi-trigger", 'P', "PERCENT", 0, "run [duration] profiling burts in an infinite loop, triggered by this"
+	  " PSI watermark (percentage stalled I/O or memory or CPU access over a 1s time window--0 means unset)", 0 },
+	{ "output-path", 'o', "PATH", 0, "Path to file(s) where to write output, instead of standard output. "
+	  "In case of psi-loop mode, a timestamp suffix will be added, for each run", 0 },
 	{ "stack-storage-size", OPT_STACK_STORAGE_SIZE, "STACK-STORAGE-SIZE", 0,
 	  "the number of unique stack traces that can be stored and displayed (default 1024)", 0 },
 	{ "cpu", 'C', "CPU", 0, "cpu number to run profile on", 0 },
@@ -245,6 +250,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'f':
 		env.folded = true;
+		break;
+	case 'o':
+		env.output_path = strdup(arg);
 		break;
 	case 'P':
 		errno = 0;
@@ -513,39 +521,39 @@ static const char *usymname(unsigned long addr)
 	return usyminfo(addr);
 }
 
-static void print_stacktrace(unsigned long *ip, symname_fn_t symname, struct fmt_t *f)
+static void print_stacktrace(int fd, unsigned long *ip, symname_fn_t symname, struct fmt_t *f)
 {
 	int i;
 
 	if (!f->folded) {
 		for (i = 0; ip[i] && i < env.perf_max_stack_depth; i++)
-			pr_format(symname(ip[i]), f);
+			pr_format(fd, symname(ip[i]), f);
 		return;
 	} else {
 		for (i = env.perf_max_stack_depth - 1; i >= 0; i--) {
 			if (!ip[i])
 				continue;
 
-			pr_format(symname(ip[i]), f);
+			pr_format(fd, symname(ip[i]), f);
 		}
 	}
 }
 
-static bool print_user_stacktrace(struct key_t *event, int stack_map,
+static bool print_user_stacktrace(int fd, struct key_t *event, int stack_map,
 				  unsigned long *ip, struct fmt_t *f, bool delim)
 {
 	if (env.kernel_stacks_only || STACK_ID_EFAULT(event->user_stack_id))
 		return false;
 
 	if (delim)
-		pr_format(f->delim, f);
+		pr_format(fd, f->delim, f);
 
 	if (bpf_map_lookup_elem(stack_map, &event->user_stack_id, ip) != 0) {
-		pr_format("[Missed User Stack]", f);
+		pr_format(fd, "[Missed User Stack]", f);
 	} else {
 		syms = syms_cache__get_syms(syms_cache, event->pid);
 		if (syms)
-			print_stacktrace(ip, usymname, f);
+			print_stacktrace(fd, ip, usymname, f);
 		else if (!f->folded)
 			fprintf(stderr, "failed to get syms\n");
 	}
@@ -553,24 +561,24 @@ static bool print_user_stacktrace(struct key_t *event, int stack_map,
 	return true;
 }
 
-static bool print_kern_stacktrace(struct key_t *event, int stack_map,
+static bool print_kern_stacktrace(int fd, struct key_t *event, int stack_map,
 				  unsigned long *ip, struct fmt_t *f, bool delim)
 {
 	if (env.user_stacks_only || STACK_ID_EFAULT(event->kern_stack_id))
 		return false;
 
 	if (delim)
-		pr_format(f->delim, f);
+		pr_format(fd, f->delim, f);
 
 	if (bpf_map_lookup_elem(stack_map, &event->kern_stack_id, ip) != 0)
-		pr_format("[Missed Kernel Stack]", f);
+		pr_format(fd, "[Missed Kernel Stack]", f);
 	else
-		print_stacktrace(ip, ksymname, f);
+		print_stacktrace(fd, ip, ksymname, f);
 
 	return true;
 }
 
-static int print_count(struct key_t *event, __u64 count, int stack_map, bool folded)
+static int print_count(int fd, struct key_t *event, __u64 count, int stack_map, bool folded)
 {
 	unsigned long *ip;
 	int ret;
@@ -584,16 +592,16 @@ static int print_count(struct key_t *event, __u64 count, int stack_map, bool fol
 
 	if (!folded) {
 		/* multi-line stack output */
-		ret = print_kern_stacktrace(event, stack_map, ip, fmt, false);
-		print_user_stacktrace(event, stack_map, ip, fmt, ret && env.delimiter);
-		printf("    %-16s %s (%d)\n", "-", event->name, event->pid);
-		printf("        %lld\n\n", count);
+		ret = print_kern_stacktrace(fd, event, stack_map, ip, fmt, false);
+		print_user_stacktrace(fd, event, stack_map, ip, fmt, ret && env.delimiter);
+		dprintf(fd, "    %-16s %s (%d)\n", "-", event->name, event->pid);
+		dprintf(fd, "        %lld\n\n", count);
 	} else {
 		/* folded stack output */
-		printf("%s", event->name);
-		ret = print_user_stacktrace(event, stack_map, ip, fmt, false);
-		print_kern_stacktrace(event, stack_map, ip, fmt, ret && env.delimiter);
-		printf(" %lld\n", count);
+		dprintf(fd, "%s", event->name);
+		ret = print_user_stacktrace(fd, event, stack_map, ip, fmt, false);
+		print_kern_stacktrace(fd, event, stack_map, ip, fmt, ret && env.delimiter);
+		dprintf(fd, " %lld\n", count);
 	}
 
 	free(ip);
@@ -653,6 +661,56 @@ cleanup:
 	return ret;
 }
 
+static void copy_between_fds(int src_fd, int dest_fd) {
+    char buffer[PATH_MAX];
+    ssize_t bytes;
+    while ((bytes = read(src_fd, buffer, sizeof(buffer))) > 0) {
+        write(dest_fd, buffer, bytes);
+    }
+}
+
+static void print_dsos_and_ksyms(int fd)
+{
+	//separator into next section
+	dprintf(fd, "==========\n");
+	print_dsos_info(fd, syms_cache);
+	//separator again (to accomodate kernel symbols)
+	dprintf(fd, "==========\n");
+	int proc_fd = open("/proc/kallsyms", O_RDONLY);
+	if (proc_fd < 0) {
+		perror("Failed to open /proc/kallsyms");
+		return;
+	}
+	//splice and friends seem to hate /proc files, so go with a
+	//buffered copy
+	copy_between_fds(proc_fd, fd);
+	close(proc_fd);
+}
+
+static char *compute_path_with_timestamp(const char *path) {
+    static char final_path[PATH_MAX];
+    char base_path[PATH_MAX], ext[64] = "";
+    time_t now;
+    struct tm *timeinfo;
+
+    const char *dot = strrchr(path, '.');
+    if (dot) {
+        snprintf(base_path, dot - path + 1, "%s", path);
+        snprintf(ext, sizeof(ext), "%s", dot);
+    } else {
+        strcpy(base_path, path);
+    }
+
+    time(&now);
+    timeinfo = localtime(&now);
+
+    char timestamp[32];
+    strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", timeinfo);
+    snprintf(final_path, sizeof(final_path), "%s_%s%s", base_path, timestamp, ext);
+
+    return final_path;
+}
+
 static int print_counts(int counts_map, int stack_map)
 {
 	struct key_ext_t *counts;
@@ -675,11 +733,21 @@ static int print_counts(int counts_map, int stack_map)
 
 	qsort(counts, nr_count, sizeof(struct key_ext_t), cmp_counts);
 
+	int fd;
+	if (env.output_path) {
+		const char *fpath = env.output_path;
+		if (env.psi_percent)
+			fpath = compute_path_with_timestamp(fpath);
+		fd = open(fpath, O_RDWR | O_CREAT | O_TRUNC, 0644);
+	} else {
+		fd = STDOUT_FILENO;
+	}
+
 	for (i = 0; i < nr_count; i++) {
 		event = &counts[i].k;
 		count = counts[i].v;
 
-		print_count(event, count, stack_map, env.folded);
+		print_count(fd, event, count, stack_map, env.folded);
 
 		/* handle stack id errors */
 		nr_missing_stacks += MISSING_STACKS(event->user_stack_id, event->kern_stack_id);
@@ -687,13 +755,10 @@ static int print_counts(int counts_map, int stack_map)
 	}
 
 
-	if (env.addrs_only) {
-		//separator into next section
-		printf("==========\n");
-		print_dsos_info(syms_cache);
-		//separator again (to accomodate kernel symbols)
-		printf("==========\n");
-	}
+	if (env.addrs_only)
+		print_dsos_and_ksyms(fd);
+	if (env.output_path)
+		close(fd);
 
 	if (nr_missing_stacks > 0) {
 		fprintf(stderr, "WARNING: %zu stack traces could not be displayed.%s\n",

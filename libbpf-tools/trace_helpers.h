@@ -63,7 +63,7 @@ partitions__get_by_dev(const struct partitions *partitions, unsigned int dev);
 const struct partition *
 partitions__get_by_name(const struct partitions *partitions, const char *name);
 
-void print_dsos_info(struct syms_cache *syms_cache);
+void print_dsos_info(int fd, struct syms_cache *syms_cache);
 void print_log2_hist(unsigned int *vals, int vals_size, const char *val_type);
 void print_linear_hist(unsigned int *vals, int vals_size, unsigned int base,
 		unsigned int step, const char *val_type);

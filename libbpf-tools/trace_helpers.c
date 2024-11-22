@@ -953,28 +953,28 @@ static void print_stars(unsigned int val, unsigned int val_max, int width)
 		printf("+");
 }
 
-static void print_dso_info(struct dso *dso) {
-	printf("path = \"%s\", pid = %ld, ranges = [", dso->name, (long)dso->tgid);
+static void print_dso_info(int fd, struct dso *dso) {
+	dprintf(fd, "path = \"%s\", pid = %ld, ranges = [", dso->name, (long)dso->tgid);
 
 	for (int i = 0; i < dso->range_sz; i++) {
 		struct load_range *range = &dso->ranges[i];
-		printf("{start = 0x%lx, end = 0x%lx, file_off = 0x%lx}",
+		dprintf(fd, "{start = 0x%lx, end = 0x%lx, file_off = 0x%lx}",
 				range->start, range->end, range->file_off);
 		if (i < dso->range_sz - 1) {
-			printf(", ");
+			dprintf(fd, ", ");
 		}
 	}
-	printf("], range_sz = %d, sh_addr = 0x%lx, sh_offset = 0x%lx, type = %s\n",
+	dprintf(fd, "], range_sz = %d, sh_addr = 0x%lx, sh_offset = 0x%lx, type = %s\n",
 			dso->range_sz, dso->sh_addr, dso->sh_offset, elf_type_to_string(dso->type));
 }
 
-void print_dsos_info(struct syms_cache *syms_cache) {
+void print_dsos_info(int fd, struct syms_cache *syms_cache) {
 	for (int i = 0; i < syms_cache->nr; i++) {
 		struct syms *syms = syms_cache->data[i].syms;
 		if (!syms)
 			continue;
 		for (int j = 0; j < syms->dso_sz; j++) {
-			print_dso_info(&syms->dsos[j]);
+			print_dso_info(fd, &syms->dsos[j]);
 		}
 	}
 }
