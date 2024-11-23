@@ -224,6 +224,20 @@ int BPF_UPROBE(munmap_enter, void *address)
 }
 
 SEC("uprobe")
+int BPF_UPROBE(mremap_enter, void *old_address, size_t old_size, size_t new_size, int flags)
+{
+	gen_free_enter(old_address);
+
+	return gen_alloc_enter(new_size);
+}
+
+SEC("uretprobe")
+int BPF_URETPROBE(mremap_exit)
+{
+	return gen_alloc_exit(ctx);
+}
+
+SEC("uprobe")
 int BPF_UPROBE(posix_memalign_enter, void **memptr, size_t alignment, size_t size)
 {
 	const u64 memptr64 = (u64)(size_t)memptr;
