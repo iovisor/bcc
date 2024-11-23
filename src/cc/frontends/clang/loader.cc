@@ -467,7 +467,11 @@ int ClangLoader::do_compile(
   }
   invocation0.getFrontendOpts().DisableFree = false;
 
+#if LLVM_VERSION_MAJOR >= 20
+  compiler0.createDiagnostics(*llvm::vfs::getRealFileSystem(), new IgnoringDiagConsumer());
+#else
   compiler0.createDiagnostics(new IgnoringDiagConsumer());
+#endif
 
   // capture the rewritten c file
   string out_str;
@@ -486,7 +490,11 @@ int ClangLoader::do_compile(
   add_main_input(invocation1, main_path, &*out_buf);
   invocation1.getFrontendOpts().DisableFree = false;
 
+#if LLVM_VERSION_MAJOR >= 20
+  compiler1.createDiagnostics(*llvm::vfs::getRealFileSystem());
+#else
   compiler1.createDiagnostics();
+#endif
 
   // capture the rewritten c file
   string out_str1;
@@ -512,7 +520,11 @@ int ClangLoader::do_compile(
   invocation2.getCodeGenOpts().setInlining(CodeGenOptions::NormalInlining);
   // suppress warnings in the 2nd pass, but bail out on errors (our fault)
   invocation2.getDiagnosticOpts().IgnoreWarnings = true;
+#if LLVM_VERSION_MAJOR >= 20
+  compiler2.createDiagnostics(*llvm::vfs::getRealFileSystem());
+#else
   compiler2.createDiagnostics();
+#endif
 
   EmitLLVMOnlyAction ir_act(&*ctx_);
   if (!compiler2.ExecuteAction(ir_act))
