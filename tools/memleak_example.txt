@@ -217,9 +217,9 @@ optional arguments:
                         sample every N-th allocation to decrease the overhead
   -T TOP, --top TOP     display only this many top allocating stacks (by size)
   -z MIN_SIZE, --min-size MIN_SIZE
-                        capture only allocations larger than this size
+                        capture only allocations larger than or equal to this size
   -Z MAX_SIZE, --max-size MAX_SIZE
-                        capture only allocations smaller than this size
+                        capture only allocations smaller than or equal to this size
   -O OBJ, --obj OBJ     attach to allocator functions in the specified object
   --sort KEY            report sorted in given key; available key list: size,
                         count

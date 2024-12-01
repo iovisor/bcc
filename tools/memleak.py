@@ -104,9 +104,9 @@ parser.add_argument("-s", "--sample-rate", default=1, type=int,
 parser.add_argument("-T", "--top", type=int, default=10,
         help="display only this many top allocating stacks (by size)")
 parser.add_argument("-z", "--min-size", type=int,
-        help="capture only allocations larger than this size")
+        help="capture only allocations larger than or equal to this size")
 parser.add_argument("-Z", "--max-size", type=int,
-        help="capture only allocations smaller than this size")
+        help="capture only allocations smaller than or equal to this size")
 parser.add_argument("-O", "--obj", type=str, default="c",
         help="attach to allocator functions in the specified object")
 parser.add_argument("--ebpf", action="store_true",
