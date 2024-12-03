@@ -17,6 +17,7 @@
 #include <asm/unistd.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
+#include <sys/stat.h>
 #include "profile.h"
 #include "profile.skel.h"
 #include "trace_helpers.h"
@@ -506,6 +507,23 @@ cleanup:
 	return ret;
 }
 
+static int set_pidns(const struct profile_bpf *obj)
+{
+	struct stat statbuf;
+
+	if (!probe_bpf_ns_current_pid_tgid())
+		return -EPERM;
+
+	if (stat("/proc/self/ns/pid", &statbuf) == -1)
+		return -errno;
+
+	obj->rodata->use_pidns = true;
+	obj->rodata->pidns_dev = statbuf.st_dev;
+	obj->rodata->pidns_ino = statbuf.st_ino;
+
+	return 0;
+}
+
 static void print_headers()
 {
 	int i;
@@ -594,6 +612,10 @@ int main(int argc, char **argv)
 	bpf_map__set_value_size(obj->maps.stackmap,
 				env.perf_max_stack_depth * sizeof(unsigned long));
 	bpf_map__set_max_entries(obj->maps.stackmap, env.stack_storage_size);
+
+	err = set_pidns(obj);
+	if (err && env.verbose)
+		fprintf(stderr, "failed to translate pidns: %s\n", strerror(-err));
 
 	err = profile_bpf__load(obj);
 	if (err) {
