@@ -24,16 +24,19 @@ loadavg = "/proc/loadavg"
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/oom.h>
+#include <linux/sched.h>
 
 struct data_t {
     u32 fpid;
     u32 tpid;
     u64 pages;
+    u64 stack_id;
     char fcomm[TASK_COMM_LEN];
     char tcomm[TASK_COMM_LEN];
 };
 
 BPF_PERF_OUTPUT(events);
+BPF_STACK_TRACE(stack_traces, 1024);
 
 void kprobe__oom_kill_process(struct pt_regs *ctx, struct oom_control *oc, const char *message)
 {
@@ -46,6 +49,10 @@ void kprobe__oom_kill_process(struct pt_regs *ctx, struct oom_control *oc, const
     data.pages = oc->totalpages;
     bpf_get_current_comm(&data.fcomm, sizeof(data.fcomm));
     bpf_probe_read_kernel(&data.tcomm, sizeof(data.tcomm), p->comm);
+
+    // Capture the user stack trace
+    data.stack_id = stack_traces.get_stackid(ctx, BPF_F_USER_STACK);
+
     events.perf_submit(ctx, &data, sizeof(data));
 }
 """
@@ -60,9 +67,15 @@ def print_event(cpu, data, size):
         event.fcomm.decode('utf-8', 'replace'), event.tpid,
         event.tcomm.decode('utf-8', 'replace'), event.pages, avgline))
 
+    # Print the stack trace
+    print("  Stack trace:")
+    stack_traces = b["stack_traces"]
+    for addr in stack_traces.walk(event.stack_id):
+        print(f"    {b.sym(addr, event.tpid)}")
+
 # initialize BPF
 b = BPF(text=bpf_text)
-print("Tracing OOM kills... Ctrl-C to stop.")
+print("Tracing OOM kills with stack traces... Ctrl-C to stop.")
 b["events"].open_perf_buffer(print_event)
 while 1:
     try:
