@@ -28,6 +28,10 @@ oomkill can also be the basis of other tools and customizations. For example,
 you can edit it to include other task_struct details from the target PID at
 the time of the OOM kill.
 
+Additionally, oomkill captures the application-level stack trace of the process
+that triggered the OOM kill, if available. This can provide valuable insights
+into what the process was doing at the time of the OOM event. If the stack trace
+is successfully captured, it will be printed after the OOM kill details.
 
 The following commands can be used to test this program, and invoke a memory
 consuming process that exhausts system memory and is OOM killed:
