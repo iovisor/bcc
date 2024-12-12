@@ -39,8 +39,9 @@ struct sock_key {
 BPF_SOCKHASH(sock_hash, struct sock_key, MAX_SOCK_OPS_MAP_ENTRIES);
 
 static __always_inline void bpf_sock_ops_ipv4(struct bpf_sock_ops *skops) {
+    volatile __u32 remote_ip4 = skops->remote_ip4;
     struct sock_key skk = {
-        .remote_ip4 = skops->remote_ip4,
+        .remote_ip4 = remote_ip4,
         .local_ip4  = skops->local_ip4,
         .local_port = skops->local_port,
         .remote_port  = bpf_ntohl(skops->remote_port),
