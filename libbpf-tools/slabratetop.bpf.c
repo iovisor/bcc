@@ -50,4 +50,10 @@ int BPF_KPROBE(kmem_cache_alloc, struct kmem_cache *cachep)
 	return probe_entry(cachep);
 }
 
+SEC("kprobe/kmem_cache_alloc_noprof")
+int BPF_KPROBE(kmem_cache_alloc_noprof, struct kmem_cache *cachep)
+{
+       return probe_entry(cachep);
+}
+
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
