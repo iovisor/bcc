@@ -107,6 +107,7 @@ bool module_btf_exists(const char *mod);
 
 bool probe_tp_btf(const char *name);
 bool probe_ringbuf();
+bool probe_bpf_ns_current_pid_tgid(void);
 
 typedef int (*convert_fn_t)(const char *src, void *dest);
 int split_convert(char *s, const char* delim, void *elems, size_t elems_size,
