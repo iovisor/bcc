@@ -723,6 +723,19 @@ void* time_process(void *arg) {
   return NULL;
 }
 
+
+int map_exists_item(int counts_map) {
+	//clear counts
+	struct key_t key = {0};
+	struct key_t next_key = {};
+
+	int ret = bpf_map_get_next_key(counts_map, &key, &next_key);
+	if (ret < 0){
+		return 1;
+	}
+	return 0;
+}
+
 int clear_counts(int counts_map){
 
 	//clear counts
@@ -826,51 +839,7 @@ void main_process() {
 	  LOG_WARNING("main thread wakeuped!!");
     }
 
-	//clear usr_map_fd;
-	LOG_INFO("clear_counts:p_st.usr_map_fd.");
-	int ret_clear = clear_counts(p_st.usr_map_fd);
-	if (0 != ret_clear) {
-		LOG_ERROR("user_space_map clear falied");
-		break;
-	}
-
-
-	//read counts data;
-	int clone_cnts = 0;
-	if(!p_st.changes_v) {
-		LOG_INFO("clone_counts:p_st.counts_fd to user_map_fd.");
-		int ret_clone = clone_counts(p_st.counts_fd, p_st.usr_map_fd, &clone_cnts);
-		if (0 != ret_clone) {
-			LOG_ERROR("user_space_map clone counts_fd falied");
-			break;
-		}
-		LOG_INFO("clear_counts:p_st.counts_fd.");
-		int ret_clear = clear_counts(p_st.counts_fd);
-		if (0 != ret_clear) {
-			LOG_ERROR("counts_fd clear falied");
-			break;;
-		}
-
-	} else {
-		LOG_INFO("clone_counts:p_st.countsback_fd to user_map_fd.");
-		int ret_clone = clone_counts(p_st.countsback_fd, p_st.usr_map_fd, &clone_cnts);
-		if (0 != ret_clone) {
-			LOG_ERROR("user_space_map clone countsback_fd falied");
-			break;
-		}
-		LOG_INFO("clear_counts:p_st.countsback_fd.");
-		int ret_clear = clear_counts(p_st.countsback_fd);
-		if (0 != ret_clear) {
-			LOG_ERROR("countsback_fd clear falied");
-			break;
-		}
-	}
-	
-	if (0 == clone_cnts) {
-		LOG_WARNING("0 == *clone_cnts, user_map_fd not have counts");
-	}
-
-
+	// choose file
 	if (i % env.interval == 0) {
 		char filename[PATH_BYTES_128] = {}; 
 		memset(filename, 0, sizeof(filename));
@@ -881,18 +850,90 @@ void main_process() {
 		}
 		p_st.info_fp = freopen(filename, "a+", stdout);
 	}
+
 	char bcc_profile_stamp[PATH_BYTES_128];
 	memset(bcc_profile_stamp, 0, sizeof(bcc_profile_stamp));
 	char bcc_profile[] = "bcc_profile : ";
 	transtime_bcclog(bcc_profile_stamp, bcc_profile);
-
 	fprintf(p_st.info_fp, "%s\n", bcc_profile_stamp);
-	print_counts(p_st.usr_map_fd,p_st.stacks_fd);
-	fprintf(p_st.info_fp, "\n");
-	// void* tmp = print_counts;
-	// if(tmp == NULL) {
-	// 	LOG_INFO("test");
+
+	// choose map
+    if(!p_st.changes_v) {
+		LOG_INFO("choose counts map");
+		
+		if (map_exists_item(p_st.counts_fd) == 0) {
+			LOG_INFO("counts map exits data");
+			print_counts(p_st.counts_fd,p_st.stacks_fd);
+
+			LOG_INFO("clear_counts:p_st.counts_fd.");
+			int ret_clear = clear_counts(p_st.counts_fd);
+			if (0 != ret_clear) {
+				LOG_ERROR("counts_fd clear falied");
+				break;
+			}
+		}
+
+	} else {
+		LOG_INFO("choose countsback map");
+
+		if (map_exists_item(p_st.countsback_fd) == 0) {
+			LOG_INFO("countsback map exits data");
+			print_counts(p_st.countsback_fd,p_st.stacks_fd);
+
+			LOG_INFO("clear_counts:p_st.countsback_fd.");
+			int ret_clear = clear_counts(p_st.countsback_fd);
+			if (0 != ret_clear) {
+				LOG_ERROR("countsback_fd clear falied");
+				break;
+			}
+		}		
+	}
+
+	// //clear usr_map_fd;
+	// LOG_INFO("clear_counts:p_st.usr_map_fd.");
+	// int ret_clear = clear_counts(p_st.usr_map_fd);
+	// if (0 != ret_clear) {
+	// 	LOG_ERROR("user_space_map clear falied");
+	// 	break;
 	// }
+
+	// //read counts data;
+	// int clone_cnts = 0;
+	// if(!p_st.changes_v) {
+	// 	LOG_INFO("clone_counts:p_st.counts_fd to user_map_fd.");
+	// 	int ret_clone = clone_counts(p_st.counts_fd, p_st.usr_map_fd, &clone_cnts);
+	// 	if (0 != ret_clone) {
+	// 		LOG_ERROR("user_space_map clone counts_fd falied");
+	// 		break;
+	// 	}
+	// 	LOG_INFO("clear_counts:p_st.counts_fd.");
+	// 	int ret_clear = clear_counts(p_st.counts_fd);
+	// 	if (0 != ret_clear) {
+	// 		LOG_ERROR("counts_fd clear falied");
+	// 		break;;
+	// 	}
+
+	// } else {
+	// 	LOG_INFO("clone_counts:p_st.countsback_fd to user_map_fd.");
+	// 	int ret_clone = clone_counts(p_st.countsback_fd, p_st.usr_map_fd, &clone_cnts);
+	// 	if (0 != ret_clone) {
+	// 		LOG_ERROR("user_space_map clone countsback_fd falied");
+	// 		break;
+	// 	}
+	// 	LOG_INFO("clear_counts:p_st.countsback_fd.");
+	// 	int ret_clear = clear_counts(p_st.countsback_fd);
+	// 	if (0 != ret_clear) {
+	// 		LOG_ERROR("countsback_fd clear falied");
+	// 		break;
+	// 	}
+	// }
+	
+	// if (0 == clone_cnts) {
+	// 	LOG_WARNING("0 == *clone_cnts, user_map_fd not have counts");
+	// }
+
+	//print_counts(p_st.usr_map_fd,p_st.stacks_fd);
+	fprintf(p_st.info_fp, "\n");
 	++i;
   }
   p_st.exit_flag = true;
