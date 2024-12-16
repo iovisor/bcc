@@ -58,6 +58,14 @@ struct {
 	__uint(max_entries, 1);
 } changes SEC(".maps");
 
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, struct key_t);
+	__type(value, u64);
+	__uint(max_entries, MAX_ENTRIES);
+} countsusers SEC(".maps");
+
+
 SEC("perf_event")
 int do_perf_event(struct bpf_perf_event_data *ctx)
 {

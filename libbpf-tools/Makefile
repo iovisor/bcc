@@ -39,7 +39,7 @@ BZ_APPS = \
 	opensnoop \
 	#
 
-APPS =  fsdist fsslower profile_v1 sigsnoop \
+APPS =  fsdist fsslower profile profile_v1 sigsnoop \
 	# bashreadline \
 	# bindsnoop \
 	# biolatency \

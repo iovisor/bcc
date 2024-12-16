@@ -21,6 +21,7 @@
 #include "profile.h"
 #include "profile_v1.skel.h"
 #include "trace_helpers.h"
+#include "log.h"
 
 #define OPT_PERF_MAX_STACK_DEPTH	1 /* --perf-max-stack-depth */
 #define OPT_STACK_STORAGE_SIZE		2 /* --stack-storage-size */
@@ -75,7 +76,7 @@ struct fmt_t stacktrace_formats[] = {
 
 /* control pthread communication*/
 struct pthread_st {
-	bool exit_flag;
+	volatile bool  exit_flag;
 	pthread_cond_t cond;
 	pthread_mutex_t mutex;
 	pthread_t timer_thread;
@@ -93,6 +94,7 @@ struct pthread_st {
 
 // file path size
 #define PATH_BYTES_128 128
+#define MSG_BYTES_32 32
 
 static struct env {
 	pid_t pids[MAX_PID_NR];
@@ -590,12 +592,17 @@ static void print_headers()
 		printf("... Hit Ctrl-C to end.\n");
 }
 
+struct tm *get_current_tm_info() {
+	time_t now;
+	time(&now);
+	struct tm *tm_info;
+	tm_info = localtime(&now);
+    return tm_info;
+}
+
 void transtime(char* des, char* str) {
-  time_t now;
-  struct tm *tm_info;
-  time(&now);
-  tm_info = localtime(&now);
-  sprintf(des, "%s/%02d%02d_%02d_%02d_%02d.txt", 
+  struct tm * tm_info=get_current_tm_info();
+  sprintf(des, "%s/bcc_profile.log.%02d%02d-%02d%02d%02d", 
 		str,
     	tm_info->tm_mon + 1,
     	tm_info->tm_mday,
@@ -603,6 +610,19 @@ void transtime(char* des, char* str) {
     	tm_info->tm_min,
     	tm_info->tm_sec);
 }
+
+void transtime_bcclog(char* des, char* str) {
+  struct tm * tm_info=get_current_tm_info();
+  sprintf(des, "%s%02d%02d_%02d_%02d_%02d", 
+		str,
+    	tm_info->tm_mon + 1,
+    	tm_info->tm_mday,
+    	tm_info->tm_hour,
+    	tm_info->tm_min,
+    	tm_info->tm_sec);
+}
+
+
 void errlog(char* des, char* str, char* err_log) {
   time_t now;
   struct tm *tm_info;
@@ -633,16 +653,19 @@ void init_resource(int stacks_fd, int counts_fd, int countsback_fd, int changes_
   p_st.info_fp = NULL;
 
   char filename[PATH_BYTES_128] = {}; 
-  char err[] = "erro_log";
+  char err[] = "glog_err";
   errlog(filename, env.output_file,err);
-  p_st.err_fp = freopen(filename, "a+", stderr);
+  set_log_file(filename);
+  set_log_level(DEBUG);
+  LOG_INFO("init resource has completed.");
 }
 
 void destroy_resource() {
   pthread_join(p_st.timer_thread, NULL);
   pthread_mutex_destroy(&p_st.mutex);
   pthread_cond_destroy(&p_st.cond);
-  fprintf(stderr, "thread mutex conditon resource recycle\n");
+  LOG_INFO("thread mutex conditon resource recycle.");
+//   fprintf(stderr, "thread mutex conditon resource recycle\n");
 
   if (p_st.err_fp != NULL) {
 	  fclose(p_st.err_fp);
@@ -650,43 +673,53 @@ void destroy_resource() {
   if (p_st.info_fp != NULL) {
 	  fclose(p_st.info_fp);
   }
-  if (p_st.usr_map_fd > 0) {
-	  close(p_st.usr_map_fd);
-  }
 }
 
 void* time_process(void *arg) {
+  LOG_INFO("begin to time_process");
   sleep(env.startafter);
   if (p_st.exit_flag) {
     pthread_cond_broadcast(&p_st.cond);
-	fprintf(stderr, "received exit signal, send signals\n");
+	LOG_ERROR("received exit signal, send signals.");
+	// fprintf(stderr, "received exit signal, send signals\n");
 	return NULL;
   }
 
   __u32 key = 0;
   if (bpf_map_update_elem(p_st.changes_fd, &key, &p_st.changes_v, BPF_ANY)) {
-	fprintf(stderr, "Failed bpf_map_update_elem to map\n");
+	LOG_ERROR("Failed bpf_map_update_elem to map");
+	p_st.exit_flag = true;
 	pthread_cond_broadcast(&p_st.cond);
 	return NULL;
   }
 
   while (true) {
+	char msg[PATH_BYTES_128];
+	sprintf(msg, "start to sleeping,cur_changes_v:%d", p_st.changes_v);
+	LOG_INFO(msg);
     sleep(env.second);
 	p_st.changes_v = !p_st.changes_v;
 	
 	if (bpf_map_update_elem(p_st.changes_fd, &key, &p_st.changes_v, BPF_ANY)) {
-		fprintf(stderr, "Failed bpf_map_update_elem to map\n");
+		LOG_ERROR("Failed bpf_map_update_elem to map");
+		p_st.exit_flag = true;
 		pthread_cond_broadcast(&p_st.cond);
 		return NULL;
   	}
+
+	memset(msg, 0 ,sizeof(msg));
+	sprintf(msg, "sleeping over, cur_changes_v:%d", p_st.changes_v);
+	LOG_INFO(msg);
+
+
     pthread_cond_broadcast(&p_st.cond);
 
     if (p_st.exit_flag) {
-	  fprintf(stderr, "received exit signal, send signals\n");
+	  LOG_ERROR("received exit signal, send signals");
       break;
     }
   }
-  fprintf(stderr, "time function will exit\n");
+  LOG_WARNING("time function will exit");
   return NULL;
 }
 
@@ -696,51 +729,78 @@ int clear_counts(int counts_map){
 	struct key_t key = {0};
 	struct key_t next_key = {};
 	int ret;
+	// debug
+	int i = 0;
 
 	do {
 		ret = bpf_map_get_next_key(counts_map, &key, &next_key);
-		if (ret < 0 && key.pid != 0) {
-			// not have next item and delete last item;
-			bpf_map_delete_elem(counts_map, &key);
+		if (ret < 0) {
+			if (key.pid != 0) {
+				// not have next item and delete last item;
+				// char msf[PATH_BYTES_128];
+				// sprintf(msf,"cur_index:%d, ret: %d",i, ret);
+				// LOG_INFO(msf);
+				++i;
+				bpf_map_delete_elem(counts_map, &key);
+			} else {
+				LOG_WARNING("this is empty countsmap");
+			}
 			break;
-		}else if (ret < 0){
-			// not have next item and current item is null;
-			break;
-		}else {
+		} else if (0 == ret && 0 == key.pid) {
+			key = next_key;
+			continue;
+		} else {
+			// char msf[PATH_BYTES_128];
+			// sprintf(msf,"cur_index:%d, ret: %d",i, ret);
+			// LOG_INFO(msf);
 			if (bpf_map_delete_elem(counts_map, &key) != 0) {
 				return 1;
 			}
 			key = next_key;
 		}
+		++i;
+
 	}while (ret == 0);
+
+	char msf[MSG_BYTES_32];
+	sprintf(msf,"clear counts:%d",i);
+	LOG_INFO(msf);
 
 	return 0;
 }
 
-int clone_counts(int counts_map, int usr_map) {
+int clone_counts(int counts_map, int usr_map, int* counts) {
 
 	struct key_t key, next_key;
 	__u64 value;
+	// debug
+	int i = 0;
 
 	while (true) {
 		int ret = bpf_map_get_next_key(counts_map, &key, &next_key);
 		if (ret < 0) {
-        	return 0;
+			break;
     	}
 		// 查找当前键对应的值
     	ret = bpf_map_lookup_elem(counts_map, &next_key, &value);
 		if (ret < 0) {
-        	fprintf(stderr, "Failed to lookup map element\n");
+			LOG_ERROR("Failed to lookup map element");
         	return 1;
     	}
 		// 将键值对插入到用户空间映射中
     	ret = bpf_map_update_elem(usr_map, &next_key, &value, BPF_ANY);
 		if (ret < 0) {
-        	fprintf(stderr, "Failed to update user space map\n");
+			LOG_ERROR("Failed to update user space map");
         	return 1;
     	}
 		key = next_key;
+		++i;
 	}
+
+	char msf[MSG_BYTES_32];
+	sprintf(msf,"clone_counts:%d",i);
+	LOG_INFO(msf);
+	*counts = i;
 	return 0;
 }
 
@@ -748,6 +808,10 @@ void main_process() {
   static int i = 0;
 
   while (true) {
+	char msf[MSG_BYTES_32];
+	sprintf(msf,"index:%d",i);
+	LOG_INFO(msf);
+
     pthread_mutex_lock(&p_st.mutex);
     int ret_pt = pthread_cond_wait(&p_st.cond, &p_st.mutex);
 	pthread_mutex_unlock(&p_st.mutex);
@@ -757,43 +821,55 @@ void main_process() {
     }
 
     if ( ret_pt == EINTR ) {
-      fprintf(stderr, "线程被信号中断\n");
+	  LOG_WARNING("main thread interrped!!");
     } else {
-      fprintf(stderr, "线程被唤醒\n");
+	  LOG_WARNING("main thread wakeuped!!");
     }
 
-    //clear usr_map_fd;
+	//clear usr_map_fd;
+	LOG_INFO("clear_counts:p_st.usr_map_fd.");
 	int ret_clear = clear_counts(p_st.usr_map_fd);
 	if (0 != ret_clear) {
-		fprintf(stderr, "user_space_map clear falied\n");
-		return;
+		LOG_ERROR("user_space_map clear falied");
+		break;
 	}
 
+
 	//read counts data;
+	int clone_cnts = 0;
 	if(!p_st.changes_v) {
-		int ret_clone = clone_counts(p_st.counts_fd, p_st.usr_map_fd);
+		LOG_INFO("clone_counts:p_st.counts_fd to user_map_fd.");
+		int ret_clone = clone_counts(p_st.counts_fd, p_st.usr_map_fd, &clone_cnts);
 		if (0 != ret_clone) {
-			fprintf(stderr, "user_space_map clone counts_fd falied\n");
-			return;
+			LOG_ERROR("user_space_map clone counts_fd falied");
+			break;
 		}
+		LOG_INFO("clear_counts:p_st.counts_fd.");
 		int ret_clear = clear_counts(p_st.counts_fd);
 		if (0 != ret_clear) {
-			fprintf(stderr, "counts_fd clear falied\n");
-			return;
+			LOG_ERROR("counts_fd clear falied");
+			break;;
 		}
 
 	} else {
-		int ret_clone = clone_counts(p_st.countsback_fd, p_st.usr_map_fd);
+		LOG_INFO("clone_counts:p_st.countsback_fd to user_map_fd.");
+		int ret_clone = clone_counts(p_st.countsback_fd, p_st.usr_map_fd, &clone_cnts);
 		if (0 != ret_clone) {
-			fprintf(stderr, "user_space_map clone counts_fd falied\n");
-			return;
+			LOG_ERROR("user_space_map clone countsback_fd falied");
+			break;
 		}
+		LOG_INFO("clear_counts:p_st.countsback_fd.");
 		int ret_clear = clear_counts(p_st.countsback_fd);
 		if (0 != ret_clear) {
-			fprintf(stderr, "countsback_fd clear falied\n");
-			return;
+			LOG_ERROR("countsback_fd clear falied");
+			break;
 		}
 	}
+	
+	if (0 == clone_cnts) {
+		LOG_WARNING("0 == *clone_cnts, user_map_fd not have counts");
+	}
+
 
 	if (i % env.interval == 0) {
 		char filename[PATH_BYTES_128] = {}; 
@@ -808,13 +884,20 @@ void main_process() {
 	char bcc_profile_stamp[PATH_BYTES_128];
 	memset(bcc_profile_stamp, 0, sizeof(bcc_profile_stamp));
 	char bcc_profile[] = "bcc_profile : ";
-	transtime(bcc_profile_stamp, bcc_profile);
+	transtime_bcclog(bcc_profile_stamp, bcc_profile);
 
 	fprintf(p_st.info_fp, "%s\n", bcc_profile_stamp);
 	print_counts(p_st.usr_map_fd,p_st.stacks_fd);
+	fprintf(p_st.info_fp, "\n");
+	// void* tmp = print_counts;
+	// if(tmp == NULL) {
+	// 	LOG_INFO("test");
+	// }
 	++i;
   }
-  fprintf(stderr, "main_function work over\n");
+  p_st.exit_flag = true;
+  LOG_WARNING("main thread set p_st.exit_flag = true");
+  LOG_WARNING("main_function work over");
 }
 
 int main(int argc, char **argv)
@@ -835,7 +918,7 @@ int main(int argc, char **argv)
 		return err;
 
 	if (env.user_stacks_only && env.kernel_stacks_only) {
-		fprintf(stderr, "user_stacks_only and kernel_stacks_only cannot be used together.\n");
+		LOG_ERROR("user_stacks_only and kernel_stacks_only cannot be used together.");
 		return 1;
 	}
 
@@ -843,19 +926,19 @@ int main(int argc, char **argv)
 
 	nr_cpus = libbpf_num_possible_cpus();
 	if (nr_cpus < 0) {
-		printf("failed to get # of possible cpus: '%s'!\n",
-		       strerror(-nr_cpus));
+		LOG_ERROR("failed to get # of possible cpus.");
+		// printf("failed to get # of possible cpus: '%s'!\n",
+		//        strerror(-nr_cpus));
 		return 1;
 	}
 	if (nr_cpus > MAX_CPU_NR) {
-		fprintf(stderr, "the number of cpu cores is too big, please "
-			"increase MAX_CPU_NR's value and recompile");
+		LOG_ERROR("the number of cpu cores is too big, please increase MAX_CPU_NR's value and recompile.");
 		return 1;
 	}
 
 	obj = profile_v1_bpf__open();
 	if (!obj) {
-		fprintf(stderr, "failed to open BPF object\n");
+		LOG_ERROR("failed to open BPF object");
 		return 1;
 	}
 
@@ -874,7 +957,7 @@ int main(int argc, char **argv)
 
 	err = profile_v1_bpf__load(obj);
 	if (err) {
-		fprintf(stderr, "failed to load BPF programs\n");
+		LOG_ERROR("failed to load BPF programs");
 		goto cleanup;
 	}
 
@@ -882,7 +965,8 @@ int main(int argc, char **argv)
 		pids_fd = bpf_map__fd(obj->maps.pids);
 		for (i = 0; i < MAX_PID_NR && env.pids[i]; i++) {
 			if (bpf_map_update_elem(pids_fd, &(env.pids[i]), &val, BPF_ANY) != 0) {
-				fprintf(stderr, "failed to init pids map: %s\n", strerror(errno));
+				LOG_ERROR("failed to init pids map");
+				// fprintf(stderr, "failed to init pids map: %s\n", strerror(errno));
 				goto cleanup;
 			}
 		}
@@ -891,7 +975,8 @@ int main(int argc, char **argv)
 		tids_fd = bpf_map__fd(obj->maps.tids);
 		for (i = 0; i < MAX_TID_NR && env.tids[i]; i++) {
 			if (bpf_map_update_elem(tids_fd, &(env.tids[i]), &val, BPF_ANY) != 0) {
-				fprintf(stderr, "failed to init tids map: %s\n", strerror(errno));
+				LOG_ERROR("failed to init tids map");
+				// fprintf(stderr, "failed to init tids map: %s\n", strerror(errno));
 				goto cleanup;
 			}
 		}
@@ -899,13 +984,15 @@ int main(int argc, char **argv)
 
 	ksyms = ksyms__load();
 	if (!ksyms) {
-		fprintf(stderr, "failed to load kallsyms\n");
+		LOG_ERROR("failed to load kallsyms");
+		// fprintf(stderr, "failed to load kallsyms\n");
 		goto cleanup;
 	}
 
 	syms_cache = syms_cache__new(0);
 	if (!syms_cache) {
-		fprintf(stderr, "failed to create syms_cache\n");
+		LOG_ERROR("failed to create syms_cache");
+		// fprintf(stderr, "failed to create syms_cache\n");
 		goto cleanup;
 	}
 
@@ -918,19 +1005,20 @@ int main(int argc, char **argv)
 	if (!env.folded)
 		print_headers();
 	
-	char user_space_map_name[] = "user_space_map";
+	// char user_space_map_name[] = "user_space_map";
 
-	int user_space_map_fd = bpf_map_create(BPF_MAP_TYPE_HASH, 
-							user_space_map_name,
-							sizeof(struct key_t), 
-							sizeof(__u64), 
-							MAX_ENTRIES, 
-							0);
+	// int user_space_map_fd = bpf_map_create(BPF_MAP_TYPE_HASH, 
+	// 						user_space_map_name,
+	// 						sizeof(struct key_t), 
+	// 						sizeof(__u64), 
+	// 						MAX_ENTRIES, 
+	// 						0);
 		
-	if (user_space_map_fd < 0) {
-    	fprintf(stderr, "Failed to create user space map\n");
-    	goto cleanup;
-	}
+	// if (user_space_map_fd < 0) {
+	// 	LOG_ERROR("Failed to create user space map");
+    // 	// fprintf(stderr, "Failed to create user space map\n");
+    // 	goto cleanup;
+	// }
 
 	/*
 	 * We'll get sleep interrupted when someone presses Ctrl-C.
@@ -946,14 +1034,22 @@ int main(int argc, char **argv)
 		bpf_map__fd(obj->maps.counts),
 		bpf_map__fd(obj->maps.countsback),
 		bpf_map__fd(obj->maps.changes),
-		user_space_map_fd);
+		bpf_map__fd(obj->maps.countsusers));
 
-	//-------debug
-	printf("%d,%s,%d\n,",env.interval,env.output_file,env.startafter);
+	LOG_INFO("create init_resource success");
+	// char msg[PATH_BYTES_128];
+	// sprintf(msg, "stacks:%d, count:%d, countsback:%d, changes:%d, user_map_fd:%d",
+	// 				p_st.stacks_fd,
+	// 				p_st.counts_fd,
+	// 				p_st.countsback_fd,
+	// 				p_st.changes_fd,
+	// 				p_st.usr_map_fd);
+	// LOG_INFO(msg);
+	//printf("%d,%s,%d,%d-------\n",env.interval,env.output_file,env.startafter,env.stack_storage_size);
 
-	// main_process();
+	pthread_create(&p_st.timer_thread, NULL, time_process, NULL);
 
-	// pthread_create(&p_st.timer_thread, NULL, time_process, NULL);
+	main_process();
 
 	destroy_resource();
 
@@ -972,3 +1068,13 @@ cleanup:
 
 	return err != 0;
 }
+
+
+/* how to excute
+* sudo ./profile_v1 --output-dir ~/future/bcc/libbpf-tools/ -f -U -F 99 --interval 150 --start-after 1  --stack-storage-size 1024000 -p 14927,15003 
+*/
+
+/* how to parse
+*  python ./parse_results.py --dir /home/mi/future/bcc/libbpf-tools
+*  bash generate_svg.sh /home/mi/future/bcc/libbpf-tools
+*/
