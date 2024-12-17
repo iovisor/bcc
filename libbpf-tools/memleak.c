@@ -380,7 +380,7 @@ int main(int argc, char *argv[])
 	const int combined_allocs_fd = bpf_map__fd(skel->maps.combined_allocs);
 	const int stack_traces_fd = bpf_map__fd(skel->maps.stack_traces);
 
-	// if userspace oriented, attach upbrobes
+	// if userspace oriented, attach uprobes
 	if (!env.kernel_trace) {
 		ret = attach_uprobes(skel);
 		if (ret) {
