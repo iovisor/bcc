@@ -1112,7 +1112,7 @@ cleanup:
 
 
 /* how to excute
-* sudo ./profile_v1 --output-dir ~/future/bcc/libbpf-tools/ -f -U -F 99 --interval 150 --start-after 1  --stack-storage-size 1024000 -p 14927,15003 
+* sudo ./profile_v1 --output-dir ~/future/bcc/libbpf-tools/ -f -U -F 99 --interval 150 --start-after 1  --stack-storage-size 16348 -p 14927,15003 
 */
 
 /* how to parse
