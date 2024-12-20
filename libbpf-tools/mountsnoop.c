@@ -185,12 +185,20 @@ static const char *gen_call(const struct event *e)
 	static char call[10240];
 
 	memset(call, 0, sizeof(call));
-	if (e->op == UMOUNT) {
+	switch (e->op) {
+	case UMOUNT:
 		snprintf(call, sizeof(call), "umount(\"%s\", %s) = %s",
-			 e->dest, strflags(e->flags), strerrno(e->ret));
-	} else {
+			 e->umount.dest, strflags(e->umount.flags),
+			 strerrno(e->ret));
+		break;
+	case MOUNT:
 		snprintf(call, sizeof(call), "mount(\"%s\", \"%s\", \"%s\", %s, \"%s\") = %s",
-			 e->src, e->dest, e->fs, strflags(e->flags), e->data, strerrno(e->ret));
+			 e->mount.src, e->mount.dest, e->mount.fs,
+			 strflags(e->mount.flags), e->mount.data,
+			 strerrno(e->ret));
+		break;
+	default:
+		break;
 	}
 	return call;
 }
@@ -230,11 +238,21 @@ static int handle_event(void *ctx, void *data, size_t len)
 	printf("%sRET:    %s\n", indent, strerrno(e->ret));
 	printf("%sLAT:    %lldus\n", indent, e->delta / 1000);
 	printf("%sMNT_NS: %u\n", indent, e->mnt_ns);
-	printf("%sFS:     %s\n", indent, e->fs);
-	printf("%sSOURCE: %s\n", indent, e->src);
-	printf("%sTARGET: %s\n", indent, e->dest);
-	printf("%sDATA:   %s\n", indent, e->data);
-	printf("%sFLAGS:  %s\n", indent, strflags(e->flags));
+	switch (e->op) {
+	case MOUNT:
+		printf("%sFS:     %s\n", indent, e->mount.fs);
+		printf("%sSOURCE: %s\n", indent, e->mount.src);
+		printf("%sTARGET: %s\n", indent, e->mount.dest);
+		printf("%sDATA:   %s\n", indent, e->mount.data);
+		printf("%sFLAGS:  %s\n", indent, strflags(e->mount.flags));
+		break;
+	case UMOUNT:
+		printf("%sTARGET: %s\n", indent, e->umount.dest);
+		printf("%sFLAGS:  %s\n", indent, strflags(e->umount.flags));
+		break;
+	default:
+		break;
+	}
 	printf("\n");
 
 	return 0;

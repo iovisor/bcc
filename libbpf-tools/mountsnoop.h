@@ -8,33 +8,55 @@
 #define PATH_MAX	4096
 
 enum op {
+	OP_MIN, /* skip 0 */
 	MOUNT,
 	UMOUNT,
 };
 
 struct arg {
 	__u64 ts;
-	__u64 flags;
-	const char *src;
-	const char *dest;
-	const char *fs;
-	const char *data;
 	enum op op;
+
+	union {
+		/* op=MOUNT */
+		struct {
+			__u64 flags;
+			const char *src;
+			const char *dest;
+			const char *fs;
+			const char *data;
+		} mount;
+		/* op=UMOUNT */
+		struct {
+			__u64 flags;
+			const char *dest;
+		} umount;
+	};
 };
 
 struct event {
 	__u64 delta;
-	__u64 flags;
 	__u32 pid;
 	__u32 tid;
 	unsigned int mnt_ns;
 	int ret;
-	char comm[TASK_COMM_LEN];
-	char fs[FS_NAME_LEN];
-	char src[PATH_MAX];
-	char dest[PATH_MAX];
-	char data[DATA_LEN];
 	enum op op;
+	char comm[TASK_COMM_LEN];
+	union {
+		/* op=MOUNT */
+		struct {
+			__u64 flags;
+			char fs[FS_NAME_LEN];
+			char src[PATH_MAX];
+			char dest[PATH_MAX];
+			char data[DATA_LEN];
+		} mount;
+		/* op=UMOUNT */
+		struct {
+			__u64 flags;
+			char dest[PATH_MAX];
+		} umount;
+	};
 };
 
 #endif /* __MOUNTSNOOP_H */
