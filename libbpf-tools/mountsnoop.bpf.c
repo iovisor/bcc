@@ -31,12 +31,21 @@ static int probe_entry(const char *src, const char *dest, const char *fs,
 		return 0;
 
 	arg.ts = bpf_ktime_get_ns();
-	arg.flags = flags;
-	arg.src = src;
-	arg.dest = dest;
-	arg.fs = fs;
-	arg.data= data;
 	arg.op = op;
+
+	switch (op) {
+	case MOUNT:
+		arg.mount.flags = flags;
+		arg.mount.src = src;
+		arg.mount.dest = dest;
+		arg.mount.fs = fs;
+		arg.mount.data= data;
+		break;
+	case UMOUNT:
+		arg.umount.flags = flags;
+		arg.umount.dest = dest;
+		break;
+	}
 	bpf_map_update_elem(&args, &tid, &arg, BPF_ANY);
 	return 0;
 };
@@ -60,29 +69,26 @@ static int probe_exit(void *ctx, int ret)
 
 	task = (struct task_struct *)bpf_get_current_task();
 	eventp->delta = bpf_ktime_get_ns() - argp->ts;
-	eventp->flags = argp->flags;
+	eventp->op = argp->op;
 	eventp->pid = pid;
 	eventp->tid = tid;
 	eventp->mnt_ns = BPF_CORE_READ(task, nsproxy, mnt_ns, ns.inum);
 	eventp->ret = ret;
-	eventp->op = argp->op;
 	bpf_get_current_comm(&eventp->comm, sizeof(eventp->comm));
-	if (argp->src)
-		bpf_probe_read_user_str(eventp->src, sizeof(eventp->src), argp->src);
-	else
-		eventp->src[0] = '\0';
-	if (argp->dest)
-		bpf_probe_read_user_str(eventp->dest, sizeof(eventp->dest), argp->dest);
-	else
-		eventp->dest[0] = '\0';
-	if (argp->fs)
-		bpf_probe_read_user_str(eventp->fs, sizeof(eventp->fs), argp->fs);
-	else
-		eventp->fs[0] = '\0';
-	if (argp->data)
-		bpf_probe_read_user_str(eventp->data, sizeof(eventp->data), argp->data);
-	else
-		eventp->data[0] = '\0';
+
+	switch (argp->op) {
+	case MOUNT:
+		eventp->mount.flags = argp->mount.flags;
+		bpf_probe_read_user_str(eventp->mount.src, sizeof(eventp->mount.src), argp->mount.src);
+		bpf_probe_read_user_str(eventp->mount.dest, sizeof(eventp->mount.dest), argp->mount.dest);
+		bpf_probe_read_user_str(eventp->mount.fs, sizeof(eventp->mount.fs), argp->mount.fs);
+		bpf_probe_read_user_str(eventp->mount.data, sizeof(eventp->mount.data), argp->mount.data);
+		break;
+	case UMOUNT:
+		eventp->umount.flags = argp->umount.flags;
+		bpf_probe_read_user_str(eventp->umount.dest, sizeof(eventp->umount.dest), argp->umount.dest);
+		break;
+	}
 
 	submit_buf(ctx, eventp, sizeof(*eventp));
 
