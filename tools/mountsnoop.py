@@ -455,6 +455,10 @@ MOUNT_FLAGS = [
     ('MS_NOUSER', 1 << 31),
 ]
 
+FSMOUNT_FLAGS = [
+    ('FSMOUNT_CLOEXEC', 0x00000001),
+]
+
 MOUNT_ATTR_FLAGS = [
     ('MOUNT_ATTR_RDONLY', 0x00000001),
     ('MOUNT_ATTR_NOSUID', 0x00000002),
@@ -612,6 +616,11 @@ def decode_mount_flags(flags):
     str_flags.extend(_decode_flags(flags, MOUNT_FLAGS))
     return '|'.join(str_flags)
 
+def decode_fsmount_flags(flags):
+    str_flags = []
+    str_flags.extend(_decode_flags(flags, FSMOUNT_FLAGS))
+    return '|'.join(str_flags)
+
 def decode_mount_attr_flags(flags):
     str_flags = []
     str_flags.extend(_decode_flags(flags, MOUNT_ATTR_FLAGS))
@@ -761,7 +770,7 @@ def print_event(mounts, umounts, parent, cpu, data, size):
                 call = ('fsmount({fs_fd}, {flags}, {attr_flags}) ' +
                         '= {retval}').format(
                     fs_fd=syscall['fs_fd'],
-                    flags=decode_mount_flags(syscall['flags']),
+                    flags=decode_fsmount_flags(syscall['flags']),
                     attr_flags=decode_mount_attr_flags(syscall['attr_flags']),
                     retval=decode_errno(event.union.retval))
             elif event.type == EventType.EVENT_FSCONFIG_RET:
