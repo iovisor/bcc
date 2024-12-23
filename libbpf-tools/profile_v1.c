@@ -32,7 +32,7 @@
 #define INTERVAL		8
 #define START_AFTER		9
 #define OUTPUT_DIR		10
-
+#define LOAD_NUM		11
 
 
 #define SYM_INFO_LEN			2048
@@ -120,6 +120,7 @@ static struct env {
 	int second;
 	int startafter;
 	char* output_file;
+	int load_num;
 } env = {
 	.stack_storage_size = 1024,
 	.perf_max_stack_depth = 127,
@@ -129,7 +130,8 @@ static struct env {
 	.cpu = -1,
 	.interval = 150,
 	.second = 1,
-	.startafter = 5
+	.startafter = 5,
+	.load_num = 5
 };
 
 const char *argp_program_version = "profile 0.1";
@@ -171,6 +173,7 @@ static const struct argp_option opts[] = {
 	{ "interval", INTERVAL, "INTERVAL", 0, "intervals between logs", 0 },
 	{ "start-after", START_AFTER, "START-AFTER", 0, "how long to collect data", 0 },
 	{ "output-dir", OUTPUT_DIR, "OUTPUT-DIR", 0, "output file dir", 0 },
+	{ "load-num", LOAD_NUM, "load-num", 0, "wait to load sysms", 0 },
 	{},
 };
 
@@ -1158,9 +1161,8 @@ cleanup:
 	return err != 0;
 }
 
-
 /* how to excute
-* sudo ./profile_v1 --output-dir ~/future/bcc/libbpf-tools/ -f -U -F 99 --interval 150 --start-after 1  --stack-storage-size 4096 -p 14927,15003 
+* sudo ./profile_v1 --output-dir ~/future/bcc/libbpf-tools/ -f -F 199 --interval 150 --start-after 1  --stack-storage-size 4096  --load-num 10 -p 14927,15003 
 */
 
 /* how to parse
