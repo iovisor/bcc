@@ -18,6 +18,8 @@
 #include <asm/unistd.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include "profile.h"
 #include "profile_v1.skel.h"
 #include "trace_helpers.h"
@@ -73,6 +75,9 @@ struct fmt_t stacktrace_formats[] = {
 
 #define pr_format(str, fmt)		printf("%s%s%s", fmt->prefix, str, fmt->suffix)
 
+// file path size
+#define PATH_BYTES_128 128
+#define MSG_BYTES_32 32
 
 /* control pthread communication*/
 struct pthread_st {
@@ -87,14 +92,14 @@ struct pthread_st {
 	int countsback_fd;
 	int stacks_fd;
 	int usr_map_fd;
+	int stacksback_fd;
 	bool changes_v;
 	FILE *err_fp;
 	FILE *info_fp;
+	char cur_info_file_path[PATH_BYTES_128];
 } p_st;
 
-// file path size
-#define PATH_BYTES_128 128
-#define MSG_BYTES_32 32
+
 
 static struct env {
 	pid_t pids[MAX_PID_NR];
@@ -600,15 +605,17 @@ struct tm *get_current_tm_info() {
     return tm_info;
 }
 
-void transtime(char* des, char* str) {
+void transtime(char* des, char* str, char* file_name, char* fm) {
   struct tm * tm_info=get_current_tm_info();
-  sprintf(des, "%s/bcc_profile.log.%02d%02d-%02d%02d%02d", 
+  sprintf(des, "%s/%s.%02d%02d-%02d%02d%02d.%s", 
 		str,
+		file_name,
     	tm_info->tm_mon + 1,
     	tm_info->tm_mday,
     	tm_info->tm_hour,
     	tm_info->tm_min,
-    	tm_info->tm_sec);
+    	tm_info->tm_sec,
+		fm);
 }
 
 void transtime_bcclog(char* des, char* str) {
@@ -622,24 +629,8 @@ void transtime_bcclog(char* des, char* str) {
     	tm_info->tm_sec);
 }
 
-
-void errlog(char* des, char* str, char* err_log) {
-  time_t now;
-  struct tm *tm_info;
-  time(&now);
-  tm_info = localtime(&now);
-  sprintf(des, "%s/%s_%02d%02d_%02d_%02d_%02d.txt", 
-		str,
-		err_log,
-    	tm_info->tm_mon + 1,
-    	tm_info->tm_mday,
-    	tm_info->tm_hour,
-    	tm_info->tm_min,
-    	tm_info->tm_sec);
-}
-
-void init_resource(int stacks_fd, int counts_fd, int countsback_fd, int changes_fd
-	, int usr_map_fd) {
+int init_resource(int stacks_fd, int counts_fd, int countsback_fd, int changes_fd, 
+	int usr_map_fd, int stacksback_fd) {
   p_st.exit_flag = false;
   p_st.changes_v = true;
   pthread_mutex_init(&p_st.mutex, NULL);
@@ -649,15 +640,31 @@ void init_resource(int stacks_fd, int counts_fd, int countsback_fd, int changes_
   p_st.countsback_fd = countsback_fd;
   p_st.changes_fd = changes_fd;
   p_st.usr_map_fd = usr_map_fd;
+  p_st.stacksback_fd = stacksback_fd;
   p_st.err_fp = NULL;
   p_st.info_fp = NULL;
 
   char filename[PATH_BYTES_128] = {}; 
-  char err[] = "glog_err";
-  errlog(filename, env.output_file,err);
+  transtime(filename, env.output_file ,"glog_err","log");
   set_log_file(filename);
   set_log_level(DEBUG);
+  memset(p_st.cur_info_file_path, 0 ,sizeof(p_st.cur_info_file_path));
+
   LOG_INFO("init resource has completed.");
+  return 0;
+}
+
+void gzip_file(const char* filepath) {
+
+	// gzip cur path
+	char command[PATH_BYTES_128 + MSG_BYTES_32] = {0};
+	sprintf(command, "gzip %s", p_st.cur_info_file_path);
+	int result = system(command);
+    if (result == 0) {
+    	LOG_INFO("file gzip success");
+    } else {
+    	LOG_ERROR("file gzip failed");
+    }
 }
 
 void destroy_resource() {
@@ -673,6 +680,12 @@ void destroy_resource() {
   if (p_st.info_fp != NULL) {
 	  fclose(p_st.info_fp);
   }
+
+  struct stat file_stat;
+  if (stat(p_st.cur_info_file_path, &file_stat) == 0) {
+	gzip_file(p_st.cur_info_file_path);     
+  }
+
 }
 
 void* time_process(void *arg) {
@@ -725,7 +738,6 @@ void* time_process(void *arg) {
 
 
 int map_exists_item(int counts_map) {
-	//clear counts
 	struct key_t key = {0};
 	struct key_t next_key = {};
 
@@ -735,6 +747,18 @@ int map_exists_item(int counts_map) {
 	}
 	return 0;
 }
+
+int stackmap_exists_item(int stack_map) {
+	__u32 key = 0;
+	__u32 next_key = 0;
+
+	int ret = bpf_map_get_next_key(stack_map, &key, &next_key);
+	if (ret < 0){
+		return 1;
+	}
+	return 0;
+}
+
 
 int clear_counts(int counts_map){
 
@@ -781,6 +805,51 @@ int clear_counts(int counts_map){
 
 	return 0;
 }
+
+
+int clear_stacks(int stackmap) {
+	//clear counts
+	__u32 key = 0;
+	__u32 next_key;
+
+	int ret;
+	// debug
+	int i = 0;
+
+	do {
+		ret = bpf_map_get_next_key(stackmap, &key, &next_key);
+		if (ret < 0) {
+			if (key != 0) {
+				++i;
+				bpf_map_delete_elem(stackmap, &key);
+			} else {
+				LOG_WARNING("this is empty stackmap");
+			}
+			break;
+		} else if (0 == ret && 0 == key) {
+			key = next_key;
+			continue;
+		} else {
+			// char msf[PATH_BYTES_128];
+			// sprintf(msf,"cur_index:%d, ret: %d",i, ret);
+			// LOG_INFO(msf);
+			if (bpf_map_delete_elem(stackmap, &key) != 0) {
+				return 1;
+			}
+			key = next_key;
+		}
+		++i;
+
+	}while (ret == 0);
+
+	char msf[MSG_BYTES_32];
+	sprintf(msf,"clear stacks:%d",i);
+	LOG_INFO(msf);
+
+	return 0;
+}
+
+
 
 int clone_counts(int counts_map, int usr_map, int* counts) {
 
@@ -841,14 +910,15 @@ void main_process() {
 
 	// choose file
 	if (i % env.interval == 0) {
-		char filename[PATH_BYTES_128] = {}; 
-		memset(filename, 0, sizeof(filename));
-		transtime(filename, env.output_file);
 	
 		if (NULL != p_st.info_fp) {
 			fclose(p_st.info_fp);
+			gzip_file(p_st.cur_info_file_path);
 		}
-		p_st.info_fp = freopen(filename, "a+", stdout);
+
+		memset(p_st.cur_info_file_path, 0, sizeof(p_st.cur_info_file_path));
+		transtime(p_st.cur_info_file_path, env.output_file, "bcc_profile", "log");
+		p_st.info_fp = freopen(p_st.cur_info_file_path, "a+", stdout);
 	}
 
 	char bcc_profile_stamp[PATH_BYTES_128];
@@ -859,9 +929,8 @@ void main_process() {
 
 	// choose map
     if(!p_st.changes_v) {
-		LOG_INFO("choose counts map");
-		
-		if (map_exists_item(p_st.counts_fd) == 0) {
+		LOG_INFO("choose counts map and stacks");
+		if (map_exists_item(p_st.counts_fd) == 0 && stackmap_exists_item(p_st.stacks_fd) == 0) {
 			LOG_INFO("counts map exits data");
 			print_counts(p_st.counts_fd,p_st.stacks_fd);
 
@@ -871,14 +940,20 @@ void main_process() {
 				LOG_ERROR("counts_fd clear falied");
 				break;
 			}
+
+			LOG_INFO("clear_stack:p_st.stack_fd.");
+			ret_clear = clear_stacks(p_st.stacks_fd);
+			if (0 != ret_clear) {
+				LOG_ERROR("stacks_fd clear falied");
+				break;
+			}
 		}
 
 	} else {
-		LOG_INFO("choose countsback map");
-
-		if (map_exists_item(p_st.countsback_fd) == 0) {
+		LOG_INFO("choose countsback map and stacksback");
+		if (map_exists_item(p_st.countsback_fd) == 0 && stackmap_exists_item(p_st.stacksback_fd) == 0) {
 			LOG_INFO("countsback map exits data");
-			print_counts(p_st.countsback_fd,p_st.stacks_fd);
+			print_counts(p_st.countsback_fd,p_st.stacksback_fd);
 
 			LOG_INFO("clear_counts:p_st.countsback_fd.");
 			int ret_clear = clear_counts(p_st.countsback_fd);
@@ -886,56 +961,18 @@ void main_process() {
 				LOG_ERROR("countsback_fd clear falied");
 				break;
 			}
-		}		
+
+			LOG_INFO("clear_stackback:p_st.stacksback_fd.");
+			ret_clear = clear_stacks(p_st.stacksback_fd);
+			if (0 != ret_clear) {
+				LOG_ERROR("stacksback_fd clear falied");
+				break;
+			}	
+		}
 	}
-
-	// //clear usr_map_fd;
-	// LOG_INFO("clear_counts:p_st.usr_map_fd.");
-	// int ret_clear = clear_counts(p_st.usr_map_fd);
-	// if (0 != ret_clear) {
-	// 	LOG_ERROR("user_space_map clear falied");
-	// 	break;
-	// }
-
-	// //read counts data;
-	// int clone_cnts = 0;
-	// if(!p_st.changes_v) {
-	// 	LOG_INFO("clone_counts:p_st.counts_fd to user_map_fd.");
-	// 	int ret_clone = clone_counts(p_st.counts_fd, p_st.usr_map_fd, &clone_cnts);
-	// 	if (0 != ret_clone) {
-	// 		LOG_ERROR("user_space_map clone counts_fd falied");
-	// 		break;
-	// 	}
-	// 	LOG_INFO("clear_counts:p_st.counts_fd.");
-	// 	int ret_clear = clear_counts(p_st.counts_fd);
-	// 	if (0 != ret_clear) {
-	// 		LOG_ERROR("counts_fd clear falied");
-	// 		break;;
-	// 	}
-
-	// } else {
-	// 	LOG_INFO("clone_counts:p_st.countsback_fd to user_map_fd.");
-	// 	int ret_clone = clone_counts(p_st.countsback_fd, p_st.usr_map_fd, &clone_cnts);
-	// 	if (0 != ret_clone) {
-	// 		LOG_ERROR("user_space_map clone countsback_fd falied");
-	// 		break;
-	// 	}
-	// 	LOG_INFO("clear_counts:p_st.countsback_fd.");
-	// 	int ret_clear = clear_counts(p_st.countsback_fd);
-	// 	if (0 != ret_clear) {
-	// 		LOG_ERROR("countsback_fd clear falied");
-	// 		break;
-	// 	}
-	// }
-	
-	// if (0 == clone_cnts) {
-	// 	LOG_WARNING("0 == *clone_cnts, user_map_fd not have counts");
-	// }
-
-	//print_counts(p_st.usr_map_fd,p_st.stacks_fd);
-	fprintf(p_st.info_fp, "\n");
 	++i;
   }
+
   p_st.exit_flag = true;
   LOG_WARNING("main thread set p_st.exit_flag = true");
   LOG_WARNING("main_function work over");
@@ -995,6 +1032,12 @@ int main(int argc, char **argv)
 	bpf_map__set_value_size(obj->maps.stackmap,
 				env.perf_max_stack_depth * sizeof(unsigned long));
 	bpf_map__set_max_entries(obj->maps.stackmap, env.stack_storage_size);
+
+
+	bpf_map__set_value_size(obj->maps.stackmapback,
+				env.perf_max_stack_depth * sizeof(unsigned long));
+	bpf_map__set_max_entries(obj->maps.stackmapback, env.stack_storage_size);
+
 
 	err = profile_v1_bpf__load(obj);
 	if (err) {
@@ -1071,11 +1114,16 @@ int main(int argc, char **argv)
 	// 	     bpf_map__fd(obj->maps.stackmap));
 	// kill -2 to process pid to exir
 
-	init_resource(bpf_map__fd(obj->maps.stackmap),
+	int res = init_resource(bpf_map__fd(obj->maps.stackmap),
 		bpf_map__fd(obj->maps.counts),
 		bpf_map__fd(obj->maps.countsback),
 		bpf_map__fd(obj->maps.changes),
-		bpf_map__fd(obj->maps.countsusers));
+		bpf_map__fd(obj->maps.countsusers),
+		bpf_map__fd(obj->maps.stackmapback));
+
+	if (res != 0) {
+		goto cleanup;
+	}
 
 	LOG_INFO("create init_resource success");
 	// char msg[PATH_BYTES_128];
@@ -1112,7 +1160,7 @@ cleanup:
 
 
 /* how to excute
-* sudo ./profile_v1 --output-dir ~/future/bcc/libbpf-tools/ -f -U -F 99 --interval 150 --start-after 1  --stack-storage-size 16348 -p 14927,15003 
+* sudo ./profile_v1 --output-dir ~/future/bcc/libbpf-tools/ -f -U -F 99 --interval 150 --start-after 1  --stack-storage-size 4096 -p 14927,15003 
 */
 
 /* how to parse

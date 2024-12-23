@@ -24,6 +24,11 @@ struct {
 } stackmap SEC(".maps");
 
 struct {
+	__uint(type, BPF_MAP_TYPE_STACK_TRACE);
+	__type(key, u32);
+} stackmapback SEC(".maps");
+
+struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__type(key, struct key_t);
 	__type(value, u64);
@@ -95,18 +100,31 @@ int do_perf_event(struct bpf_perf_event_data *ctx)
 	key.pid = pid;
 	bpf_get_current_comm(&key.name, sizeof(key.name));
 
-	if (user_stacks_only)
+	if (user_stacks_only) {
 		key.kern_stack_id = -1;
-	else
-		key.kern_stack_id = bpf_get_stackid(&ctx->regs, &stackmap, 0);
+	}
+	else {
+		if (*change_value == true) {
+			key.kern_stack_id = bpf_get_stackid(&ctx->regs, &stackmap, 0);
+		} else {
+			key.kern_stack_id = bpf_get_stackid(&ctx->regs, &stackmapback, 0);
+		} 
+	}
 
-	if (kernel_stacks_only)
+	if (kernel_stacks_only) {
 		key.user_stack_id = -1;
-	else
-		key.user_stack_id = bpf_get_stackid(&ctx->regs, &stackmap,
+	}
+	else {
+		if (*change_value == true) {
+			key.user_stack_id = bpf_get_stackid(&ctx->regs, &stackmap,
 						    BPF_F_USER_STACK);
+		} else {
+			key.user_stack_id = bpf_get_stackid(&ctx->regs, &stackmapback,
+						    BPF_F_USER_STACK);
+		} 
+	}
 
-	if (*change_value == true){
+	if (*change_value == true) {
 		valp = bpf_map_lookup_or_try_init(&counts, &key, &zero);
 		if (valp)
 			__sync_fetch_and_add(valp, 1);
