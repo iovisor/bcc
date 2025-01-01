@@ -194,14 +194,14 @@ Bucket disk = 'xvda1'
      16384 -> 32767      : 20       |***********                             |
      32768 -> 65535      : 7        |***                                     |
 
-This output sows that xvda1 has much higher latency, usually between 0.5 ms
+This output shows that xvda1 has much higher latency, usually between 0.5 ms
 and 32 ms, whereas xvdc is usually between 0.2 ms and 4 ms.
 
 
 The -F option prints a separate histogram for each unique set of request
 flags. For example:
 
-./biolatency.py -Fm
+# ./biolatency.py -Fm
 Tracing block device I/O... Hit Ctrl-C to end.
 ^C
 
@@ -289,7 +289,7 @@ flags = Priority-Metadata-Write
      msecs               : count     distribution
          0 -> 1          : 9        |****************************************|
 
-These can be handled differently by the storage device, and this mode lets us
+These can be handled differently by the request flags, and this mode lets us
 examine their performance in isolation.
 
 

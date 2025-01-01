@@ -1247,3 +1247,67 @@ bool probe_ringbuf()
 	close(map_fd);
 	return true;
 }
+
+bool probe_bpf_ns_current_pid_tgid(void)
+{
+	int fd, insn_cnt;
+	struct bpf_insn insns[] = {
+		{ .code = BPF_ALU64 | BPF_MOV | BPF_X, .dst_reg = 3, .src_reg = BPF_REG_10 },
+		{ .code = BPF_ALU64 | BPF_ADD | BPF_K, .dst_reg = 3, .imm = -8 },
+		{ .code = BPF_ALU64 | BPF_MOV | BPF_K, .dst_reg = 1, .imm = 0 },
+		{ .code = BPF_ALU64 | BPF_MOV | BPF_K, .dst_reg = 2, .imm = 0 },
+		{ .code = BPF_ALU64 | BPF_MOV | BPF_K, .dst_reg = 4, .imm = 8 },
+		{ .code = BPF_JMP | BPF_CALL, .imm = BPF_FUNC_get_ns_current_pid_tgid },
+		{ .code = BPF_JMP | BPF_EXIT },
+	};
+
+	insn_cnt = sizeof(insns) / sizeof(insns[0]);
+
+	fd = bpf_prog_load(BPF_PROG_TYPE_KPROBE, NULL, "GPL", insns, insn_cnt, NULL);
+	if (fd >= 0)
+		close(fd);
+
+	return fd >= 0;
+}
+
+int split_convert(char *s, const char* delim, void *elems, size_t elems_size,
+		  size_t elem_size, convert_fn_t convert)
+{
+	char *token;
+	int ret;
+	char *pos = (char *)elems;
+
+	if (!s || !delim || !elems)
+		return -EINVAL;
+
+	token = strtok(s, delim);
+	while (token) {
+		if (pos + elem_size > (char*)elems + elems_size)
+			return -ENOBUFS;
+
+		ret = convert(token, pos);
+		if (ret)
+			return -ret;
+
+		pos += elem_size;
+		token = strtok(NULL, delim);
+	}
+
+	return 0;
+}
+
+int str_to_int(const char *src, void *dest)
+{
+	errno = 0;
+	*(int*)dest = strtol(src, NULL, 10);
+
+	return errno;
+}
+
+int str_to_long(const char *src, void *dest)
+{
+	errno = 0;
+	*(long*)dest = strtol(src, NULL, 10);
+
+	return errno;
+}

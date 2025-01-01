@@ -119,7 +119,7 @@ static int gen_alloc_exit2(void *ctx, u64 address)
 	info.size = *size;
 	bpf_map_delete_elem(&sizes, &tid);
 
-	if (address != 0) {
+	if (address != 0 && address != MAP_FAILED) {
 		info.timestamp_ns = bpf_ktime_get_ns();
 
 		info.stack_id = bpf_get_stackid(ctx, &stack_traces, stack_flags);
@@ -221,6 +221,20 @@ SEC("uprobe")
 int BPF_UPROBE(munmap_enter, void *address)
 {
 	return gen_free_enter(address);
+}
+
+SEC("uprobe")
+int BPF_UPROBE(mremap_enter, void *old_address, size_t old_size, size_t new_size, int flags)
+{
+	gen_free_enter(old_address);
+
+	return gen_alloc_enter(new_size);
+}
+
+SEC("uretprobe")
+int BPF_URETPROBE(mremap_exit)
+{
+	return gen_alloc_exit(ctx);
 }
 
 SEC("uprobe")

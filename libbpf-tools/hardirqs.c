@@ -27,9 +27,11 @@ struct env {
 	bool verbose;
 	char *cgroupspath;
 	bool cg;
+	int targ_cpu;
 } env = {
 	.interval = 99999999,
 	.times = 99999999,
+	.targ_cpu = -1,
 };
 
 static volatile bool exiting;
@@ -47,12 +49,14 @@ const char argp_program_doc[] =
 "    hardirqs -d         # show hard irq event time as histograms\n"
 "    hardirqs 1 10       # print 1 second summaries, 10 times\n"
 "    hardirqs -c CG      # Trace process under cgroupsPath CG\n"
+"    hardirqs --cpu 1    # only stat irq on cpu 1\n"
 "    hardirqs -NT 1      # 1s summaries, nanoseconds, and timestamps\n";
 
 static const struct argp_option opts[] = {
 	{ "count", 'C', NULL, 0, "Show event counts instead of timing", 0 },
 	{ "distributed", 'd', NULL, 0, "Show distributions as histograms", 0 },
 	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path", 0 },
+	{ "cpu", 's', "CPU", 0, "Only stat irq on selected cpu", 0 },
 	{ "timestamp", 'T', NULL, 0, "Include timestamp on output", 0 },
 	{ "nanoseconds", 'N', NULL, 0, "Output in nanoseconds", 0 },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
@@ -76,6 +80,14 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'C':
 		env.count = true;
+		break;
+	case 's':
+		errno = 0;
+		env.targ_cpu = atoi(arg);
+		if (errno || env.targ_cpu < 0) {
+			fprintf(stderr, "invalid cpu: %s\n", arg);
+			argp_usage(state);
+		}
 		break;
 	case 'c':
 		env.cgroupspath = arg;
@@ -218,6 +230,7 @@ int main(int argc, char **argv)
 
 	obj->rodata->filter_cg = env.cg;
 	obj->rodata->do_count = env.count;
+	obj->rodata->targ_cpu = env.targ_cpu;
 
 	/* initialize global data (filtering options) */
 	if (!env.count) {

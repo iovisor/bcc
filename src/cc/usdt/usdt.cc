@@ -78,7 +78,7 @@ bool Probe::in_shared_object(const std::string &bin_path) {
 
 bool Probe::resolve_global_address(uint64_t *global, const std::string &bin_path,
                                    const uint64_t addr) {
-  if (in_shared_object(bin_path)) {
+  if (in_shared_object(bin_path) || bcc_elf_is_pie(bin_path.c_str())) {
     return (pid_ &&
             !bcc_resolve_global_addr(*pid_, bin_path.c_str(), addr, mod_match_inode_only_, global));
   }

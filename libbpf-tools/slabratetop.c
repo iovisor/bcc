@@ -261,6 +261,15 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	if (kprobe_exists("kmem_cache_alloc"))
+		bpf_program__set_autoload(obj->progs.kmem_cache_alloc_noprof, false);
+	else if (kprobe_exists("kmem_cache_alloc_noprof"))
+		bpf_program__set_autoload(obj->progs.kmem_cache_alloc, false);
+	else {
+		warn("kmem_cache_alloc and kmem_cache_alloc_noprof function not found\n");
+		goto cleanup;
+	}
+
 	obj->rodata->target_pid = target_pid;
 
 	err = slabratetop_bpf__load(obj);

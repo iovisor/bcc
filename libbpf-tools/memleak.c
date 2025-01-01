@@ -35,7 +35,7 @@ static struct env {
 	bool trace_all;
 	bool show_allocs;
 	bool combined_only;
-	int min_age_ns;
+	long min_age_ns;
 	uint64_t sample_rate;
 	int top_stacks;
 	size_t min_size;
@@ -200,8 +200,8 @@ static const struct argp_option argp_options[] = {
 	{"wa-missing-free", 'F', 0, 0, "workaround to alleviate misjudgments when free is missing", 0 },
 	{"sample-rate", 's', "SAMPLE_RATE", 0, "sample every N-th allocation to decrease the overhead", 0 },
 	{"top", 'T', "TOP_STACKS", 0, "display only this many top allocating stacks (by size)", 0 },
-	{"min-size", 'z', "MIN_SIZE", 0, "capture only allocations larger than this size", 0 },
-	{"max-size", 'Z', "MAX_SIZE", 0, "capture only allocations smaller than this size", 0 },
+	{"min-size", 'z', "MIN_SIZE", 0, "capture only allocations larger than or equal to this size", 0 },
+	{"max-size", 'Z', "MAX_SIZE", 0, "capture only allocations smaller than or equal to this size", 0 },
 	{"obj", 'O', "OBJECT", 0, "attach to allocator functions in the specified object", 0 },
 	{"percpu", 'P', NULL, 0, "trace percpu allocations", 0 },
 	{"symbols-prefix", 'S', "SYMBOLS_PREFIX", 0, "memory allocator symbols prefix", 0 },
@@ -380,7 +380,7 @@ int main(int argc, char *argv[])
 	const int combined_allocs_fd = bpf_map__fd(skel->maps.combined_allocs);
 	const int stack_traces_fd = bpf_map__fd(skel->maps.stack_traces);
 
-	// if userspace oriented, attach upbrobes
+	// if userspace oriented, attach uprobes
 	if (!env.kernel_trace) {
 		ret = attach_uprobes(skel);
 		if (ret) {
@@ -508,10 +508,11 @@ long argp_parse_long(int key, const char *arg, struct argp_state *state)
 error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 {
 	static int pos_args = 0;
+	long age_ms;
 
 	switch (key) {
 	case 'p':
-		env.pid = atoi(arg);
+		env.pid = argp_parse_long(key, arg, state);
 		break;
 	case 't':
 		env.trace_all = true;
@@ -520,7 +521,12 @@ error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 		env.show_allocs = true;
 		break;
 	case 'o':
-		env.min_age_ns = 1e6 * atoi(arg);
+		age_ms = argp_parse_long(key, arg, state);
+		if (age_ms > (LONG_MAX / 1e6) || age_ms < (LONG_MIN / 1e6)) {
+			fprintf(stderr, "invalid AGE_MS: %s\n", arg);
+			argp_usage(state);
+		}
+		env.min_age_ns = age_ms * 1e6;
 		break;
 	case 'c':
 		strncpy(env.command, arg, sizeof(env.command) - 1);
@@ -538,7 +544,7 @@ error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 		strncpy(env.symbols_prefix, arg, sizeof(env.symbols_prefix) - 1);
 		break;
 	case 'T':
-		env.top_stacks = atoi(arg);
+		env.top_stacks = argp_parse_long(key, arg, state);
 		break;
 	case 'z':
 		env.min_size = argp_parse_long(key, arg, state);
@@ -1054,9 +1060,15 @@ int attach_uprobes(struct memleak_bpf *skel)
 	if (strlen(env.symbols_prefix)) {
 		ATTACH_UPROBE(skel, mmap, mmap_enter);
 		ATTACH_URETPROBE(skel, mmap, mmap_exit);
+
+		ATTACH_UPROBE(skel, mremap, mmap_enter);
+		ATTACH_URETPROBE(skel, mremap, mmap_exit);
 	} else {
 		ATTACH_UPROBE_CHECKED(skel, mmap, mmap_enter);
 		ATTACH_URETPROBE_CHECKED(skel, mmap, mmap_exit);
+
+		ATTACH_UPROBE_CHECKED(skel, mremap, mremap_enter);
+		ATTACH_URETPROBE_CHECKED(skel, mremap, mremap_exit);
 	}
 
 	ATTACH_UPROBE_CHECKED(skel, posix_memalign, posix_memalign_enter);

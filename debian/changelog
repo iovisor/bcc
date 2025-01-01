@@ -1,3 +1,15 @@
+bcc (0.32.0-1) unstable; urgency=low
+
+  * Support for kernel up to 6.11.
+  * bcc tool update: wakeuptime, readahead, shmsnoop, offcputime, cachestat, cachetop, hardirqs
+  * libbpf tool update: futexctn, profile, readhead, softirqs, hardirqs
+  * Multiple enhancements for memleak, better error path checking, adding mremap uprobe
+  * Support get pid/tgid in pid namespaces (cpudist, profile)
+  * multiple pid filtering support: profile, offcputime
+  * detect whether elf binary is PIE even if the binary is marked as DYN
+  * Fix several compilation issues with llvm20
+  * doc update, other bug fixes and tools improvement.
+
 bcc (0.31.0-1) unstable; urgency=low
 
   * Support for kernel up to 6.9.
