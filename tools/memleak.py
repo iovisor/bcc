@@ -560,7 +560,7 @@ def print_outstanding():
         to_show = sorted(alloc_info.values(), key=alloc_sort_map[sort_key])[-top_stacks:]
         for alloc in to_show:
                 print("\t%d bytes in %d allocations of type %d from stack\n\t\t%s" %
-                      (alloc.size, alloc.count, alloc.type_index
+                      (alloc.size, alloc.count, alloc.type_index,
                        b"\n\t\t".join(alloc.stack).decode("ascii")))
 
 def print_outstanding_combined():
