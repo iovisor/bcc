@@ -130,7 +130,7 @@ class ProcSyms : SymbolCache {
     // process by storing a file descriptor created from openat(2) if possible
     // if openat fails, falls back to process-dependent path with /proc/.../root
    private:
-    int fd_;
+    int fd_ = -1;
     std::string proc_root_path_;
     std::string path_;
 
