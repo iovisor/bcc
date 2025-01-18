@@ -1380,7 +1380,11 @@ bool BTypeVisitor::VisitBinaryOperator(BinaryOperator *E) {
             }
 
             uint64_t ofs = C.getFieldOffset(F);
+#if LLVM_VERSION_MAJOR >= 20
+            uint64_t sz = F->isBitField() ? F->getBitWidthValue() : C.getTypeSize(F->getType());
+#else
             uint64_t sz = F->isBitField() ? F->getBitWidthValue(C) : C.getTypeSize(F->getType());
+#endif
             string base = rewriter_.getRewrittenText(expansionRange(Base->getSourceRange()));
             string text = "bpf_dins_pkt(" + fn_args_[0]->getName().str() + ", (u64)" + base + "+" + to_string(ofs >> 3)
                 + ", " + to_string(ofs & 0x7) + ", " + to_string(sz) + ",";
@@ -1410,7 +1414,11 @@ bool BTypeVisitor::VisitImplicitCastExpr(ImplicitCastExpr *E) {
             return false;
           }
           uint64_t ofs = C.getFieldOffset(F);
+#if LLVM_VERSION_MAJOR >= 20
+          uint64_t sz = F->isBitField() ? F->getBitWidthValue() : C.getTypeSize(F->getType());
+#else
           uint64_t sz = F->isBitField() ? F->getBitWidthValue(C) : C.getTypeSize(F->getType());
+#endif
           string text = "bpf_dext_pkt(" + fn_args_[0]->getName().str() + ", (u64)" + Ref->getDecl()->getName().str() + "+"
               + to_string(ofs >> 3) + ", " + to_string(ofs & 0x7) + ", " + to_string(sz) + ")";
           rewriter_.ReplaceText(expansionRange(E->getSourceRange()), text);
