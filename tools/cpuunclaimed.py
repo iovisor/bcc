@@ -61,7 +61,7 @@ from bcc import BPF, PerfType, PerfSWConfig
 from time import sleep, strftime
 import argparse
 import multiprocessing
-from os import getpid, system, open, close, dup, unlink, O_WRONLY
+from os import open, close, dup, unlink, O_WRONLY
 from tempfile import NamedTemporaryFile
 
 # arguments
