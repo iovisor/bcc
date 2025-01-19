@@ -156,30 +156,31 @@ to the '-n' option.
 The -e option prints out extra columns; for example, the following output
 contains the flags passed to open(2), in octal:
 
-# ./opensnoop -e
-PID    COMM               FD ERR FLAGS    PATH
-28512  sshd               10   0 00101101 /proc/self/oom_score_adj
-28512  sshd                3   0 02100000 /etc/ld.so.cache
-28512  sshd                3   0 02100000 /lib/x86_64-linux-gnu/libwrap.so.0
-28512  sshd                3   0 02100000 /lib/x86_64-linux-gnu/libaudit.so.1
-28512  sshd                3   0 02100000 /lib/x86_64-linux-gnu/libpam.so.0
-28512  sshd                3   0 02100000 /lib/x86_64-linux-gnu/libselinux.so.1
-28512  sshd                3   0 02100000 /lib/x86_64-linux-gnu/libsystemd.so.0
-28512  sshd                3   0 02100000 /usr/lib/x86_64-linux-gnu/libcrypto.so.1.0.2
-28512  sshd                3   0 02100000 /lib/x86_64-linux-gnu/libutil.so.1
+# ./opensnoop.py -e
+PID    COMM               FD ERR FLAGS    MODE PATH
+312769 cgroupify           5   0 02204000 0000 .
+312769 cgroupify           5   0 00000000 0000 312814/cgroup.procs
+312769 cgroupify           5   0 00000000 0000 312749/cgroup.procs
+312769 cgroupify           5   0 00000000 0000 313063/cgroup.procs
+1648   abrt-dump-journ    28   0 02004000 0000 /var/log/journal/system.journal
+1646   abrt-dump-journ    28   0 02004000 0000 /var/log/journal/system.journal
+1325   in:imjournal      106   0 02004000 0000 /var/log/journal/system.journal
+1647   abrt-dump-journ    28   0 02004000 0000 /var/log/journal/system.journal
+322334 cpptools           14   0 02100000 0666 /proc/328016/status
+322334 cpptools           14   0 02100000 0666 /proc/328050/status
+322334 cpptools           14   0 02100000 0666 /proc/327773/status
 
 
 The -f option filters based on flags to the open(2) call, for example:
 
-# ./opensnoop -e -f O_WRONLY -f O_RDWR
-PID    COMM               FD ERR FLAGS    PATH
-28084  clear_console       3   0 00100002 /dev/tty
-28084  clear_console      -1  13 00100002 /dev/tty0
-28084  clear_console      -1  13 00100001 /dev/tty0
-28084  clear_console      -1  13 00100002 /dev/console
-28084  clear_console      -1  13 00100001 /dev/console
-28051  sshd                8   0 02100002 /var/run/utmp
-28051  sshd                7   0 00100001 /var/log/wtmp
+# ./opensnoop.py -e -f O_WRONLY -f O_RDWR
+PID    COMM               FD ERR FLAGS    MODE PATH
+1325   in:imjournal      106   0 02000101 0600 /var/lib/rsyslog/imjournal.state.tmp
+312749 ThreadPoolForeg   196   0 00000302 0600 /home/rongtao/Default/.com.google.Chrome.FDpC7Z
+312749 ThreadPoolForeg   196   0 00000302 0600 /home/rongtao/.com.google.Chrome.AiQLoO
+1580   gssproxy           -1   2 00000002 0000 /proc/net/rpc/use-gss-proxy
+328900 awk                 3   0 00000002 0000 /dev/null
+1387   ksmtuned            3   0 00001101 0666 /sys/kernel/mm/ksm/run
 
 
 The --cgroupmap option filters based on a cgroup set. It is meant to be used

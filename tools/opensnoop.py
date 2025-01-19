@@ -117,6 +117,7 @@ struct val_t {
     char comm[TASK_COMM_LEN];
     const char *fname;
     int flags; // EXTENDED_STRUCT_MEMBER
+    unsigned short mode; // EXTENDED_STRUCT_MEMBER
 };
 
 struct data_t {
@@ -130,6 +131,7 @@ struct data_t {
 #endif
     char name[NAME_MAX];
     int flags; // EXTENDED_STRUCT_MEMBER
+    unsigned short mode; // EXTENDED_STRUCT_MEMBER
 };
 
 BPF_PERF_OUTPUT(events);
@@ -158,6 +160,7 @@ int trace_return(struct pt_regs *ctx)
     data.ts = tsp / 1000;
     data.uid = bpf_get_current_uid_gid();
     data.flags = valp->flags; // EXTENDED_STRUCT_MEMBER
+    data.mode = valp->mode; // EXTENDED_STRUCT_MEMBER
     data.ret = PT_REGS_RC(ctx);
 
     SUBMIT_DATA
@@ -169,12 +172,15 @@ int trace_return(struct pt_regs *ctx)
 """
 
 bpf_text_kprobe_header_open = """
-int syscall__trace_entry_open(struct pt_regs *ctx, const char __user *filename, int flags)
+int syscall__trace_entry_open(struct pt_regs *ctx, const char __user *filename,
+                              int flags, unsigned short mode)
 {
 """
 
 bpf_text_kprobe_header_openat = """
-int syscall__trace_entry_openat(struct pt_regs *ctx, int dfd, const char __user *filename, int flags)
+int syscall__trace_entry_openat(struct pt_regs *ctx, int dfd,
+                                const char __user *filename, int flags,
+                                unsigned short mode)
 {
 """
 
@@ -183,6 +189,7 @@ bpf_text_kprobe_header_openat2 = """
 int syscall__trace_entry_openat2(struct pt_regs *ctx, int dfd, const char __user *filename, struct open_how *how)
 {
     int flags = how->flags;
+    unsigned short mode = how->mode;
 """
 
 bpf_text_kprobe_body = """
@@ -204,6 +211,7 @@ bpf_text_kprobe_body = """
         val.id = id;
         val.fname = filename;
         val.flags = flags; // EXTENDED_STRUCT_MEMBER
+        val.mode = mode; // EXTENDED_STRUCT_MEMBER
         infotmp.update(&id, &val);
     }
 
@@ -217,8 +225,10 @@ KRETFUNC_PROBE(FNNAME, struct pt_regs *regs, int ret)
 {
     const char __user *filename = (char *)PT_REGS_PARM1(regs);
     int flags = PT_REGS_PARM2(regs);
+    unsigned short mode = PT_REGS_PARM3(regs);
 #else
-KRETFUNC_PROBE(FNNAME, const char __user *filename, int flags, int ret)
+KRETFUNC_PROBE(FNNAME, const char __user *filename, int flags,
+               unsigned short mode, int ret)
 {
 #endif
 """
@@ -230,8 +240,10 @@ KRETFUNC_PROBE(FNNAME, struct pt_regs *regs, int ret)
     int dfd = PT_REGS_PARM1(regs);
     const char __user *filename = (char *)PT_REGS_PARM2(regs);
     int flags = PT_REGS_PARM3(regs);
+    unsigned short mode = PT_REGS_PARM4(regs);
 #else
-KRETFUNC_PROBE(FNNAME, int dfd, const char __user *filename, int flags, int ret)
+KRETFUNC_PROBE(FNNAME, int dfd, const char __user *filename, int flags,
+               unsigned short mode, int ret)
 {
 #endif
 """
@@ -245,13 +257,16 @@ KRETFUNC_PROBE(FNNAME, struct pt_regs *regs, int ret)
     const char __user *filename = (char *)PT_REGS_PARM2(regs);
     struct open_how __user how;
     int flags;
+    unsigned short mode;
 
     bpf_probe_read_user(&how, sizeof(struct open_how), (struct open_how*)PT_REGS_PARM3(regs));
     flags = how.flags;
+    mode = how.mode;
 #else
 KRETFUNC_PROBE(FNNAME, int dfd, const char __user *filename, struct open_how __user *how, int ret)
 {
     int flags = how->flags;
+    unsigned short mode = how->mode;
 #endif
 """
 
@@ -278,6 +293,7 @@ bpf_text_kfunc_body = """
     data.ts    = tsp / 1000;
     data.uid   = bpf_get_current_uid_gid();
     data.flags = flags; // EXTENDED_STRUCT_MEMBER
+    data.mode  = mode; // EXTENDED_STRUCT_MEMBER
     data.ret   = ret;
 
     SUBMIT_DATA
@@ -406,7 +422,7 @@ if args.print_uid:
 print("%-6s %-16s %4s %3s " %
       ("TID" if args.tid else "PID", "COMM", "FD", "ERR"), end="")
 if args.extended_fields:
-    print("%-9s" % ("FLAGS"), end="")
+    print("%-8s %-4s " % ("FLAGS", "MODE"), end="")
 print("PATH")
 
 class EventType(object):
@@ -453,7 +469,7 @@ def print_event(cpu, data, size):
                     event.comm, fd_s, err), nl="")
 
             if args.extended_fields:
-                printb(b"%08o " % event.flags, nl="")
+                printb(b"%08o %04o " % (event.flags, event.mode), nl="")
 
             if not args.full_path:
                 printb(b"%s" % event.name)
