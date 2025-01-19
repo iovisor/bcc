@@ -1,3 +1,18 @@
+bcc (0.33.0-1) unstable; urgency=low
+
+  * Support for kernel up to 6.12
+  * Add new bcc tool numasched
+  * syms: Initialize ModulePath::fd_ to invalid FD
+  * libbpf-tools/memleak: Fix off-by-one error
+  * libbpf-tools/slabratetop: Fix failed to create kprobe error
+  * libbpf_tools/profile: Support PID namespace mapping
+  * libbpf-tools/mountsnoop: Support fsopen,fsconfig,fsmount,move_mount syscalls
+  * tools/oomkill: get application level stack trace
+  * tools/profile: Add additional information to backtrace
+  * tools/mountsnoop: Fix fsmount printing wrong flags
+  * tools/compactsnoop: Add aarch64 support
+  * doc update, other bug fixes and tools improvement.
+
 bcc (0.32.0-1) unstable; urgency=low
 
   * Support for kernel up to 6.11.
