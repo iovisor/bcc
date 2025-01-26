@@ -15,10 +15,5 @@
  */
 #include <llvm/Config/llvm-config.h>
 
-#if LLVM_VERSION_MAJOR >= 8
 #define GET_BEGINLOC(E)  ((E)->getBeginLoc())
 #define GET_ENDLOC(E)  ((E)->getEndLoc())
-#else
-#define GET_BEGINLOC(E)  ((E)->getLocStart())
-#define GET_ENDLOC(E)    ((E)->getLocEnd())
-#endif
