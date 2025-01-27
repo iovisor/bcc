@@ -758,11 +758,7 @@ bool ProbeVisitor::IsContextMemberExpr(Expr *E) {
 
 SourceRange
 ProbeVisitor::expansionRange(SourceRange range) {
-#if LLVM_VERSION_MAJOR >= 7
   return rewriter_.getSourceMgr().getExpansionRange(range).getAsRange();
-#else
-  return rewriter_.getSourceMgr().getExpansionRange(range);
-#endif
 }
 
 SourceLocation
@@ -1431,11 +1427,7 @@ bool BTypeVisitor::VisitImplicitCastExpr(ImplicitCastExpr *E) {
 
 SourceRange
 BTypeVisitor::expansionRange(SourceRange range) {
-#if LLVM_VERSION_MAJOR >= 7
   return rewriter_.getSourceMgr().getExpansionRange(range).getAsRange();
-#else
-  return rewriter_.getSourceMgr().getExpansionRange(range);
-#endif
 }
 
 template <unsigned N>
@@ -1454,17 +1446,10 @@ int64_t BTypeVisitor::getFieldValue(VarDecl *Decl, FieldDecl *FDecl, int64_t Ori
   unsigned idx = FDecl->getFieldIndex();
 
   if (auto I = dyn_cast_or_null<InitListExpr>(Decl->getInit())) {
-#if LLVM_VERSION_MAJOR >= 8
     Expr::EvalResult res;
     if (I->getInit(idx)->EvaluateAsInt(res, C)) {
       return res.Val.getInt().getExtValue();
     }
-#else
-    llvm::APSInt res;
-    if (I->getInit(idx)->EvaluateAsInt(res, C)) {
-      return res.getExtValue();
-    }
-#endif
   }
 
   return OrigFValue;
@@ -1871,17 +1856,10 @@ void BFrontendAction::EndSourceFileAction() {
 
   if (flags_ & DEBUG_PREPROCESSOR)
     rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).write(llvm::errs());
-#if LLVM_VERSION_MAJOR >= 9
+
   llvm::raw_string_ostream tmp_os(mod_src_);
   rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID())
       .write(tmp_os);
-#else
-  if (flags_ & DEBUG_SOURCE) {
-    llvm::raw_string_ostream tmp_os(mod_src_);
-    rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID())
-        .write(tmp_os);
-  }
-#endif
 
   for (auto func : func_range_) {
     auto f = func.first;

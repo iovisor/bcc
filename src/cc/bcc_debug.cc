@@ -127,12 +127,9 @@ void SourceDebugger::dump() {
     errs() << "Debug Error: cannot get register info\n";
     return;
   }
-#if LLVM_VERSION_MAJOR >= 10
+
   MCTargetOptions MCOptions;
   std::unique_ptr<MCAsmInfo> MAI(T->createMCAsmInfo(*MRI, TripleStr, MCOptions));
-#else
-  std::unique_ptr<MCAsmInfo> MAI(T->createMCAsmInfo(*MRI, TripleStr));
-#endif
   if (!MAI) {
     errs() << "Debug Error: cannot get assembly info\n";
     return;
@@ -174,13 +171,7 @@ void SourceDebugger::dump() {
     return;
   }
 
-  // bcc has only one compilation unit
-  // getCompileUnitAtIndex() was gone in llvm 8.0 (https://reviews.llvm.org/D49741)
-#if LLVM_VERSION_MAJOR >= 8
   DWARFCompileUnit *CU = cast<DWARFCompileUnit>(DwarfCtx->getUnitAtIndex(0));
-#else
-  DWARFCompileUnit *CU = DwarfCtx->getCompileUnitAtIndex(0);
-#endif
   if (!CU) {
     errs() << "Debug Error: dwarf context failed to get compile unit\n";
     return;
@@ -202,7 +193,7 @@ void SourceDebugger::dump() {
     uint64_t Size;
     uint8_t *FuncStart = info.start_;
     uint64_t FuncSize = info.size_;
-#if LLVM_VERSION_MAJOR >= 9
+
     auto section = sections_.find(info.section_);
     if (section == sections_.end()) {
       errs() << "Debug Error: no section entry for section " << info.section_
@@ -210,7 +201,7 @@ void SourceDebugger::dump() {
       return;
     }
     unsigned SectionID = get<2>(section->second);
-#endif
+
     ArrayRef<uint8_t> Data(FuncStart, FuncSize);
     uint32_t CurrentSrcLine = 0;
 
@@ -219,12 +210,7 @@ void SourceDebugger::dump() {
     string src_dbg_str;
     llvm::raw_string_ostream os(src_dbg_str);
     for (uint64_t Index = 0; Index < FuncSize; Index += Size) {
-#if LLVM_VERSION_MAJOR >= 10
       S = DisAsm->getInstruction(Inst, Size, Data.slice(Index), Index, nulls());
-#else
-      S = DisAsm->getInstruction(Inst, Size, Data.slice(Index), Index, nulls(),
-                                 nulls());
-#endif
       if (S != MCDisassembler::Success) {
         os << "Debug Error: disassembler failed: " << std::to_string(S) << '\n';
         break;
@@ -232,11 +218,7 @@ void SourceDebugger::dump() {
         DILineInfo LineInfo;
 
         LineTable->getFileLineInfoForAddress(
-#if LLVM_VERSION_MAJOR >= 9
             {(uint64_t)FuncStart + Index, SectionID},
-#else
-            (uint64_t)FuncStart + Index,
-#endif
 #if LLVM_VERSION_MAJOR >= 20
             false,
 #endif
@@ -248,11 +230,7 @@ void SourceDebugger::dump() {
                     os);
         os << format("%4" PRIu64 ":", Index >> 3) << '\t';
         dumpBytes(Data.slice(Index, Size), os);
-#if LLVM_VERSION_MAJOR >= 10
         IP->printInst(&Inst, 0, "", *STI, os);
-#else
-        IP->printInst(&Inst, os, "", *STI);
-#endif
         os << '\n';
       }
     }

@@ -123,17 +123,10 @@ class MyMemoryManager : public SectionMemoryManager {
       if (!section)
         continue;
 
-#if LLVM_VERSION_MAJOR >= 10
       auto sec_name = section.get()->getName();
       if (!sec_name)
         continue;
-#else
-      llvm::StringRef sec_name_obj;
-      if (!section.get()->getName(sec_name_obj))
-        continue;
 
-      auto sec_name = &sec_name_obj;
-#endif
       info->section_ = sec_name->str();
       info->size_ = ss.second;
     }
@@ -160,11 +153,9 @@ BPFModule::BPFModule(unsigned flags, TableStorage *ts, bool rw_engine_enabled,
   LLVMInitializeBPFTargetMC();
   LLVMInitializeBPFTargetInfo();
   LLVMInitializeBPFAsmPrinter();
-#if LLVM_VERSION_MAJOR >= 6
   LLVMInitializeBPFAsmParser();
   if (flags & DEBUG_SOURCE)
     LLVMInitializeBPFDisassembler();
-#endif
   LLVMLinkInMCJIT(); /* call empty function to force linking of MCJIT */
   if (!ts_) {
     local_ts_ = createSharedTableStorage();
@@ -553,19 +544,12 @@ int BPFModule::finalize() {
       *sections_p;
 
   mod->setTargetTriple("bpf-pc-linux");
-#if LLVM_VERSION_MAJOR >= 11
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
   mod->setDataLayout("e-m:e-p:64:64-i64:64-i128:128-n32:64-S128");
 #else
   mod->setDataLayout("E-m:e-p:64:64-i64:64-i128:128-n32:64-S128");
 #endif
-#else
-#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-  mod->setDataLayout("e-m:e-p:64:64-i64:64-n32:64-S128");
-#else
-  mod->setDataLayout("E-m:e-p:64:64-i64:64-n32:64-S128");
-#endif
-#endif
+
   sections_p = rw_engine_enabled_ ? &sections_ : &tmp_sections;
 
   string err;
