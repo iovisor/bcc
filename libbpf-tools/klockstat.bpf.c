@@ -95,17 +95,7 @@ static void lock_contended(void *ctx, void *lock)
 
 	li->task_id = task_id;
 	li->lock_ptr = (u64)lock;
-	/*
-	 * Skip 4 frames, e.g.:
-	 *       __this_module+0x34ef
-	 *       __this_module+0x34ef
-	 *       __this_module+0x8c44
-	 *             mutex_lock+0x5
-	 *
-	 * Note: if you make major changes to this bpf program, double check
-	 * that you aren't skipping too many frames.
-	 */
-	li->stack_id = bpf_get_stackid(ctx, &stack_map, 4 | BPF_F_FAST_STACK_CMP);
+	li->stack_id = bpf_get_stackid(ctx, &stack_map, BPF_F_FAST_STACK_CMP);
 
 	/* Legit failures include EEXIST */
 	if (li->stack_id < 0)
