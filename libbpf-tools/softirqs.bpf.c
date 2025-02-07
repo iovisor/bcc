@@ -66,7 +66,7 @@ static int handle_exit(unsigned int vec_nr)
 		u64 slot;
 
 		hist = &hists[vec_nr];
-		slot = log2(delta);
+		slot = log2l(delta);
 		if (slot >= MAX_SLOTS)
 			slot = MAX_SLOTS - 1;
 		__sync_fetch_and_add(&hist->slots[slot], 1);
