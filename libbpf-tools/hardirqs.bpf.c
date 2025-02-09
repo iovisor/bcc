@@ -107,7 +107,7 @@ static int handle_exit(int irq, struct irqaction *action)
 	} else {
 		u64 slot;
 
-		slot = log2(delta);
+		slot = log2l(delta);
 		if (slot >= MAX_SLOTS)
 			slot = MAX_SLOTS - 1;
 		info->slots[slot]++;
