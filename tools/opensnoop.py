@@ -192,7 +192,7 @@ int syscall__trace_entry_openat2(struct pt_regs *ctx, int dfd, const char __user
     int flags = how->flags;
     u32 mode = 0;
 
-    if (flags & (O_CREAT | O_TMPFILE))
+    if (flags & O_CREAT || (flags & O_TMPFILE) == O_TMPFILE)
         mode = how->mode;
 """
 
@@ -238,7 +238,7 @@ KRETFUNC_PROBE(FNNAME, struct pt_regs *regs, int ret)
      *
      * Other O_CREAT | O_TMPFILE checks about flags are also for this reason.
      */
-    if (flags & (O_CREAT | O_TMPFILE))
+    if (flags & O_CREAT || (flags & O_TMPFILE) == O_TMPFILE)
         mode = PT_REGS_PARM3(regs);
 #else
 KRETFUNC_PROBE(FNNAME, const char __user *filename, int flags,
@@ -256,7 +256,7 @@ KRETFUNC_PROBE(FNNAME, struct pt_regs *regs, int ret)
     int flags = PT_REGS_PARM3(regs);
     u32 mode = 0;
 
-    if (flags & (O_CREAT | O_TMPFILE))
+    if (flags & O_CREAT || (flags & O_TMPFILE) == O_TMPFILE)
         mode = PT_REGS_PARM4(regs);
 #else
 KRETFUNC_PROBE(FNNAME, int dfd, const char __user *filename, int flags,
@@ -279,7 +279,7 @@ KRETFUNC_PROBE(FNNAME, struct pt_regs *regs, int ret)
     bpf_probe_read_user(&how, sizeof(struct open_how), (struct open_how*)PT_REGS_PARM3(regs));
     flags = how.flags;
 
-    if (flags & (O_CREAT | O_TMPFILE))
+    if (flags & O_CREAT || (flags & O_TMPFILE) == O_TMPFILE)
         mode = how.mode;
 #else
 KRETFUNC_PROBE(FNNAME, int dfd, const char __user *filename, struct open_how __user *how, int ret)
@@ -287,7 +287,7 @@ KRETFUNC_PROBE(FNNAME, int dfd, const char __user *filename, struct open_how __u
     int flags = how->flags;
     u32 mode = 0;
 
-    if (flags & (O_CREAT | O_TMPFILE))
+    if (flags & O_CREAT || (flags & O_TMPFILE) == O_TMPFILE)
         mode = how->mode;
 #endif
 """
@@ -493,7 +493,8 @@ def print_event(cpu, data, size):
             if args.extended_fields:
                 # If neither O_CREAT nor O_TMPFILE is specified in flags, then
                 # mode is ignored, see open(2).
-                if event.mode == 0 and event.flags & (os.O_CREAT | os.O_TMPFILE) == 0:
+                if event.mode == 0 and event.flags & os.O_CREAT == 0 and \
+                   (event.flags & os.O_TMPFILE) != os.O_TMPFILE:
                     printb(b"%08o n/a  " % event.flags, nl="")
                 else:
                     printb(b"%08o %04o " % (event.flags, event.mode), nl="")
