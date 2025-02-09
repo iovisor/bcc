@@ -4,7 +4,11 @@
 //
 // Based on opensnoop(8) from BCC by Brendan Gregg and others.
 // 14-Feb-2020   Brendan Gregg   Created this.
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 #include <argp.h>
+#include <fcntl.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -257,7 +261,11 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	printf("%-6d %-16s %3d %3d ", e.pid, e.comm, fd, err);
 	sps_cnt += 7 + 17 + 4 + 4;
 	if (env.extended) {
-		printf("%08o ", e.flags);
+		if (e.mode == 0 && (e.flags & O_CREAT) == 0 &&
+		    (e.flags & O_TMPFILE) != O_TMPFILE)
+			printf("%08o n/a  ", e.flags);
+		else
+			printf("%08o %04o ", e.flags, e.mode);
 		sps_cnt += 9;
 	}
 	printf("%s\n", e.fname);
@@ -328,6 +336,15 @@ int main(int argc, char **argv)
 		bpf_program__set_autoload(obj->progs.tracepoint__syscalls__sys_exit_open, false);
 	}
 
+	/**
+	 * linux since v5.5 support openat2(2), commit fddb5d430ad9 ("open:
+	 * introduce openat2(2) syscall").
+	 */
+	if (!tracepoint_exists("syscalls", "sys_enter_openat2")) {
+		bpf_program__set_autoload(obj->progs.tracepoint__syscalls__sys_enter_openat2, false);
+		bpf_program__set_autoload(obj->progs.tracepoint__syscalls__sys_exit_openat2, false);
+	}
+
 	err = opensnoop_bpf__load(obj);
 	if (err) {
 		fprintf(stderr, "failed to load BPF object: %d\n", err);
@@ -352,7 +369,7 @@ int main(int argc, char **argv)
 		printf("%-7s ", "UID");
 	printf("%-6s %-16s %3s %3s ", "PID", "COMM", "FD", "ERR");
 	if (env.extended)
-		printf("%-8s ", "FLAGS");
+		printf("%-8s %-5s ", "FLAGS", "MODE");
 	printf("%s", "PATH");
 #ifdef USE_BLAZESYM
 	if (env.callers)

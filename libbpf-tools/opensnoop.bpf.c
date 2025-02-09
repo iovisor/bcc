@@ -5,6 +5,13 @@
 #include <bpf/bpf_helpers.h>
 #include "opensnoop.h"
 
+#ifndef O_CREAT
+#define O_CREAT		00000100
+#endif
+#ifndef O_TMPFILE
+#define O_TMPFILE	020200000
+#endif
+
 const volatile pid_t targ_pid = 0;
 const volatile pid_t targ_tgid = 0;
 const volatile uid_t targ_uid = 0;
@@ -59,6 +66,7 @@ int tracepoint__syscalls__sys_enter_open(struct syscall_trace_enter* ctx)
 		struct args_t args = {};
 		args.fname = (const char *)ctx->args[0];
 		args.flags = (int)ctx->args[1];
+		args.mode = (__u32)ctx->args[2];
 		bpf_map_update_elem(&start, &pid, &args, 0);
 	}
 	return 0;
@@ -77,10 +85,33 @@ int tracepoint__syscalls__sys_enter_openat(struct syscall_trace_enter* ctx)
 		struct args_t args = {};
 		args.fname = (const char *)ctx->args[1];
 		args.flags = (int)ctx->args[2];
+		args.mode = (__u32)ctx->args[3];
 		bpf_map_update_elem(&start, &pid, &args, 0);
 	}
 	return 0;
 }
+
+SEC("tracepoint/syscalls/sys_enter_openat2")
+int tracepoint__syscalls__sys_enter_openat2(struct syscall_trace_enter* ctx)
+{
+	u64 id = bpf_get_current_pid_tgid();
+	/* use kernel terminology here for tgid/pid: */
+	u32 tgid = id >> 32;
+	u32 pid = id;
+
+	/* store arg info for later lookup */
+	if (trace_allowed(tgid, pid)) {
+		struct args_t args = {};
+		struct open_how how = {};
+		args.fname = (const char *)ctx->args[1];
+		bpf_probe_read_user(&how, sizeof(how), (void *)ctx->args[2]);
+		args.flags = (int)how.flags;
+		args.mode = (__u32)how.mode;
+		bpf_map_update_elem(&start, &pid, &args, 0);
+	}
+	return 0;
+}
+
 
 static __always_inline
 int trace_exit(struct syscall_trace_exit* ctx)
@@ -104,6 +135,12 @@ int trace_exit(struct syscall_trace_exit* ctx)
 	bpf_get_current_comm(&event.comm, sizeof(event.comm));
 	bpf_probe_read_user_str(&event.fname, sizeof(event.fname), ap->fname);
 	event.flags = ap->flags;
+
+	if (ap->flags & O_CREAT || (ap->flags & O_TMPFILE) == O_TMPFILE)
+		event.mode = ap->mode;
+	else
+		event.mode = 0;
+
 	event.ret = ret;
 
 	bpf_get_stack(ctx, &stack, sizeof(stack),
@@ -129,6 +166,12 @@ int tracepoint__syscalls__sys_exit_open(struct syscall_trace_exit* ctx)
 
 SEC("tracepoint/syscalls/sys_exit_openat")
 int tracepoint__syscalls__sys_exit_openat(struct syscall_trace_exit* ctx)
+{
+	return trace_exit(ctx);
+}
+
+SEC("tracepoint/syscalls/sys_exit_openat2")
+int tracepoint__syscalls__sys_exit_openat2(struct syscall_trace_exit* ctx)
 {
 	return trace_exit(ctx);
 }
