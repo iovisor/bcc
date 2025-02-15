@@ -26,15 +26,16 @@
 # 20-Oct-2016      "      "     Switched to use the new 4.9 support.
 # 26-Jan-2019      "      "     Changed to exclude CPU idle by default.
 # 11-Apr-2023   Rocky Xing      Added option to increase hash storage size.
+# 14-Feb-2025   Rocky Xing      Prioritized using the cpu-cycles hardware event.
 
 from __future__ import print_function
-from bcc import BPF, PerfType, PerfSWConfig
+from bcc import BPF, PerfType, PerfSWConfig, PerfHWConfig
 from bcc.containers import filter_by_containers
 from sys import stderr
 from time import sleep
+from os import open, close, dup, stat, uname, devnull, O_WRONLY
 import argparse
 import signal
-import os
 import errno
 
 #
@@ -229,8 +230,8 @@ int do_perf_event(struct bpf_perf_event_data *ctx) {
 
 # pid-namespace translation
 try:
-    devinfo = os.stat("/proc/self/ns/pid")
-    version = "".join([ver.zfill(2) for ver in os.uname().release.split(".")])
+    devinfo = stat("/proc/self/ns/pid")
+    version = "".join([ver.zfill(2) for ver in uname().release.split(".")])
     # Need Linux >= 5.7 to have helper bpf_get_ns_current_pid_tgid() available:
     assert(version[:4] >= "0507")
     bpf_text = bpf_text.replace('USE_PIDNS', "1")
@@ -311,9 +312,29 @@ if debug or args.ebpf:
 
 # initialize BPF & perf_events
 b = BPF(text=bpf_text)
-b.attach_perf_event(ev_type=PerfType.SOFTWARE,
-    ev_config=PerfSWConfig.CPU_CLOCK, fn_name="do_perf_event",
-    sample_period=sample_period, sample_freq=sample_freq, cpu=args.cpu)
+
+# Duplicate and close stderr (fd = 2)
+old_stderr = dup(2)
+close(2)
+
+# Open a new file, should get fd number 2
+# This will avoid printing perf_event_open error on the screen
+fd = open(devnull, O_WRONLY)
+
+try:
+    b.attach_perf_event(ev_type=PerfType.HARDWARE,
+        ev_config=PerfHWConfig.CPU_CYCLES, fn_name="do_perf_event",
+        sample_period=sample_period, sample_freq=sample_freq, cpu=args.cpu)
+except Exception:
+    # The cpu-cycles hardware event not supported, fall back to cpu-clock
+    b.attach_perf_event(ev_type=PerfType.SOFTWARE,
+        ev_config=PerfSWConfig.CPU_CLOCK, fn_name="do_perf_event",
+        sample_period=sample_period, sample_freq=sample_freq, cpu=args.cpu)
+finally:
+    # Release the fd 2, and next dup should restore old stderr
+    close(fd)
+    dup(old_stderr)
+    close(old_stderr)
 
 # signal handler
 def signal_ignore(signal, frame):
