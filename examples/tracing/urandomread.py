@@ -4,6 +4,7 @@
 #              For Linux, uses BCC, BPF. Embedded C.
 #
 # REQUIRES: Linux 4.7+ (BPF_PROG_TYPE_TRACEPOINT support).
+#               < 5.18 (urandom_read tracepoint removed).
 #
 # Test by running this, then in another shell, run:
 #     dd if=/dev/urandom of=/dev/null bs=1k count=5
