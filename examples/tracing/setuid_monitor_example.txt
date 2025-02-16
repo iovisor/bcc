@@ -1,0 +1,28 @@
+Examples of setuid_monitor.py, the Linux eBPF/bcc version.
+
+
+To demonstrate this, run following or other commands in which setuid are
+involved:
+
+# su
+# sudo
+# passwd
+
+While setuid_monitor.py was tracing in another session:
+
+# ./setuid_monitor.py
+TIME(s)            COMM             PID    UID
+7615.997           su               2989   0
+7616.005           su               2990   0
+7616.008           su               2991   0
+7621.446           passwd           3008   0
+7624.655           passwd           3009   0
+7624.664           passwd           3010   0
+7629.624           master           1262   0
+7640.942           sudo             3012   0
+
+The UID here is the target User ID that setuid trys to elevate the
+executable's privilege to.
+
+This program was written as a simplified demonstration of tracing a
+tracepoint.
