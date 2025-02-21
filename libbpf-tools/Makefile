@@ -158,6 +158,18 @@ ifeq ($(USE_BLAZESYM),1)
 LDFLAGS += $(OUTPUT)/libblazesym.a -lrt -lpthread -ldl
 endif
 
+# In sigsnoop, SIGRTMAX and SIGRTMIN are used as array indexes. However,
+# SIGRTMAX and SIGRTMIN are not constants in glibc, so we add constants.
+SIGRT_PROBE := '\#include <stdio.h>\n'
+SIGRT_PROBE += '\#include <signal.h>\n'
+SIGRT_PROBE += 'int main(void) {\n'
+SIGRT_PROBE += '	printf("-DCONST_SIGRTMIN=%d -DCONST_SIGRTMAX=%d\\n", SIGRTMIN, SIGRTMAX);\n'
+SIGRT_PROBE += '	return 0;\n'
+SIGRT_PROBE += '}'
+
+CFLAGS += $(shell printf '%b\n' $(SIGRT_PROBE) | \
+	$(CC) -xc -Wall - -o sig.out 2>&1 && ./sig.out && rm -f sig.out)
+
 .PHONY: clean
 clean:
 	$(call msg,CLEAN)

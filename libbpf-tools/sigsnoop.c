@@ -63,6 +63,56 @@ static const char *sig_name[] = {
 	[29] = "SIGIO",
 	[30] = "SIGPWR",
 	[31] = "SIGSYS",
+	/**
+	 * manual signal(7)
+	 * The Linux kernel supports a range of 33 different real-time signals,
+	 * numbered 32 to 64. However, the glibc POSIX threads implementation
+	 * internally uses two or three real-time signals, and adjusts the
+	 * value of SIGRTMIN suitably (to 34 or 35).
+	 */
+#if CONST_SIGRTMIN == 35
+	[32] = "SIGRTMIN-3",
+	[33] = "SIGRTMIN-2",
+	[34] = "SIGRTMIN-1",
+#elif CONST_SIGRTMIN == 34
+	[32] = "SIGRTMIN-2",
+	[33] = "SIGRTMIN-1",
+#else
+#error "Unsupported CONST_SIGRTMIN value"
+#endif
+	[CONST_SIGRTMIN] = "SIGRTMIN",
+	[CONST_SIGRTMIN+1] = "SIGRTMIN+1",
+	[CONST_SIGRTMIN+2] = "SIGRTMIN+2",
+	[CONST_SIGRTMIN+3] = "SIGRTMIN+3",
+	[CONST_SIGRTMIN+4] = "SIGRTMIN+4",
+	[CONST_SIGRTMIN+5] = "SIGRTMIN+5",
+	[CONST_SIGRTMIN+6] = "SIGRTMIN+6",
+	[CONST_SIGRTMIN+7] = "SIGRTMIN+7",
+	[CONST_SIGRTMIN+8] = "SIGRTMIN+8",
+	[CONST_SIGRTMIN+9] = "SIGRTMIN+9",
+	[CONST_SIGRTMIN+10] = "SIGRTMIN+10",
+	[CONST_SIGRTMIN+11] = "SIGRTMIN+11",
+	[CONST_SIGRTMIN+12] = "SIGRTMIN+12",
+	[CONST_SIGRTMIN+13] = "SIGRTMIN+13",
+	[CONST_SIGRTMIN+14] = "SIGRTMIN+14",
+#if CONST_SIGRTMIN == 34
+	[CONST_SIGRTMIN+15] = "SIGRTMIN+15",
+#endif
+	[CONST_SIGRTMAX-14] = "SIGRTMAX-14",
+	[CONST_SIGRTMAX-13] = "SIGRTMAX-13",
+	[CONST_SIGRTMAX-12] = "SIGRTMAX-12",
+	[CONST_SIGRTMAX-11] = "SIGRTMAX-11",
+	[CONST_SIGRTMAX-10] = "SIGRTMAX-10",
+	[CONST_SIGRTMAX-9] = "SIGRTMAX-9",
+	[CONST_SIGRTMAX-8] = "SIGRTMAX-8",
+	[CONST_SIGRTMAX-7] = "SIGRTMAX-7",
+	[CONST_SIGRTMAX-6] = "SIGRTMAX-6",
+	[CONST_SIGRTMAX-5] = "SIGRTMAX-5",
+	[CONST_SIGRTMAX-4] = "SIGRTMAX-4",
+	[CONST_SIGRTMAX-3] = "SIGRTMAX-3",
+	[CONST_SIGRTMAX-2] = "SIGRTMAX-2",
+	[CONST_SIGRTMAX-1] = "SIGRTMAX-1",
+	[CONST_SIGRTMAX] = "SIGRTMAX",
 };
 
 const char *argp_program_version = "sigsnoop 0.1";
@@ -172,10 +222,10 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	tm = localtime(&t);
 	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
 	if (signal_name && e->sig < ARRAY_SIZE(sig_name))
-		printf("%-8s %-7d %-16s %-9s %-7d %-6d\n",
+		printf("%-8s %-7d %-16s %-12s %-7d %-6d\n",
 		       ts, e->pid, e->comm, sig_name[e->sig], e->tpid, e->ret);
 	else
-		printf("%-8s %-7d %-16s %-9d %-7d %-6d\n",
+		printf("%-8s %-7d %-16s %-12d %-7d %-6d\n",
 		       ts, e->pid, e->comm, e->sig, e->tpid, e->ret);
 }
 
@@ -248,7 +298,7 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	printf("%-8s %-7s %-16s %-9s %-7s %-6s\n",
+	printf("%-8s %-7s %-16s %-12s %-7s %-6s\n",
 	       "TIME", "PID", "COMM", "SIG", "TPID", "RESULT");
 
 	while (!exiting) {
