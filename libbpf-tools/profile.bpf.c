@@ -9,6 +9,7 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_tracing.h>
+#include <bpf/usdt.bpf.h>
 #include "profile.h"
 #include "maps.bpf.h"
 
@@ -47,6 +48,13 @@ struct {
 	__uint(max_entries, MAX_TID_NR);
 } tids SEC(".maps");
 
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, u64);
+	__type(value, char[MAX_SYM_LEN]);
+	__uint(max_entries, 2 * 4096); // TODO: make this dynamic and small enough
+} kaddr_to_sym SEC(".maps");
+
 SEC("perf_event")
 int do_perf_event(struct bpf_perf_event_data *ctx)
 {
@@ -57,6 +65,7 @@ int do_perf_event(struct bpf_perf_event_data *ctx)
 	u32 pid;
 	u32 tid;
 	struct bpf_pidns_info ns = {};
+	const u64 stackid_flags = BPF_F_FAST_STACK_CMP | BPF_F_REUSE_STACKID;
 
 	if (use_pidns && !bpf_get_ns_current_pid_tgid(pidns_dev, pidns_ino, &ns,
 						      sizeof(ns))) {
@@ -83,19 +92,38 @@ int do_perf_event(struct bpf_perf_event_data *ctx)
 	if (user_stacks_only)
 		key.kern_stack_id = -1;
 	else
-		key.kern_stack_id = bpf_get_stackid(&ctx->regs, &stackmap, 0);
+		key.kern_stack_id = bpf_get_stackid(&ctx->regs, &stackmap, stackid_flags);
 
 	if (kernel_stacks_only)
 		key.user_stack_id = -1;
 	else
 		key.user_stack_id = bpf_get_stackid(&ctx->regs, &stackmap,
-						    BPF_F_USER_STACK);
+						    BPF_F_USER_STACK | stackid_flags);
 
 	valp = bpf_map_lookup_or_try_init(&counts, &key, &zero);
 	if (valp)
 		__sync_fetch_and_add(valp, 1);
 
 	return 0;
+}
+
+static long __convert_fn(struct bpf_map *map, const void *key, void *value, void *_ctx)
+{
+	char *str = value;
+	u64 *addr = (u64*) key;
+	long err = bpf_snprintf(str, MAX_SYM_LEN, "%pB", addr, 1 * sizeof(u64));
+	if (err < 0) {
+		static const char err_fmt[] = "convert: bpf_snprintf failed unexpectadly";
+		bpf_trace_printk(err_fmt, sizeof(err_fmt));
+		return 1;
+	}
+	bpf_map_update_elem(map, key, value, BPF_EXIST);
+	return 0;
+}
+
+SEC("usdt//proc/self/exe:" TOSTRING(USDT_PROVIDER) ":" TOSTRING(USDT_READY_TO_CONVERT))
+long convert(void *ctx) {
+	return bpf_for_each_map_elem(&kaddr_to_sym, &__convert_fn, 0, 0);
 }
 
 char LICENSE[] SEC("license") = "GPL";

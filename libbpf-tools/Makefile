@@ -8,7 +8,7 @@ BPFTOOL ?= $(BPFTOOL_OUTPUT)/bootstrap/bpftool
 LIBBPF_SRC := $(abspath ../src/cc/libbpf/src)
 LIBBPF_OBJ := $(abspath $(OUTPUT)/libbpf.a)
 LIBBLAZESYM_SRC := $(abspath blazesym/target/release/libblazesym.a)
-INCLUDES := -I$(OUTPUT) -I../src/cc/libbpf/include/uapi
+INCLUDES := -I$(OUTPUT) -I../src/cc/libbpf/include/uapi -I/usr/include/x86_64-linux-gnu/
 CFLAGS := -g -O2 -Wall -Wmissing-field-initializers -Werror -Werror=undef
 BPFCFLAGS := -g -O2 -Wall -Werror=undef
 BPFCFLAGS_softirqs := $(BPFCFLAGS) -mcpu=v3
@@ -138,6 +138,8 @@ all: $(APPS) $(APP_ALIASES)
 ifeq ($(V),1)
 Q =
 msg =
+CFLAGS += -v
+BPFCFLAGS += -v
 else
 Q = @
 msg = @printf '  %-8s %s%s\n' "$(1)" "$(notdir $(2))" "$(if $(3), $(3))";
