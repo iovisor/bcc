@@ -300,7 +300,7 @@ static int cmp_counts(const void *a, const void *b)
 
 static int read_counts_map(int fd, struct key_ext_t *items, __u32 *count)
 {
-	struct key_t empty = {};
+	struct key_t empty = {0};
 	struct key_t *lookup_key = &empty;
 	int i = 0;
 	int err;
@@ -715,17 +715,18 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	print_counts(bpf_map__fd(obj->maps.counts),
-		     bpf_map__fd(obj->maps.stackmap),
-		     bpf_map__fd(obj->maps.kaddr_to_sym));
-
-cleanup:
 	if (env.cpu != -1)
 		bpf_link__destroy(links[env.cpu]);
 	else {
 		for (i = 0; i < nr_cpus; i++)
 			bpf_link__destroy(links[i]);
 	}
+
+	print_counts(bpf_map__fd(obj->maps.counts),
+		     bpf_map__fd(obj->maps.stackmap),
+		     bpf_map__fd(obj->maps.kaddr_to_sym));
+
+cleanup:
 	if (syms_cache)
 		syms_cache__free(syms_cache);
 	profile_bpf__destroy(obj);
