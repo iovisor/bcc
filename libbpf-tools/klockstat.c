@@ -31,6 +31,7 @@
 #include "trace_helpers.h"
 
 #define warn(...) fprintf(stderr, __VA_ARGS__)
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
 
 enum {
 	SORT_ACQ_MAX,
@@ -92,6 +93,29 @@ static const char program_doc[] =
 "  klockstat -s 6                # display 6 stack entries per lock\n"
 "  klockstat -P                  # print stats per thread\n"
 ;
+
+static const char *lock_ksym_names[] = {
+	"mutex_lock",
+	"mutex_lock_nested",
+	"mutex_lock_interruptible",
+	"mutex_lock_interruptible_nested",
+	"mutex_lock_killable",
+	"mutex_lock_killable_nested",
+	"mutex_trylock",
+	"down_read",
+	"down_read_nested",
+	"down_read_interruptible",
+	"down_read_killable",
+	"down_read_killable_nested",
+	"down_read_trylock",
+	"down_write",
+	"down_write_nested",
+	"down_write_killable",
+	"down_write_killable_nested",
+	"down_write_trylock",
+};
+
+static unsigned long lock_ksym_addr[ARRAY_SIZE(lock_ksym_names)];
 
 static const struct argp_option opts[] = {
 	{ "pid", 'p', "PID", 0, "Filter by process ID", 0 },
@@ -359,6 +383,38 @@ static char *symname(struct ksyms *ksyms, uint64_t pc, char *buf, size_t n)
 	return buf;
 }
 
+static int resolve_lock_ksyms(struct ksyms *ksyms)
+{
+	const struct ksym *ksym;
+	int i, j = 0;
+
+	for (i = 0; i < ARRAY_SIZE(lock_ksym_names); i++) {
+		ksym = ksyms__get_symbol(ksyms, lock_ksym_names[i]);
+		if (!ksym)
+			continue;
+
+		lock_ksym_addr[j++] = ksym->addr;
+	}
+
+	return !j;
+}
+
+static int find_stack_offset(struct ksyms *ksyms, struct stack_stat *ss)
+{
+	const struct ksym *ksym;
+        int i, j;
+
+	for (i = 0; i < PERF_MAX_STACK_DEPTH && ss->bt[i]; i++) {
+		ksym = ksyms__map_addr(ksyms, ss->bt[i]);
+
+		for (j = 0; j < ARRAY_SIZE(lock_ksym_addr) && lock_ksym_addr[j]; j++)
+			if (ksym->addr == lock_ksym_addr[j])
+				return i + 1;
+	}
+
+	return 0;
+}
+
 static char *print_caller(char *buf, int size, struct stack_stat *ss)
 {
 	snprintf(buf, size, "%u  %16s", ss->stack_id, ss->ls.acq_max_comm);
@@ -404,6 +460,7 @@ static void print_acq_header(void)
 static void print_acq_stat(struct ksyms *ksyms, struct stack_stat *ss,
 			   int nr_stack_entries)
 {
+	int offset = find_stack_offset(ksyms, ss);
 	char buf[40];
 	char avg[40];
 	char max[40];
@@ -411,12 +468,12 @@ static void print_acq_stat(struct ksyms *ksyms, struct stack_stat *ss,
 	int i;
 
 	printf("%37s %9s %8llu %10s %12s\n",
-	       symname(ksyms, ss->bt[0], buf, sizeof(buf)),
+	       symname(ksyms, ss->bt[offset], buf, sizeof(buf)),
 	       print_time(avg, sizeof(avg), ss->ls.acq_total_time / ss->ls.acq_count),
 	       ss->ls.acq_count,
 	       print_time(max, sizeof(max), ss->ls.acq_max_time),
 	       print_time(tot, sizeof(tot), ss->ls.acq_total_time));
-	for (i = 1; i < nr_stack_entries; i++) {
+	for (i = offset + 1; i < nr_stack_entries + offset; i++) {
 		if (!ss->bt[i] || env.per_thread)
 			break;
 		printf("%37s\n", symname(ksyms, ss->bt[i], buf, sizeof(buf)));
@@ -457,6 +514,7 @@ static void print_hld_header(void)
 static void print_hld_stat(struct ksyms *ksyms, struct stack_stat *ss,
 			   int nr_stack_entries)
 {
+	int offset = find_stack_offset(ksyms, ss);
 	char buf[40];
 	char avg[40];
 	char max[40];
@@ -464,12 +522,12 @@ static void print_hld_stat(struct ksyms *ksyms, struct stack_stat *ss,
 	int i;
 
 	printf("%37s %9s %8llu %10s %12s\n",
-	       symname(ksyms, ss->bt[0], buf, sizeof(buf)),
+	       symname(ksyms, ss->bt[offset], buf, sizeof(buf)),
 	       print_time(avg, sizeof(avg), ss->ls.hld_total_time / ss->ls.hld_count),
 	       ss->ls.hld_count,
 	       print_time(max, sizeof(max), ss->ls.hld_max_time),
 	       print_time(tot, sizeof(tot), ss->ls.hld_total_time));
-	for (i = 1; i < nr_stack_entries; i++) {
+	for (i = offset + 1; i < nr_stack_entries + offset; i++) {
 		if (!ss->bt[i] || env.per_thread)
 			break;
 		printf("%37s\n", symname(ksyms, ss->bt[i], buf, sizeof(buf)));
@@ -504,7 +562,7 @@ static int print_stats(struct ksyms *ksyms, int stack_map, int stat_map)
 	size_t stats_sz = 1;
 	uint32_t lookup_key = 0;
 	uint32_t stack_id;
-	int ret, i;
+	int ret, i, offset;
 	int nr_stack_entries;
 
 	stats = calloc(stats_sz, sizeof(void *));
@@ -538,7 +596,9 @@ static int print_stats(struct ksyms *ksyms, int stack_map, int stat_map)
 			/* Can still report the results without a backtrace. */
 			warn("failed to lookup stack_id %u\n", stack_id);
 		}
-		if (!env.per_thread && !caller_is_traced(ksyms, ss->bt[0])) {
+
+		offset = find_stack_offset(ksyms, ss);
+		if (!env.per_thread && !caller_is_traced(ksyms, ss->bt[offset])) {
 			free(ss);
 			continue;
 		}
@@ -721,6 +781,13 @@ int main(int argc, char **argv)
 		err = 1;
 		goto cleanup;
 	}
+
+	err = resolve_lock_ksyms(ksyms);
+	if (err) {
+		warn("failed to resolve lock ksyms\n");
+		goto cleanup;
+	}
+
 	if (env.lock_name) {
 		lock_addr = get_lock_addr(ksyms, env.lock_name);
 		if (!lock_addr) {
