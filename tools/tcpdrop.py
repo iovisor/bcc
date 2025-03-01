@@ -248,8 +248,10 @@ b = BPF(text=bpf_text)
 if b.get_kprobe_functions(b"tcp_drop"):
     b.attach_kprobe(event="tcp_drop", fn_name="trace_tcp_drop")
 elif b.tracepoint_exists("skb", "kfree_skb"):
-    print("WARNING: tcp_drop() kernel function not found or traceable. "
-          "Use tracpoint:skb:kfree_skb instead.")
+    print("ERROR: tcp_drop() kernel function not found or traceable. "
+          "(It may have been inlined.) "
+          "Use tracepoint:skb:kfree_skb instead.")
+    exit()
 else:
     print("ERROR: tcp_drop() kernel function and tracpoint:skb:kfree_skb"
           " not found or traceable. "
