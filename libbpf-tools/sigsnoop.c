@@ -63,6 +63,39 @@ static const char *sig_name[] = {
 	[29] = "SIGIO",
 	[30] = "SIGPWR",
 	[31] = "SIGSYS",
+	[32] = "SIGNAL-32", /* SIGRTMIN in kernel */
+	[33] = "SIGNAL-33",
+	[34] = "SIGNAL-34",
+	[35] = "SIGNAL-35",
+	[36] = "SIGNAL-36",
+	[37] = "SIGNAL-37",
+	[38] = "SIGNAL-38",
+	[39] = "SIGNAL-39",
+	[40] = "SIGNAL-40",
+	[41] = "SIGNAL-41",
+	[42] = "SIGNAL-42",
+	[43] = "SIGNAL-43",
+	[44] = "SIGNAL-44",
+	[45] = "SIGNAL-45",
+	[46] = "SIGNAL-46",
+	[47] = "SIGNAL-47",
+	[48] = "SIGNAL-48",
+	[49] = "SIGNAL-49",
+	[50] = "SIGNAL-50",
+	[51] = "SIGNAL-51",
+	[52] = "SIGNAL-52",
+	[53] = "SIGNAL-53",
+	[54] = "SIGNAL-54",
+	[55] = "SIGNAL-55",
+	[56] = "SIGNAL-56",
+	[57] = "SIGNAL-57",
+	[58] = "SIGNAL-58",
+	[59] = "SIGNAL-59",
+	[60] = "SIGNAL-60",
+	[61] = "SIGNAL-61",
+	[62] = "SIGNAL-62",
+	[63] = "SIGNAL-63",
+	[64] = "SIGNAL-64", /* SIGRTMAX */
 };
 
 const char *argp_program_version = "sigsnoop 0.1";
@@ -172,10 +205,10 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	tm = localtime(&t);
 	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
 	if (signal_name && e->sig < ARRAY_SIZE(sig_name))
-		printf("%-8s %-7d %-16s %-9s %-7d %-6d\n",
+		printf("%-8s %-7d %-16s %-12s %-7d %-6d\n",
 		       ts, e->pid, e->comm, sig_name[e->sig], e->tpid, e->ret);
 	else
-		printf("%-8s %-7d %-16s %-9d %-7d %-6d\n",
+		printf("%-8s %-7d %-16s %-12d %-7d %-6d\n",
 		       ts, e->pid, e->comm, e->sig, e->tpid, e->ret);
 }
 
@@ -248,7 +281,7 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	printf("%-8s %-7s %-16s %-9s %-7s %-6s\n",
+	printf("%-8s %-7s %-16s %-12s %-7s %-6s\n",
 	       "TIME", "PID", "COMM", "SIG", "TPID", "RESULT");
 
 	while (!exiting) {
