@@ -227,10 +227,15 @@ void trace_completion(struct pt_regs *ctx, struct request *req) {
 if BPF.get_kprobe_functions(b'blk_start_request'):
         b.attach_kprobe(event="blk_start_request", fn_name="trace_start")
 b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_start")
+
 if BPF.get_kprobe_functions(b'__blk_account_io_done'):
+    # __blk_account_io_done is available before kernel v6.4. 
     b.attach_kprobe(event="__blk_account_io_done", fn_name="trace_completion")
-else:
+elif BPF.get_kprobe_functions(b'blk_account_io_done'):
+    # blk_account_io_done is traceable (not inline) before v5.16. 
     b.attach_kprobe(event="blk_account_io_done", fn_name="trace_completion")
+else:
+    b.attach_kprobe(event="blk_mq_end_request", fn_name="trace_completion")
 [...]
 ```
 
@@ -240,6 +245,7 @@ Things to learn:
 1. ```trace_start(struct pt_regs *ctx, struct request *req)```: This function will later be attached to kprobes. The arguments to kprobe functions are ```struct pt_regs *ctx```, for registers and BPF context, and then the actual arguments to the function. We'll attach this to blk_start_request(), where the first argument is ```struct request *```.
 1. ```start.update(&req, &ts)```: We're using the pointer to the request struct as a key in our hash. What? This is commonplace in tracing. Pointers to structs turn out to be great keys, as they are unique: two structs can't have the same pointer address. (Just be careful about when it gets free'd and reused.) So what we're really doing is tagging the request struct, which describes the disk I/O, with our own timestamp, so that we can time it. There's two common keys used for storing timestamps: pointers to structs, and, thread IDs (for timing function entry to return).
 1. ```req->__data_len```: We're dereferencing members of ```struct request```. See its definition in the kernel source for what members are there. bcc actually rewrites these expressions to be a series of ```bpf_probe_read_kernel()``` calls. Sometimes bcc can't handle a complex dereference, and you need to call ```bpf_probe_read_kernel()``` directly.
+1. ```if BPF.get_kprobe_functions(b'__blk_account_io_done'):...```: Different functions are attached here depending on kernel versions. Legacy functions ```__blk_account_io_done``` and  ```blk_account_io_done``` are not available on newer kernels, so instead, we use ```blk_mq_end_request``` as a workaround.
 
 This is a pretty interesting program, and if you can understand all the code, you'll understand many important basics. We're still using the bpf_trace_printk() hack, so let's fix that next.
 
@@ -367,6 +373,15 @@ int kprobe__blk_account_io_done(struct pt_regs *ctx, struct request *req)
 	return 0;
 }
 """)
+
+if BPF.get_kprobe_functions(b'__blk_account_io_done'):
+    # __blk_account_io_done is available before kernel v6.4.
+    b.attach_kprobe(event="__blk_account_io_done", fn_name="trace_req_done")
+elif BPF.get_kprobe_functions(b'blk_account_io_done'):
+    # blk_account_io_done is traceable (not inline) before v5.16.
+    b.attach_kprobe(event="blk_account_io_done", fn_name="trace_req_done")
+else:
+    b.attach_kprobe(event="blk_mq_end_request", fn_name="trace_req_done")
 
 # header
 print("Tracing... Hit Ctrl-C to end.")
