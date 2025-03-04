@@ -3,7 +3,7 @@
 # bashreadline Print entered bash commands from all running shells.
 #               For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: bashreadline [-h] [-s [SHARED]] [-j] [-o [OUTPUT]]
+# USAGE: bashreadline [-h] [-s [SHARED]] [-j] [-f [OUTPUT]]
 # This works by tracing the readline() function using a uretprobe (uprobes).
 # When you failed to run the script directly with error:
 # `Exception: could not determine address of symbol b'readline'`,
