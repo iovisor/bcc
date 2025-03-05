@@ -28,6 +28,10 @@
 #include "blazesym.h"
 #endif
 
+#ifdef USE_DWARF_UNWIND
+#include "unwind_helpers.h"
+#endif
+
 static struct env {
 	int interval;
 	int nr_intervals;
@@ -51,6 +55,10 @@ static struct env {
 	bool verbose;
 	char command[32];
 	char symbols_prefix[16];
+#ifdef USE_DWARF_UNWIND
+	bool dwarf_unwind;
+	int dwarf_ustack_size;
+#endif
 } env = {
 	.interval = 5, // posarg 1
 	.nr_intervals = -1, // posarg 2
@@ -73,6 +81,9 @@ static struct env {
 	.verbose = false,
 	.command = {0}, // -c --command
 	.symbols_prefix = {0},
+#ifdef USE_DWARF_UNWIND
+	.dwarf_ustack_size = 128,
+#endif
 };
 
 struct allocation_node {
@@ -90,6 +101,9 @@ struct allocation {
 
 #define OPT_PERF_MAX_STACK_DEPTH	1 /* --perf-max-stack-depth */
 #define OPT_STACK_STORAGE_SIZE		2 /* --stack-storage-size */
+#ifdef USE_DWARF_UNWIND
+#define OPT_DWARF_STACK_SIZE		3 /* --dwarf-stack-size */
+#endif
 
 #define __ATTACH_UPROBE(skel, sym_name, prog_name, is_retprobe) \
 	do { \
@@ -223,6 +237,10 @@ static const struct argp_option argp_options[] = {
 	 "the number of unique stack traces that can be stored and displayed (default 10240)", 0 },
 	{"perf-max-stack-depth", OPT_PERF_MAX_STACK_DEPTH,
 	 "PERF-MAX-STACK-DEPTH", 0, "the limit for both kernel and user stack traces (default 127)", 0 },
+#ifdef USE_DWARF_UNWIND
+	{ "dwarf-unwind", 'D', NULL, 0, "Enable DWARF mode stack traces", 0 },
+	{ "dwarf-stack-size", OPT_DWARF_STACK_SIZE, "STACK-SIZE", 0, "Set user stack size for DWARF mode (default 128)", 0 },
+#endif
 	{"verbose", 'v', NULL, 0, "verbose debug output", 0 },
 	{},
 };
@@ -385,6 +403,11 @@ int main(int argc, char *argv[])
 		bpf_map__set_max_entries(skel->maps.combined_allocs, COMBINED_ALLOCS_MAX_ENTRIES);
 		skel->rodata->combined_only = true;
 	}
+
+#ifdef USE_DWARF_UNWIND
+	if (env.dwarf_unwind)
+		UW_MAP_SET(skel, env.dwarf_ustack_size, env.stack_map_max_entries);
+#endif
 
 	// disable kernel tracepoints based on settings or availability
 	if (env.kernel_trace) {
@@ -603,6 +626,25 @@ error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 			argp_usage(state);
 		}
 		break;
+#ifdef USE_DWARF_UNWIND
+	case 'D':
+		env.dwarf_unwind = true;
+		break;
+	case OPT_DWARF_STACK_SIZE:
+		errno = 0;
+		env.dwarf_ustack_size = strtol(arg, NULL, 10);
+		if (errno) {
+			fprintf(stderr, "invalid stack size: %s\n", arg);
+			argp_usage(state);
+		}
+		if (env.dwarf_ustack_size > UW_STACK_MAX_SZ) {
+			fprintf(stderr, "the stack size is too big, please "
+				"increase UW_STACK_MAX_SZ's value and recompile");
+			argp_usage(state);
+		}
+
+		break;
+#endif
 	case ARGP_KEY_ARG:
 		pos_args++;
 
@@ -828,6 +870,26 @@ void print_stack_frames_by_syms_cache()
 }
 #endif
 
+static int stack_map_lookup_elem(int sfd, int *stack_id, pid_t pid, unsigned long *ip, size_t count)
+{
+#ifdef USE_DWARF_UNWIND
+	int err;
+
+	if (env.dwarf_unwind) {
+		err = uw_map_lookup_elem(stack_id, pid, ip, count);
+		if (err == -ENOBUFS) {
+			fprintf(stderr, "WARNING: The stack trace cannot be fully displayed."
+					" Consider increasing --dwarf-stack-size.\n");
+			err = 0;
+		}
+		errno = -err;
+		return err;
+	}
+#endif
+
+	return bpf_map_lookup_elem(sfd, stack_id, ip);
+}
+
 int print_stack_frames(struct allocation *allocs, size_t nr_allocs, int stack_traces_fd)
 {
 	for (size_t i = 0; i < nr_allocs; ++i) {
@@ -843,7 +905,8 @@ int print_stack_frames(struct allocation *allocs, size_t nr_allocs, int stack_tr
 			}
 		}
 
-		if (bpf_map_lookup_elem(stack_traces_fd, &alloc->stack_id, stack)) {
+		if (stack_map_lookup_elem(stack_traces_fd, (int*)&alloc->stack_id, env.pid, stack,
+					  env.perf_max_stack_depth)) {
 			if (errno == ENOENT)
 				continue;
 
