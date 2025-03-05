@@ -28,6 +28,10 @@
 #include "blazesym.h"
 #endif
 
+#ifdef USE_LIBUNWIND
+#include "unwind_helpers.h"
+#endif
+
 static struct env {
 	int interval;
 	int nr_intervals;
@@ -51,6 +55,10 @@ static struct env {
 	bool verbose;
 	char command[32];
 	char symbols_prefix[16];
+#ifdef USE_LIBUNWIND
+	bool post_unwind;
+	int sample_ustack_size;
+#endif
 } env = {
 	.interval = 5, // posarg 1
 	.nr_intervals = -1, // posarg 2
@@ -73,6 +81,9 @@ static struct env {
 	.verbose = false,
 	.command = {0}, // -c --command
 	.symbols_prefix = {0},
+#ifdef USE_LIBUNWIND
+	.sample_ustack_size = 128,
+#endif
 };
 
 struct allocation_node {
@@ -189,6 +200,10 @@ const char argp_args_doc[] =
 "        Trace task who sue jemalloc\n"
 "";
 
+#ifdef USE_LIBUNWIND
+#define OPT_SAMPLE_STACK_SIZE		1 /* --sample-stack-size */
+#endif
+
 static const struct argp_option argp_options[] = {
 	// name/longopt:str, key/shortopt:int, arg:str, flags:int, doc:str
 	{"pid", 'p', "PID", 0, "process ID to trace. if not specified, trace kernel allocs", 0 },
@@ -205,6 +220,10 @@ static const struct argp_option argp_options[] = {
 	{"obj", 'O', "OBJECT", 0, "attach to allocator functions in the specified object", 0 },
 	{"percpu", 'P', NULL, 0, "trace percpu allocations", 0 },
 	{"symbols-prefix", 'S', "SYMBOLS_PREFIX", 0, "memory allocator symbols prefix", 0 },
+#ifdef USE_LIBUNWIND
+	{ "post-unwind", 'U', NULL, 0, "post unwind", 0 },
+	{ "sample-stack-size", OPT_SAMPLE_STACK_SIZE, "STACK-SIZE", 0, "the size of dump stack (default 128)", 0 },
+#endif
 	{"verbose", 'v', NULL, 0, "verbose debug output", 0 },
 	{},
 };
@@ -357,6 +376,15 @@ int main(int argc, char *argv[])
 	bpf_map__set_value_size(skel->maps.stack_traces,
 				env.perf_max_stack_depth * sizeof(unsigned long));
 	bpf_map__set_max_entries(skel->maps.stack_traces, env.stack_map_max_entries);
+
+#ifdef USE_LIBUNWIND
+	if (env.post_unwind) {
+		if (UW_INIT(skel, env.sample_ustack_size, MAX_ENTRIES) < 0) {
+			fprintf(stderr, "failed to int unwind_helpers\n");
+			goto cleanup;
+		}
+	}
+#endif
 
 	// disable kernel tracepoints based on settings or availability
 	if (env.kernel_trace) {
@@ -561,6 +589,25 @@ error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 	case 'v':
 		env.verbose = true;
 		break;
+#ifdef USE_LIBUNWIND
+	case 'U':
+		env.post_unwind = true;
+		break;
+	case OPT_SAMPLE_STACK_SIZE:
+		errno = 0;
+		env.sample_ustack_size = strtol(arg, NULL, 10);
+		if (errno) {
+			fprintf(stderr, "invalid stack size: %s\n", arg);
+			argp_usage(state);
+		}
+		if (env.sample_ustack_size > UW_STACK_MAX_SZ) {
+			fprintf(stderr, "the stack size is too big, please "
+				"increase UW_STACK_MAX_SZ's value and recompile");
+			argp_usage(state);
+		}
+
+		break;
+#endif
 	case ARGP_KEY_ARG:
 		pos_args++;
 
@@ -786,6 +833,25 @@ void print_stack_frames_by_syms_cache()
 }
 #endif
 
+static int stack_map_lookup_elem(int sfd, int *stack_id, pid_t pid, unsigned long *ip, size_t count)
+{
+#ifdef USE_LIBUNWIND
+	int err;
+
+	if (env.post_unwind) {
+		err = uw_map_lookup_elem(stack_id, pid, ip, count);
+		if (err == -ENOBUFS) {
+			fprintf(stderr, "WARNING: The stack trace cannot be fully displayed."
+				" Consider increasing --sample-stack-size.\n");
+			err = 0;
+		}
+		return err;
+	}
+
+#endif
+	return bpf_map_lookup_elem(sfd, stack_id, ip);
+}
+
 int print_stack_frames(struct allocation *allocs, size_t nr_allocs, int stack_traces_fd)
 {
 	for (size_t i = 0; i < nr_allocs; ++i) {
@@ -801,7 +867,8 @@ int print_stack_frames(struct allocation *allocs, size_t nr_allocs, int stack_tr
 			}
 		}
 
-		if (bpf_map_lookup_elem(stack_traces_fd, &alloc->stack_id, stack)) {
+		if (stack_map_lookup_elem(stack_traces_fd, (int*)&alloc->stack_id, env.pid, stack,
+					  env.perf_max_stack_depth)) {
 			if (errno == ENOENT)
 				continue;
 
