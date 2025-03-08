@@ -25,6 +25,7 @@ static volatile sig_atomic_t exiting = 0;
 static pid_t target_pid = 0;
 static bool trace_failed_only = false;
 static bool emit_timestamp = false;
+static bool emit_sysname = false;
 static bool verbose = false;
 
 const char *argp_program_version = "statsnoop 0.1";
@@ -33,11 +34,12 @@ const char *argp_program_bug_address =
 const char argp_program_doc[] =
 "Trace stat syscalls.\n"
 "\n"
-"USAGE: statsnoop [-h] [-t] [-x] [-p PID]\n"
+"USAGE: statsnoop [-h] [-t] [-s] [-x] [-p PID]\n"
 "\n"
 "EXAMPLES:\n"
 "    statsnoop             # trace all stat syscalls\n"
 "    statsnoop -t          # include timestamps\n"
+"    statsnoop -s          # include syscall name\n"
 "    statsnoop -x          # only show failed stats\n"
 "    statsnoop -p 1216     # only trace PID 1216\n";
 
@@ -45,9 +47,19 @@ static const struct argp_option opts[] = {
 	{ "pid", 'p', "PID", 0, "Process ID to trace", 0 },
 	{ "failed", 'x', NULL, 0, "Only show failed stats", 0 },
 	{ "timestamp", 't', NULL, 0, "Include timestamp on output", 0 },
+	{ "sysname", 's', NULL, 0, "Include syscall name on output", 0 },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
+};
+
+static char *sys_names[] = {
+	[0] = "N/A",
+	[SYS_STATFS] = "statfs",
+	[SYS_NEWSTAT] = "newstat",
+	[SYS_STATX] = "statx",
+	[SYS_NEWFSTATAT] = "newfstatat",
+	[SYS_NEWLSTAT] = "newlstat",
 };
 
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
@@ -69,6 +81,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 't':
 		emit_timestamp = true;
+		break;
+	case 's':
+		emit_sysname = true;
 		break;
 	case 'v':
 		verbose = true;
@@ -121,7 +136,10 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		ts = (double)(e.ts_ns - start_timestamp) / 1000000000;
 		printf("%-14.9f ", ts);
 	}
-	printf("%-7d %-20s %-4d %-4d %-s\n", e.pid, e.comm, fd, err, e.pathname);
+	printf("%-7d %-20s %-4d %-4d", e.pid, e.comm, fd, err);
+	if (emit_sysname)
+		printf(" %-10s", sys_names[e.type]);
+	printf(" %-s\n", e.pathname);
 }
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
@@ -211,8 +229,11 @@ int main(int argc, char **argv)
 
 	if (emit_timestamp)
 		printf("%-14s ", "TIME(s)");
-	printf("%-7s %-20s %-4s %-4s %-s\n",
-	       "PID", "COMM", "RET", "ERR", "PATH");
+	printf("%-7s %-20s %-4s %-4s",
+	       "PID", "COMM", "RET", "ERR");
+	if (emit_sysname)
+		printf(" %-10s", "SYSCALL");
+	printf(" %-s\n", "PATH");
 
 	while (!exiting) {
 		err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS);
