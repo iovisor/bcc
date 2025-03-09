@@ -56,18 +56,20 @@ to opensnoop, which shows what files were actually opened.
 USAGE message:
 
 # ./statsnoop -h
-usage: statsnoop [-h] [-t] [-x] [-p PID]
+usage: statsnoop.py [-h] [-t] [-s] [-x] [-p PID]
 
 Trace stat() syscalls
 
-optional arguments:
-  -h, --help         show this help message and exit
-  -t, --timestamp    include timestamp on output
-  -x, --failed       only show failed stats
-  -p PID, --pid PID  trace this PID only
+options:
+  -h, --help       show this help message and exit
+  -t, --timestamp  include timestamp on output
+  -s, --sysname    include syscall name on output
+  -x, --failed     only show failed stats
+  -p, --pid PID    trace this PID only
 
 examples:
     ./statsnoop           # trace all stat() syscalls
     ./statsnoop -t        # include timestamps
+    ./statsnoop -s        # include syscall name
     ./statsnoop -x        # only show failed stats
     ./statsnoop -p 181    # only trace PID 181
