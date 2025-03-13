@@ -25,6 +25,7 @@
 
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
+#include <bpf/btf.h>
 #include "klockstat.h"
 #include "klockstat.skel.h"
 #include "compat.h"
@@ -117,6 +118,10 @@ static const char *lock_ksym_names[] = {
 
 static unsigned long lock_ksym_addr[ARRAY_SIZE(lock_ksym_names)];
 
+static struct btf *vmlinux_btf;
+static const char **nltype_map;
+static size_t nltype_max = 0;
+
 static const struct argp_option opts[] = {
 	{ "pid", 'p', "PID", 0, "Filter by process ID", 0 },
 	{ "tid", 't', "TID", 0, "Filter by thread ID", 0 },
@@ -138,6 +143,93 @@ static const struct argp_option opts[] = {
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
+
+static char *get_nltype(unsigned long nltype)
+{
+	static char buf[100];
+
+	if (!nltype)
+		return "";
+
+	if (nltype >= nltype_max || !nltype_map[nltype])
+		snprintf(buf, sizeof(buf), " nltype %lu", nltype);
+	else
+		snprintf(buf, sizeof(buf), " nltype %s", nltype_map[nltype]);
+
+	buf[sizeof(buf)-1] = '\0';
+	return buf;
+}
+
+static int build_nlmsg_name_table(const struct btf_type *t)
+{
+	const struct btf_enum *e;
+	unsigned short vlen;
+	size_t max_val = 0;
+	const char *name;
+	int i;
+
+	vlen = btf_vlen(t);
+	e = btf_enum(t);
+
+	/* first pass - find the value of __RTM_MAX to size the allocation */
+	for (i = 0; i < vlen; i++) {
+		name = btf__name_by_offset(vmlinux_btf, e[i].name_off);
+		if (!strcmp(name, "__RTM_MAX")) {
+			max_val = e[i].val;
+			break;
+		}
+	}
+
+	if (!max_val)
+		return -ENOENT;
+
+	nltype_map = calloc(max_val, sizeof(void *));
+	if (!nltype_map)
+		return -ENOMEM;
+
+	nltype_max = max_val;
+
+	for (i = 0; i < vlen; i++) {
+		if (e[i].val >= max_val)
+			break;
+
+		nltype_map[e[i].val] = btf__name_by_offset(vmlinux_btf, e[i].name_off);
+	}
+
+	return 0;
+}
+
+static int resolve_nlmsg_names(void)
+{
+	const struct btf_type *t;
+	const struct btf_enum *e;
+	int nr_types, i, j, err;
+	unsigned short vlen;
+	const char *name;
+
+	if (!vmlinux_btf)
+		vmlinux_btf = btf__load_vmlinux_btf();
+
+	if ((err = libbpf_get_error(vmlinux_btf)))
+		return err;
+
+	nr_types = btf__type_cnt(vmlinux_btf);
+	for (i = 1; i < nr_types; i++) {
+		t = btf__type_by_id(vmlinux_btf, i);
+		if (!btf_is_enum(t))
+			continue;
+
+		vlen = btf_vlen(t);
+		e = btf_enum(t);
+		for (j = 0; j < vlen; j++) {
+			name = btf__name_by_offset(vmlinux_btf, e[j].name_off);
+			if (!strcmp(name, "RTM_BASE"))
+				return build_nlmsg_name_table(t);
+		}
+	}
+
+	return -ENOENT;
+}
 
 static void *parse_lock_addr(const char *lock_name)
 {
@@ -479,11 +571,12 @@ static void print_acq_stat(struct ksyms *ksyms, struct stack_stat *ss,
 		printf("%37s\n", symname(ksyms, ss->bt[i], buf, sizeof(buf)));
 	}
 	if (nr_stack_entries > 1 && !env.per_thread)
-		printf("                              Max PID %llu, COMM %s, Lock %s (0x%llx)\n",
+		printf("                              Max PID %llu, COMM %s, Lock %s (0x%llx)%s\n",
 		       ss->ls.acq_max_id >> 32,
 		       ss->ls.acq_max_comm,
-			   get_lock_name(ksyms, ss->ls.acq_max_lock_ptr),
-			   ss->ls.acq_max_lock_ptr);
+		       get_lock_name(ksyms, ss->ls.acq_max_lock_ptr),
+		       ss->ls.acq_max_lock_ptr,
+		       get_nltype(ss->ls.acq_max_nltype));
 }
 
 static void print_acq_task(struct stack_stat *ss)
@@ -533,11 +626,12 @@ static void print_hld_stat(struct ksyms *ksyms, struct stack_stat *ss,
 		printf("%37s\n", symname(ksyms, ss->bt[i], buf, sizeof(buf)));
 	}
 	if (nr_stack_entries > 1 && !env.per_thread)
-		printf("                              Max PID %llu, COMM %s, Lock %s (0x%llx)\n",
+		printf("                              Max PID %llu, COMM %s, Lock %s (0x%llx)%s\n",
 		       ss->ls.hld_max_id >> 32,
 		       ss->ls.hld_max_comm,
-			   get_lock_name(ksyms, ss->ls.hld_max_lock_ptr),
-			   ss->ls.hld_max_lock_ptr);
+		       get_lock_name(ksyms, ss->ls.hld_max_lock_ptr),
+		       ss->ls.hld_max_lock_ptr,
+		       get_nltype(ss->ls.hld_max_nltype));
 }
 
 static void print_hld_task(struct stack_stat *ss)
@@ -633,7 +727,7 @@ static int print_stats(struct ksyms *ksyms, int stack_map, int stat_map)
 		if (env.reset) {
 			ss = stats[i];
 			bpf_map_delete_elem(stat_map, &ss->stack_id);
-		}	
+		}
 		free(stats[i]);
         }
 	free(stats);
@@ -687,6 +781,11 @@ static void enable_fentry(struct klockstat_bpf *obj)
 	bpf_program__set_autoload(obj->progs.kprobe_down_write_killable, false);
 	bpf_program__set_autoload(obj->progs.kprobe_down_write_killable_exit, false);
 	bpf_program__set_autoload(obj->progs.kprobe_up_write, false);
+
+	bpf_program__set_autoload(obj->progs.kprobe_rtnetlink_rcv_msg, false);
+	bpf_program__set_autoload(obj->progs.kprobe_rtnetlink_rcv_msg_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_netlink_dump, false);
+	bpf_program__set_autoload(obj->progs.kprobe_netlink_dump_exit, false);
 
 	/* CONFIG_DEBUG_LOCK_ALLOC is on */
 	debug_lock = fentry_can_attach("mutex_lock_nested", NULL);
@@ -749,6 +848,24 @@ static void enable_kprobes(struct klockstat_bpf *obj)
 	bpf_program__set_autoload(obj->progs.down_write_killable, false);
 	bpf_program__set_autoload(obj->progs.down_write_killable_exit, false);
 	bpf_program__set_autoload(obj->progs.up_write, false);
+
+	bpf_program__set_autoload(obj->progs.rtnetlink_rcv_msg, false);
+	bpf_program__set_autoload(obj->progs.rtnetlink_rcv_msg_exit, false);
+	bpf_program__set_autoload(obj->progs.netlink_dump, false);
+	bpf_program__set_autoload(obj->progs.netlink_dump_exit, false);
+}
+
+static void disable_nldump_probes(struct klockstat_bpf *obj)
+{
+	bpf_program__set_autoload(obj->progs.rtnetlink_rcv_msg, false);
+	bpf_program__set_autoload(obj->progs.rtnetlink_rcv_msg_exit, false);
+	bpf_program__set_autoload(obj->progs.netlink_dump, false);
+	bpf_program__set_autoload(obj->progs.netlink_dump_exit, false);
+
+	bpf_program__set_autoload(obj->progs.kprobe_rtnetlink_rcv_msg, false);
+	bpf_program__set_autoload(obj->progs.kprobe_rtnetlink_rcv_msg_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_netlink_dump, false);
+	bpf_program__set_autoload(obj->progs.kprobe_netlink_dump_exit, false);
 }
 
 int main(int argc, char **argv)
@@ -814,6 +931,14 @@ int main(int argc, char **argv)
 		enable_fentry(obj);
 	else
 		enable_kprobes(obj);
+
+	if (env.nr_stack_entries != 1) {
+		err = resolve_nlmsg_names();
+		if (err)
+			warn("failed to resolve nlmsg names\n");
+	} else {
+		disable_nldump_probes(obj);
+	}
 
 	err = klockstat_bpf__load(obj);
 	if (err) {

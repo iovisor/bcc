@@ -34,6 +34,7 @@ struct task_lock {
 
 struct lockholder_info {
 	s32 stack_id;
+	u16 nlmsg_type;
 	u64 task_id;
 	u64 try_at;
 	u64 acq_at;
@@ -68,6 +69,13 @@ struct {
 	__type(key, u32);
 	__type(value, void *);
 } locks SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, MAX_ENTRIES);
+	__type(key, u32);
+	__type(value, u16);
+} nltypes SEC(".maps");
 
 static bool tracing_task(u64 task_id)
 {
@@ -125,6 +133,8 @@ static void lock_aborted(void *lock)
 static void lock_acquired(void *lock)
 {
 	u64 task_id;
+	u32 tid;
+	u16 *nltype;
 	struct lockholder_info *li;
 	struct task_lock tl = {};
 
@@ -141,6 +151,11 @@ static void lock_acquired(void *lock)
 		return;
 
 	li->acq_at = bpf_ktime_get_ns();
+
+	tid = (u32)task_id;
+	nltype = bpf_map_lookup_elem(&nltypes, &tid);
+	if (nltype)
+		li->nlmsg_type = *nltype;
 }
 
 static void account(struct lockholder_info *li)
@@ -181,6 +196,7 @@ static void account(struct lockholder_info *li)
 		WRITE_ONCE(ls->acq_max_time, delta);
 		WRITE_ONCE(ls->acq_max_id, li->task_id);
 		WRITE_ONCE(ls->acq_max_lock_ptr, li->lock_ptr);
+		WRITE_ONCE(ls->acq_max_nltype, li->nlmsg_type);
 		/*
 		 * Potentially racy, if multiple threads think they are the max,
 		 * so you may get a clobbered write.
@@ -196,6 +212,7 @@ static void account(struct lockholder_info *li)
 		WRITE_ONCE(ls->hld_max_time, delta);
 		WRITE_ONCE(ls->hld_max_id, li->task_id);
 		WRITE_ONCE(ls->hld_max_lock_ptr, li->lock_ptr);
+		WRITE_ONCE(ls->hld_max_nltype, li->nlmsg_type);
 		if (!per_thread)
 			bpf_get_current_comm(ls->hld_max_comm, TASK_COMM_LEN);
 	}
@@ -222,6 +239,58 @@ static void lock_released(void *lock)
 	account(li);
 
 	bpf_map_delete_elem(&lockholder_map, &tl);
+}
+
+static void record_nltype(const struct nlmsghdr *hdr)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+	u16 nltype = 0;
+
+	nltype = BPF_CORE_READ(hdr, nlmsg_type);
+
+	bpf_map_update_elem(&nltypes, &tid, &nltype, BPF_ANY);
+}
+
+static void release_nltype(void)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+
+	bpf_map_delete_elem(&nltypes, &tid);
+}
+
+SEC("fentry/rtnetlink_rcv_msg")
+int BPF_PROG(rtnetlink_rcv_msg, struct sk_buff *skb, struct nlmsghdr *nlh,
+	     struct netlink_ext_ack *extack)
+{
+	record_nltype(nlh);
+	return 0;
+}
+
+SEC("fexit/rtnetlink_rcv_msg")
+int BPF_PROG(rtnetlink_rcv_msg_exit, struct sk_buff *skb, struct nlmsghdr *nlh,
+	     struct netlink_ext_ack *extack, long ret)
+{
+	release_nltype();
+	return 0;
+}
+
+SEC("fentry/netlink_dump")
+int BPF_PROG(netlink_dump, struct sock *sk, bool lock_taken)
+{
+	struct netlink_sock *nlk = container_of(sk, struct netlink_sock, sk);
+	const struct nlmsghdr *nlh;
+
+	nlh = BPF_CORE_READ(nlk, cb.nlh);
+	record_nltype(nlh);
+	return 0;
+}
+
+SEC("fexit/netlink_dump")
+int BPF_PROG(netlink_dump_exit, struct sk_buff *skb, struct nlmsghdr *nlh,
+	     struct netlink_ext_ack *extack)
+{
+	release_nltype();
+	return 0;
 }
 
 SEC("fentry/mutex_lock")
@@ -728,5 +797,39 @@ int BPF_KPROBE(kprobe_up_write, struct rw_semaphore *lock)
 	lock_released(lock);
 	return 0;
 }
+
+SEC("kprobe/rtnetlink_rcv_msg")
+int BPF_KPROBE(kprobe_rtnetlink_rcv_msg, struct sk_buff *skb, struct nlmsghdr *nlh,
+	       struct netlink_ext_ack *ext)
+{
+	record_nltype(nlh);
+	return 0;
+}
+
+SEC("kretprobe/rtnetlink_rcv_msg")
+int BPF_KRETPROBE(kprobe_rtnetlink_rcv_msg_exit, long ret)
+{
+	release_nltype();
+	return 0;
+}
+
+SEC("kprobe/netlink_dump")
+int BPF_KPROBE(kprobe_netlink_dump, struct sock *sk, bool lock_taken)
+{
+	struct netlink_sock *nlk = container_of(sk, struct netlink_sock, sk);
+	const struct nlmsghdr *nlh;
+
+	nlh = BPF_CORE_READ(nlk, cb.nlh);
+	record_nltype(nlh);
+	return 0;
+}
+
+SEC("kretprobe/netlink_dump")
+int BPF_KRETPROBE(kprobe_netlink_dump_exit, long ret)
+{
+	release_nltype();
+	return 0;
+}
+
 
 char LICENSE[] SEC("license") = "GPL";
