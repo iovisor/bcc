@@ -133,7 +133,7 @@ def print_event(cpu, data, size):
             output_file.write(event_output + "\n")
     else:
         print(
-            "%-9s %-7d %-6d %s"
+            "%-20s %-7d %-6d %s"
             % (
                 event_time,
                 event.pid,
