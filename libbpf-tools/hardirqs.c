@@ -18,7 +18,7 @@
 #include "trace_helpers.h"
 
 struct env {
-	bool count;
+	bool cpu;
 	bool distributed;
 	bool nanoseconds;
 	time_t interval;
@@ -42,7 +42,7 @@ const char *argp_program_bug_address =
 const char argp_program_doc[] =
 "Summarize hard irq event time as histograms.\n"
 "\n"
-"USAGE: hardirqs [--help] [-T] [-N] [-d] [interval] [count] [-c CG]\n"
+"USAGE: hardirqs [--help] [-T] [-N] [-d] [interval] [-C] [-c CG]\n"
 "\n"
 "EXAMPLES:\n"
 "    hardirqs            # sum hard irq event time\n"
@@ -53,7 +53,7 @@ const char argp_program_doc[] =
 "    hardirqs -NT 1      # 1s summaries, nanoseconds, and timestamps\n";
 
 static const struct argp_option opts[] = {
-	{ "count", 'C', NULL, 0, "Show event counts instead of timing", 0 },
+	{ "CPU", 'C', NULL, 0, "Display separately by CPU", 0 },
 	{ "distributed", 'd', NULL, 0, "Show distributions as histograms", 0 },
 	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path", 0 },
 	{ "cpu", 's', "CPU", 0, "Only stat irq on selected cpu", 0 },
@@ -79,7 +79,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		env.distributed = true;
 		break;
 	case 'C':
-		env.count = true;
+		env.cpu = true;
 		break;
 	case 's':
 		errno = 0;
@@ -142,15 +142,12 @@ static int print_map(struct bpf_map *map)
 {
 	struct irq_key lookup_key = {}, next_key;
 	struct info info;
+	const char *units = env.nanoseconds ? "nsecs" : "usecs";
 	int fd, err;
 
-	if (env.count) {
-		printf("%-26s %11s\n", "HARDIRQ", "TOTAL_count");
-	} else if (!env.distributed) {
-		const char *units = env.nanoseconds ? "nsecs" : "usecs";
-
-		printf("%-26s %6s%5s\n", "HARDIRQ", "TOTAL_", units);
-	}
+	if (!env.distributed)
+		printf("%-26s %3s %11s %6s%5s %4s%5s\n", "HARDIRQ", "CPU",
+			"TOTAL_count", "TOTAL_", units, "MAX_", units);
 
 	fd = bpf_map__fd(map);
 	while (!bpf_map_get_next_key(fd, &lookup_key, &next_key)) {
@@ -160,10 +157,15 @@ static int print_map(struct bpf_map *map)
 			return -1;
 		}
 		if (!env.distributed)
-			printf("%-26s %11llu\n", next_key.name, info.count);
+			if (env.cpu)
+				printf("%-26s %3u %11llu %11llu %9llu\n", next_key.name,
+					next_key.cpu, info.count, info.total_time, info.max_time);
+			else
+				printf("%-26s %3c %11llu %11llu %9llu\n", next_key.name, '-',
+					info.count, info.total_time, info.max_time);
 		else {
-			const char *units = env.nanoseconds ? "nsecs" : "usecs";
-
+			if (env.cpu)
+				printf("cpu = %u ", next_key.cpu);
 			printf("hardirq = %s\n", next_key.name);
 			print_log2_hist(info.slots, MAX_SLOTS, units);
 		}
@@ -203,11 +205,6 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
-	if (env.count && env.distributed) {
-		fprintf(stderr, "count, distributed cann't be used together.\n");
-		return 1;
-	}
-
 	libbpf_set_print(libbpf_print_fn);
 
 	obj = hardirqs_bpf__open();
@@ -219,24 +216,17 @@ int main(int argc, char **argv)
 	if (probe_tp_btf("irq_handler_entry")) {
 		bpf_program__set_autoload(obj->progs.irq_handler_entry, false);
 		bpf_program__set_autoload(obj->progs.irq_handler_exit, false);
-		if (env.count)
-			bpf_program__set_autoload(obj->progs.irq_handler_exit_btf, false);
 	} else {
 		bpf_program__set_autoload(obj->progs.irq_handler_entry_btf, false);
 		bpf_program__set_autoload(obj->progs.irq_handler_exit_btf, false);
-		if (env.count)
-			bpf_program__set_autoload(obj->progs.irq_handler_exit, false);
 	}
-
-	obj->rodata->filter_cg = env.cg;
-	obj->rodata->do_count = env.count;
-	obj->rodata->targ_cpu = env.targ_cpu;
 
 	/* initialize global data (filtering options) */
-	if (!env.count) {
-		obj->rodata->targ_dist = env.distributed;
-		obj->rodata->targ_ns = env.nanoseconds;
-	}
+	obj->rodata->filter_cg = env.cg;
+	obj->rodata->cpu = env.cpu;
+	obj->rodata->targ_cpu = env.targ_cpu;
+	obj->rodata->targ_dist = env.distributed;
+	obj->rodata->targ_ns = env.nanoseconds;
 
 	err = hardirqs_bpf__load(obj);
 	if (err) {
@@ -267,10 +257,7 @@ int main(int argc, char **argv)
 
 	signal(SIGINT, sig_handler);
 
-	if (env.count)
-		printf("Tracing hard irq events... Hit Ctrl-C to end.\n");
-	else
-		printf("Tracing hard irq event time... Hit Ctrl-C to end.\n");
+	printf("Tracing hard irq event time... Hit Ctrl-C to end.\n");
 
 	/* main: poll */
 	while (1) {
