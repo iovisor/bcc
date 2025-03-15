@@ -3,8 +3,10 @@
 //
 // Based on statsnoop(8) from BCC by Brendan Gregg.
 // 09-May-2021   Hengqi Chen   Created this.
+// 15-Mar-2025   Rong Tao      Support fd and dirfd.
 #include <argp.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <signal.h>
 #include <time.h>
 #include <unistd.h>
@@ -58,6 +60,7 @@ static char *sys_names[] = {
 	[SYS_STATFS] = "statfs",
 	[SYS_NEWSTAT] = "newstat",
 	[SYS_STATX] = "statx",
+	[SYS_NEWFSTAT] = "newfstat",
 	[SYS_NEWFSTATAT] = "newfstatat",
 	[SYS_NEWLSTAT] = "newlstat",
 };
@@ -109,12 +112,44 @@ static void sig_int(int signo)
 	exiting = 1;
 }
 
+char *proc_fd_pathname(pid_t pid, int fd, int is_dir, char *buf, size_t buf_len)
+{
+	int err, n;
+	char fdpath[PATH_MAX];
+
+	if (fd == INVALID_FD)
+		goto skip;
+	else if (fd == AT_FDCWD)
+		snprintf(fdpath, PATH_MAX - 1, "/proc/%d/cwd", pid);
+	else
+		snprintf(fdpath, PATH_MAX - 1, "/proc/%d/fd/%d", pid, fd);
+
+	err = readlink(fdpath, buf, buf_len);
+	if (err == -1)
+		goto skip;
+
+	if (is_dir) {
+		/* Add '/' in the end of string */
+		n = strlen(buf);
+		buf[n] = '/';
+		buf[n + 1] = '\0';
+	}
+
+	return buf;
+
+skip:
+	/* maybe process already exit or fd already be closed, just ignore cwd
+	 * or skip no-exist pathname */
+	return "";
+}
+
 static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	static __u64 start_timestamp = 0;
 	struct event e;
 	int fd, err;
 	double ts = 0.0;
+	char fdpath[PATH_MAX] = {0}, dirfdpath[PATH_MAX] = {0};
 
 	if (data_sz < sizeof(e)) {
 		printf("Error: packet too small\n");
@@ -139,7 +174,11 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	printf("%-7d %-20s %-4d %-4d", e.pid, e.comm, fd, err);
 	if (emit_sysname)
 		printf(" %-10s", sys_names[e.type]);
-	printf(" %-s\n", e.pathname);
+
+	printf(" %s%s%-s\n",
+		e.pathname[0] == '/' ? "" : proc_fd_pathname(e.pid, e.fd, 0, fdpath, PATH_MAX),
+		e.pathname[0] == '/' ? "" : proc_fd_pathname(e.pid, e.dirfd, 1, dirfdpath, PATH_MAX),
+		e.pathname);
 }
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
@@ -195,6 +234,10 @@ int main(int argc, char **argv)
 	if (!tracepoint_exists("syscalls", "sys_enter_newfstatat")) {
 		bpf_program__set_autoload(obj->progs.handle_newfstatat_entry, false);
 		bpf_program__set_autoload(obj->progs.handle_newfstatat_return, false);
+	}
+	if (!tracepoint_exists("syscalls", "sys_enter_newfstat")) {
+		bpf_program__set_autoload(obj->progs.handle_newfstat_entry, false);
+		bpf_program__set_autoload(obj->progs.handle_newfstat_return, false);
 	}
 	if (!tracepoint_exists("syscalls", "sys_enter_newlstat")) {
 		bpf_program__set_autoload(obj->progs.handle_newlstat_entry, false);
