@@ -82,7 +82,7 @@ struct allocation_node {
 };
 
 struct allocation {
-	uint64_t stack_id;
+	int64_t stack_id;
 	size_t size;
 	size_t count;
 	struct allocation_node* allocations;
@@ -1018,6 +1018,11 @@ int print_outstanding_combined_allocs(int combined_allocs_fd, int stack_traces_f
 			.count = combined_alloc_info.number_of_allocs,
 			.allocations = NULL
 		};
+
+		// filter invalid stacks
+		if (alloc.stack_id < 0) {
+			continue;
+		}
 
 		memcpy(&allocs[nr_allocs], &alloc, sizeof(alloc));
 		nr_allocs++;
