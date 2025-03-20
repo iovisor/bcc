@@ -88,6 +88,9 @@ struct allocation {
 	struct allocation_node* allocations;
 };
 
+#define OPT_PERF_MAX_STACK_DEPTH	1 /* --perf-max-stack-depth */
+#define OPT_STACK_STORAGE_SIZE		2 /* --stack-storage-size */
+
 #define __ATTACH_UPROBE(skel, sym_name, prog_name, is_retprobe) \
 	do { \
 		char sym[32]; \
@@ -205,6 +208,10 @@ static const struct argp_option argp_options[] = {
 	{"obj", 'O', "OBJECT", 0, "attach to allocator functions in the specified object", 0 },
 	{"percpu", 'P', NULL, 0, "trace percpu allocations", 0 },
 	{"symbols-prefix", 'S', "SYMBOLS_PREFIX", 0, "memory allocator symbols prefix", 0 },
+	{"stack-storage-size", OPT_STACK_STORAGE_SIZE, "STACK-STORAGE-SIZE", 0,
+	 "the number of unique stack traces that can be stored and displayed (default 10240)", 0 },
+	{"perf-max-stack-depth", OPT_PERF_MAX_STACK_DEPTH,
+	 "PERF-MAX-STACK-DEPTH", 0, "the limit for both kernel and user stack traces (default 127)", 0 },
 	{"verbose", 'v', NULL, 0, "verbose debug output", 0 },
 	{},
 };
@@ -560,6 +567,22 @@ error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'v':
 		env.verbose = true;
+		break;
+	case OPT_PERF_MAX_STACK_DEPTH:
+		errno = 0;
+		env.perf_max_stack_depth = strtol(arg, NULL, 10);
+		if (errno) {
+			fprintf(stderr, "invalid perf max stack depth: %s\n", arg);
+			argp_usage(state);
+		}
+		break;
+	case OPT_STACK_STORAGE_SIZE:
+		errno = 0;
+		env.stack_map_max_entries = strtol(arg, NULL, 10);
+		if (errno) {
+			fprintf(stderr, "invalid stack storage size: %s\n", arg);
+			argp_usage(state);
+		}
 		break;
 	case ARGP_KEY_ARG:
 		pos_args++;
