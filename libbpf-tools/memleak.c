@@ -358,6 +358,11 @@ int main(int argc, char *argv[])
 				env.perf_max_stack_depth * sizeof(unsigned long));
 	bpf_map__set_max_entries(skel->maps.stack_traces, env.stack_map_max_entries);
 
+	if (env.combined_only) {
+		bpf_map__set_max_entries(skel->maps.combined_allocs, COMBINED_ALLOCS_MAX_ENTRIES);
+		skel->rodata->combined_only = true;
+	}
+
 	// disable kernel tracepoints based on settings or availability
 	if (env.kernel_trace) {
 		if (!has_kernel_node_tracepoints())

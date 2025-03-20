@@ -15,6 +15,7 @@ const volatile __u64 sample_rate = 1;
 const volatile bool trace_all = false;
 const volatile __u64 stack_flags = 0;
 const volatile bool wa_missing_free = false;
+const volatile bool combined_only = false;
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
@@ -34,7 +35,7 @@ struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__type(key, u64); /* stack id */
 	__type(value, union combined_alloc_info);
-	__uint(max_entries, COMBINED_ALLOCS_MAX_ENTRIES);
+	__uint(max_entries, 1);
 } combined_allocs SEC(".maps");
 
 struct {
@@ -126,7 +127,8 @@ static int gen_alloc_exit2(void *ctx, u64 address)
 
 		bpf_map_update_elem(&allocs, &address, &info, BPF_ANY);
 
-		update_statistics_add(info.stack_id, info.size);
+		if (combined_only)
+			update_statistics_add(info.stack_id, info.size);
 	}
 
 	if (trace_all) {
@@ -151,7 +153,9 @@ static int gen_free_enter(const void *address)
 		return 0;
 
 	bpf_map_delete_elem(&allocs, &addr);
-	update_statistics_del(info->stack_id, info->size);
+
+	if (combined_only)
+		update_statistics_del(info->stack_id, info->size);
 
 	if (trace_all) {
 		bpf_printk("free entered, address = %lx, size = %lu\n",
