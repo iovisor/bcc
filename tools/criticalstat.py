@@ -62,12 +62,26 @@ if (not os.path.exists(trace_path + b"irq_disable") or
    not os.path.exists(trace_path + b"irq_enable") or
    not os.path.exists(trace_path + b"preempt_disable") or
    not os.path.exists(trace_path + b"preempt_enable")):
-    print("ERROR: required tracing events are not available\n" +
-        "Make sure the kernel is built with CONFIG_DEBUG_PREEMPT " +
-        "CONFIG_PREEMPT_TRACER " +
-        "and CONFIG_PREEMPTIRQ_EVENTS (CONFIG_PREEMPTIRQ_TRACEPOINTS in "
-        "kernel 4.19 and later) enabled. Also please disable " +
-        "CONFIG_PROVE_LOCKING and CONFIG_LOCKDEP on older kernels.")
+    error_message = """
+    ERROR: required tracing events are not available
+
+    Make sure the kernel is built with the following configurations enabled:
+    - CONFIG_DEBUG_PREEMPT
+    - CONFIG_PREEMPT_TRACER
+
+    For kernel 4.19 and later:
+    - CONFIG_PREEMPTIRQ_TRACEPOINTS
+    - CONFIG_TRACE_IRQFLAGS
+    - CONFIG_TRACE_PREEMPT_TOGGLE
+
+    For kernel 4.15 to 4.18:
+    - CONFIG_PREEMPTIRQ_EVENTS
+    - CONFIG_PROVE_LOCKING
+    - CONFIG_DEBUG_PREEMPT
+
+    Also, please disable CONFIG_LOCKDEP on older kernels.
+    """
+    print(error_message)
     sys.exit(0)
 
 bpf_text = """
