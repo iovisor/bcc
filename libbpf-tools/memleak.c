@@ -51,6 +51,7 @@ static struct env {
 	bool verbose;
 	char command[32];
 	char symbols_prefix[16];
+	bool output;
 } env = {
 	.interval = 5, // posarg 1
 	.nr_intervals = -1, // posarg 2
@@ -90,6 +91,7 @@ struct allocation {
 
 #define OPT_PERF_MAX_STACK_DEPTH	1 /* --perf-max-stack-depth */
 #define OPT_STACK_STORAGE_SIZE		2 /* --stack-storage-size */
+#define OPT_OUTPUT			3 /* --output */
 
 #define __ATTACH_UPROBE(skel, sym_name, prog_name, is_retprobe) \
 	do { \
@@ -223,6 +225,7 @@ static const struct argp_option argp_options[] = {
 	 "the number of unique stack traces that can be stored and displayed (default 10240)", 0 },
 	{"perf-max-stack-depth", OPT_PERF_MAX_STACK_DEPTH,
 	 "PERF-MAX-STACK-DEPTH", 0, "the limit for both kernel and user stack traces (default 127)", 0 },
+	{"output", OPT_OUTPUT, NULL, 0, "Output metrics in specified format (currently only 'line' supported)", 0 },
 	{"verbose", 'v', NULL, 0, "verbose debug output", 0 },
 	{},
 };
@@ -467,7 +470,8 @@ int main(int argc, char *argv[])
 	}
 #endif
 
-	print_headers();
+	if (!env.output)
+		print_headers();
 
 	// main loop
 	while (!exiting && env.nr_intervals) {
@@ -602,6 +606,9 @@ error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 			fprintf(stderr, "invalid stack storage size: %s\n", arg);
 			argp_usage(state);
 		}
+		break;
+	case OPT_OUTPUT:
+		env.output = true;
 		break;
 	case ARGP_KEY_ARG:
 		pos_args++;
@@ -828,6 +835,26 @@ void print_stack_frames_by_syms_cache()
 }
 #endif
 
+static void print_metrics(struct allocation *allocs, size_t nr_allocs, time_t ts)
+{
+	for (size_t i = 0; i < nr_allocs; ++i) {
+		const struct allocation *alloc = &allocs[i];
+
+		/* name */
+		printf("memleak");
+
+		/* tag */
+		printf(",stackid=%lu", alloc->stack_id);
+
+		/* fields */
+		printf(" size=%zu", alloc->size);
+		printf(",count=%zu", alloc->count);
+
+		/* timestamp */
+		printf(" %lu\n", ts);
+	}
+}
+
 int print_stack_frames(struct allocation *allocs, size_t nr_allocs, int stack_traces_fd)
 {
 	for (size_t i = 0; i < nr_allocs; ++i) {
@@ -977,6 +1004,11 @@ int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 		nr_allocs++;
 	}
 
+	if (env.output) {
+		print_metrics(allocs, nr_allocs, t);
+		goto cleanup;
+	}
+
 	// sort the allocs array in descending order
 	qsort(allocs, nr_allocs, sizeof(allocs[0]), alloc_size_compare);
 
@@ -988,6 +1020,7 @@ int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 
 	print_stack_frames(allocs, nr_allocs_to_show, stack_traces_fd);
 
+cleanup:
 	// Reset allocs list so that we dont accidentaly reuse data the next time we call this function
 	for (size_t i = 0; i < nr_allocs; i++) {
 		allocs[i].stack_id = 0;
@@ -1067,6 +1100,11 @@ int print_outstanding_combined_allocs(int combined_allocs_fd, int stack_traces_f
 		nr_allocs++;
 	}
 
+	if (env.output) {
+		print_metrics(allocs, nr_allocs, t);
+		goto cleanup;
+	}
+
 	qsort(allocs, nr_allocs, sizeof(allocs[0]), alloc_size_compare);
 
 	// get min of allocs we stored vs the top N requested stacks
@@ -1077,6 +1115,7 @@ int print_outstanding_combined_allocs(int combined_allocs_fd, int stack_traces_f
 
 	print_stack_frames(allocs, nr_allocs, stack_traces_fd);
 
+cleanup:
 	if (nr_missing_stacks > 0) {
 		fprintf(stderr, "WARNING: %zu stack traces could not be displayed"
 			" due to memory shortage, including %zu caused by hash collisions."
