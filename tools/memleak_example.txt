@@ -181,6 +181,77 @@ When using the --symbols-prefix argument, memleak can trace the third-party memo
 allocations, such as jemalloc whose symbols are usually identified by the "je_" prefix
 in redis project.
 
+
+Output Metrics in Line Protocol
+-------------------------------
+
+The `--output` option enables `memleak` to output metrics in InfluxDB Line
+Protocol format, a text-based format for writing data points to time-series
+databases like InfluxDB. This is useful for tracking outstanding allocations and
+piping them into monitoring systems for analysis.
+
+Usage
+-----
+Use `--output` to switch to Line Protocol output. Combine with `<interval>`
+for periodic metrics, or other options to adjust output.
+
+Example Output
+--------------
+Running `memleak --output 1` might produce:
+memleak,stackid=14613 size=22753280,count=5555 1742641470
+memleak,stackid=12929 size=40960,count=10 1742641470
+memleak,stackid=15137 size=16384,count=2 1742641470
+
+I find this format handy for saving to files and processing with scripts or
+databases to spot memory leaks over time.
+
+Using the Output with InfluxDB and Grafana
+------------------------------------------
+
+The Line Protocol output can be stored in InfluxDB and visualized in Grafana or
+the InfluxDB Web UI, much like how `syscount` metrics are graphed. Here's how:
+
+1. Storing in InfluxDB
+Pipe the output into InfluxDB using the `influx` CLI. For example:
+
+# memleak --output 1 > memleak_metrics.txt
+$ influx write -b mybucket -f memleak_metrics.txt -p s
+
+For real-time ingestion:
+# unbuffer memleak --output 1 | influx write -b mybucket -p s
+
+Note: The -p s option specifies second-precision timestamps. Saving metrics
+files is handy for debugging or reprocessing.
+
+2. Visualizing Metrics
+Once stored in InfluxDB, query the `memleak` measurement to create graphs in
+Grafana or the InfluxDB Web UI. Here are two visualization examples:
+
+2.1) Outstanding Allocation Size
+Command: `memleak --output 1`
+Shows outstanding allocation sizes per stack ID as a time-series graph, useful
+for spotting large memory leaks. Visualize in Grafana or the InfluxDB Web UI's
+Data Explorer (no Grafana needed).
+See: images/memleak_size.png (Grafana), images/memleak_dataexplorer.png (Web UI)
+Query:
+from(bucket: "mybucket")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r._measurement == "memleak" and r._field == "size")
+
+2.2) Outstanding Allocation Count
+Command: `memleak --output 1`
+Displays the number of outstanding allocations per stack ID, helping identify
+frequent memory leaks.
+See: images/memleak_count.png
+Grafana Query:
+from(bucket: "mybucket")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r._measurement == "memleak" and r._field == "count")
+
+These graphs can be added to a Grafana dashboard or viewed in the InfluxDB UI
+to monitor outstanding allocations in real-time or analyze historical trends.
+
+
 USAGE message:
 
 # ./memleak -h
