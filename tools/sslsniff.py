@@ -117,6 +117,11 @@ BPF_PERF_OUTPUT(perf_SSL_rw);
 BPF_HASH(start_ns, u32);
 BPF_HASH(bufs, u32, u64);
 
+__attribute__((always_inline))
+static inline u32 bpf_min(u32 a, u32 b) {
+  return (a < b) ? a : b;
+}
+
 int probe_SSL_rw_enter(struct pt_regs *ctx, void *ssl, void *buf, int num) {
         int ret;
         u32 zero = 0;
@@ -170,7 +175,7 @@ static int SSL_exit(struct pt_regs *ctx, int rw) {
         data->len = (u32)len;
         data->buf_filled = 0;
         data->rw = rw;
-        u32 buf_copy_size = min((size_t)MAX_BUF_SIZE, (size_t)len);
+        u32 buf_copy_size = bpf_min(MAX_BUF_SIZE, len);
 
         bpf_get_current_comm(&data->comm, sizeof(data->comm));
 
@@ -205,7 +210,7 @@ int probe_SSL_do_handshake_enter(struct pt_regs *ctx, void *ssl) {
         u32 tid = (u32)pid_tgid;
         u64 ts = bpf_ktime_get_ns();
         u32 uid = bpf_get_current_uid_gid();
-        
+
         PID_FILTER
         UID_FILTER
 
