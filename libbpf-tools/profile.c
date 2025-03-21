@@ -18,6 +18,7 @@
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 #include <sys/stat.h>
+#include <sys/sdt.h>
 #include "profile.h"
 #include "profile.skel.h"
 #include "trace_helpers.h"
@@ -99,7 +100,6 @@ const char argp_program_doc[] =
 "EXAMPLES:\n"
 "    profile             # profile stack traces at 49 Hertz until Ctrl-C\n"
 "    profile -F 99       # profile stack traces at 99 Hertz\n"
-"    profile -c 1000000  # profile stack traces every 1 in a million events\n"
 "    profile 5           # profile at 49 Hertz for 5 seconds only\n"
 "    profile -f          # output in folded format for flame graphs\n"
 "    profile -p 185      # only profile process with PID 185\n"
@@ -128,7 +128,6 @@ static const struct argp_option opts[] = {
 	{},
 };
 
-struct ksyms *ksyms;
 struct syms_cache *syms_cache;
 struct syms *syms;
 static char syminfo[SYM_INFO_LEN];
@@ -301,7 +300,7 @@ static int cmp_counts(const void *a, const void *b)
 
 static int read_counts_map(int fd, struct key_ext_t *items, __u32 *count)
 {
-	struct key_t empty = {};
+	struct key_t empty = {0};
 	struct key_t *lookup_key = &empty;
 	int i = 0;
 	int err;
@@ -324,16 +323,16 @@ static int read_counts_map(int fd, struct key_ext_t *items, __u32 *count)
 	return 0;
 }
 
-static const char *ksymname(unsigned long addr)
+static const char *ksymname(unsigned long addr, int ksym_map)
 {
-	const struct ksym *ksym = ksyms__map_addr(ksyms, addr);
+	static char name[MAX_SYM_LEN];
+	int err = bpf_map_lookup_elem(ksym_map, &addr, name);
 
 	if (!env.verbose)
-		return ksym ? ksym->name : "[unknown]";
+		return !err ? name : "[unknown]";
 
-	if (ksym)
-		snprintf(syminfo, SYM_INFO_LEN, "0x%lx %s+0x%lx", addr,
-			 ksym->name, addr - ksym->addr);
+	if (!err)
+		snprintf(syminfo, SYM_INFO_LEN, "0x%lx %s", addr, name);
 	else
 		snprintf(syminfo, SYM_INFO_LEN, "0x%lx [unknown]", addr);
 
@@ -381,7 +380,6 @@ static void print_stacktrace(unsigned long *ip, symname_fn_t symname, struct fmt
 	if (!f->folded) {
 		for (i = 0; ip[i] && i < env.perf_max_stack_depth; i++)
 			pr_format(symname(ip[i]), f);
-		return;
 	} else {
 		for (i = env.perf_max_stack_depth - 1; i >= 0; i--) {
 			if (!ip[i])
@@ -414,7 +412,7 @@ static bool print_user_stacktrace(struct key_t *event, int stack_map,
 	return true;
 }
 
-static bool print_kern_stacktrace(struct key_t *event, int stack_map,
+static bool print_kern_stacktrace(struct key_t *event, int stack_map, int ksym_map,
 				  unsigned long *ip, struct fmt_t *f, bool delim)
 {
 	if (env.user_stacks_only || STACK_ID_EFAULT(event->kern_stack_id))
@@ -425,13 +423,26 @@ static bool print_kern_stacktrace(struct key_t *event, int stack_map,
 
 	if (bpf_map_lookup_elem(stack_map, &event->kern_stack_id, ip) != 0)
 		pr_format("[Missed Kernel Stack]", f);
-	else
-		print_stacktrace(ip, ksymname, f);
+	else {
+		int i;
+
+		if (!f->folded) {
+			for (i = 0; ip[i] && i < env.perf_max_stack_depth; i++)
+				pr_format(ksymname(ip[i], ksym_map), f);
+		} else {
+			for (i = env.perf_max_stack_depth - 1; i >= 0; i--) {
+				if (!ip[i])
+					continue;
+
+				pr_format(ksymname(ip[i], ksym_map), f);
+			}
+		}
+	}
 
 	return true;
 }
 
-static int print_count(struct key_t *event, __u64 count, int stack_map, bool folded)
+static int print_count(struct key_t *event, __u64 count, int stack_map, int ksym_map, bool folded)
 {
 	unsigned long *ip;
 	int ret;
@@ -445,7 +456,7 @@ static int print_count(struct key_t *event, __u64 count, int stack_map, bool fol
 
 	if (!folded) {
 		/* multi-line stack output */
-		ret = print_kern_stacktrace(event, stack_map, ip, fmt, false);
+		ret = print_kern_stacktrace(event, stack_map, ksym_map, ip, fmt, false);
 		print_user_stacktrace(event, stack_map, ip, fmt, ret && env.delimiter);
 		printf("    %-16s %s (%d)\n", "-", event->name, event->pid);
 		printf("        %lld\n\n", count);
@@ -453,7 +464,7 @@ static int print_count(struct key_t *event, __u64 count, int stack_map, bool fol
 		/* folded stack output */
 		printf("%s", event->name);
 		ret = print_user_stacktrace(event, stack_map, ip, fmt, false);
-		print_kern_stacktrace(event, stack_map, ip, fmt, ret && env.delimiter);
+		print_kern_stacktrace(event, stack_map, ksym_map, ip, fmt, ret && env.delimiter);
 		printf(" %lld\n", count);
 	}
 
@@ -462,7 +473,7 @@ static int print_count(struct key_t *event, __u64 count, int stack_map, bool fol
 	return 0;
 }
 
-static int print_counts(int counts_map, int stack_map)
+static int print_counts(int counts_map, int stack_map, int kaddr_map)
 {
 	struct key_ext_t *counts;
 	struct key_t *event;
@@ -473,14 +484,43 @@ static int print_counts(int counts_map, int stack_map)
 	int i, ret = 0;
 
 	counts = calloc(MAX_ENTRIES, sizeof(struct key_ext_t));
-	if (!counts) {
-		fprintf(stderr, "Out of memory\n");
-		return -ENOMEM;
-	}
+	if (!counts)
+		goto out_of_mem;
 
 	ret = read_counts_map(counts_map, counts, &nr_count);
 	if (ret)
 		goto cleanup;
+
+	if (!env.user_stacks_only) {
+		char empty_str[MAX_SYM_LEN] = {0};
+		unsigned long *ip = calloc(env.perf_max_stack_depth, sizeof(ip[0]));
+		if (!ip)
+			goto out_of_mem;
+		for (i = 0; i < nr_count; i++) {
+			event = &counts[i].k;
+
+			if (STACK_ID_EFAULT(event->kern_stack_id))
+				continue;
+
+			if (bpf_map_lookup_elem(stack_map, &event->kern_stack_id, ip)) {
+				static bool has_run = false;
+				if (!has_run) {
+				fprintf(stderr, "Error searchin for kernel stack.\n"
+						"Consider incresing stack-storage-size.\n"
+						"Continuing anyway\n");
+				has_run = true;
+				}
+				continue;
+			}
+			for (int j=0; ip[j] && j < env.perf_max_stack_depth; j++) {
+				bpf_map_update_elem (kaddr_map, ip+j, empty_str, BPF_NOEXIST);
+			}
+			memset(ip, 0, env.perf_max_stack_depth);
+		}
+		free(ip);
+
+		DTRACE_PROBE(USDT_PROVIDER, USDT_READY_TO_CONVERT);
+	}
 
 	qsort(counts, nr_count, sizeof(struct key_ext_t), cmp_counts);
 
@@ -488,7 +528,7 @@ static int print_counts(int counts_map, int stack_map)
 		event = &counts[i].k;
 		count = counts[i].v;
 
-		print_count(event, count, stack_map, env.folded);
+		print_count(event, count, stack_map, kaddr_map, env.folded);
 
 		/* handle stack id errors */
 		nr_missing_stacks += MISSING_STACKS(event->user_stack_id, event->kern_stack_id);
@@ -501,8 +541,13 @@ static int print_counts(int counts_map, int stack_map)
 			" Consider increasing --stack-storage-size.":"");
 	}
 
+	goto cleanup;
+out_of_mem:
+	fprintf(stderr, "Out of memory\n");
+	ret = -ENOMEM;
 cleanup:
-	free(counts);
+	if (counts)
+		free(counts);
 
 	return ret;
 }
@@ -642,12 +687,6 @@ int main(int argc, char **argv)
 		}
 	}
 
-	ksyms = ksyms__load();
-	if (!ksyms) {
-		fprintf(stderr, "failed to load kallsyms\n");
-		goto cleanup;
-	}
-
 	syms_cache = syms_cache__new(0);
 	if (!syms_cache) {
 		fprintf(stderr, "failed to create syms_cache\n");
@@ -669,20 +708,27 @@ int main(int argc, char **argv)
 	 */
 	sleep(env.duration);
 
-	print_counts(bpf_map__fd(obj->maps.counts),
-		     bpf_map__fd(obj->maps.stackmap));
+	profile_bpf__attach(obj);
+	if (!obj->links.convert) {
+		err = errno;
+		fprintf(stderr, "attaching failed: %s\n", strerror(err));
+		goto cleanup;
+	}
 
-cleanup:
 	if (env.cpu != -1)
 		bpf_link__destroy(links[env.cpu]);
 	else {
 		for (i = 0; i < nr_cpus; i++)
 			bpf_link__destroy(links[i]);
 	}
+
+	print_counts(bpf_map__fd(obj->maps.counts),
+		     bpf_map__fd(obj->maps.stackmap),
+		     bpf_map__fd(obj->maps.kaddr_to_sym));
+
+cleanup:
 	if (syms_cache)
 		syms_cache__free(syms_cache);
-	if (ksyms)
-		ksyms__free(ksyms);
 	profile_bpf__destroy(obj);
 
 	return err != 0;
