@@ -126,11 +126,14 @@ int BPF_PROG(block_rq_insert)
 		return 0;
 
 	/**
-	 * commit a54895fa (v5.11-rc1) changed tracepoint argument list
+	 * commit a54895fa (block: remove the request_queue to argument
+	 * request based tracepoints) changed tracepoint argument list
 	 * from TP_PROTO(struct request_queue *q, struct request *rq)
 	 * to TP_PROTO(struct request *rq)
+	 * see:
+	 *     https://github.com/torvalds/linux/commit/a54895fa
 	 */
-	if (LINUX_KERNEL_VERSION >= KERNEL_VERSION(5, 11, 0))
+	if (LINUX_KERNEL_VERSION >= KERNEL_VERSION(5, 10, 137))
 		return trace_rq_start((void *)ctx[0], true);
 	else
 		return trace_rq_start((void *)ctx[1], true);
@@ -143,11 +146,14 @@ int BPF_PROG(block_rq_issue)
 		return 0;
 
 	/**
-	 * commit a54895fa (v5.11-rc1) changed tracepoint argument list
+	 * commit a54895fa (block: remove the request_queue to argument
+	 * request based tracepoints) changed tracepoint argument list
 	 * from TP_PROTO(struct request_queue *q, struct request *rq)
 	 * to TP_PROTO(struct request *rq)
+	 * see:
+	 *     https://github.com/torvalds/linux/commit/a54895fa
 	 */
-	if (LINUX_KERNEL_VERSION >= KERNEL_VERSION(5, 11, 0))
+	if (LINUX_KERNEL_VERSION >= KERNEL_VERSION(5, 10, 137))
 		return trace_rq_start((void *)ctx[0], false);
 	else
 		return trace_rq_start((void *)ctx[1], false);
