@@ -78,6 +78,11 @@ BPF_HASH(detach_ptr, u64, struct cmsghdr *);
 BPF_HASH(sock_fd, u64, int);
 BPF_PERF_OUTPUT(events);
 
+__attribute__((always_inline))
+static inline u32 bpf_min(u32 a, u32 b) {
+    return (a < b) ? a : b;
+}
+
 static void set_fd(int fd)
 {
     u64 id = bpf_get_current_pid_tgid();
@@ -103,7 +108,7 @@ static void put_fd(void)
 
 static int sent_1(struct pt_regs *ctx, struct val_t *val, int num, void *data)
 {
-    val->fd_cnt = min(num, MAX_FD);
+    val->fd_cnt = bpf_min(num, MAX_FD);
 
     if (bpf_probe_read_kernel(&val->fd[0], MAX_FD * sizeof(int), data))
         return -1;
