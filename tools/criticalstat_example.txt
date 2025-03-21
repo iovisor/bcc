@@ -10,13 +10,20 @@ sections are a source of long latency/responsive issues for real-time systems.
 This works by probing the preempt/irq and cpuidle tracepoints in the kernel.
 Since this uses BPF, only the root user can use this tool. Further, the kernel
 has to be built with certain CONFIG options enabled inorder for it to work:
-CONFIG_PREEMPTIRQ_EVENTS before kernel 4.19
-CONFIG_PREEMPTIRQ_TRACEPOINTS in kernel 4.19 and later
-CONFIG_DEBUG_PREEMPT
-CONFIG_PREEMPT_TRACER
+    - CONFIG_DEBUG_PREEMPT
+    - CONFIG_PREEMPT_TRACER
+    
+    For kernel 4.19 and later:
+    - CONFIG_PREEMPTIRQ_TRACEPOINTS
+    - CONFIG_TRACE_IRQFLAGS
+    - CONFIG_TRACE_PREEMPT_TOGGLE
+    
+    For kernel 4.15 to 4.18:
+    - CONFIG_PREEMPTIRQ_EVENTS
+    - CONFIG_PROVE_LOCKING
+    - CONFIG_DEBUG_PREEMPT
 Additionally, the following options should be turned off on older kernels:
-CONFIG_PROVE_LOCKING
-CONFIG_LOCKDEP
+    - CONFIG_LOCKDEP
 
 USAGE:
 # ./criticalstat -h
