@@ -238,22 +238,23 @@ def print_ipv6_event(cpu, data, size):
         print("\t%s" % sym)
     print("")
 
+kfree_skb_traceable = False
+
 if BPF.tracepoint_exists("skb", "kfree_skb"):
     if BPF.kernel_struct_has_field("trace_event_raw_kfree_skb", "reason") == 1:
         bpf_text += bpf_kfree_skb_text
+        kfree_skb_traceable = True
 
 # initialize BPF
 b = BPF(text=bpf_text)
 
 if b.get_kprobe_functions(b"tcp_drop"):
     b.attach_kprobe(event="tcp_drop", fn_name="trace_tcp_drop")
-elif b.tracepoint_exists("skb", "kfree_skb"):
-    print("ERROR: tcp_drop() kernel function not found or traceable. "
-          "(It may have been inlined.) "
+elif b.tracepoint_exists("skb", "kfree_skb") and kfree_skb_traceable:
+    print("WARNING: tcp_drop() kernel function not found or traceable. "
           "Use tracepoint:skb:kfree_skb instead.")
-    exit()
 else:
-    print("ERROR: tcp_drop() kernel function and tracpoint:skb:kfree_skb"
+    print("ERROR: tcp_drop() kernel function and tracepoint:skb:kfree_skb"
           " not found or traceable. "
           "The kernel might be too old or the the function has been inlined.")
     exit()
