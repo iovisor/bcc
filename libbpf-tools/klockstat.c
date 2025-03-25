@@ -30,6 +30,7 @@
 #include "klockstat.skel.h"
 #include "compat.h"
 #include "trace_helpers.h"
+#include "ioctl_names.h"
 
 #define warn(...) fprintf(stderr, __VA_ARGS__)
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
@@ -144,17 +145,36 @@ static const struct argp_option opts[] = {
 	{},
 };
 
-static char *get_nltype(unsigned long nltype)
+static const char *get_ioctl_name(unsigned long ioctl)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(ioctl_names); i++)
+		if (ioctl == ioctl_names[i].value)
+			return ioctl_names[i].name;
+	return NULL;
+}
+
+static char *get_nltype_ioctl(unsigned long nltype, unsigned long ioctl)
 {
 	static char buf[100];
 
-	if (!nltype)
+	if (!nltype && !ioctl)
 		return "";
 
-	if (nltype >= nltype_max || !nltype_map[nltype])
-		snprintf(buf, sizeof(buf), " nltype %lu", nltype);
-	else
-		snprintf(buf, sizeof(buf), " nltype %s", nltype_map[nltype]);
+	if (nltype) {
+		if (nltype >= nltype_max || !nltype_map[nltype])
+			snprintf(buf, sizeof(buf), " nltype %lu", nltype);
+		else
+			snprintf(buf, sizeof(buf), " nltype %s", nltype_map[nltype]);
+
+	} else {
+		const char *ioctl_name = get_ioctl_name(ioctl);
+		if (ioctl_name)
+			snprintf(buf, sizeof(buf), " ioctl %s", ioctl_name);
+		else
+			snprintf(buf, sizeof(buf), " ioctl 0x%lx", ioctl);
+	}
 
 	buf[sizeof(buf)-1] = '\0';
 	return buf;
@@ -576,7 +596,7 @@ static void print_acq_stat(struct ksyms *ksyms, struct stack_stat *ss,
 		       ss->ls.acq_max_comm,
 		       get_lock_name(ksyms, ss->ls.acq_max_lock_ptr),
 		       ss->ls.acq_max_lock_ptr,
-		       get_nltype(ss->ls.acq_max_nltype));
+		       get_nltype_ioctl(ss->ls.acq_max_nltype, ss->ls.acq_max_ioctl));
 }
 
 static void print_acq_task(struct stack_stat *ss)
@@ -631,7 +651,7 @@ static void print_hld_stat(struct ksyms *ksyms, struct stack_stat *ss,
 		       ss->ls.hld_max_comm,
 		       get_lock_name(ksyms, ss->ls.hld_max_lock_ptr),
 		       ss->ls.hld_max_lock_ptr,
-		       get_nltype(ss->ls.hld_max_nltype));
+		       get_nltype_ioctl(ss->ls.hld_max_nltype, ss->ls.hld_max_ioctl));
 }
 
 static void print_hld_task(struct stack_stat *ss)
@@ -786,6 +806,8 @@ static void enable_fentry(struct klockstat_bpf *obj)
 	bpf_program__set_autoload(obj->progs.kprobe_rtnetlink_rcv_msg_exit, false);
 	bpf_program__set_autoload(obj->progs.kprobe_netlink_dump, false);
 	bpf_program__set_autoload(obj->progs.kprobe_netlink_dump_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_sock_do_ioctl, false);
+	bpf_program__set_autoload(obj->progs.kprobe_sock_do_ioctl_exit, false);
 
 	/* CONFIG_DEBUG_LOCK_ALLOC is on */
 	debug_lock = fentry_can_attach("mutex_lock_nested", NULL);
@@ -853,19 +875,25 @@ static void enable_kprobes(struct klockstat_bpf *obj)
 	bpf_program__set_autoload(obj->progs.rtnetlink_rcv_msg_exit, false);
 	bpf_program__set_autoload(obj->progs.netlink_dump, false);
 	bpf_program__set_autoload(obj->progs.netlink_dump_exit, false);
+	bpf_program__set_autoload(obj->progs.sock_do_ioctl, false);
+	bpf_program__set_autoload(obj->progs.sock_do_ioctl_exit, false);
 }
 
-static void disable_nldump_probes(struct klockstat_bpf *obj)
+static void disable_nldump_ioctl_probes(struct klockstat_bpf *obj)
 {
 	bpf_program__set_autoload(obj->progs.rtnetlink_rcv_msg, false);
 	bpf_program__set_autoload(obj->progs.rtnetlink_rcv_msg_exit, false);
 	bpf_program__set_autoload(obj->progs.netlink_dump, false);
 	bpf_program__set_autoload(obj->progs.netlink_dump_exit, false);
+	bpf_program__set_autoload(obj->progs.sock_do_ioctl, false);
+	bpf_program__set_autoload(obj->progs.sock_do_ioctl_exit, false);
 
 	bpf_program__set_autoload(obj->progs.kprobe_rtnetlink_rcv_msg, false);
 	bpf_program__set_autoload(obj->progs.kprobe_rtnetlink_rcv_msg_exit, false);
 	bpf_program__set_autoload(obj->progs.kprobe_netlink_dump, false);
 	bpf_program__set_autoload(obj->progs.kprobe_netlink_dump_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_sock_do_ioctl, false);
+	bpf_program__set_autoload(obj->progs.kprobe_sock_do_ioctl_exit, false);
 }
 
 int main(int argc, char **argv)
@@ -937,7 +965,7 @@ int main(int argc, char **argv)
 		if (err)
 			warn("failed to resolve nlmsg names\n");
 	} else {
-		disable_nldump_probes(obj);
+		disable_nldump_ioctl_probes(obj);
 	}
 
 	err = klockstat_bpf__load(obj);

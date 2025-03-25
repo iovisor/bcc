@@ -32,9 +32,15 @@ struct task_lock {
 	u64 lock_ptr;
 };
 
+struct task_state {
+	u16 nlmsg_type;
+	u16 ioctl;
+};
+
 struct lockholder_info {
 	s32 stack_id;
 	u16 nlmsg_type;
+	u16 ioctl;
 	u64 task_id;
 	u64 try_at;
 	u64 acq_at;
@@ -74,8 +80,8 @@ struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, MAX_ENTRIES);
 	__type(key, u32);
-	__type(value, u16);
-} nltypes SEC(".maps");
+	__type(value, struct task_state);
+} task_states SEC(".maps");
 
 static bool tracing_task(u64 task_id)
 {
@@ -134,7 +140,7 @@ static void lock_acquired(void *lock)
 {
 	u64 task_id;
 	u32 tid;
-	u16 *nltype;
+	struct task_state *state;
 	struct lockholder_info *li;
 	struct task_lock tl = {};
 
@@ -153,9 +159,11 @@ static void lock_acquired(void *lock)
 	li->acq_at = bpf_ktime_get_ns();
 
 	tid = (u32)task_id;
-	nltype = bpf_map_lookup_elem(&nltypes, &tid);
-	if (nltype)
-		li->nlmsg_type = *nltype;
+	state = bpf_map_lookup_elem(&task_states, &tid);
+	if (state) {
+		li->nlmsg_type = state->nlmsg_type;
+		li->ioctl = state->ioctl;
+	}
 }
 
 static void account(struct lockholder_info *li)
@@ -197,6 +205,7 @@ static void account(struct lockholder_info *li)
 		WRITE_ONCE(ls->acq_max_id, li->task_id);
 		WRITE_ONCE(ls->acq_max_lock_ptr, li->lock_ptr);
 		WRITE_ONCE(ls->acq_max_nltype, li->nlmsg_type);
+		WRITE_ONCE(ls->acq_max_ioctl, li->ioctl);
 		/*
 		 * Potentially racy, if multiple threads think they are the max,
 		 * so you may get a clobbered write.
@@ -213,6 +222,7 @@ static void account(struct lockholder_info *li)
 		WRITE_ONCE(ls->hld_max_id, li->task_id);
 		WRITE_ONCE(ls->hld_max_lock_ptr, li->lock_ptr);
 		WRITE_ONCE(ls->hld_max_nltype, li->nlmsg_type);
+		WRITE_ONCE(ls->hld_max_ioctl, li->ioctl);
 		if (!per_thread)
 			bpf_get_current_comm(ls->hld_max_comm, TASK_COMM_LEN);
 	}
@@ -244,18 +254,27 @@ static void lock_released(void *lock)
 static void record_nltype(const struct nlmsghdr *hdr)
 {
 	u32 tid = (u32)bpf_get_current_pid_tgid();
-	u16 nltype = 0;
+	struct task_state state = {};
 
-	nltype = BPF_CORE_READ(hdr, nlmsg_type);
-
-	bpf_map_update_elem(&nltypes, &tid, &nltype, BPF_ANY);
+	/* nlmsg_type and ioctl will never be set at the same time */
+	state.nlmsg_type = BPF_CORE_READ(hdr, nlmsg_type);
+	bpf_map_update_elem(&task_states, &tid, &state, BPF_ANY);
 }
 
-static void release_nltype(void)
+static void record_ioctl(unsigned int cmd)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+	struct task_state state = {.ioctl = cmd};
+
+	/* nlmsg_type and ioctl will never be set at the same time */
+	bpf_map_update_elem(&task_states, &tid, &state, BPF_ANY);
+}
+
+static void release_task_state(void)
 {
 	u32 tid = (u32)bpf_get_current_pid_tgid();
 
-	bpf_map_delete_elem(&nltypes, &tid);
+	bpf_map_delete_elem(&task_states, &tid);
 }
 
 SEC("fentry/rtnetlink_rcv_msg")
@@ -270,7 +289,7 @@ SEC("fexit/rtnetlink_rcv_msg")
 int BPF_PROG(rtnetlink_rcv_msg_exit, struct sk_buff *skb, struct nlmsghdr *nlh,
 	     struct netlink_ext_ack *extack, long ret)
 {
-	release_nltype();
+	release_task_state();
 	return 0;
 }
 
@@ -289,7 +308,22 @@ SEC("fexit/netlink_dump")
 int BPF_PROG(netlink_dump_exit, struct sk_buff *skb, struct nlmsghdr *nlh,
 	     struct netlink_ext_ack *extack)
 {
-	release_nltype();
+	release_task_state();
+	return 0;
+}
+
+SEC("fentry/sock_do_ioctl")
+int BPF_PROG(sock_do_ioctl, struct net *net, struct socket *sock,
+	     unsigned int cmd, unsigned long arg)
+{
+	record_ioctl(cmd);
+	return 0;
+}
+
+SEC("fexit/sock_do_ioctl")
+int BPF_PROG(sock_do_ioctl_exit)
+{
+	release_task_state();
 	return 0;
 }
 
@@ -809,7 +843,7 @@ int BPF_KPROBE(kprobe_rtnetlink_rcv_msg, struct sk_buff *skb, struct nlmsghdr *n
 SEC("kretprobe/rtnetlink_rcv_msg")
 int BPF_KRETPROBE(kprobe_rtnetlink_rcv_msg_exit, long ret)
 {
-	release_nltype();
+	release_task_state();
 	return 0;
 }
 
@@ -827,9 +861,26 @@ int BPF_KPROBE(kprobe_netlink_dump, struct sock *sk, bool lock_taken)
 SEC("kretprobe/netlink_dump")
 int BPF_KRETPROBE(kprobe_netlink_dump_exit, long ret)
 {
-	release_nltype();
+	release_task_state();
 	return 0;
 }
+
+SEC("kprobe/sock_do_ioctl")
+int BPF_PROG(kprobe_sock_do_ioctl, struct net *net, struct socket *sock,
+	     unsigned int cmd, unsigned long arg)
+{
+	record_ioctl(cmd);
+	return 0;
+}
+
+SEC("kretprobe/sock_do_ioctl")
+int BPF_PROG(kprobe_sock_do_ioctl_exit)
+{
+	release_task_state();
+	return 0;
+}
+
+
 
 
 char LICENSE[] SEC("license") = "GPL";

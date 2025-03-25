@@ -13,6 +13,7 @@ struct lock_stat {
 	__u64 acq_max_id;
 	__u64 acq_max_lock_ptr;
 	__u64 acq_max_nltype;
+	__u64 acq_max_ioctl;
 	char acq_max_comm[TASK_COMM_LEN];
 	__u64 hld_count;
 	__u64 hld_total_time;
@@ -20,6 +21,7 @@ struct lock_stat {
 	__u64 hld_max_id;
 	__u64 hld_max_lock_ptr;
 	__u64 hld_max_nltype;
+	__u64 hld_max_ioctl;
 	char hld_max_comm[TASK_COMM_LEN];
 };
 
