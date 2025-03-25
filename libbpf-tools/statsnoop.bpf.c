@@ -38,7 +38,7 @@ static int probe_entry(void *ctx, enum sys_type type, int fd, int dirfd,
 	__u32 tid = (__u32)id;
 	struct value value = {};
 
-	if (!pathname && fd == INVALID_FD)
+	if (!pathname && fd == INVALID_FD && dirfd == INVALID_FD)
 		return 0;
 
 	if (target_pid && target_pid != pid)
