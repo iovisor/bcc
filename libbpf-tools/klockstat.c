@@ -518,6 +518,8 @@ static int find_stack_offset(struct ksyms *ksyms, struct stack_stat *ss)
 
 	for (i = 0; i < PERF_MAX_STACK_DEPTH && ss->bt[i]; i++) {
 		ksym = ksyms__map_addr(ksyms, ss->bt[i]);
+		if (!ksym)
+			continue;
 
 		for (j = 0; j < ARRAY_SIZE(lock_ksym_addr) && lock_ksym_addr[j]; j++)
 			if (ksym->addr == lock_ksym_addr[j])
