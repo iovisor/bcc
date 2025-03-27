@@ -106,6 +106,25 @@ static int readahead__set_attach_target(struct bpf_program *prog)
 	return err;
 }
 
+static int attach_access(struct readahead_bpf *obj)
+{
+	bpf_program__set_autoload(obj->progs.folio_mark_accessed, false);
+	bpf_program__set_autoload(obj->progs.mark_page_accessed, false);
+
+	/*
+	 * 76580b65 ("mm/swap: Add folio_mark_accessed()") in v5.15
+	 * convert mark_page_accessed() to folio_mark_accessed().
+	 */
+	if (fentry_can_attach("folio_mark_accessed", NULL))
+		return bpf_program__set_autoload(obj->progs.folio_mark_accessed, true);
+
+	if (fentry_can_attach("mark_page_accessed", NULL))
+		return bpf_program__set_autoload(obj->progs.mark_page_accessed, true);
+	
+	fprintf(stderr, "failed to attach to access functions\n");
+	return -1;
+}
+
 static int attach_alloc_ret(struct readahead_bpf *obj)
 {
 	bpf_program__set_autoload(obj->progs.page_cache_alloc_ret, false);
@@ -156,6 +175,9 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	err = attach_access(obj);
+	if (err)
+		goto cleanup;
 	err = attach_alloc_ret(obj);
 	if (err)
 		goto cleanup;

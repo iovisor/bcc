@@ -80,8 +80,8 @@ int BPF_PROG(do_page_cache_ra_ret)
 	return 0;
 }
 
-SEC("fentry/mark_page_accessed")
-int BPF_PROG(mark_page_accessed, struct page *page)
+static __always_inline
+int mark_accessed(struct page *page)
 {
 	u64 *tsp, slot, ts = bpf_ktime_get_ns();
 	s64 delta;
@@ -102,6 +102,18 @@ update_and_cleanup:
 	bpf_map_delete_elem(&birth, &page);
 
 	return 0;
+}
+
+SEC("fentry/folio_mark_accessed")
+int BPF_PROG(folio_mark_accessed, struct folio *folio)
+{
+	return mark_accessed(&folio->page);
+}
+
+SEC("fentry/mark_page_accessed")
+int BPF_PROG(mark_page_accessed, struct page *page)
+{
+	return mark_accessed(page);
 }
 
 char LICENSE[] SEC("license") = "GPL";
