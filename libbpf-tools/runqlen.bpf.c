@@ -4,6 +4,7 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_tracing.h>
+#include "core_fixes.bpf.h"
 #include "runqlen.h"
 
 const volatile bool targ_per_cpu = false;
@@ -22,7 +23,7 @@ int do_sample(struct bpf_perf_event_data *ctx)
 	if (targ_host)
 		slot = BPF_CORE_READ(task, se.cfs_rq, rq, nr_running);
 	else
-		slot = BPF_CORE_READ(task, se.cfs_rq, nr_running);
+		slot = cfs_rq_get_nr_running_or_nr_queued(BPF_CORE_READ(task, se.cfs_rq));
 	/*
 	 * Calculate run queue length by subtracting the currently running task,
 	 * if present. len 0 == idle, len 1 == one running task.
