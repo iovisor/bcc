@@ -149,7 +149,7 @@ filter_event(struct sock *sk, __u32 uid, __u32 pid)
 }
 
 static __always_inline int
-enter_tcp_connect(struct pt_regs *ctx, struct sock *sk)
+enter_tcp_connect(struct sock *sk)
 {
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 pid = pid_tgid >> 32;
@@ -165,7 +165,7 @@ enter_tcp_connect(struct pt_regs *ctx, struct sock *sk)
 }
 
 static __always_inline int
-exit_tcp_connect(struct pt_regs *ctx, int ret, __u16 family)
+exit_tcp_connect(int ret, __u16 family)
 {
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 pid = pid_tgid >> 32;
@@ -203,25 +203,25 @@ end:
 SEC("kprobe/tcp_v4_connect")
 int BPF_KPROBE(tcp_v4_connect, struct sock *sk)
 {
-	return enter_tcp_connect(ctx, sk);
+	return enter_tcp_connect(sk);
 }
 
 SEC("kretprobe/tcp_v4_connect")
 int BPF_KRETPROBE(tcp_v4_connect_ret, int ret)
 {
-	return exit_tcp_connect(ctx, ret, AF_INET);
+	return exit_tcp_connect(ret, AF_INET);
 }
 
 SEC("kprobe/tcp_v6_connect")
 int BPF_KPROBE(tcp_v6_connect, struct sock *sk)
 {
-	return enter_tcp_connect(ctx, sk);
+	return enter_tcp_connect(sk);
 }
 
 SEC("kretprobe/tcp_v6_connect")
 int BPF_KRETPROBE(tcp_v6_connect_ret, int ret)
 {
-	return exit_tcp_connect(ctx, ret, AF_INET6);
+	return exit_tcp_connect(ret, AF_INET6);
 }
 
 SEC("kprobe/tcp_close")
