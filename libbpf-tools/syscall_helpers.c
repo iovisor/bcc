@@ -104,8 +104,8 @@ close:
 	err = pclose(f);
 	if (err < 0)
 		warn("pclose: %s\n", strerror(errno));
-#if !defined(__x86_64__) && !defined(__aarch64__) && !defined(__riscv)
-	/* Ignore the error for x86_64/arm64/riscv where we have a table compiled in */
+#if !defined(__x86_64__) && !defined(__aarch64__) && !defined(__riscv) && !defined(__loongarch64)
+	/* Ignore the error for x86_64/arm64/riscv/loongarch64 where we have a table compiled in */
 	else if (err && WEXITSTATUS(err) == 127) {
 		warn("ausyscall required for syscalls number/name mapping\n");
 	} else if (err) {
@@ -487,7 +487,7 @@ static const char *syscall_names_x86_64[] = {
 	[438] = "pidfd_getfd",
 };
 size_t syscall_names_x86_64_size = sizeof(syscall_names_x86_64)/sizeof(char*);
-#elif defined(__aarch64__) || defined(__riscv)
+#elif defined(__aarch64__) || defined(__riscv) || defined(__loongarch64)
 static const char *syscall_names_generic[] = {
 	[0] = "io_setup",
 	[1] = "io_destroy",
@@ -800,6 +800,12 @@ static const char *syscall_names_generic[] = {
 	[448] = "process_mrelease",
 	[449] = "futex_waitv",
 	[450] = "set_mempolicy_home_node",
+	[451] = "cachestat",
+	[452] = "fchmodat2",
+	[453] = "map_shadow_stack",
+	[454] = "futex_wake",
+	[455] = "futex_wait",
+	[456] = "futex_requeue",
 };
 size_t syscall_names_generic_size = sizeof(syscall_names_generic)/sizeof(char*);
 #endif
@@ -813,7 +819,7 @@ void syscall_name(unsigned n, char *buf, size_t size)
 #ifdef __x86_64__
 	else if (n < syscall_names_x86_64_size)
 		name = syscall_names_x86_64[n];
-#elif defined(__aarch64__) || defined(__riscv)
+#elif defined(__aarch64__) || defined(__riscv) || defined(__loongarch64)
 	else if (n < syscall_names_generic_size)
 		name = syscall_names_generic[n];
 #endif
@@ -834,7 +840,7 @@ int list_syscalls(void)
 		size = syscall_names_x86_64_size;
 		list = syscall_names_x86_64;
 	}
-#elif defined(__aarch64__) || defined(__riscv)
+#elif defined(__aarch64__) || defined(__riscv) || defined(__loongarch64)
 	if (!size) {
 		size = syscall_names_generic_size;
 		list = syscall_names_generic;
