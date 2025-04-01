@@ -81,7 +81,7 @@ int exit__page_cache_alloc(struct pt_regs *ctx) {
 
 int entry_mark_page_accessed(struct pt_regs *ctx) {
     u64 ts, delta;
-    struct page *arg0 = (struct page *) PT_REGS_PARM1(ctx);
+    struct page *arg0 = GET_ARG1_PAGE;
     u32 zero = 0; // static key for accessing pages[0]
     u64 *bts = birth.lookup(&arg0);
     if (bts != NULL) {
@@ -94,7 +94,7 @@ int entry_mark_page_accessed(struct pt_regs *ctx) {
 }
 """
 
-bpf_text_kfunc = """
+bpf_text_kfunc_cache_readahead = """
 KFUNC_PROBE(RA_FUNC)
 {
     u32 pid = bpf_get_current_pid_tgid();
@@ -112,18 +112,21 @@ KRETFUNC_PROBE(RA_FUNC)
     flag.update(&pid, &zero);
     return 0;
 }
+"""
 
-KFUNC_PROBE(mark_page_accessed, struct page *arg0)
+bpf_text_kfunc_mark_accessed_template = """
+KFUNC_PROBE(MA_FUNC_NAME, MA_ARG_TYPE arg0)
 {
     u64 ts, delta;
     u32 zero = 0; // static key for accessing pages[0]
-    u64 *bts = birth.lookup(&arg0);
+    struct page *page = GET_PAGE_PTR_FROM_ARG0;
+    u64 *bts = birth.lookup(&page);
 
     if (bts != NULL) {
         delta = bpf_ktime_get_ns() - *bts;
         dist.atomic_increment(bpf_log2l(delta/1000000));
         pages.atomic_increment(zero, -1);
-        birth.delete(&arg0); // remove the entry from hashmap
+        birth.delete(&page); // remove the entry from hashmap
     }
     return 0;
 }
@@ -181,9 +184,9 @@ if BPF.support_kfunc():
     elif BPF.get_kprobe_functions(b"page_cache_ra_order"):
         ra_func = "page_cache_ra_order"
     else:
-        print("Not found any kfunc.")
+        print("Not found any kfunc for page cache readahead.")
         exit()
-    bpf_text += bpf_text_kfunc.replace("RA_FUNC", ra_func)
+    bpf_text += bpf_text_kfunc_cache_readahead.replace("RA_FUNC", ra_func)
     if BPF.get_kprobe_functions(b"__page_cache_alloc"):
         bpf_text += bpf_text_kfunc_cache_alloc_ret_page
     else:
@@ -195,6 +198,26 @@ if BPF.support_kfunc():
             print("ERROR: No cache alloc function found. Exiting.")
             exit()
         bpf_text += bpf_text_kfunc_cache_alloc_ret_folio_func_body
+    if BPF.get_kprobe_functions(b"folio_mark_accessed"):
+        ma_func_name = "folio_mark_accessed"
+        ma_arg_type = "struct folio *"
+        get_page_ptr_code = "folio_page(arg0, 0)"
+        bpf_text_kfunc_mark_accessed = bpf_text_kfunc_mark_accessed_template \
+            .replace("MA_FUNC_NAME", ma_func_name) \
+            .replace("MA_ARG_TYPE", ma_arg_type) \
+            .replace("GET_PAGE_PTR_FROM_ARG0", get_page_ptr_code)
+    elif BPF.get_kprobe_functions(b"mark_page_accessed"):
+        ma_func_name = "mark_page_accessed"
+        ma_arg_type = "struct page *"
+        get_page_ptr_code = "arg0"
+        bpf_text_kfunc_mark_accessed = bpf_text_kfunc_mark_accessed_template \
+            .replace("MA_FUNC_NAME", ma_func_name) \
+            .replace("MA_ARG_TYPE", ma_arg_type) \
+            .replace("GET_PAGE_PTR_FROM_ARG0", get_page_ptr_code)
+    else:
+        print("Not found any kfunc for page cache mark accessed.")
+        exit()
+    bpf_text += bpf_text_kfunc_mark_accessed
     b = BPF(text=bpf_text)
 else:
     bpf_text += bpf_text_kprobe
@@ -205,7 +228,7 @@ else:
     elif BPF.get_kprobe_functions(b"page_cache_ra_order"):
         ra_event = "page_cache_ra_order"
     else:
-        print("Not found any kprobe.")
+        print("Not found any kprobe for page cache readahead.")
         exit()
     if BPF.get_kprobe_functions(b"__page_cache_alloc"):
         cache_func = "__page_cache_alloc"
@@ -219,12 +242,21 @@ else:
             print("ERROR: No cache alloc function found. Exiting.")
             exit()
         bpf_text = bpf_text.replace('GET_RETVAL_PAGE', 'folio_page((struct folio *)PT_REGS_RC(ctx), 0)')
+    if BPF.get_kprobe_functions(b"folio_mark_accessed"):
+        ma_event = "folio_mark_accessed"
+        bpf_text = bpf_text.replace('GET_ARG1_PAGE', 'folio_page((struct folio *)PT_REGS_PARM1(ctx), 0)')
+    elif BPF.get_kprobe_functions(b"mark_page_accessed"):
+        ma_event = "mark_page_accessed"
+        bpf_text = bpf_text.replace('GET_ARG1_PAGE', '(struct page *)PT_REGS_PARM1(ctx)')
+    else:
+        print("Not found any kprobe for page cache mark accessed.")
+        exit()
 
     b = BPF(text=bpf_text)
     b.attach_kprobe(event=ra_event, fn_name="entry__do_page_cache_readahead")
     b.attach_kretprobe(event=ra_event, fn_name="exit__do_page_cache_readahead")
     b.attach_kretprobe(event=cache_func, fn_name="exit__page_cache_alloc")
-    b.attach_kprobe(event="mark_page_accessed", fn_name="entry_mark_page_accessed")
+    b.attach_kprobe(event=ma_event, fn_name="entry_mark_page_accessed")
 
 # header
 print("Tracing... Hit Ctrl-C to end.")
