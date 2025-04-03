@@ -1372,7 +1372,7 @@ class BPF(object):
             return b"%s_%s_0x%x_%d" % (prefix, self._probe_repl.sub(b"_", path), addr, pid)
 
     def attach_uprobe(self, name=b"", sym=b"", sym_re=b"", addr=None,
-            fn_name=b"", pid=-1, sym_off=0):
+            fn_name=b"", pid=-1, sym_off=0, semaphore_offset=0):
         """attach_uprobe(name="", sym="", sym_re="", addr=None, fn_name=""
                          pid=-1, sym_off=0)
 
@@ -1414,7 +1414,7 @@ class BPF(object):
             self._check_probe_quota(len(addresses))
             for sym_addr in addresses:
                 self.attach_uprobe(name=name, addr=sym_addr,
-                                   fn_name=fn_name, pid=pid)
+                                   fn_name=fn_name, pid=pid, semaphore_offset=semaphore_offset)
             return
 
         (path, addr) = BPF._check_path_symbol(name, sym, addr, pid, sym_off)
@@ -1422,14 +1422,14 @@ class BPF(object):
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = self._get_uprobe_evname(b"p", path, addr, pid)
-        fd = lib.bpf_attach_uprobe(fn.fd, 0, ev_name, path, addr, pid)
+        fd = lib.bpf_attach_uprobe(fn.fd, 0, ev_name, path, addr, pid, semaphore_offset)
         if fd < 0:
             raise Exception("Failed to attach BPF to uprobe")
         self._add_uprobe_fd(ev_name, fd)
         return self
 
     def attach_uretprobe(self, name=b"", sym=b"", sym_re=b"", addr=None,
-            fn_name=b"", pid=-1):
+            fn_name=b"", pid=-1, semaphore_offset=0):
         """attach_uretprobe(name="", sym="", sym_re="", addr=None, fn_name=""
                             pid=-1)
 
@@ -1446,7 +1446,7 @@ class BPF(object):
         if sym_re:
             for sym_addr in BPF.get_user_addresses(name, sym_re):
                 self.attach_uretprobe(name=name, addr=sym_addr,
-                                      fn_name=fn_name, pid=pid)
+                                      fn_name=fn_name, pid=pid, semaphore_offset=semaphore_offset)
             return
 
         (path, addr) = BPF._check_path_symbol(name, sym, addr, pid)
@@ -1454,7 +1454,7 @@ class BPF(object):
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = self._get_uprobe_evname(b"r", path, addr, pid)
-        fd = lib.bpf_attach_uprobe(fn.fd, 1, ev_name, path, addr, pid)
+        fd = lib.bpf_attach_uprobe(fn.fd, 1, ev_name, path, addr, pid, semaphore_offset)
         if fd < 0:
             raise Exception("Failed to attach BPF to uretprobe")
         self._add_uprobe_fd(ev_name, fd)

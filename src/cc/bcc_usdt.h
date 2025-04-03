@@ -87,7 +87,7 @@ const char *bcc_usdt_get_fully_specified_probe_argctype(
   void *ctx, const char* provider_name, const char* probe_name, const int arg_index
 );
 
-typedef void (*bcc_usdt_uprobe_cb)(const char *, const char *, uint64_t, int);
+typedef void (*bcc_usdt_uprobe_cb)(const char *, const char *, uint64_t, int, uint64_t);
 void bcc_usdt_foreach_uprobe(void *usdt, bcc_usdt_uprobe_cb callback);
 
 #ifdef __cplusplus

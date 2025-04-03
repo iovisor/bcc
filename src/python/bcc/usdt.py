@@ -203,16 +203,16 @@ To check which probes are present in the process, use the tplist tool.
     # is a USDT context and probes need to be attached.
     def attach_uprobes(self, bpf, attach_usdt_ignore_pid):
         probes = self.enumerate_active_probes()
-        for (binpath, fn_name, addr, pid) in probes:
+        for (binpath, fn_name, addr, pid, semaphore_offset) in probes:
             if attach_usdt_ignore_pid:
                 pid = -1
             bpf.attach_uprobe(name=binpath, fn_name=fn_name,
-                              addr=addr, pid=pid)
+                              addr=addr, pid=pid, semaphore_offset=semaphore_offset)
 
     def enumerate_active_probes(self):
         probes = []
-        def _add_probe(binpath, fn_name, addr, pid):
-            probes.append((binpath, fn_name, addr, pid))
+        def _add_probe(binpath, fn_name, addr, pid, semaphore_offset):
+            probes.append((binpath, fn_name, addr, pid, semaphore_offset))
 
         lib.bcc_usdt_foreach_uprobe(self.context, _USDT_PROBE_CB(_add_probe))
         return probes

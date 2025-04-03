@@ -343,7 +343,7 @@ public:
   typedef void (*each_cb)(struct bcc_usdt *);
   void each(each_cb callback);
 
-  typedef void (*each_uprobe_cb)(const char *, const char *, uint64_t, int);
+  typedef void (*each_uprobe_cb)(const char *, const char *, uint64_t, int, uint64_t);
   void each_uprobe(each_uprobe_cb callback);
 
   friend class ::ebpf::BPF;
