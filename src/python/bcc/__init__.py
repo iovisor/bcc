@@ -461,6 +461,7 @@ class BPF(object):
         self.raw_tracepoint_fds = {}
         self.kfunc_entry_fds = {}
         self.kfunc_exit_fds = {}
+        self.fmod_ret_fds = {}
         self.lsm_fds = {}
         self.perf_buffers = {}
         self.open_perf_events = {}
@@ -1157,6 +1158,12 @@ class BPF(object):
             return True
         return False
 
+    @staticmethod
+    def support_fmod_ret():
+        # It is not clear what can be used to check if 'fmod_ret'
+        # is supported by the kernel. Assuming checking kfunc is enough
+        return BPF.support_kfunc()
+
     def detach_kfunc(self, fn_name=b""):
         fn_name = _assert_is_bytes(fn_name)
         fn_name = BPF.add_prefix(b"kfunc__", fn_name)
@@ -1165,6 +1172,15 @@ class BPF(object):
             raise Exception("Kernel entry func %s is not attached" % fn_name)
         os.close(self.kfunc_entry_fds[fn_name])
         del self.kfunc_entry_fds[fn_name]
+
+    def detach_fmod_ret(self, fn_name=b""):
+        fn_name = _assert_is_bytes(fn_name)
+        fn_name = BPF.add_prefix(b"kmod_ret__", fn_name)
+
+        if fn_name not in self.fmod_ret_fds:
+            raise Exception("Fmod_ret func %s is not attached" % fn_name)
+        os.close(self.fmod_ret_fds[fn_name])
+        del self.fmod_ret_fds[fn_name]
 
     def detach_kretfunc(self, fn_name=b""):
         fn_name = _assert_is_bytes(fn_name)
@@ -1187,6 +1203,22 @@ class BPF(object):
         if fd < 0:
             raise Exception("Failed to attach BPF to entry kernel func")
         self.kfunc_entry_fds[fn_name] = fd
+        return self
+
+    def attach_fmod_ret(self, fn_name=b""):
+        fn_name = _assert_is_bytes(fn_name)
+        fn_name = BPF.add_prefix(b"kmod_ret__", fn_name)
+
+        if fn_name in self.fmod_ret_fds:
+            raise Exception("Fmod_ret func %s has been attached" % fn_name)
+
+        fn = self.load_func(fn_name, BPF.TRACING)
+        fd = lib.bpf_attach_kfunc(fn.fd)
+
+        if fd < 0:
+            raise Exception("Failed to attach BPF to fmod_ret kernel func")
+        self.fmod_ret_fds[fn_name] = fd
+
         return self
 
     def attach_kretfunc(self, fn_name=b""):
@@ -1824,6 +1856,8 @@ class BPF(object):
             self.detach_kretfunc(k)
         for k, v in list(self.lsm_fds.items()):
             self.detach_lsm(k)
+        for k, v in list(self.fmod_ret_fds.items()):
+            self.detach_fmod_ret(k)
 
         # Clean up opened perf ring buffer and perf events
         table_keys = list(self.tables.keys())
