@@ -42,7 +42,7 @@ const char argp_program_doc[] =
 "    drsnoop -p 123  # trace pid 123\n"
 "    drsnoop -t 123  # trace tid 123 (use for threads only)\n"
 "    drsnoop -d 10   # trace for 10 seconds only\n"
-"    drsnoop -e      # trace all direct reclaim events with extended faileds\n";
+"    drsnoop -e      # trace all direct reclaim events with extended fields\n";
 
 static const struct argp_option opts[] = {
 	{ "duration", 'd', "DURATION", 0, "Total duration of trace in seconds", 0 },

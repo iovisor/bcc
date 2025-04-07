@@ -57,7 +57,7 @@ EXAMPLES:
     drsnoop -p 123  # trace pid 123
     drsnoop -t 123  # trace tid 123 (use for threads only)
     drsnoop -d 10   # trace for 10 seconds only
-    drsnoop -e      # trace all direct reclaim events with extended faileds
+    drsnoop -e      # trace all direct reclaim events with extended fields
 
   -d, --duration=DURATION    Total duration of trace in seconds
   -e, --extended             Extended fields output
