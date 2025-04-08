@@ -13,6 +13,7 @@
 #include <time.h>
 
 #include <bpf/bpf.h>
+#include <bpf/btf.h>
 #include "sigsnoop.h"
 #include "sigsnoop.skel.h"
 
@@ -189,6 +190,23 @@ static void alias_parse(char *prog)
 	}
 }
 
+/**
+ * since linux commit 3f0e6f2b41d3 ("bpf: Add bpf_task_from_pid() kfunc")
+ * v6.1-rc4-1163-g3f0e6f2b41d3 support bpf_task_from_pid() helper.
+ */
+static bool support_bpf_task_from_pid(void)
+{
+	const struct btf *btf = btf__load_vmlinux_btf();
+	int type_id;
+
+	type_id = btf__find_by_name_kind(btf, "bpf_task_from_pid",
+					 BTF_KIND_FUNC);
+	if (type_id < 0)
+		return false;
+
+	return true;
+}
+
 static void sig_int(int signo)
 {
 	exiting = 1;
@@ -205,11 +223,11 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	tm = localtime(&t);
 	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
 	if (signal_name && e->sig < ARRAY_SIZE(sig_name))
-		printf("%-8s %-7d %-16s %-12s %-7d %-6d\n",
-		       ts, e->pid, e->comm, sig_name[e->sig], e->tpid, e->ret);
+		printf("%-8s %-7d %-16s %-12s %-7d %-16s %-6d\n",
+		       ts, e->pid, e->comm, sig_name[e->sig], e->tpid, e->tcomm, e->ret);
 	else
-		printf("%-8s %-7d %-16s %-12d %-7d %-6d\n",
-		       ts, e->pid, e->comm, e->sig, e->tpid, e->ret);
+		printf("%-8s %-7d %-16s %-12d %-7d %-16s %-6d\n",
+		       ts, e->pid, e->comm, e->sig, e->tpid, e->tcomm, e->ret);
 }
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
@@ -281,8 +299,12 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	printf("%-8s %-7s %-16s %-12s %-7s %-6s\n",
-	       "TIME", "PID", "COMM", "SIG", "TPID", "RESULT");
+	if (!support_bpf_task_from_pid())
+		fprintf(stderr, "WARNING: Current kernel not support "\
+				"bpf_task_from_pid(), ignore TCOMM field\n");
+
+	printf("%-8s %-7s %-16s %-12s %-7s %-16s %-6s\n",
+	       "TIME", "PID", "COMM", "SIG", "TPID", "TCOMM", "RESULT");
 
 	while (!exiting) {
 		err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS);
