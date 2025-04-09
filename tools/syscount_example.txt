@@ -154,6 +154,97 @@ SYSCALL                   COUNT
 stat                        316
 ^C
 
+
+Output Metrics in Line Protocol
+-------------------------------
+
+The `--output` option enables `syscount` to output metrics in InfluxDB Line
+Protocol format, a text-based format for writing data points into time-series
+databases like InfluxDB. This is useful for piping syscall counts and latencies
+into monitoring systems for visualization and analysis.
+
+Usage
+-----
+Use `--output` (or `--output=line`) to switch to Line Protocol output. Combine
+with options like `-P` (group by process), `-L` (include latency), and `-i
+<interval>` for periodic metrics.
+
+Example Output
+--------------
+Running `syscount --output -i 1` might produce:
+syscount,syscall=read count=45 1744253477
+syscount,syscall=write count=23 1744253477
+syscount,syscall=openat count=12 1744253477
+
+With `-P` (group by process):
+syscount,pid=1234 count=45 1744253477
+syscount,pid=5678 count=19 1744253477
+
+With `-L` (include latency):
+syscount,syscall=read count=45,latency=70217 1744253477
+syscount,syscall=write count=23,latency=45123 1744253477
+
+
+Using the Output with InfluxDB and Grafana
+------------------------------------------
+
+The Line Protocol output can be stored in InfluxDB and visualized in Grafana,
+similar to how folded stacks from `profile` are turned into flame graphs.
+Here's how:
+
+1. Storing in InfluxDB
+Pipe the output into InfluxDB using the `influx` CLI. For example:
+
+# syscount --output -i 1 > syscount_metrics.txt
+$ influx write -b mybucket -f syscount_metrics.txt -p s
+
+For real-time ingestion:
+# unbuffer syscount --output -i 1 | influx write -b mybucket -p s
+
+Note: The -p s option specifies second-precision timestamps.
+
+2. Visualizing in Grafana
+Once stored in InfluxDB, query the `syscount` measurement in Grafana to create
+time-series graphs. Here are some examples:
+
+1) Basic Mode
+Command: `syscount --output -i 1`
+Shows syscall counts over time as a line graph.
+See: images/syscount_call.png
+Grafana Query:
+from(bucket: "mybucket")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r._measurement == "syscount")
+
+2) Process Mode
+Command: `syscount --output -P -i 1`
+Displays syscall counts grouped by process ID, useful for identifying
+per-process activity.
+See: images/syscount_process.png
+Grafana Query:
+from(bucket: "mybucket")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r._measurement == "syscount")
+
+3) Latency Mode
+Command: `syscount --output -L -i 1`
+Plots syscall counts and latencies together, highlighting performance
+bottlenecks.
+See: images/syscount_latency.png
+Grafana Query:
+from(bucket: "mybucket")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r._measurement == "syscount" and r._field == "latency")
+
+4) Combined Syscall Metrics Dashboard
+Combines Basic Mode and Latency Mode in a single Grafana dashboard for a
+comprehensive view of syscall activity and performance.
+See: images/syscounts.png
+
+These graphs can be added to a Grafana dashboard to monitor syscall activity in
+real-time or analyze historical trends.
+
+
 USAGE:
 # syscount -h
 usage: syscount.py [-h] [-p PID] [-t TID] [-i INTERVAL] [-d DURATION] [-T TOP]

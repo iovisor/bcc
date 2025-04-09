@@ -25,6 +25,7 @@ struct data_ext_t {
 	__u32 key;
 };
 
+#define OPT_OUTPUT			1 /* --output */
 
 #define warn(...) fprintf(stderr, __VA_ARGS__)
 
@@ -60,6 +61,7 @@ static const struct argp_option opts[] = {
 	{ "errno", 'e', "ERRNO", 0, "Trace only syscalls that return this error"
 				 "(numeric or EPERM, etc.)", 0 },
 	{ "list", 'l', NULL, 0, "Print list of recognized syscalls and exit", 0 },
+	{ "output", OPT_OUTPUT, NULL, 0, "Output metrics in specified format (currently only 'line' supported)", 0},
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
@@ -78,6 +80,7 @@ static struct env {
 	pid_t pid;
 	char *cgroupspath;
 	bool cg;
+	bool output;
 } env = {
 	.top = 10,
 };
@@ -150,6 +153,38 @@ static void print_latency_header(void)
 static void print_count_header(void)
 {
 	printf("%-22s %8s\n", agg_colname(), "COUNT");
+}
+
+static void print_metrics(struct data_ext_t *datas, size_t count)
+{
+	time_t ts = time(NULL);
+	char buf[2 * TASK_COMM_LEN];
+	struct data_ext_t *data;
+	int err = 0;
+	int i;
+
+	for (i = 0; i < count; i++) {
+		data = &datas[i];
+
+		/* Name */
+		printf("syscount");
+
+		/* Tags */
+		if (!env.process) {
+			err = syscall_name(data->key, buf, sizeof(buf));
+			printf(",syscall=%s", err ? "unknown" : buf);
+		} else {
+			printf(",pid=%u", data->key);
+		}
+
+		/* Fields */
+		printf(" count=%llu", data->count);
+		if (env.latency)
+			printf(",latency=%llu" ,data->total_ns);
+
+		/* Timestamp */
+		printf(" %lu\n", ts);
+	}
 }
 
 static void print_latency(struct data_ext_t *vals, size_t count)
@@ -361,6 +396,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	case 'l':
 		env.list_syscalls = true;
 		break;
+	case OPT_OUTPUT:
+		env.output = true;
+		break;
 	default:
 		return ARGP_ERR_UNKNOWN;
 	}
@@ -474,9 +512,14 @@ int main(int argc, char **argv)
 	}
 
 	compar = env.latency ? compar_latency : compar_count;
-	print = env.latency ? print_latency : print_count;
+	if (env.output)
+		print = print_metrics;
+	else
+		print = env.latency ? print_latency : print_count;
 
-	printf("Tracing syscalls, printing top %d... Ctrl+C to quit.\n", env.top);
+	if (!env.output)
+		printf("Tracing syscalls, printing top %d... Ctrl+C to quit.\n", env.top);
+
 	while (hang_on) {
 		sleep(env.interval ?: 1);
 		if (env.duration) {
@@ -493,8 +536,10 @@ int main(int argc, char **argv)
 		if (!count)
 			continue;
 
-		qsort(vals, count, sizeof(vals[0]), compar);
-		print_timestamp();
+		if (!env.output) {
+			qsort(vals, count, sizeof(vals[0]), compar);
+			print_timestamp();
+		}
 		print(vals, count);
 	}
 
