@@ -363,6 +363,7 @@ ProbeVisitor::ProbeVisitor(ASTContext &C, Rewriter &rewriter,
   addrof_stmt_(nullptr), is_addrof_(false) {
   const char **calling_conv_regs = get_call_conv();
   cannot_fall_back_safely = (calling_conv_regs == calling_conv_regs_s390x || calling_conv_regs == calling_conv_regs_riscv64);
+  probe_read_func = cannot_fall_back_safely ? "bpf_probe_read_kernel" : "bpf_probe_read";
 }
 
 bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbDerefs) {
@@ -776,6 +777,7 @@ BTypeVisitor::BTypeVisitor(ASTContext &C, BFrontendAction &fe)
     : C(C), diag_(C.getDiagnostics()), fe_(fe), rewriter_(fe.rewriter()), out_(llvm::errs()) {
   const char **calling_conv_regs = get_call_conv();
   cannot_fall_back_safely = (calling_conv_regs == calling_conv_regs_s390x || calling_conv_regs == calling_conv_regs_riscv64);
+  probe_read_func = cannot_fall_back_safely ? "bpf_probe_read_kernel" : "bpf_probe_read";
 }
 
 void BTypeVisitor::genParamDirectAssign(FunctionDecl *D, string& preamble,
@@ -816,13 +818,8 @@ void BTypeVisitor::genParamIndirectAssign(FunctionDecl *D, string& preamble,
       size_t d = idx - 1;
       const char *reg = calling_conv_regs[d];
       tmp_preamble += "\n " + text + ";";
-      if (cannot_fall_back_safely)
-        tmp_preamble += " bpf_probe_read_kernel";
-      else
-        tmp_preamble += " bpf_probe_read";
-      tmp_preamble += "(&" + arg->getName().str() + ", sizeof(" +
-                  arg->getName().str() + "), &" + new_ctx + "->" +
-                  string(reg) + ");";
+      tmp_preamble += " BCC_PROBE_READ";
+      tmp_preamble += "(&" + arg->getName().str() + ", &" + new_ctx + "->" + string(reg) + ", " + probe_read_func + ");";
     }
   }
 
@@ -1826,6 +1823,18 @@ void BFrontendAction::DoMiscWorkAround() {
   else {
     probefunc = "";
   }
+  probefunc += "#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__\n"
+    "#define BCC_PROBE_READ(dst, src, probe_read_func) ({ \\\n"
+    "  probe_read_func(dst, sizeof(*(dst)), src); \\\n"
+    "})\n"
+    "#else\n"
+    "#define BCC_PROBE_READ(dst, src, probe_read_func) ({ \\\n"
+    "  int __sz = sizeof(*(dst)) < sizeof(*(src)) ? sizeof(*(dst)) : sizeof(*(src)); \\\n"
+    "  __builtin_memset((char *)(dst), 0, sizeof(*(dst)) - __sz); \\\n"
+    "  probe_read_func((char *)(dst) + sizeof(*(dst)) - __sz, __sz, \\\n"
+    "  (const char *)(src) + sizeof(*(src)) - __sz); \\\n"
+    "})\n"
+    "#endif\n";
   std::string prologue = "#if defined(BPF_LICENSE)\n"
     "#error BPF_LICENSE cannot be specified through cflags\n"
     "#endif\n"
