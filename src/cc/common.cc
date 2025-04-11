@@ -175,7 +175,7 @@ static inline field_kind_t _get_field_kind(std::string const& line,
       auto v = get_enum_val_from_btf(dim.c_str());
       if (v)
         dim = std::to_string(*v);
-      field_name.replace(pos1 + 1, pos2 - pos1 - 1, dim, 0);
+      field_name.replace(pos1 + 1, pos2 - pos1 - 1, dim);
     }
     return field_kind_t::regular;
   }
