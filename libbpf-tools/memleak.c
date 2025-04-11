@@ -51,7 +51,7 @@ static struct env {
 	bool verbose;
 	char command[32];
 	char symbols_prefix[16];
-	bool output;
+	enum output_format output;
 } env = {
 	.interval = 5, // posarg 1
 	.nr_intervals = -1, // posarg 2
@@ -225,7 +225,7 @@ static const struct argp_option argp_options[] = {
 	 "the number of unique stack traces that can be stored and displayed (default 10240)", 0 },
 	{"perf-max-stack-depth", OPT_PERF_MAX_STACK_DEPTH,
 	 "PERF-MAX-STACK-DEPTH", 0, "the limit for both kernel and user stack traces (default 127)", 0 },
-	{"output", OPT_OUTPUT, NULL, 0, "Output metrics in specified format (currently only 'line' supported)", 0 },
+	{"output", OPT_OUTPUT, "FORMAT", OPTION_ARG_OPTIONAL, "Output metrics in specified format (currently only 'line' supported)", 0 },
 	{"verbose", 'v', NULL, 0, "verbose debug output", 0 },
 	{},
 };
@@ -608,7 +608,14 @@ error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 		}
 		break;
 	case OPT_OUTPUT:
-		env.output = true;
+		env.output = FORMAT_LINE_PROTOCOL;
+		if (arg) {
+			if (strcmp(arg, "line") == 0)
+				env.output = FORMAT_LINE_PROTOCOL;
+			else
+				argp_error(state, "Invalid output format: %s. "
+					   "Only 'line' is supported.", arg);
+		}
 		break;
 	case ARGP_KEY_ARG:
 		pos_args++;
@@ -839,19 +846,20 @@ static void print_metrics(struct allocation *allocs, size_t nr_allocs, time_t ts
 {
 	for (size_t i = 0; i < nr_allocs; ++i) {
 		const struct allocation *alloc = &allocs[i];
+		struct metric m = {
+			.name = "memleak",
+			.tags = {{ "stackid", "" }},
+			.nr_tags = 1,
+			.fields = {
+				{ "size", alloc->size },
+				{ "count", alloc->count }
+			},
+			.nr_fields = 2,
+			.ts = ts
+		};
+		snprintf(m.tags[0].value, sizeof(m.tags[0].value), "%lu", alloc->stack_id);
 
-		/* name */
-		printf("memleak");
-
-		/* tag */
-		printf(",stackid=%lu", alloc->stack_id);
-
-		/* fields */
-		printf(" size=%zu", alloc->size);
-		printf(",count=%zu", alloc->count);
-
-		/* timestamp */
-		printf(" %lu\n", ts);
+		print_metric(&m, env.output);
 	}
 }
 
