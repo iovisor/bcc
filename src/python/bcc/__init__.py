@@ -1365,11 +1365,11 @@ class BPF(object):
 
     def _get_uprobe_evname(self, prefix, path, addr, pid):
         if pid == -1:
-            return b"%s_%s_0x%x" % (prefix, self._probe_repl.sub(b"_", path), addr)
+            return b"%s_%s_0x%x" % (prefix, self._probe_repl.sub(b"_", os.path.basename(path)), addr)
         else:
             # if pid is valid, put pid in the name, so different pid
             # can have different event names
-            return b"%s_%s_0x%x_%d" % (prefix, self._probe_repl.sub(b"_", path), addr, pid)
+            return b"%s_%s_0x%x_%d" % (prefix, self._probe_repl.sub(b"_", os.path.basename(path)), addr, pid)
 
     def attach_uprobe(self, name=b"", sym=b"", sym_re=b"", addr=None,
             fn_name=b"", pid=-1, sym_off=0):
