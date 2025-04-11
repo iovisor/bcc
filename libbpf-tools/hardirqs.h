@@ -6,10 +6,13 @@
 
 struct irq_key {
 	char name[32];
+	__u32 cpu;
 };
 
 struct info {
 	__u64 count;
+	__u64 total_time;
+	__u64 max_time;
 	__u32 slots[MAX_SLOTS];
 };
 
