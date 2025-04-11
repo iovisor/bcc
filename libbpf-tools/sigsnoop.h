@@ -11,6 +11,7 @@ struct event {
 	int sig;
 	int ret;
 	char comm[TASK_COMM_LEN];
+	char tcomm[TASK_COMM_LEN];
 };
 
 #endif /* __SIGSNOOP_H */
