@@ -7,6 +7,15 @@
 #define MAX_ENTRIES		10240
 #define MAX_PID_NR		30
 #define MAX_TID_NR		30
+// maximum kernel symbol name length including trailing 0
+#define MAX_SYM_LEN		128
+#define USDT_PROVIDER		bpfprofiler
+#define USDT_READY_TO_CONVERT	ready_to_launch_converter
+
+
+#define STRINGIFY(x) #x
+// Useful to convert usdt tokens to strings
+#define TOSTRING(x) STRINGIFY(x)
 
 struct key_t {
 	__u32 pid;
