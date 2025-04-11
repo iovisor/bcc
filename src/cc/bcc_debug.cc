@@ -114,7 +114,11 @@ void SourceDebugger::getDebugSections(
 
 void SourceDebugger::dump() {
   string Error;
+#if LLVM_VERSION_MAJOR >= 21
+  string TripleStr(mod_->getTargetTriple().str());
+#else
   string TripleStr(mod_->getTargetTriple());
+#endif
   Triple TheTriple(TripleStr);
   const Target *T = TargetRegistry::lookupTarget(TripleStr, Error);
   if (!T) {

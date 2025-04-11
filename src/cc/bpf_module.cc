@@ -543,7 +543,11 @@ int BPFModule::finalize() {
   sec_map_def tmp_sections,
       *sections_p;
 
+#if LLVM_VERSION_MAJOR >= 21
+  mod->setTargetTriple(Triple("bpf-pc-linux"));
+#else
   mod->setTargetTriple("bpf-pc-linux");
+#endif
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
   mod->setDataLayout("e-m:e-p:64:64-i64:64-i128:128-n32:64-S128");
 #else
