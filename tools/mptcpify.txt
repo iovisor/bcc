@@ -1,0 +1,21 @@
+Demonstrations of mptcpify, the Linux eBPF/bcc version.
+
+
+mptcpify forces the application to use to MPTCP instead of TCP.
+
+mptcpify has been verified with iperf3 and rsync[TCP module]. It can be used
+for incresing the speed of transferring data with rsync.
+
+The MPTCP configuration is decribed in
+https://www.mptcp.dev/pm.html
+
+USAGE message:
+
+usage: sudo python ./mptcpify.py [-h] -t TARGETS
+
+mptcpify try to force applications to use MPTCP instead of TCP
+
+options:
+  -h, --help            show this help message and exit
+  -t TARGETS, --targets TARGETS
+                        use ',' for multi targets, eg: 'iperf3,rsync'
