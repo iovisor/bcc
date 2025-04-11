@@ -1,3 +1,22 @@
+bcc (0.34.0-1) unstable; urgency=low
+
+  * Support for kernel up to 6.13
+  * Bump cmake minimum version to 3.12
+  * statsnoop: Display syscall name with -s
+  * readahead: Fix incorrect page accessed count since kernel 5.16
+  * libbpf-tools/opensnoop: Add new fields
+  * libbpf-tools: hardirqs/softirqs: Fix logarithmic calculation issue
+  * libbpf-tools/hardirqs: have better default display and add CPU column
+  * libbpf-tools/klockstat: Better stack dump and summary info
+  * libbpf-tools/sigsnoop: Support real-time signals and thread comm
+  * libbpf-tools/statsnoop: Support more syscalls
+  * libbpf-tools/memleak: Some fixes and better messages
+  * tools/opensnoop: Add new fields and fix bad mode value
+  * tools/profile: Prioritize using the cpu-cycles hardware event
+  * tools/tcpdrop: Add support for dumping TCP drop reasons
+  * Fix event name too long error in python source
+  * doc update, other bug fixes and example improvement.
+
 bcc (0.33.0-1) unstable; urgency=low
 
   * Support for kernel up to 6.12
