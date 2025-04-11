@@ -1311,3 +1311,36 @@ int str_to_long(const char *src, void *dest)
 
 	return errno;
 }
+
+int print_metric_line(const struct metric *m) {
+	size_t i;
+
+	/* name */
+	printf("%s", m->name);
+
+	/* tags */
+	for (i = 0; i < m->nr_tags; i++)
+		printf(",%s=%s", m->tags[i].key, m->tags[i].value);
+
+	/* fields */
+	for (i = 0; i < m->nr_fields; i++)
+		printf("%s%s=%lu", i ? "," : " ", m->fields[i].key, m->fields[i].value);
+
+	/* timestamp */
+	printf(" %lu\n", m->ts);
+
+	return 0;
+}
+
+typedef int (*metric_print_fn_t)(const struct metric *m);
+
+static metric_print_fn_t print_functions[] = {
+	print_metric_line,      /* FORMAT_LINE_PROTOCOL */
+};
+
+int print_metric(const struct metric *m, enum output_format fmt) {
+	if (fmt >= FORMAT_MAX)
+		return -EINVAL;
+
+	return print_functions[fmt - 1](m);
+}
