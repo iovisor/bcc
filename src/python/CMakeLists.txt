@@ -27,13 +27,13 @@ foreach(PY_CMD ${PYTHON_CMD})
     configure_file(${PY_INC} ${PY_DIRECTORY}/${PY_INC_REPLACED} @ONLY)
   endforeach()
 
-  set(PIP_INSTALLABLE "${PY_DIRECTORY}/dist/bcc-${REVISION}.tar.gz")
+  set(PIP_INSTALLABLE "${PY_DIRECTORY}/dist/bcc-${REVISION}-py3-none-any.whl")
   add_custom_command(
     OUTPUT ${PIP_INSTALLABLE}
-    COMMAND ${PY_CMD} setup.py sdist
+    COMMAND ${PY_CMD} -m build --wheel ${PY_DIRECTORY}
     WORKING_DIRECTORY ${PY_DIRECTORY}
     DEPENDS ${PYTHON_SOURCES} ${PYTHON_INCLUDES}
-    COMMENT "Building sdist for ${PY_CMD}"
+    COMMENT "Building ${PIP_INSTALLABLE} for ${PY_CMD}"
   )
   add_custom_target(bcc_py_${PY_CMD_ESCAPED} ALL DEPENDS ${PIP_INSTALLABLE})
 
@@ -44,7 +44,9 @@ foreach(PY_CMD ${PYTHON_CMD})
   install(
     CODE "
       execute_process(
-        COMMAND ${PY_CMD} setup.py install -f ${PYTHON_FLAGS} --prefix=${PYTHON_PREFIX} --record ${CMAKE_BINARY_DIR}/install_manifest_python_bcc.txt
+        COMMAND ${PY_CMD} -m installer --prefix=${PYTHON_PREFIX} ${PIP_INSTALLABLE}
+	#--record ${CMAKE_BINARY_DIR}/install_manifest_python_bcc.txt
         WORKING_DIRECTORY ${PY_DIRECTORY})"
+    COMMENT "Install ${PIP_INSTALLABLE} for ${PY_CMD}"
     COMPONENT python)
 endforeach()
