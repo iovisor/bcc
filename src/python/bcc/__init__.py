@@ -1252,6 +1252,12 @@ class BPF(object):
         field_name = _assert_is_bytes(field_name)
         return lib.kernel_struct_has_field(struct_name, field_name)
 
+    @staticmethod
+    def kernel_enum_has_val(enum_name, value_name):
+        enum_name = _assert_is_bytes(enum_name)
+        value_name = _assert_is_bytes(value_name)
+        return lib.kernel_enum_has_val(enum_name, value_name)
+
     def detach_tracepoint(self, tp=b""):
         """detach_tracepoint(tp="")
 
