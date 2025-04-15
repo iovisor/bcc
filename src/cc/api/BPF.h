@@ -389,7 +389,7 @@ class BPF {
   StatusTuple check_binary_symbol(const std::string& binary_path,
                                   const std::string& symbol,
                                   uint64_t symbol_addr, std::string& module_res,
-                                  uint64_t& offset_res,
+                                  uint64_t& offset_res,pid_t pid,
                                   uint64_t symbol_offset = 0);
 
   void init_fail_reset();

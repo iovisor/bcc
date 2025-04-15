@@ -270,7 +270,7 @@ StatusTuple BPF::attach_uprobe(const std::string& binary_path,
 
   std::string module;
   uint64_t offset;
-  TRY2(check_binary_symbol(binary_path, symbol, symbol_addr, module, offset,
+  TRY2(check_binary_symbol(binary_path, symbol, symbol_addr, module, offset, pid,
                            symbol_offset));
 
   std::string probe_event = get_uprobe_event(module, offset, attach_type, pid);
@@ -281,7 +281,7 @@ StatusTuple BPF::attach_uprobe(const std::string& binary_path,
   TRY2(load_func(probe_func, BPF_PROG_TYPE_KPROBE, probe_fd));
 
   int res_fd = bpf_attach_uprobe(probe_fd, attach_type, probe_event.c_str(),
-                                 binary_path.c_str(), offset, pid,
+                                 module.c_str(), offset, pid,
                                  ref_ctr_offset);
 
   if (res_fd < 0) {
@@ -513,7 +513,7 @@ StatusTuple BPF::detach_uprobe(const std::string& binary_path,
                                uint64_t symbol_offset) {
   std::string module;
   uint64_t offset;
-  TRY2(check_binary_symbol(binary_path, symbol, symbol_addr, module, offset,
+  TRY2(check_binary_symbol(binary_path, symbol, symbol_addr, module, offset, pid,
                            symbol_offset));
 
   std::string event = get_uprobe_event(module, offset, attach_type, pid);
@@ -762,11 +762,11 @@ StatusTuple BPF::check_binary_symbol(const std::string& binary_path,
                                      const std::string& symbol,
                                      uint64_t symbol_addr,
                                      std::string& module_res,
-                                     uint64_t& offset_res,
+                                     uint64_t& offset_res, pid_t pid,
                                      uint64_t symbol_offset) {
   bcc_symbol output;
   int res = bcc_resolve_symname(binary_path.c_str(), symbol.c_str(),
-                                symbol_addr, -1, nullptr, &output);
+                                symbol_addr, pid, nullptr, &output);
   if (res < 0)
     return StatusTuple(
         -1, "Unable to find offset for binary %s symbol %s address %lx",
@@ -776,7 +776,7 @@ StatusTuple BPF::check_binary_symbol(const std::string& binary_path,
     module_res = output.module;
     ::free(const_cast<char*>(output.module));
   } else {
-    module_res = "";
+    module_res = binary_path;
   }
   offset_res = output.offset + symbol_offset;
   return StatusTuple::OK();
