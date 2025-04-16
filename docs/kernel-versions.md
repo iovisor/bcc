@@ -163,7 +163,7 @@ AF_XDP socket (XSK) references  | 4.18 | [`fbfc504a24f5`](https://github.com/tor
 Socket references (hashmap)     | 4.18 | [`81110384441a`](https://github.com/torvalds/linux/commit/81110384441a59cff47430f20f049e69b98c17f4) | BPF_MAP_TYPE_SOCKHASH
 cgroup storage                  | 4.19 | [`de9cbbaadba5`](https://github.com/torvalds/linux/commit/de9cbbaadba5adf88a19e46df61f7054000838f6) | BPF_MAP_TYPE_CGROUP_STORAGE
 reuseport sockarray             | 4.19 | [`5dc4c4b7d4e8`](https://github.com/torvalds/linux/commit/5dc4c4b7d4e8115e7cde96a030f98cb3ab2e458c) | BPF_MAP_TYPE_REUSEPORT_SOCKARRAY
-precpu cgroup storage           | 4.20 | [`b741f1630346`](https://github.com/torvalds/linux/commit/b741f1630346defcbc8cc60f1a2bdae8b3b0036f) | BPF_MAP_TYPE_PERCPU_CGROUP_STORAGE
+percpu cgroup storage           | 4.20 | [`b741f1630346`](https://github.com/torvalds/linux/commit/b741f1630346defcbc8cc60f1a2bdae8b3b0036f) | BPF_MAP_TYPE_PERCPU_CGROUP_STORAGE
 queue                           | 4.20 | [`f1a2e44a3aec`](https://github.com/torvalds/linux/commit/f1a2e44a3aeccb3ff18d3ccc0b0203e70b95bd92) | BPF_MAP_TYPE_QUEUE
 stack                           | 4.20 | [`f1a2e44a3aec`](https://github.com/torvalds/linux/commit/f1a2e44a3aeccb3ff18d3ccc0b0203e70b95bd92) | BPF_MAP_TYPE_STACK
 socket local storage            | 5.2  | [`6ac99e8f23d4`](https://github.com/torvalds/linux/commit/6ac99e8f23d4b10258406ca0dd7bffca5f31da9d) | BPF_MAP_TYPE_SK_STORAGE
