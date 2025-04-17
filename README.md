@@ -173,6 +173,7 @@ pair of .c and .py files, and some are directories of files.
 - tools/[tcptop](tools/tcptop.py): Summarize TCP send/recv throughput by host. Top for TCP. [Examples](tools/tcptop_example.txt).
 - tools/[tcptracer](tools/tcptracer.py): Trace TCP established connections (connect(), accept(), close()). [Examples](tools/tcptracer_example.txt).
 - tools/[tcpcong](tools/tcpcong.py): Trace TCP socket congestion control status duration. [Examples](tools/tcpcong_example.txt).
+- tools/[mptcpify](tools/mptcpify.py): Force applications to use MPTCP instead of TCP. [Examples](tools/mptcpify_example.txt).
 
 ##### Storage and Filesystems Tools
 
