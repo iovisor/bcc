@@ -1,0 +1,44 @@
+Demonstrations of mptcpify, the Linux eBPF/bcc version.
+
+
+mptcpify forces the application to use to MPTCP instead of TCP.
+
+mptcpify has been verified with iperf3 and rsync[TCP module]. It can be used
+for incresing the speed of transferring data with rsync.
+
+The MPTCP configuration is decribed in
+https://www.mptcp.dev/pm.html
+
+USAGE message:
+
+usage: sudo python ./mptcpify.py [-h] [-t TARGETS]
+
+mptcpify try to force applications to use MPTCP instead of TCP
+
+options:
+  -h, --help            show this help message and exit
+  -t TARGETS, --targets TARGETS
+                        use ',' for multi targets, eg: 'iperf3,rsync'. Without '-t', it can works on all applications by default.
+
+Here are some example output.
+
+1、curl
+	$ curl https://check.mptcp.dev
+	You are not using MPTCP.
+
+	$ sudo python3 mptcpify.py -t curl &
+	$ curl https://check.mptcp.dev
+	You are using MPTCP.
+
+2、iperf3
+	'iperf.sh' can be obtained through th link below:
+	https://github.com/Dwyane-Yan/bcc_test_iperf/blob/main/iperf.sh
+
+	$ sudo ./iperf.sh
+	[ ID] Interval Transfer Bitrate
+	[ 5] 0.00-1.00 sec 11.4 MBytes 95.3 Mbits/sec
+
+	$ sudo python3 mptcpify.py -t iperf3
+	$ sudo ./iperf.sh
+	[ ID] Interval Transfer Bitrate
+	[ 5] 0.00-1.00 sec 87.0 MBytes 729 Mbits/sec
