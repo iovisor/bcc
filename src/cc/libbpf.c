@@ -1540,6 +1540,42 @@ static int find_member_by_name(struct btf *btf, const struct btf_type *btf_type,
   return 0;
 }
 
+int kernel_enum_has_val(const char *enum_name, const char *val_name)
+{
+  const struct btf_type *btf_type;
+  struct btf *btf;
+  int ret, btf_id;
+
+  btf = btf__load_vmlinux_btf();
+  ret = libbpf_get_error(btf);
+  if (ret)
+    return -1;
+
+  btf_id = btf__find_by_name_kind(btf, enum_name, BTF_KIND_ENUM);
+  if (btf_id < 0) {
+    ret = -1;
+    goto cleanup;
+  }
+
+  btf_type = btf__type_by_id(btf, btf_id);
+
+  const struct btf_enum *enums = btf_enum(btf_type);
+  uint16_t vlen = BTF_INFO_VLEN(btf_type->info);
+  for (uint16_t i = 0; i < vlen; i++) {
+    const struct btf_enum *e = &enums[i];
+    const char *member_name = btf__name_by_offset(btf, e->name_off);
+
+    if (member_name && strcmp(member_name, val_name) == 0) {
+      ret = 1;
+      break;
+    }
+  }
+
+cleanup:
+  btf__free(btf);
+  return ret;
+}
+
 int kernel_struct_has_field(const char *struct_name, const char *field_name)
 {
   const struct btf_type *btf_type;
