@@ -8,12 +8,13 @@
 
 #define warn(...) fprintf(stderr, __VA_ARGS__)
 
-static bool batch_map_ops = true; /* hope for the best */
+/* Whether batch operations (lookup and lookup_and_delete) are supported */
+static bool batch_map_ops = true;
 
 static int
 dump_hash_iter(int map_fd, void *keys, __u32 key_size,
 	       void *values, __u32 value_size, __u32 *count,
-	       void *invalid_key)
+	       void *invalid_key, bool lookup_and_delete)
 {
 	__u8 key[key_size], next_key[key_size];
 	__u32 n = 0;
@@ -33,12 +34,17 @@ dump_hash_iter(int map_fd, void *keys, __u32 key_size,
 		n++;
 	}
 
-	/* Now read values */
+	/* Now read values (and optionally delete) */
 	for (i = 0; i < n; i++) {
 		err = bpf_map_lookup_elem(map_fd, keys + key_size * i,
 					  values + value_size * i);
 		if (err)
 			return -1;
+		if (lookup_and_delete) {
+			err = bpf_map_delete_elem(map_fd, keys + key_size * i);
+			if (err)
+				return -1;
+		}
 	}
 
 	*count = n;
@@ -47,7 +53,8 @@ dump_hash_iter(int map_fd, void *keys, __u32 key_size,
 
 static int
 dump_hash_batch(int map_fd, void *keys, __u32 key_size,
-		void *values, __u32 value_size, __u32 *count)
+		void *values, __u32 value_size, __u32 *count,
+		bool lookup_and_delete)
 {
 	void *in = NULL, *out;
 	__u32 n, n_read = 0;
@@ -55,10 +62,17 @@ dump_hash_batch(int map_fd, void *keys, __u32 key_size,
 
 	while (n_read < *count && !err) {
 		n = *count - n_read;
-		err = bpf_map_lookup_batch(map_fd, &in, &out,
-					   keys + n_read * key_size,
-					   values + n_read * value_size,
-					   &n, NULL);
+		if (lookup_and_delete) {
+			err = bpf_map_lookup_and_delete_batch(map_fd, &in, &out,
+							      keys + n_read * key_size,
+							      values + n_read * value_size,
+							      &n, NULL);
+		} else {
+			err = bpf_map_lookup_batch(map_fd, &in, &out,
+						   keys + n_read * key_size,
+						   values + n_read * value_size,
+						   &n, NULL);
+		}
 		if (err && errno != ENOENT) {
 			return -1;
 		}
@@ -73,7 +87,8 @@ dump_hash_batch(int map_fd, void *keys, __u32 key_size,
 int dump_hash(int map_fd,
 	      void *keys, __u32 key_size,
 	      void *values, __u32 value_size,
-	      __u32 *count, void *invalid_key)
+	      __u32 *count, void *invalid_key,
+	      bool lookup_and_delete)
 {
 	int err;
 
@@ -84,7 +99,7 @@ int dump_hash(int map_fd,
 
 	if (batch_map_ops) {
 		err = dump_hash_batch(map_fd, keys, key_size,
-				      values, value_size, count);
+				      values, value_size, count, lookup_and_delete);
 		if (err && errno == EINVAL) {
 			/* assume that batch operations are not
 			 * supported and try non-batch mode */
@@ -100,5 +115,6 @@ int dump_hash(int map_fd,
 	}
 
 	return dump_hash_iter(map_fd, keys, key_size,
-			      values, value_size, count, invalid_key);
+			      values, value_size, count, invalid_key,
+			      lookup_and_delete);
 }

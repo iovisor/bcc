@@ -6,6 +6,7 @@
 #include <bpf/bpf.h>
 
 int dump_hash(int map_fd, void *keys, __u32 key_size,
-	      void *values, __u32 value_size, __u32 *count, void *invalid_key);
+	      void *values, __u32 value_size, __u32 *count, void *invalid_key,
+	      bool lookup_and_delete);
 
 #endif /* __MAP_HELPERS_H */
