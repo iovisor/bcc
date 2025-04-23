@@ -26,6 +26,7 @@
 #include "biotop.skel.h"
 #include "compat.h"
 #include "trace_helpers.h"
+#include "map_helpers.h"
 
 #define warn(...) fprintf(stderr, __VA_ARGS__)
 #define OUTPUT_ROWS_LIMIT 10240
@@ -276,16 +277,36 @@ static char *search_disk_name(int major, int minor)
 	return "";
 }
 
+static int read_stat(struct biotop_bpf *obj, struct data_t *datas, __u32 *count)
+{
+	struct info_t keys[OUTPUT_ROWS_LIMIT];
+	struct val_t values[OUTPUT_ROWS_LIMIT];
+	struct info_t invalid_key = {0};
+	int fd = bpf_map__fd(obj->maps.counts);
+	int err, i;
+
+	err = dump_hash(fd, keys, sizeof(struct info_t), values, sizeof(struct val_t),
+			count, &invalid_key, true /* lookup_and_delete */);
+	if (err)
+		return err;
+
+	/* Store data in datas array */
+	for (i = 0; i < *count; i++) {
+		datas[i].key = keys[i];
+		datas[i].value = values[i];
+	}
+
+	return 0;
+}
+
 static int print_stat(struct biotop_bpf *obj)
 {
 	FILE *f;
 	time_t t;
 	struct tm *tm;
 	char ts[16], buf[256];
-	struct info_t *prev_key = NULL;
 	static struct data_t datas[OUTPUT_ROWS_LIMIT];
-	int n, i, err = 0, rows = 0;
-	int fd = bpf_map__fd(obj->maps.counts);
+	int n, i, err = 0, rows = OUTPUT_ROWS_LIMIT;
 
 	f = fopen("/proc/loadavg", "r");
 	if (f) {
@@ -301,23 +322,10 @@ static int print_stat(struct biotop_bpf *obj)
 	printf("%-7s %-16s %1s %-3s %-3s %-8s %5s %7s %6s\n",
 	       "PID", "COMM", "D", "MAJ", "MIN", "DISK", "I/O", "Kbytes", "AVGms");
 
-	while (1) {
-		err = bpf_map_get_next_key(fd, prev_key, &datas[rows].key);
-		if (err) {
-			if (errno == ENOENT) {
-				err = 0;
-				break;
-			}
-			warn("bpf_map_get_next_key failed: %s\n", strerror(errno));
-			return err;
-		}
-		err = bpf_map_lookup_elem(fd, &datas[rows].key, &datas[rows].value);
-		if (err) {
-			warn("bpf_map_lookup_elem failed: %s\n", strerror(errno));
-			return err;
-		}
-		prev_key = &datas[rows].key;
-		rows++;
+	err = read_stat(obj, datas, (__u32*) &rows);
+	if (err) {
+		fprintf(stderr, "read stat failed: %s\n", strerror(errno));
+		return err;
 	}
 
 	qsort(datas, rows, sizeof(struct data_t), sort_column);
@@ -343,27 +351,6 @@ static int print_stat(struct biotop_bpf *obj)
 	}
 
 	printf("\n");
-	prev_key = NULL;
-
-	while (1) {
-		struct info_t key;
-
-		err = bpf_map_get_next_key(fd, prev_key, &key);
-		if (err) {
-			if (errno == ENOENT) {
-				err = 0;
-				break;
-			}
-			warn("bpf_map_get_next_key failed: %s\n", strerror(errno));
-			return err;
-		}
-		err = bpf_map_delete_elem(fd, &key);
-		if (err) {
-			warn("bpf_map_delete_elem failed: %s\n", strerror(errno));
-			return err;
-		}
-		prev_key = &key;
-	}
 	return err;
 }
 
