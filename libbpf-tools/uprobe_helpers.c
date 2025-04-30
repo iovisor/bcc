@@ -57,6 +57,7 @@ int get_pid_lib_path(pid_t pid, const char *lib, char *path, size_t path_sz)
 	char proc_pid_maps[32];
 	char line_buf[1024];
 	char path_buf[1024];
+	int err = -1;
 
 	if (snprintf(proc_pid_maps, sizeof(proc_pid_maps), "/proc/%d/maps", pid)
 	    >= sizeof(proc_pid_maps)) {
@@ -86,16 +87,17 @@ int get_pid_lib_path(pid_t pid, const char *lib, char *path, size_t path_sz)
 			continue;
 		if (strnlen(path_buf, 1024) >= path_sz) {
 			warn("path size too small\n");
-			return -1;
+			goto cleanup;
 		}
 		strcpy(path, path_buf);
-		fclose(maps);
-		return 0;
+		err = 0;
+		goto cleanup;
 	}
 
 	warn("Cannot find library %s\n", lib);
+cleanup:
 	fclose(maps);
-	return -1;
+	return err;
 }
 
 /*
