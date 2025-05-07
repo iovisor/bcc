@@ -18,6 +18,8 @@ from __future__ import print_function
 from bcc import BPF
 from time import sleep, strftime
 import argparse
+import os
+import stat
 from subprocess import call
 
 # arguments
@@ -25,6 +27,7 @@ examples = """examples:
     ./filetop                 # file I/O top, 1 second refresh
     ./filetop -C              # don't clear the screen
     ./filetop -p 181          # PID 181 only
+    ./filetop -d /home/user   # trace files in /home/user directory only
     ./filetop 5               # 5 second summaries
     ./filetop 5 10            # 5 second summaries, 10 times only
     ./filetop 5 --read-only   # 5 second summaries, only read operations traced
@@ -55,6 +58,9 @@ parser.add_argument("count", nargs="?", default=99999999,
     help="number of outputs")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-d", "--directory", type=str,
+    help="trace this directory only")
+
 args = parser.parse_args()
 interval = int(args.interval)
 countdown = int(args.count)
@@ -107,6 +113,10 @@ static int do_entry(struct pt_regs *ctx, struct file *file,
     int mode = file->f_inode->i_mode;
     struct qstr d_name = de->d_name;
     if (d_name.len == 0 || TYPE_FILTER)
+        return 0;
+
+    // skip if not in the specified directory
+    if (DIRECTORY_FILTER)
         return 0;
 
     // store counts and sizes by pid & file
@@ -163,6 +173,16 @@ if args.all_files:
     bpf_text = bpf_text.replace('TYPE_FILTER', '0')
 else:
     bpf_text = bpf_text.replace('TYPE_FILTER', '!S_ISREG(mode)')
+if args.directory:
+    try:
+        directory_inode = os.lstat(args.directory)[stat.ST_INO]
+        print(f'Tracing directory: {args.directory} (Inode: {directory_inode})')
+        bpf_text = bpf_text.replace('DIRECTORY_FILTER',  'file->f_path.dentry->d_parent->d_inode->i_ino != %d' % directory_inode)
+    except (FileNotFoundError, PermissionError) as e:
+        print(f'Error accessing directory {args.directory}: {e}')
+        exit(1)
+else:
+    bpf_text = bpf_text.replace('DIRECTORY_FILTER', '0')
 
 if debug or args.ebpf:
     print(bpf_text)
