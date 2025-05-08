@@ -399,7 +399,7 @@ struct key_t {
   u32 curr_pid;
 };
 BPF_HASH(stats, struct key_t, u64, 1024);
-int kprobe__finish_task_switch(struct pt_regs *ctx, struct task_struct *prev) {
+int count_sched(struct pt_regs *ctx, struct task_struct *prev) {
   struct key_t key = {};
   u64 zero = 0, *val;
   key.curr_pid = bpf_get_current_pid_tgid();
@@ -412,6 +412,10 @@ int kprobe__finish_task_switch(struct pt_regs *ctx, struct task_struct *prev) {
   return 0;
 }
 """)
+        b.attach_kprobe(
+            event_re=r'^finish_task_switch$|^finish_task_switch\.isra\.\d$',
+            fn_name=b"count_sched"
+        )
 
     def test_probe_simple_assign(self):
         b = BPF(text=b"""
