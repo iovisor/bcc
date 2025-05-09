@@ -6,7 +6,7 @@ inputs:
     description: "OS Disctribution. Ex: ubuntu"
     required: true
   os_version:
-    description: "Version of the OS. Ex: 20.04"
+    description: "Version of the OS. Ex: 24.04"
     required: true
   os_nick:
     description: "Nickname of the OS. Ex: focal"
