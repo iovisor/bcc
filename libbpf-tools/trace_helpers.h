@@ -5,6 +5,9 @@
 #include <stdbool.h>
 
 #define NSEC_PER_SEC		1000000000ULL
+#define MAX_TAGS 10
+#define MAX_FIELDS 10
+#define MAX_NAME_LEN 32
 
 struct ksym {
 	const char *name;
@@ -120,5 +123,31 @@ int split_convert(char *s, const char* delim, void *elems, size_t elems_size,
 int str_to_int(const char *src, void *dest);
 /* converts a string to a long integer */
 int str_to_long(const char *src, void *dest);
+
+enum output_format {
+	FORMAT_LINE_PROTOCOL = 1,  // InfluxDB Line Protocol
+	FORMAT_MAX,
+};
+
+struct tag {
+	const char *key;
+	char value[MAX_NAME_LEN];
+};
+
+struct field {
+	const char *key;
+	unsigned long value;
+};
+
+struct metric {
+	const char *name;
+	struct tag tags[MAX_TAGS];
+	size_t nr_tags;
+	struct field fields[MAX_FIELDS];
+	size_t nr_fields;
+	time_t ts;
+};
+
+int print_metric(const struct metric *m, enum output_format fmt);
 
 #endif /* __TRACE_HELPERS_H */
