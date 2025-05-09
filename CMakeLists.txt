@@ -67,6 +67,7 @@ if(NOT CMAKE_USE_LIBBPF_PACKAGE)
     endif()
   else()
     execute_process(COMMAND git diff --shortstat ${CMAKE_CURRENT_SOURCE_DIR}/src/cc/libbpf/
+                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
                     OUTPUT_VARIABLE DIFF_STATUS)
     if("${DIFF_STATUS}" STREQUAL "")
       execute_process(COMMAND git submodule update --init --recursive
