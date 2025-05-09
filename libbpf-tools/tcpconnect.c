@@ -217,7 +217,7 @@ static void print_count_ipv4(int map_fd)
 	struct in_addr src;
 	struct in_addr dst;
 
-	if (dump_hash(map_fd, keys, key_size, counts, value_size, &n, &zero)) {
+	if (dump_hash(map_fd, keys, key_size, counts, value_size, &n, &zero, false)) {
 		warn("dump_hash: %s", strerror(errno));
 		return;
 	}
@@ -250,7 +250,7 @@ static void print_count_ipv6(int map_fd)
 	struct in6_addr src;
 	struct in6_addr dst;
 
-	if (dump_hash(map_fd, keys, key_size, counts, value_size, &n, &zero)) {
+	if (dump_hash(map_fd, keys, key_size, counts, value_size, &n, &zero, false)) {
 		warn("dump_hash: %s", strerror(errno));
 		return;
 	}
