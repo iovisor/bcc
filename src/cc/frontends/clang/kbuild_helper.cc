@@ -137,6 +137,13 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
   cflags->push_back("-Wno-pointer-sign");
   cflags->push_back("-fno-stack-protector");
 
+  /*
+   * kernel is usually build with gcc and the kernel devel header
+   * reflects that fact. However we build with clang and this must be
+   * set to avoid some compilation errors
+   */
+  cflags->push_back("-DCONFIG_CC_IS_CLANG");
+
   return 0;
 }
 
