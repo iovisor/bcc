@@ -260,6 +260,7 @@ TEST_CASE("test bpf stack_id table", "[bpf_stack_table]") {
   /* libc locations on different distributions are added below*/
   bpf.add_module("/lib/x86_64-linux-gnu/libc.so.6"); //Location of libc in ubuntu
   bpf.add_module("/lib64/libc.so.6"); //Location of libc fedora machine
+  bpf.add_module("/lib/libc.so.6");//location of libc in custom image
 
   int stack_id = id[0];
   REQUIRE(stack_id >= 0);
