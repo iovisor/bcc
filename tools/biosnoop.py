@@ -218,7 +218,6 @@ static int __trace_req_completion(void *ctx, struct hash_key key)
     struct start_req_t *startp;
     struct val_t *valp;
     struct data_t data = {};
-    //struct gendisk *rq_disk;
     u64 ts;
 
     // fetch timestamp and calculate delta
@@ -228,7 +227,6 @@ static int __trace_req_completion(void *ctx, struct hash_key key)
         return 0;
     }
     ts = bpf_ktime_get_ns();
-    //rq_disk = req->__RQ_DISK__;
     data.delta = ts - startp->ts;
     data.ts = ts / 1000;
     data.qdelta = 0;
@@ -260,10 +258,10 @@ static int __trace_req_completion(void *ctx, struct hash_key key)
 
     sector = last_sectors.lookup(&sector_key);
     if (sector != 0) {
-        data.pattern = req->__sector == *sector ? SEQUENTIAL : RANDOM;
+        data.pattern = key.sector == *sector ? SEQUENTIAL : RANDOM;
     }
 
-    last_sector = req->__sector + data.len / 512;
+    last_sector = key.sector + data.len / 512;
     last_sectors.update(&sector_key, &last_sector);
 #endif
 
