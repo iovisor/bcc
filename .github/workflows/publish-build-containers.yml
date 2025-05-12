@@ -24,7 +24,7 @@ jobs:
     strategy:
       matrix:
         os: [
-          {distro: "ubuntu", version: "24.04", nick: focal, installed_llvm_versions: "12 15 17 19"},
+          {distro: "ubuntu", version: "24.04", nick: noble, installed_llvm_versions: "12 15 17 19"},
           {distro: "fedora", version: "41", nick: "f41", installed_llvm_versions: "this is not used"},
         ]
 
