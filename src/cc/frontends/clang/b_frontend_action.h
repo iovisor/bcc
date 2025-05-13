@@ -91,6 +91,7 @@ class BTypeVisitor : public clang::RecursiveASTVisitor<BTypeVisitor> {
   std::set<clang::Expr *> visited_;
   std::string current_fn_;
   bool cannot_fall_back_safely;
+  std::string probe_read_func;
 };
 
 // Do a depth-first search to rewrite all pointers that need to be probed
@@ -131,6 +132,7 @@ class ProbeVisitor : public clang::RecursiveASTVisitor<ProbeVisitor> {
   const clang::Stmt *addrof_stmt_;
   bool is_addrof_;
   bool cannot_fall_back_safely;
+  std::string probe_read_func;
 };
 
 // A helper class to the frontend action, walks the decls
