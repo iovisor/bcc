@@ -64,7 +64,7 @@ int kprobe__htab_map_delete_elem(struct pt_regs *ctx, struct bpf_map *map, u64 *
 #include <linux/version.h>
 typedef struct { char name[TASK_COMM_LEN]; u64 slot; } Key;
 BPF_HISTOGRAM(hist1, Key, 1024);
-int kprobe__finish_task_switch(struct pt_regs *ctx, struct task_struct *prev) {
+int count_prev_task_start_time(struct pt_regs *ctx, struct task_struct *prev) {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5,5,0)
     Key k = {.slot = bpf_log2l(prev->real_start_time)};
 #else
@@ -77,6 +77,10 @@ int kprobe__finish_task_switch(struct pt_regs *ctx, struct task_struct *prev) {
     return 0;
 }
 """)
+        b.attach_kprobe(
+            event_re=r'^finish_task_switch$|^finish_task_switch\.isra\.\d$',
+            fn_name=b"count_prev_task_start_time"
+        )
         for i in range(0, 100): time.sleep(0.01)
         b[b"hist1"].print_log2_hist()
         b.cleanup()
