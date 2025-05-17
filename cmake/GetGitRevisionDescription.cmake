@@ -74,10 +74,14 @@ function(get_git_head_revision _refspecvar _hashvar)
 endfunction()
 
 function(git_describe _var)
+	message(STATUS "git_describe 0: ${GIT_FOUND}")
 	if(NOT GIT_FOUND)
 		find_package(Git QUIET)
 	endif()
+	message(STATUS "git_describe 1: GIT_AUTHOR_NAME, ${GIT_AUTHOR_NAME}, GIT_AUTHOR_EMAIL, ${GIT_AUTHOR_EMAIL}")
+	message(STATUS "git_describe 2: ${GIT_FOUND}")
 	get_git_head_revision(refspec hash)
+	message(STATUS "git_describe 3: ${GIT_FOUND}, ${hash}")
 	if(NOT GIT_FOUND)
 		set(${_var} "GIT-NOTFOUND" PARENT_SCOPE)
 		return()
@@ -95,7 +99,7 @@ function(git_describe _var)
 	#	message(FATAL_ERROR "Looks like someone's doing something nefarious with git_describe! Passed arguments ${ARGN}")
 	#endif()
 
-	#message(STATUS "Arguments to execute_process: ${ARGN}")
+	message(STATUS "Arguments to execute_process: ${GIT_EXECUTABLE}, ${hash}, ${ARGN}, ${CMAKE_SOURCE_DIR}")
 
 	execute_process(COMMAND
 		"${GIT_EXECUTABLE}"
@@ -110,6 +114,7 @@ function(git_describe _var)
 		out
 		ERROR_QUIET
 		OUTPUT_STRIP_TRAILING_WHITESPACE)
+	message(STATUS "git_describe 4: ${res}")
 	if(NOT res EQUAL 0)
 		set(out "${out}-${res}-NOTFOUND")
 	endif()

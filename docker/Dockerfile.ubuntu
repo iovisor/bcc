@@ -1,4 +1,4 @@
-ARG OS_TAG=22.04
+ARG OS_TAG=24.04
 FROM ubuntu:${OS_TAG} as builder
 
 ARG OS_TAG
@@ -23,7 +23,7 @@ COPY --from=builder /root/bcc/*.deb /root/bcc/
 
 RUN \
   apt-get update -y && \
-  DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-pip python-is-python3 binutils libelf1 kmod llvm-12-dev && \
+  DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-pip python-is-python3 binutils libelf1 kmod llvm-16-dev && \
   pip3 install dnslib cachetools pyelftools  && \
   dpkg -i /root/bcc/*.deb && \
   apt-get clean
