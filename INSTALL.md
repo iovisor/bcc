@@ -117,7 +117,7 @@ echo "deb https://repo.iovisor.org/apt/$(lsb_release -cs) $(lsb_release -cs) mai
 sudo apt-get update
 sudo apt-get install bcc-tools libbcc-examples linux-headers-$(uname -r)
 ```
-(replace `xenial` with `artful` or `bionic` as appropriate). Tools will be installed under /usr/share/bcc/tools.
+Tools will be installed under /usr/share/bcc/tools.
 
 **Upstream Nightly Packages**
 
