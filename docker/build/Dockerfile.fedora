@@ -30,8 +30,6 @@ RUN dnf -y install \
 	elfutils-debuginfod-client-devel \
 #	elfutils-libelf-devel-static \
 	elfutils-libelf-devel \
-	luajit \
-	luajit-devel \
 	python3-devel \
 	libstdc++ \
 	libstdc++-devel \
@@ -59,6 +57,8 @@ RUN dnf -y install \
 	iperf \
 	netperf
 
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 RUN pip3 install pyroute2==0.5.18 netaddr==0.8.0 dnslib==0.9.14 cachetools==3.1.1 pyelftools==0.30
 
 RUN wget -O ruby-install-${RUBY_INSTALL_VERSION}.tar.gz \

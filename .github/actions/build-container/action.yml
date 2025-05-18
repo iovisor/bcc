@@ -6,15 +6,15 @@ inputs:
     description: "OS Disctribution. Ex: ubuntu"
     required: true
   os_version:
-    description: "Version of the OS. Ex: 20.04"
+    description: "Version of the OS. Ex: 24.04"
     required: true
   os_nick:
-    description: "Nickname of the OS. Ex: focal"
+    description: "Nickname of the OS. Ex: noble"
     required: true
   llvm_versions:
     description: "Space separated list of llvm versions to install in the container. Only supported for Ubuntu containers."
     type: string
-    default: "12"
+    default: "15"
   registry:
     description: "Registry where to push images"
     default: ghcr.io
