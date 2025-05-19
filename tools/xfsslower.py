@@ -69,7 +69,7 @@ bpf_text = """
 #define TRACE_FSYNC     3
 
 struct key_t {
-    u64 ptid; //pid and tid
+    u64 id;
     u32 type;
 };
 
@@ -108,7 +108,7 @@ static int trace_rw_entry(struct pt_regs *ctx, struct kiocb *iocb, int type)
         return 0;
 
     struct key_t key = {};
-    key.ptid = id;
+    key.id = id;
     key.type = type;
 
     // store filep and timestamp by id
@@ -143,7 +143,7 @@ int trace_open_entry(struct pt_regs *ctx, struct inode *inode,
         return 0;
     
     struct key_t key = {};
-    key.ptid = id;
+    key.id = id;
     key.type = TRACE_OPEN;
 
     // store filep and timestamp by id
@@ -167,7 +167,7 @@ int trace_fsync_entry(struct pt_regs *ctx, struct file *file)
         return 0;
 
     struct key_t key = {};
-    key.ptid = id;
+    key.id = id;
     key.type = TRACE_FSYNC;
 
     // store filep and timestamp by id
@@ -191,7 +191,7 @@ static int trace_return(struct pt_regs *ctx, int type)
     u64 id = bpf_get_current_pid_tgid();
     u32 pid = id >> 32; // PID is higher part
     struct key_t key = {};
-    key.ptid = id;
+    key.id = id;
     key.type = type;
 
     valp = entryinfo.lookup(&key);
