@@ -251,6 +251,16 @@ static struct allocation *allocs;
 
 static const char default_object[] = "libc.so.6";
 
+static void print_headers()
+{
+	if (env.kernel_trace)
+		printf("Attaching to kernel allocators");
+	else
+		printf("Attaching to pid %d", env.pid);
+
+	printf(", Ctrl+C to quit.\n");
+}
+
 int main(int argc, char *argv[])
 {
 	int ret = 0;
@@ -283,14 +293,10 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	if (!strlen(env.object)) {
-		printf("using default object: %s\n", default_object);
+	if (!strlen(env.object))
 		strncpy(env.object, default_object, sizeof(env.object) - 1);
-	}
 
 	env.page_size = sysconf(_SC_PAGE_SIZE);
-	printf("using page size: %ld\n", env.page_size);
-
 	env.kernel_trace = env.pid < 0 && !strlen(env.command);
 
 	// if specific userspace program was specified,
@@ -404,15 +410,12 @@ int main(int argc, char *argv[])
 
 	// if userspace oriented, attach uprobes
 	if (!env.kernel_trace) {
-		printf("Attaching to pid %d, Ctrl+C to quit.\n", env.pid);
 		ret = attach_uprobes(skel);
 		if (ret) {
 			fprintf(stderr, "failed to attach uprobes\n");
 
 			goto cleanup;
 		}
-	} else {
-		printf("Attaching to kernel allocators, Ctrl+C to quit.\n");
 	}
 
 	ret = memleak_bpf__attach(skel);
@@ -464,6 +467,8 @@ int main(int argc, char *argv[])
 	}
 #endif
 
+	print_headers();
+
 	// main loop
 	while (!exiting && env.nr_intervals) {
 		env.nr_intervals--;
@@ -510,8 +515,6 @@ cleanup:
 
 	free(allocs);
 	free(stack);
-
-	printf("done\n");
 
 	return ret;
 }
