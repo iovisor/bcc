@@ -31,6 +31,8 @@
 #define warn(...) fprintf(stderr, __VA_ARGS__)
 #define OUTPUT_ROWS_LIMIT 10240
 
+#define OPT_OUTPUT			1 /* --output */
+
 enum SORT {
 	ALL,
 	IO,
@@ -48,6 +50,11 @@ struct vector {
 	size_t nr;
 	size_t capacity;
 	void **elems;
+};
+
+struct data_t {
+	struct info_t key;
+	struct val_t value;
 };
 
 int grow_vector(struct vector *vector) {
@@ -87,6 +94,8 @@ static int interval = 1;
 static int count = 99999999;
 static pid_t target_pid = 0;
 static bool verbose = false;
+enum output_format output = 0;
+static struct data_t datas[OUTPUT_ROWS_LIMIT];
 
 const char *argp_program_version = "biotop 0.1";
 const char *argp_program_bug_address =
@@ -107,6 +116,7 @@ static const struct argp_option opts[] = {
 	{ "rows", 'r', "ROWS", 0, "Maximum rows to print, default 20", 0 },
 	{ "pid", 'p', "PID", 0, "Process ID to trace", 0 },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ "output", OPT_OUTPUT, "FORMAT", OPTION_ARG_OPTIONAL, "Output metrics in specified format (currently only 'line' supported)", 0 },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
@@ -160,6 +170,16 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	case 'h':
 		argp_state_help(state, stderr, ARGP_HELP_STD_HELP);
 		break;
+	case OPT_OUTPUT:
+		output = FORMAT_LINE_PROTOCOL;
+		if (arg) {
+			if (strcmp(arg, "line") == 0)
+				output = FORMAT_LINE_PROTOCOL;
+			else
+				argp_error(state, "Invalid output format: %s. "
+					   "Only 'line' is supported.", arg);
+		}
+		break;
 	case ARGP_KEY_ARG:
 		errno = 0;
 		if (pos_args == 0) {
@@ -197,11 +217,6 @@ static void sig_int(int signo)
 {
 	exiting = 1;
 }
-
-struct data_t {
-	struct info_t key;
-	struct val_t value;
-};
 
 static int sort_column(const void *obj1, const void *obj2)
 {
@@ -299,13 +314,58 @@ static int read_stat(struct biotop_bpf *obj, struct data_t *datas, __u32 *count)
 	return 0;
 }
 
+static int print_metrics(struct biotop_bpf *obj)
+{
+	int i, err = 0, rows = OUTPUT_ROWS_LIMIT;
+	time_t ts = time(NULL);
+	struct metric m = {
+		.name = "biotop",
+		.tags = {{ "pid", "" }},
+		.nr_tags = 1,
+		.fields = {
+			{ "I/O", 0 },
+			{ "Kbytes", 0},
+			{ "AVGms", 0}
+		},
+		.nr_fields = 3,
+		.ts = ts
+	};
+
+	err = read_stat(obj, datas, (__u32*) &rows);
+	if (err) {
+		fprintf(stderr, "read stat failed: %s\n", strerror(errno));
+		return err;
+	}
+
+	for (i = 0; i < rows; i++) {
+		struct info_t *key = &datas[i].key;
+		struct val_t *value = &datas[i].value;
+		float avg_ms = 0;
+
+		/* Tag */
+		snprintf(m.tags[0].value, sizeof(m.tags[0].value), "%u", key->pid);
+
+		/* To avoid floating point exception. */
+		if (value->io)
+			avg_ms = ((float) value->us) / 1000 / value->io;
+
+		/* Fields */
+		m.fields[0].value = value->io;
+		m.fields[1].value = value->bytes;
+		m.fields[2].value = avg_ms;
+
+		print_metric(&m, output);
+	}
+
+	return 0;
+}
+
 static int print_stat(struct biotop_bpf *obj)
 {
 	FILE *f;
 	time_t t;
 	struct tm *tm;
 	char ts[16], buf[256];
-	static struct data_t datas[OUTPUT_ROWS_LIMIT];
 	int n, i, err = 0, rows = OUTPUT_ROWS_LIMIT;
 
 	f = fopen("/proc/loadavg", "r");
@@ -319,6 +379,7 @@ static int print_stat(struct biotop_bpf *obj)
 			printf("%8s loadavg: %s\n", ts, buf);
 		fclose(f);
 	}
+
 	printf("%-7s %-16s %1s %-3s %-3s %-8s %5s %7s %6s\n",
 	       "PID", "COMM", "D", "MAJ", "MIN", "DISK", "I/O", "Kbytes", "AVGms");
 
@@ -448,15 +509,21 @@ int main(int argc, char **argv)
 	while (1) {
 		sleep(interval);
 
-		if (clear_screen) {
-			err = system("clear");
+		if (output) {
+			err = print_metrics(obj);
+			if (err)
+				goto cleanup;
+		} else {
+			if (clear_screen) {
+				err = system("clear");
+				if (err)
+					goto cleanup;
+			}
+
+			err = print_stat(obj);
 			if (err)
 				goto cleanup;
 		}
-
-		err = print_stat(obj);
-		if (err)
-			goto cleanup;
 
 		count--;
 		if (exiting || !count)
