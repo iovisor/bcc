@@ -103,6 +103,8 @@ bpf_text = """
 #include <linux/sched.h>
 #ifdef FULLPATH
 #include <linux/fs_struct.h>
+#include <linux/fs.h>
+#include <linux/mount.h>
 #include <linux/dcache.h>
 
 #define MAX_ENTRIES 32
@@ -110,6 +112,15 @@ bpf_text = """
 enum event_type {
     EVENT_ENTRY,
     EVENT_END,
+};
+
+/* see https://github.com/torvalds/linux/blob/master/fs/mount.h */
+struct mount {
+    struct hlist_node mnt_hash;
+    struct mount *mnt_parent;
+    struct dentry *mnt_mountpoint;
+    struct vfsmount mnt;
+    /* ... */
 };
 #endif
 
@@ -389,25 +400,65 @@ if args.full_path:
 
     if (data.name[0] != '/') { // relative path
         struct task_struct *task;
-        struct dentry *dentry;
+        struct fs_struct *fs;
+        struct path *path, *root;
+        struct dentry *dentry, *d_parent, *mnt_root;
+        struct vfsmount *vfsmnt;
+        struct mount *mnt;
+        struct qstr d_name;
         int i;
 
         task = (struct task_struct *)bpf_get_current_task_btf();
-        dentry = task->fs->pwd.dentry;
+        fs = task->fs;
+        path = &fs->pwd;
+        root = &fs->root;
+
+        dentry = path->dentry;
+        vfsmnt = path->mnt;
+
+        if (!vfsmnt)
+            goto submit_end;
+
+        mnt = container_of(vfsmnt, struct mount, mnt);
 
         for (i = 1; i < MAX_ENTRIES; i++) {
-            bpf_probe_read_kernel(&data.name, sizeof(data.name), (void *)dentry->d_name.name);
+            if (!dentry || !vfsmnt)
+                goto submit_end;
+
+            bpf_probe_read_kernel(&mnt_root, sizeof(mnt_root), &vfsmnt->mnt_root);
+            bpf_probe_read_kernel(&d_parent, sizeof(d_parent), &dentry->d_parent);
+
+            /* root directory */
+            if (dentry == mnt_root || dentry == d_parent) {
+                struct mount *parent;
+                bpf_probe_read_kernel(&parent, sizeof(parent), &mnt->mnt_parent);
+                if (dentry != mnt_root) {
+                    break;
+                }
+                if (mnt != parent) {
+                    bpf_probe_read_kernel(&dentry, sizeof(dentry), &mnt->mnt_mountpoint);
+                    mnt = parent;
+                    vfsmnt = &mnt->mnt;
+                    bpf_probe_read_kernel(&mnt_root, sizeof(mnt_root), &vfsmnt->mnt_root);
+
+                    if (!vfsmnt)
+                        goto submit_end;
+                    continue;
+                }
+            }
+
+            bpf_probe_read_kernel(&d_name, sizeof(d_name), &dentry->d_name);
+            bpf_probe_read_kernel(&data.name, sizeof(data.name), (void *)d_name.name);
             data.type = EVENT_ENTRY;
             events.perf_submit(ctx, &data, sizeof(data));
 
-            if (dentry == dentry->d_parent) { // root directory
-                break;
-            }
-
-            dentry = dentry->d_parent;
+            bpf_probe_read_kernel(&d_parent, sizeof(d_parent), &dentry->d_parent);
+            dentry = d_parent;
+            bpf_probe_read_kernel(&d_parent, sizeof(d_parent), &dentry->d_parent);
         }
     }
 
+submit_end:
     data.type = EVENT_END;
     events.perf_submit(ctx, &data, sizeof(data));
     """)
