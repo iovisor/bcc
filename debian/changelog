@@ -1,3 +1,17 @@
+bcc (0.35.0-1) unstable; urgency=low
+
+  * Support for kernel up to 6.14
+  * New bcc tools: mptcp: enable mptcp for tcp traffic
+  * tools/biosnoop: Fix biosnoop pattern option
+  * Allow cmake run out of the source tree
+  * Fix for test bpf_stack_id when running on custom image in yocto
+  * libbpf-tools/map_helpers: Add bpf_map_lookup_and_delete_batch to dump_hash
+  * libbpf-tools/biotop: Use dump_hash for map processing
+  * uninstall: use execute_process() instead of exec_program()
+  * clang: Fix pointer dereference on big-endian machines
+  * ci: Upgrade to ubuntu 24.04
+  * doc update, other bug fixes and example improvement.
+
 bcc (0.34.0-1) unstable; urgency=low
 
   * Support for kernel up to 6.13
