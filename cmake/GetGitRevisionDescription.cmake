@@ -118,6 +118,6 @@ function(git_describe _var)
 endfunction()
 
 function(git_get_exact_tag _var)
-	git_describe(out --exact-match ${ARGN})
+	git_describe(out --exact-match --tags ${ARGN})
 	set(${_var} "${out}" PARENT_SCOPE)
 endfunction()
