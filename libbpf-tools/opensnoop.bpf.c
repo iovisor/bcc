@@ -16,6 +16,7 @@ const volatile pid_t targ_pid = 0;
 const volatile pid_t targ_tgid = 0;
 const volatile uid_t targ_uid = 0;
 const volatile bool targ_failed = false;
+const volatile bool full_path = false;
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
@@ -149,7 +150,34 @@ int trace_exit(struct syscall_trace_exit* ctx)
 	event.callers[0] = stack[1];
 	event.callers[1] = stack[2];
 
+	if (full_path && event.fname[0] != '/') {
+		struct task_struct *task;
+		struct dentry *dentry;
+		int i;
+
+		event.type = EVENT_ENTRY;
+		bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU,
+					&event, sizeof(event));
+
+		task = (struct task_struct *)bpf_get_current_task_btf();
+		dentry = task->fs->pwd.dentry;
+
+		for (i = 1; i < MAX_ENTRIES; i++) {
+			bpf_probe_read_kernel(&event.fname, sizeof(event.fname),
+						(void *)dentry->d_name.name);
+			event.type = EVENT_ENTRY;
+			bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU,
+						&event, sizeof(event));
+
+			if (dentry == dentry->d_parent)
+				break;
+
+			dentry = dentry->d_parent;
+		}
+	}
+
 	/* emit event */
+	event.type = EVENT_END;
 	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU,
 			      &event, sizeof(event));
 

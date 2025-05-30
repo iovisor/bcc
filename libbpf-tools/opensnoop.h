@@ -5,6 +5,12 @@
 #define TASK_COMM_LEN 16
 #define NAME_MAX 255
 #define INVALID_UID ((uid_t)-1)
+#define MAX_ENTRIES 32
+
+enum event_type {
+	EVENT_ENTRY,
+	EVENT_END,
+};
 
 struct args_t {
 	const char *fname;
@@ -23,6 +29,7 @@ struct event {
 	__u64 callers[2];
 	char comm[TASK_COMM_LEN];
 	char fname[NAME_MAX];
+	enum event_type type;
 };
 
 #endif /* __OPENSNOOP_H */

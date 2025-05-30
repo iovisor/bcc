@@ -8,7 +8,9 @@
 #define _GNU_SOURCE
 #endif
 #include <argp.h>
+#include <assert.h>
 #include <fcntl.h>
+#include <search.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -57,6 +59,7 @@ static struct env {
 #ifdef USE_BLAZESYM
 	bool callers;
 #endif
+	bool full_path;
 } env = {
 	.uid = INVALID_UID
 };
@@ -88,6 +91,7 @@ const char argp_program_doc[] =
 #ifdef USE_BLAZESYM
 "    ./opensnoop -c        # show calling functions\n"
 #endif
+"    ./opensnoop -F        # show full path for an open file\n"
 "";
 
 static const struct argp_option opts[] = {
@@ -105,6 +109,7 @@ static const struct argp_option opts[] = {
 #ifdef USE_BLAZESYM
 	{ "callers", 'c', NULL, 0, "Show calling functions", 0 },
 #endif
+	{ "full-path", 'F', NULL, 0, "Show full path", 0 },
 	{},
 };
 
@@ -177,6 +182,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		env.callers = true;
 		break;
 #endif
+	case 'F':
+		env.full_path = true;
+		break;
 	case ARGP_KEY_ARG:
 		if (pos_args++) {
 			fprintf(stderr,
@@ -203,9 +211,136 @@ static void sig_int(int signo)
 	exiting = 1;
 }
 
-void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
+/**
+ * hash value, key is 'pid'
+ *
+ * [key, value]
+ *                       nitem = 3
+ * [pid, path_values] -> pathes[0] --------------*
+ *                       pathes[1] -----------+  |
+ *                       pathes[3] ------*    |  |
+ *                                       |    |  |
+ *                                      /path/to/file
+ */
+struct path_values {
+	int nitem;
+	char **pathes;
+};
+
+/**
+ * use to cleanup, glibc hash table key key points to a null-terminated string,
+ * more to see hsearch(3)
+ */
+static char **full_path_keys = NULL;
+static char full_path_nkeys = 0;
+
+int full_path_init(void)
 {
-	struct event e;
+	size_t pid_max = 32768;
+	char buffer[32];
+	FILE *fp;
+
+	fp = fopen("/proc/sys/kernel/pid_max", "r");
+	if (!fp) {
+		perror("Failed to open /proc/sys/kernel/pid_max");
+	} else {
+		fgets(buffer, sizeof(buffer), fp);
+		pid_max = strtol(buffer, NULL, 10);
+	}
+
+	return hcreate(pid_max);
+}
+
+int full_path_insert(pid_t pid, const char *path)
+{
+	ENTRY e, *ep;
+	struct path_values *pvs;
+	char str_pid[64];
+
+	if (!env.full_path)
+		return 0;
+
+	/* Skip root '/', becuase '/' prefix will added for each path when
+	 * display */
+	if (path[0] == '/' && path[1] == '\0')
+		return 0;
+
+	snprintf(str_pid, sizeof(str_pid), "%d", pid);
+
+	e.key = str_pid;
+	ep = hsearch(e, FIND);
+	/* already exist */
+	if (ep) {
+		pvs = (struct path_values *)ep->data;
+	} else {
+		pvs = malloc(sizeof(struct path_values));
+		memset(pvs, 0x0, sizeof(struct path_values));
+
+		/* Must pass a string for ENTRY */
+		e.key = strdup(str_pid);
+		e.data = (void *)pvs;
+		ep = hsearch(e, ENTER);
+		assert(ep && "hsearch ENTER failed!\n");
+
+		/* record keys, use to cleanup */
+		full_path_keys = realloc(full_path_keys, ++full_path_nkeys * sizeof(char *));
+		full_path_keys[full_path_nkeys - 1] = (char *)e.key;
+	}
+
+	pvs->nitem++;
+	pvs->pathes = (char **)realloc(pvs->pathes, pvs->nitem * sizeof(char *));
+	pvs->pathes[pvs->nitem - 1] = strdup(path);
+	return 0;
+}
+
+int full_path_rebuild(pid_t pid, char *buf, size_t buf_len)
+{
+	int i;
+	ENTRY e, *ep;
+	struct path_values *pvs;
+	char str_pid[64];
+
+	if (!env.full_path)
+		return 0;
+
+	snprintf(str_pid, sizeof(str_pid), "%d", pid);
+
+	e.key = str_pid;
+	ep = hsearch(e, FIND);
+	if (!ep)
+		return -ENOENT;
+
+	pvs = ep->data;
+
+	for (i = pvs->nitem - 1; i >= 0; i--) {
+		strncat(buf, "/", buf_len);
+		strncat(buf, pvs->pathes[i], buf_len);
+		free(pvs->pathes[i]);
+		pvs->pathes[i] = NULL;
+	}
+
+	free(pvs->pathes);
+	pvs->nitem = 0;
+	pvs->pathes = NULL;
+	return 0;
+}
+
+void full_path_destroy(void)
+{
+	int i;
+	if (!env.full_path)
+		return;
+	hdestroy();
+
+	for (i = 0; i < full_path_nkeys; i++)
+		free(full_path_keys[i]);
+	if (full_path_keys)
+		free(full_path_keys);
+}
+
+void handle_event_end(void *ctx, int cpu, void *data, __u32 data_sz)
+{
+	struct event *e = data;
 	struct tm *tm;
 #ifdef USE_BLAZESYM
 	const blazesym_result *result = NULL;
@@ -217,35 +352,28 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	time_t t;
 	int fd, err;
 
-	if (data_sz < sizeof(e)) {
-		printf("Error: packet too small\n");
-		return;
-	}
-	/* Copy data as alignment in the perf buffer isn't guaranteed. */
-	memcpy(&e, data, sizeof(e));
-
 	/* name filtering is currently done in user space */
-	if (env.name && strstr(e.comm, env.name) == NULL)
+	if (env.name && strstr(e->comm, env.name) == NULL)
 		return;
 
 	/* prepare fields */
 	time(&t);
 	tm = localtime(&t);
 	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
-	if (e.ret >= 0) {
-		fd = e.ret;
+	if (e->ret >= 0) {
+		fd = e->ret;
 		err = 0;
 	} else {
 		fd = -1;
-		err = - e.ret;
+		err = - e->ret;
 	}
 
 #ifdef USE_BLAZESYM
 	sym_src_cfg cfgs[] = {
-		{ .src_type = SRC_T_PROCESS, .params = { .process = { .pid = e.pid }}},
+		{ .src_type = SRC_T_PROCESS, .params = { .process = { .pid = e->pid }}},
 	};
 	if (env.callers)
-		result = blazesym_symbolize(symbolizer, cfgs, 1, (const uint64_t *)&e.callers, 2);
+		result = blazesym_symbolize(symbolizer, cfgs, 1, (const uint64_t *)&e->callers, 2);
 #endif
 
 	/* print output */
@@ -255,20 +383,20 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		sps_cnt += 9;
 	}
 	if (env.print_uid) {
-		printf("%-7d ", e.uid);
+		printf("%-7d ", e->uid);
 		sps_cnt += 8;
 	}
-	printf("%-6d %-16s %3d %3d ", e.pid, e.comm, fd, err);
+	printf("%-6d %-16s %3d %3d ", e->pid, e->comm, fd, err);
 	sps_cnt += 7 + 17 + 4 + 4;
 	if (env.extended) {
-		if (e.mode == 0 && (e.flags & O_CREAT) == 0 &&
-		    (e.flags & O_TMPFILE) != O_TMPFILE)
-			printf("%08o n/a  ", e.flags);
+		if (e->mode == 0 && (e->flags & O_CREAT) == 0 &&
+		    (e->flags & O_TMPFILE) != O_TMPFILE)
+			printf("%08o n/a  ", e->flags);
 		else
-			printf("%08o %04o ", e.flags, e.mode);
+			printf("%08o %04o ", e->flags, e->mode);
 		sps_cnt += 9;
 	}
-	printf("%s\n", e.fname);
+	printf("%s\n", e->fname);
 
 #ifdef USE_BLAZESYM
 	for (i = 0; result && i < result->size; i++) {
@@ -286,6 +414,33 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 
 	blazesym_result_free(result);
 #endif
+}
+
+void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
+{
+	struct event e;
+	char fname[sizeof(e.fname)];
+
+	if (data_sz < sizeof(struct event)) {
+		printf("Error: packet too small\n");
+		return;
+	}
+
+	/* Copy data as alignment in the perf buffer isn't guaranteed. */
+	memcpy(&e, data, sizeof(e));
+
+	switch (e.type) {
+	case EVENT_ENTRY:
+		full_path_insert(e.pid, e.fname);
+		break;
+	case EVENT_END:
+		memset(fname, 0x0, sizeof(fname));
+		full_path_rebuild(e.pid, fname, sizeof(fname));
+		if (fname[0])
+			strcpy(e.fname, fname);
+		handle_event_end(ctx, cpu, &e, data_sz);
+		break;
+	}
 }
 
 void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
@@ -329,6 +484,7 @@ int main(int argc, char **argv)
 	obj->rodata->targ_pid = env.tid;
 	obj->rodata->targ_uid = env.uid;
 	obj->rodata->targ_failed = env.failed;
+	obj->rodata->full_path = env.full_path;
 
 	/* aarch64 and riscv64 don't have open syscall */
 	if (!tracepoint_exists("syscalls", "sys_enter_open")) {
@@ -343,6 +499,13 @@ int main(int argc, char **argv)
 	if (!tracepoint_exists("syscalls", "sys_enter_openat2")) {
 		bpf_program__set_autoload(obj->progs.tracepoint__syscalls__sys_enter_openat2, false);
 		bpf_program__set_autoload(obj->progs.tracepoint__syscalls__sys_exit_openat2, false);
+	}
+
+	if (env.full_path) {
+		if (!full_path_init()) {
+			fprintf(stderr, "failed to init for full-path hash\n");
+			goto cleanup;
+		}
 	}
 
 	err = opensnoop_bpf__load(obj);
@@ -416,6 +579,7 @@ cleanup:
 #ifdef USE_BLAZESYM
 	blazesym_free(symbolizer);
 #endif
+	full_path_destroy();
 
 	return err != 0;
 }
