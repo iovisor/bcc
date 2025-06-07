@@ -152,6 +152,7 @@ class BPF {
                             bpf_probe_attach_type attach_type = BPF_PROBE_ENTRY,
                             pid_t pid = -1,
                             uint64_t symbol_offset = 0);
+  StatusTuple detach_all_uprobes_for_binary(const std::string& binary_path);                          
   StatusTuple attach_usdt(const USDT& usdt, pid_t pid = -1);
   StatusTuple attach_usdt_all();
   StatusTuple detach_usdt(const USDT& usdt, pid_t pid = -1);
