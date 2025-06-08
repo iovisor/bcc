@@ -163,6 +163,81 @@ This shows another "dd" command reading from xvda1. On this system, various
 creating and updating "status" files).
 
 
+Output Metrics in Line Protocol
+-------------------------------
+
+The `--output` option enables `biotop` to output metrics in InfluxDB Line
+Protocol format, a text-based format for writing data points to time-series
+databases like InfluxDB. This is useful for tracking I/O operations, kilobytes
+transferred, and average latency per process ID (PID) for monitoring systems.
+
+Usage
+-----
+Use `--output` to switch to Line Protocol output.
+
+Example Output
+--------------
+Running `biotop --output` might produce:
+biotop,pid=279 I/O=6,Kbytes=69632,AVGms=0 1745473912
+biotop,pid=0 I/O=9,Kbytes=0,AVGms=94 1745473912
+biotop,pid=1585 I/O=14,Kbytes=94208,AVGms=1 1745473912
+
+This format is easy to save to files or process with scripts and databases to
+monitor I/O activity over time.
+
+Using the Output with InfluxDB and Grafana
+------------------------------------------
+
+The Line Protocol output can be stored in InfluxDB and visualized in Grafana,
+similar to how folded stacks from `profile` are turned into flame graphs.
+Here's how:
+
+1. Storing in InfluxDB
+Pipe the output into InfluxDB using the `influx` CLI. For example:
+
+# biotop --output > biotop_metrics.txt
+influx write -b mybucket -f biotop_metrics.txt -p s
+
+For real-time ingestion:
+# unbuffer biotop --output | influx write -b mybucket -p s
+
+Note: The -p s option specifies second-precision timestamps.
+
+2. Visualizing Metrics
+Once stored in InfluxDB, query the `biotop` measurement in Grafana to create
+time-series graphs. Here are some examples:
+
+2.1) I/O Operations per PID
+Command: `biotop --output`
+Shows I/O operations per process ID as a time-series graph, useful for finding
+processes with high I/O activity.
+See: bcc/tools/images/biotop_io.png
+Query:
+from(bucket: "mybucket")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r._measurement == "biotop" and r._field == "I/O")
+
+2.2) Latency per PID
+Command: `biotop --output`
+Shows average I/O latency per process ID in milliseconds, helping identify
+processes with high I/O delays.
+See: bcc/tools/images/biotop_latency.png
+Query:
+from(bucket: "mybucket")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r._measurement == "biotop" and r._field == "AVGms")
+
+2.3) Combined I/O Metrics Dashboard
+Command: `biotop --output`
+Displays I/O operations, kilobytes transferred, and average latency per process
+ID in a single Grafana dashboard, providing a comprehensive view of I/O activity
+for real-time monitoring and trend analysis.
+See: bcc/tools/images/biotops.png
+
+These graphs can be added to a Grafana dashboard to monitor I/O activity in
+real-time or analyze trends.
+
+
 USAGE message:
 
 # ./biotop.py -h
