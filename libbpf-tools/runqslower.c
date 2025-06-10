@@ -20,6 +20,7 @@ static volatile sig_atomic_t exiting = 0;
 struct env {
 	pid_t pid;
 	pid_t tid;
+	char *comm;
 	__u64 min_us;
 	bool previous;
 	bool verbose;
@@ -33,18 +34,20 @@ const char *argp_program_bug_address =
 const char argp_program_doc[] =
 "Trace high run queue latency.\n"
 "\n"
-"USAGE: runqslower [--help] [-p PID] [-t TID] [-P] [min_us]\n"
+"USAGE: runqslower [--help] [-p PID] [-t TID] [-P] [min_us] [-c COMM]\n"
 "\n"
 "EXAMPLES:\n"
 "    runqslower         # trace latency higher than 10000 us (default)\n"
 "    runqslower 1000    # trace latency higher than 1000 us\n"
 "    runqslower -p 123  # trace pid 123\n"
 "    runqslower -t 123  # trace tid 123 (use for threads only)\n"
+"    runqslower -c ksof # Trace processes with names starting with 'ksof'\n"
 "    runqslower -P      # also show previous task name and TID\n";
 
 static const struct argp_option opts[] = {
 	{ "pid", 'p', "PID", 0, "Process PID to trace", 0 },
 	{ "tid", 't', "TID", 0, "Thread TID to trace", 0 },
+	{ "comm",  'c', "COMM",  0, "filter processes by command name prefix", 0 },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
 	{ "previous", 'P', NULL, 0, "also show previous task name and TID", 0 },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
@@ -63,6 +66,12 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'v':
 		env.verbose = true;
+		break;
+	case 'c':
+		env.comm = strdup(arg);
+		if (strlen(arg) >= TASK_COMM_LEN)
+			fprintf(stderr, "Warning: Command name '%.*s...'is too long (max %d), truncated to: '%.*s'\n",
+				TASK_COMM_LEN - 1, env.comm, TASK_COMM_LEN - 1, TASK_COMM_LEN - 1, env.comm);
 		break;
 	case 'P':
 		env.previous = true;
@@ -169,6 +178,10 @@ int main(int argc, char **argv)
 	}
 
 	/* initialize global data (filtering options) */
+	if (env.comm) {
+		snprintf(obj->rodata->targ_comm, TASK_COMM_LEN, "%s", env.comm);
+		obj->rodata->filter_comm = true;
+	}
 	obj->rodata->targ_tgid = env.pid;
 	obj->rodata->targ_pid = env.tid;
 	obj->rodata->min_us = env.min_us;
