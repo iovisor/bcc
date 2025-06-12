@@ -2,7 +2,9 @@
 // Copyright (c) 2019 Facebook
 // Copyright (c) 2020 Netflix
 #include <vmlinux.h>
+#include <bpf/bpf_core_read.h>
 #include <bpf/bpf_helpers.h>
+#include "compat.bpf.h"
 #include "opensnoop.h"
 
 #ifndef O_CREAT
@@ -16,6 +18,7 @@ const volatile pid_t targ_pid = 0;
 const volatile pid_t targ_tgid = 0;
 const volatile uid_t targ_uid = 0;
 const volatile bool targ_failed = false;
+const volatile bool full_path = false;
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
@@ -23,12 +26,6 @@ struct {
 	__type(key, u32);
 	__type(value, struct args_t);
 } start SEC(".maps");
-
-struct {
-	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
-	__uint(key_size, sizeof(u32));
-	__uint(value_size, sizeof(u32));
-} events SEC(".maps");
 
 static __always_inline bool valid_uid(uid_t uid) {
 	return uid != INVALID_UID;
@@ -116,7 +113,7 @@ int tracepoint__syscalls__sys_enter_openat2(struct syscall_trace_enter* ctx)
 static __always_inline
 int trace_exit(struct syscall_trace_exit* ctx)
 {
-	struct event event = {};
+	struct event *eventp;
 	struct args_t *ap;
 	uintptr_t stack[3];
 	int ret;
@@ -129,29 +126,69 @@ int trace_exit(struct syscall_trace_exit* ctx)
 	if (targ_failed && ret >= 0)
 		goto cleanup;	/* want failed only */
 
+	eventp = reserve_buf(sizeof(*eventp));
+	if (!eventp)
+		goto cleanup;
+
 	/* event data */
-	event.pid = bpf_get_current_pid_tgid() >> 32;
-	event.uid = bpf_get_current_uid_gid();
-	bpf_get_current_comm(&event.comm, sizeof(event.comm));
-	bpf_probe_read_user_str(&event.fname, sizeof(event.fname), ap->fname);
-	event.flags = ap->flags;
+	eventp->pid = bpf_get_current_pid_tgid() >> 32;
+	eventp->uid = bpf_get_current_uid_gid();
+	bpf_get_current_comm(&eventp->comm, sizeof(eventp->comm));
+	bpf_probe_read_user_str(&eventp->fname, sizeof(eventp->fname),
+			  ap->fname);
+	eventp->path_depth = 0;
+	eventp->flags = ap->flags;
 
 	if (ap->flags & O_CREAT || (ap->flags & O_TMPFILE) == O_TMPFILE)
-		event.mode = ap->mode;
+		eventp->mode = ap->mode;
 	else
-		event.mode = 0;
+		eventp->mode = 0;
 
-	event.ret = ret;
+	eventp->ret = ret;
 
 	bpf_get_stack(ctx, &stack, sizeof(stack),
 		      BPF_F_USER_STACK);
 	/* Skip the first address that is usually the syscall it-self */
-	event.callers[0] = stack[1];
-	event.callers[1] = stack[2];
+	eventp->callers[0] = stack[1];
+	eventp->callers[1] = stack[2];
+
+	if (full_path && eventp->fname[0] != '/') {
+		int depth;
+		struct task_struct *task;
+		struct dentry *dentry, *parent_dentry;
+		size_t filepart_length;
+		void *payload = eventp->fname;
+
+
+		task = (struct task_struct *)bpf_get_current_task_btf();
+		dentry = BPF_CORE_READ(task, fs, pwd.dentry);
+
+		for (depth = 1, payload += NAME_MAX; depth < MAX_PATH_DEPTH; depth++) {
+			filepart_length =
+				bpf_probe_read_kernel_str(payload, NAME_MAX,
+						BPF_CORE_READ(dentry, d_name.name));
+
+			if (filepart_length < 0) {
+				eventp->get_path_failed = 1;
+				break;
+			}
+
+			parent_dentry = BPF_CORE_READ(dentry, d_parent);
+			if (dentry == parent_dentry)
+				break;
+
+			if (filepart_length > NAME_MAX)
+				break;
+
+			payload += NAME_MAX;
+
+			dentry = parent_dentry;
+			eventp->path_depth++;
+		}
+	}
 
 	/* emit event */
-	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU,
-			      &event, sizeof(event));
+	submit_buf(ctx, eventp, sizeof(*eventp));
 
 cleanup:
 	bpf_map_delete_elem(&start, &pid);
