@@ -810,7 +810,7 @@ static const char *syscall_names_generic[] = {
 size_t syscall_names_generic_size = sizeof(syscall_names_generic)/sizeof(char*);
 #endif
 
-void syscall_name(unsigned n, char *buf, size_t size)
+int syscall_name(unsigned n, char *buf, size_t size)
 {
 	const char *name = NULL;
 
@@ -824,10 +824,13 @@ void syscall_name(unsigned n, char *buf, size_t size)
 		name = syscall_names_generic[n];
 #endif
 
-	if (name)
+	if (name) {
 		strncpy(buf, name, size-1);
-	else
+		return 0;
+	} else {
 		snprintf(buf, size, "[unknown: %u]", n);
+		return -EINVAL;
+	}
 }
 
 int list_syscalls(void)
