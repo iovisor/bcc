@@ -108,9 +108,9 @@ static int handle_sched_switch(void *ctx, bool preempt, struct task_struct *prev
 	delta = (s64)(bpf_ktime_get_ns() - i_keyp->start_ts);
 	if (delta < 0)
 		goto cleanup;
-	delta /= 1000U;
 	if (delta < min_block_ns || delta > max_block_ns)
 		goto cleanup;
+	delta /= 1000U;
 	valp = bpf_map_lookup_elem(&info, &i_keyp->key);
 	if (!valp)
 		goto cleanup;
