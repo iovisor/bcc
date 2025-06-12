@@ -7,6 +7,7 @@
 // 17-Oct-2022   Krisztian Fekete Edited this.
 #include <argp.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -90,7 +91,7 @@ static int handle_event(void *ctx, void *data, size_t len)
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 {
-	printf("Lost %llu events on CPU #%d!\n", lost_cnt, cpu);
+	printf("Lost %" PRIu64" events on CPU #%d!\n", (uint64_t)lost_cnt, cpu);
 }
 
 static void sig_int(int signo)
