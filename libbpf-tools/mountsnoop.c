@@ -15,6 +15,7 @@
 #include <argp.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <string.h>
 #include <time.h>
@@ -454,7 +455,7 @@ static int handle_event(void *ctx, void *data, size_t len)
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 {
-	warn("lost %llu events on CPU #%d\n", lost_cnt, cpu);
+	warn("lost %" PRIu64" events on CPU #%d\n", (uint64_t)lost_cnt, cpu);
 }
 
 int main(int argc, char **argv)
