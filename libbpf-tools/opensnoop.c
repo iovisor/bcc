@@ -268,7 +268,16 @@ int handle_event(void *ctx, void *data, size_t data_sz)
 		sps_cnt += 9;
 	}
 	if (env.full_path) {
-		for (int depth = e.path_depth; depth >= 0; depth--)
+		for (int depth = e.path_depth; depth >= 0; depth--) {
+			char *fname = (char *)&e.fname[NAME_MAX * depth];
+
+			/**
+			 * If it is a mount point, there will be a '/', because
+			 * the '/' will be added below, so just skip this '/'.
+			 */
+			if (fname[0] == '/' && fname[1] == '\0')
+				continue;
+
 			/**
 			 * 1. If the file/path name starts with '/', do not
 			 *    print the '/' prefix.
@@ -281,7 +290,8 @@ int handle_event(void *ctx, void *data, size_t data_sz)
 				"/\0" + (e.fname[NAME_MAX * depth] == '/' ||
 					 ((e.get_path_failed || e.path_depth == MAX_PATH_DEPTH - 1) &&
 					  depth == e.path_depth)),
-				(char *)&e.fname[NAME_MAX * depth]);
+				fname);
+		}
 		printf("\n");
 	} else
 		printf("%s\n", e.fname);

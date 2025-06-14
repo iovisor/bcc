@@ -155,13 +155,18 @@ int trace_exit(struct syscall_trace_exit* ctx)
 	if (full_path && eventp->fname[0] != '/') {
 		int depth;
 		struct task_struct *task;
-		struct dentry *dentry, *parent_dentry;
+		struct dentry *dentry, *parent_dentry, *mnt_root;
+		struct vfsmount *vfsmnt;
+		struct mount *mnt;
 		size_t filepart_length;
-		void *payload = eventp->fname;
+		char *payload = eventp->fname;
 
 
 		task = (struct task_struct *)bpf_get_current_task_btf();
 		dentry = BPF_CORE_READ(task, fs, pwd.dentry);
+		vfsmnt = BPF_CORE_READ(task, fs, pwd.mnt);
+		mnt = container_of(vfsmnt, struct mount, mnt);
+		mnt_root = BPF_CORE_READ(vfsmnt, mnt_root);
 
 		for (depth = 1, payload += NAME_MAX; depth < MAX_PATH_DEPTH; depth++) {
 			filepart_length =
@@ -173,12 +178,31 @@ int trace_exit(struct syscall_trace_exit* ctx)
 				break;
 			}
 
-			parent_dentry = BPF_CORE_READ(dentry, d_parent);
-			if (dentry == parent_dentry)
-				break;
-
 			if (filepart_length > NAME_MAX)
 				break;
+
+			parent_dentry = BPF_CORE_READ(dentry, d_parent);
+
+			if (dentry == parent_dentry || dentry == mnt_root) {
+				struct mount *mnt_parent;
+				mnt_parent = BPF_CORE_READ(mnt, mnt_parent);
+
+				if (mnt != mnt_parent) {
+					dentry = BPF_CORE_READ(mnt, mnt_mountpoint);
+
+					mnt = mnt_parent;
+					vfsmnt = &mnt->mnt;
+
+					mnt_root = BPF_CORE_READ(vfsmnt, mnt_root);
+
+					eventp->path_depth++;
+					payload += NAME_MAX;
+					continue;
+				} else {
+					/* Real root directory */
+					break;
+				}
+			}
 
 			payload += NAME_MAX;
 
