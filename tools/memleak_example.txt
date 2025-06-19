@@ -29,7 +29,7 @@ inspect each allocation individually -- you get a nice summary of which stack
 is responsible for a large leak.
 
 Occasionally, you do want the individual allocation details. Perhaps the same
-stack is allocating various sizes and you want to confirm which sizes are 
+stack is allocating various sizes and you want to confirm which sizes are
 prevalent. Use the -a switch:
 
 # ./memleak -p $(pidof allocs) -a
@@ -109,18 +109,18 @@ to reduce the memory overhead.
 To avoid false positives, allocations younger than a certain age (500ms by
 default) are not printed. To change this threshold, use the -o switch.
 
-By default, memleak prints its output every 5 seconds. To change this 
-interval, pass the interval as a positional parameter to memleak. You can 
+By default, memleak prints its output every 5 seconds. To change this
+interval, pass the interval as a positional parameter to memleak. You can
 also control the number of times the output will be printed before exiting.
 For example:
 
 # ./memleak 1 10
 
 ... will print the outstanding allocation statistics every second, for ten
-times, and then exit. 
+times, and then exit.
 
 memleak may introduce considerable overhead if your application or kernel is
-allocating and freeing memory at a very high rate. In that case, you can 
+allocating and freeing memory at a very high rate. In that case, you can
 control the overhead by sampling every N-th allocation. For example, to sample
 roughly 10% of the allocations and print the outstanding allocations every 5
 seconds, 3 times before quitting:
@@ -142,9 +142,9 @@ Attaching to pid 2614, Ctrl+C to quit.
                  main+0x6d [allocs]
                  __libc_start_main+0xf0 [libc-2.21.so]
 
-Note that even though the application leaks 16 bytes of memory every second, 
+Note that even though the application leaks 16 bytes of memory every second,
 the report (printed every 5 seconds) doesn't "see" all the allocations because
-of the sampling rate applied. 
+of the sampling rate applied.
 
 Profiling in memory part is hard to be accurate because of BPF infrastructure.
 memleak keeps misjudging memory leak on the complicated environment which has
@@ -177,9 +177,89 @@ Attaching to pid 2623, Ctrl+C to quit.
 		0x0000559b478700b7	main+0x4a7 [redis-server]
 		0x00007fdf47029d90	__libc_start_call_main+0x80 [libc.so.6]
 
-When using the --symbols-prefix argument, memleak can trace the third-party memory 
+When using the --symbols-prefix argument, memleak can trace the third-party memory
 allocations, such as jemalloc whose symbols are usually identified by the "je_" prefix
 in redis project.
+
+
+Output Metrics in Line Protocol
+-------------------------------
+
+The `--output` option enables `memleak` to output metrics in InfluxDB Line
+Protocol format, a text-based format for writing data points to time-series
+databases like InfluxDB. This is useful for tracking outstanding allocations and
+piping them into monitoring systems for analysis.
+
+Usage
+-----
+Use `--output` to switch to Line Protocol output. Combine with `<interval>`
+for periodic metrics, or other options to adjust output.
+
+Example Output
+--------------
+Running `memleak --output 1` might produce:
+memleak,stackid=14613 size=22753280,count=5555 1742641470
+memleak,stackid=12929 size=40960,count=10 1742641470
+memleak,stackid=15137 size=16384,count=2 1742641470
+
+
+Using the Output with InfluxDB and Grafana
+------------------------------------------
+
+The Line Protocol output can be stored in InfluxDB and visualized in Grafana,
+similar to how folded stacks from `profile` are turned into flame graphs.
+Here's how:
+
+1. Storing in InfluxDB
+Pipe the output into InfluxDB using the `influx` CLI. For example:
+
+# memleak --output 1 > memleak_metrics.txt
+$ influx write -b mybucket -f memleak_metrics.txt -p s
+
+For real-time ingestion:
+# unbuffer memleak --output 1 | influx write -b mybucket -p s
+
+Note: The -p s option specifies second-precision timestamps. Saving metrics
+files is handy for debugging or reprocessing.
+
+2. Visualizing Metrics
+Once stored in InfluxDB, query the `memleak` measurement to create graphs in
+Grafana or the InfluxDB Web UI(no Grafana needed). Here are two visualization
+examples:
+
+2.1) Outstanding Allocation Size
+Command: `memleak --output 1`
+Shows outstanding allocation sizes per stack ID as a time-series graph, useful
+for spotting large memory leaks.
+See: images/memleak_size.png
+Query:
+from(bucket: "mybucket")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r._measurement == "memleak" and r._field == "size")
+
+2.2) Outstanding Allocation Count
+Command: `memleak --output 1`
+Displays the number of outstanding allocations per stack ID, helping identify
+frequent memory leaks.
+See: images/memleak_count.png
+Grafana Query:
+from(bucket: "mybucket")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r._measurement == "memleak" and r._field == "count")
+
+2.3) Combined Memory Leak Metrics Dashboard
+Displays both outstanding allocation size and count in a single Grafana dashboard,
+offering a comprehensive overview of memory leak activity for real-time
+monitoring and trend analysis.
+See: images/memleak_kernel.png
+
+This visualization combines the allocation size and count metrics per stack ID,
+enabling efficient identification of both large and frequent memory leaks in a
+unified view.
+
+These graphs can be added to a Grafana dashboard or viewed in the InfluxDB UI
+to monitor outstanding allocations in real-time or analyze historical trends.
+
 
 USAGE message:
 
