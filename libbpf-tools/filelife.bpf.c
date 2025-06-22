@@ -5,31 +5,42 @@
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_tracing.h>
 #include "filelife.h"
+#include "compat.bpf.h"
 #include "core_fixes.bpf.h"
+#include "path_helpers.bpf.h"
 
 /* linux: include/linux/fs.h */
 #define FMODE_CREATED	0x100000
 
 const volatile pid_t targ_tgid = 0;
+const volatile bool full_path = false;
+
+struct create_arg {
+	u64 ts;
+	struct dentry *cwd_dentry;
+	struct vfsmount *cwd_vfsmnt;
+};
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, 8192);
 	__type(key, struct dentry *);
-	__type(value, u64);
+	__type(value, struct create_arg);
 } start SEC(".maps");
 
-struct {
-	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
-	__uint(key_size, sizeof(u32));
-	__uint(value_size, sizeof(u32));
-} events SEC(".maps");
+struct unlink_event {
+	__u64 delta_ns;
+	pid_t tgid;
+	struct dentry *dentry;
+	struct dentry *cwd_dentry;
+	struct vfsmount *cwd_vfsmnt;
+};
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, 8192);
 	__type(key, u32); /* tid */
-	__type(value, struct event);
+	__type(value, struct unlink_event);
 } currevent SEC(".maps");
 
 static __always_inline int
@@ -37,13 +48,19 @@ probe_create(struct dentry *dentry)
 {
 	u64 id = bpf_get_current_pid_tgid();
 	u32 tgid = id >> 32;
-	u64 ts;
+	struct create_arg arg = {};
+	struct task_struct *task;
 
 	if (targ_tgid && targ_tgid != tgid)
 		return 0;
 
-	ts = bpf_ktime_get_ns();
-	bpf_map_update_elem(&start, &dentry, &ts, 0);
+	task = (struct task_struct *)bpf_get_current_task_btf();
+
+	arg.ts = bpf_ktime_get_ns();
+	arg.cwd_dentry = BPF_CORE_READ(task, fs, pwd.dentry);
+	arg.cwd_vfsmnt = BPF_CORE_READ(task, fs, pwd.mnt);
+
+	bpf_map_update_elem(&start, &dentry, &arg, 0);
 	return 0;
 }
 
@@ -102,33 +119,29 @@ SEC("kprobe/vfs_unlink")
 int BPF_KPROBE(vfs_unlink, void *arg0, void *arg1, void *arg2)
 {
 	u64 id = bpf_get_current_pid_tgid();
-	struct event event = {};
-	const u8 *qs_name_ptr;
+	struct unlink_event unlink_event = {};
+	struct create_arg *arg;
 	u32 tgid = id >> 32;
 	u32 tid = (u32)id;
-	u64 *tsp, delta_ns;
+	u64 delta_ns;
 	bool has_arg = renamedata_has_old_mnt_userns_field()
 				|| renamedata_has_new_mnt_idmap_field();
 
-	tsp = has_arg
+	arg = has_arg
 		? bpf_map_lookup_elem(&start, &arg2)
 		: bpf_map_lookup_elem(&start, &arg1);
-	if (!tsp)
+	if (!arg)
 		return 0;   // missed entry
 
-	delta_ns = bpf_ktime_get_ns() - *tsp;
+	delta_ns = bpf_ktime_get_ns() - arg->ts;
 
-	qs_name_ptr = has_arg
-		? BPF_CORE_READ((struct dentry *)arg2, d_name.name)
-		: BPF_CORE_READ((struct dentry *)arg1, d_name.name);
+	unlink_event.delta_ns = delta_ns;
+	unlink_event.tgid = tgid;
+	unlink_event.dentry = has_arg ? arg2 : arg1;
+	unlink_event.cwd_dentry = arg->cwd_dentry;
+	unlink_event.cwd_vfsmnt = arg->cwd_vfsmnt;
 
-	bpf_probe_read_kernel_str(&event.file, sizeof(event.file), qs_name_ptr);
-	bpf_get_current_comm(&event.task, sizeof(event.task));
-	event.delta_ns = delta_ns;
-	event.tgid = tgid;
-	event.dentry = has_arg ? arg2 : arg1;
-
-	bpf_map_update_elem(&currevent, &tid, &event, BPF_ANY);
+	bpf_map_update_elem(&currevent, &tid, &unlink_event, BPF_ANY);
 	return 0;
 }
 
@@ -138,10 +151,13 @@ int BPF_KRETPROBE(vfs_unlink_ret)
 	u64 id = bpf_get_current_pid_tgid();
 	u32 tid = (u32)id;
 	int ret = PT_REGS_RC(ctx);
-	struct event *event;
+	struct unlink_event *unlink_event;
+	struct event *eventp;
+	struct dentry *dentry;
+	const u8 *qs_name_ptr;
 
-	event = bpf_map_lookup_elem(&currevent, &tid);
-	if (!event)
+	unlink_event = bpf_map_lookup_elem(&currevent, &tid);
+	if (!unlink_event)
 		return 0;
 	bpf_map_delete_elem(&currevent, &tid);
 
@@ -149,11 +165,32 @@ int BPF_KRETPROBE(vfs_unlink_ret)
 	if (ret)
 		return 0;
 
-	bpf_map_delete_elem(&start, &event->dentry);
+	eventp = reserve_buf(sizeof(*eventp));
+	if (!eventp)
+		return 0;
+
+	eventp->tgid = unlink_event->tgid;
+	eventp->delta_ns = unlink_event->delta_ns;
+	bpf_get_current_comm(&eventp->task, sizeof(eventp->task));
+
+	dentry = unlink_event->dentry;
+	qs_name_ptr = BPF_CORE_READ(dentry, d_name.name);
+	bpf_probe_read_kernel_str(&eventp->fname.pathes, sizeof(eventp->fname.pathes),
+			   qs_name_ptr);
+	eventp->fname.depth = 0;
+
+	/* get full-path */
+	if (full_path && eventp->fname.pathes[0] != '/')
+		bpf_dentry_full_path(eventp->fname.pathes + NAME_MAX, NAME_MAX,
+				MAX_PATH_DEPTH - 1,
+				unlink_event->cwd_dentry,
+				unlink_event->cwd_vfsmnt,
+				&eventp->fname.failed, &eventp->fname.depth);
+
+	bpf_map_delete_elem(&start, &unlink_event->dentry);
 
 	/* output */
-	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU,
-			      event, sizeof(*event));
+	submit_buf(ctx, eventp, sizeof(*eventp));
 	return 0;
 }
 
