@@ -26,6 +26,7 @@
 #ifdef USE_BLAZESYM
 #include "blazesym.h"
 #endif
+#include "path_helpers.h"
 
 #define NSEC_PER_SEC		1000000000ULL
 
@@ -268,33 +269,10 @@ int handle_event(void *ctx, void *data, size_t data_sz)
 		sps_cnt += 9;
 	}
 	if (env.full_path) {
-		for (int depth = e.path_depth; depth >= 0; depth--) {
-			char *fname = (char *)&e.fname[NAME_MAX * depth];
-
-			/**
-			 * If it is a mount point, there will be a '/', because
-			 * the '/' will be added below, so just skip this '/'.
-			 */
-			if (fname[0] == '/' && fname[1] == '\0')
-				continue;
-
-			/**
-			 * 1. If the file/path name starts with '/', do not
-			 *    print the '/' prefix.
-			 * 2. If bpf_probe_read_kernel_str() fails, or the
-			 *    directory depth reaches the upper limit
-			 *    MAX_PATH_DEPTH, the top-level directory
-			 *    is printed without the prefix '/'.
-			 */
-			printf("%s%s",
-				"/\0" + (e.fname[NAME_MAX * depth] == '/' ||
-					 ((e.get_path_failed || e.path_depth == MAX_PATH_DEPTH - 1) &&
-					  depth == e.path_depth)),
-				fname);
-		}
+		print_full_path(&e.fname);
 		printf("\n");
 	} else
-		printf("%s\n", e.fname);
+		printf("%s\n", e.fname.pathes);
 
 #ifdef USE_BLAZESYM
 	for (i = 0; result && i < result->size; i++) {
