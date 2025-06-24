@@ -104,6 +104,17 @@ bpf_text = """
 #ifdef FULLPATH
 #include <linux/fs_struct.h>
 #include <linux/dcache.h>
+#include <linux/fs.h>
+#include <linux/mount.h>
+
+/* see https://github.com/torvalds/linux/blob/master/fs/mount.h */
+struct mount {
+    struct hlist_node mnt_hash;
+    struct mount *mnt_parent;
+    struct dentry *mnt_mountpoint;
+    struct vfsmount mnt;
+    /* ... */
+};
 #endif
 
 #define NAME_MAX 255
@@ -408,28 +419,60 @@ if args.full_path:
     bpf_text = bpf_text.replace('SUBMIT_DATA', """
     if (data->name[0] != '/') { // relative path
         struct task_struct *task;
-        struct dentry *dentry;
+        struct dentry *dentry, *parent_dentry, *mnt_root;
+        struct vfsmount *vfsmnt;
+        struct fs_struct *fs;
+        struct path *path;
+        struct mount *mnt;
         size_t filepart_length;
         char *payload = data->name;
+        struct qstr d_name;
         int i;
 
         task = (struct task_struct *)bpf_get_current_task_btf();
-        dentry = task->fs->pwd.dentry;
+
+        fs = task->fs;
+        path = &fs->pwd;
+        dentry = path->dentry;
+        vfsmnt = path->mnt;
+
+        mnt = container_of(vfsmnt, struct mount, mnt);
 
         for (i = 1, payload += NAME_MAX; i < MAX_ENTRIES; i++) {
+            bpf_probe_read_kernel(&d_name, sizeof(d_name), &dentry->d_name);
             filepart_length =
-                bpf_probe_read_kernel(payload, NAME_MAX, (void *)dentry->d_name.name);
+                bpf_probe_read_kernel_str(payload, NAME_MAX, (void *)d_name.name);
 
             if (filepart_length < 0 || filepart_length > NAME_MAX)
                 break;
 
-            if (dentry == dentry->d_parent) { // root directory
-                break;
+            bpf_probe_read_kernel(&mnt_root, sizeof(mnt_root), &vfsmnt->mnt_root);
+            bpf_probe_read_kernel(&parent_dentry, sizeof(parent_dentry), &dentry->d_parent);
+
+            if (dentry == parent_dentry || dentry == mnt_root) {
+                struct mount *mnt_parent;
+                bpf_probe_read_kernel(&mnt_parent, sizeof(mnt_parent), &mnt->mnt_parent);
+
+                if (mnt != mnt_parent) {
+                    bpf_probe_read_kernel(&dentry, sizeof(dentry), &mnt->mnt_mountpoint);
+
+                    mnt = mnt_parent;
+                    vfsmnt = &mnt->mnt;
+
+                    bpf_probe_read_kernel(&mnt_root, sizeof(mnt_root), &vfsmnt->mnt_root);
+
+                    data->path_depth++;
+                    payload += NAME_MAX;
+                    continue;
+                } else {
+                    /* Real root directory */
+                    break;
+                }
             }
 
             payload += NAME_MAX;
 
-            dentry = dentry->d_parent;
+            dentry = parent_dentry;
             data->path_depth++;
         }
     }
@@ -529,7 +572,12 @@ def print_event(cpu, data, size):
             # see struct data_t::name field comment.
             names = split_names(bytes(event.name))
             picked = names[:event.path_depth + 1]
-            picked_str = [x.decode('utf-8', 'ignore') if isinstance(x, bytes) else str(x) for x in picked]
+            picked_str = []
+            for x in picked:
+                s = x.decode('utf-8', 'ignore') if isinstance(x, bytes) else str(x)
+                # remove mountpoint '/' and empty string
+                if s != "/" and s != "":
+                    picked_str.append(s)
             joined = '/'.join(picked_str[::-1])
             result = joined if joined.startswith('/') else '/' + joined
             printb(b"%s" % result.encode("utf-8"))
