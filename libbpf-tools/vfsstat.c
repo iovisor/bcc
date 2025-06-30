@@ -86,24 +86,6 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 	return vfprintf(stderr, format, args);
 }
 
-static const char *strftime_now(char *s, size_t max, const char *format)
-{
-	struct tm *tm;
-	time_t t;
-
-	t = time(NULL);
-	tm = localtime(&t);
-	if (tm == NULL) {
-		fprintf(stderr, "localtime: %s\n", strerror(errno));
-		return "<failed>";
-	}
-	if (strftime(s, max, format, tm) == 0) {
-		fprintf(stderr, "strftime error\n");
-		return "<failed>";
-	}
-	return s;
-}
-
 static const char *stat_types_names[] = {
 	[S_READ] = "READ",
 	[S_WRITE] = "WRITE",
@@ -131,7 +113,8 @@ static void print_and_reset_stats(__u64 stats[S_MAXSTAT])
 	__u64 val;
 	int i;
 
-	printf("%-8s: ", strftime_now(s, sizeof(s), "%H:%M:%S"));
+	str_timestamp("%H:%M:%S", s, sizeof(s));
+	printf("%-8s: ", s);
 	for (i = 0; i < S_MAXSTAT; i++) {
 		val = __atomic_exchange_n(&stats[i], 0, __ATOMIC_RELAXED);
 		printf(" %8llu", val / env.interval);

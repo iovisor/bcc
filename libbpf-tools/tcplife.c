@@ -16,6 +16,7 @@
 #include <sys/socket.h>
 
 #include "btf_helpers.h"
+#include "trace_helpers.h"
 #include "tcplife.h"
 #include "tcplife.skel.h"
 
@@ -117,8 +118,6 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	char ts[32], saddr[48], daddr[48];
 	struct event e;
-	struct tm *tm;
-	time_t t;
 
 	if (data_sz < sizeof(e)) {
 		printf("Error: packet too small\n");
@@ -128,9 +127,7 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	memcpy(&e, data, sizeof(e));
 
 	if (emit_timestamp) {
-		time(&t);
-		tm = localtime(&t);
-		strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+		str_timestamp("%H:%M:%S", ts, sizeof(ts));
 		printf("%8s ", ts);
 	}
 
