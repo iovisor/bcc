@@ -205,7 +205,6 @@ static void sig_int(int signo)
 int handle_event(void *ctx, void *data, size_t data_sz)
 {
 	struct event e;
-	struct tm *tm;
 #ifdef USE_BLAZESYM
 	const blazesym_result *result = NULL;
 	const blazesym_csym *sym;
@@ -213,7 +212,6 @@ int handle_event(void *ctx, void *data, size_t data_sz)
 #endif
 	int sps_cnt;
 	char ts[32];
-	time_t t;
 	int fd, err;
 
 	if (data_sz < sizeof(struct event)) {
@@ -229,9 +227,8 @@ int handle_event(void *ctx, void *data, size_t data_sz)
 		return -1;
 
 	/* prepare fields */
-	time(&t);
-	tm = localtime(&t);
-	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+	str_timestamp("%H:%M:%S", ts, sizeof(ts));
+
 	if (e.ret >= 0) {
 		fd = e.ret;
 		err = 0;

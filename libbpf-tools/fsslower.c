@@ -351,9 +351,7 @@ static void print_headers()
 static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	struct event e;
-	struct tm *tm;
 	char ts[32];
-	time_t t;
 
 	if (data_sz < sizeof(e)) {
    	   	printf("Error: packet too small\n");
@@ -372,9 +370,7 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		return;
 	}
 
-	time(&t);
-	tm = localtime(&t);
-	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+	str_timestamp("%H:%M:%S", ts, sizeof(ts));
 
 	printf("%-8s %-16s %-7d %c ", ts, e.task, e.pid, file_op[e.op]);
 	if (e.size == LLONG_MAX)

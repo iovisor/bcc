@@ -388,9 +388,7 @@ int main(int argc, char **argv)
 		.doc = argp_program_doc,
 	};
 	struct fsdist_bpf *skel;
-	struct tm *tm;
 	char ts[32];
-	time_t t;
 	int err;
 	bool support_fentry;
 
@@ -464,9 +462,7 @@ int main(int argc, char **argv)
 		printf("\n");
 
 		if (emit_timestamp) {
-			time(&t);
-			tm = localtime(&t);
-			strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+			str_timestamp("%H:%M:%S", ts, sizeof(ts));
 			printf("%-8s\n", ts);
 		}
 

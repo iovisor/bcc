@@ -16,6 +16,7 @@
 #include <bpf/btf.h>
 #include "sigsnoop.h"
 #include "sigsnoop.skel.h"
+#include "trace_helpers.h"
 
 #define PERF_BUFFER_PAGES	16
 #define PERF_POLL_TIMEOUT_MS	100
@@ -215,13 +216,9 @@ static void sig_int(int signo)
 static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	struct event *e = data;
-	struct tm *tm;
 	char ts[32];
-	time_t t;
 
-	time(&t);
-	tm = localtime(&t);
-	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+	str_timestamp("%H:%M:%S", ts, sizeof(ts));
 	if (signal_name && e->sig < ARRAY_SIZE(sig_name))
 		printf("%-8s %-7d %-16s %-12s %-7d %-16s %-6d\n",
 		       ts, e->pid, e->comm, sig_name[e->sig], e->tpid, e->tcomm, e->ret);
