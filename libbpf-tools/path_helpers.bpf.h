@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
 /* Copyright (c) 2025 Rong Tao */
 #ifndef __PATH_HELPERS_BPF_H
 #define __PATH_HELPERS_BPF_H 1
