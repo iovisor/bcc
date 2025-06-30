@@ -169,26 +169,13 @@ static int sort_column(const void *obj1, const void *obj2)
 
 static int print_stat(struct slabratetop_bpf *obj)
 {
-	FILE *f;
-	time_t t;
-	struct tm *tm;
-	char ts[16], buf[256];
+	char buf[256];
 	char *key, **prev_key = NULL;
 	static struct slabrate_info values[OUTPUT_ROWS_LIMIT];
-	int n, i, err = 0, rows = 0;
+	int i, err = 0, rows = 0;
 	int fd = bpf_map__fd(obj->maps.slab_entries);
 
-	f = fopen("/proc/loadavg", "r");
-	if (f) {
-		time(&t);
-		tm = localtime(&t);
-		strftime(ts, sizeof(ts), "%H:%M:%S", tm);
-		memset(buf, 0 , sizeof(buf));
-		n = fread(buf, 1, sizeof(buf), f);
-		if (n)
-			printf("%8s loadavg: %s\n", ts, buf);
-		fclose(f);
-	}
+	printf("%s\n", str_loadavg(buf, sizeof(buf), true) ? "N/A" : buf);
 
 	printf("%-32s %6s %10s\n", "CACHE", "ALLOCS", "BYTES");
 

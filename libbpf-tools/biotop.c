@@ -301,24 +301,14 @@ static int read_stat(struct biotop_bpf *obj, struct data_t *datas, __u32 *count)
 
 static int print_stat(struct biotop_bpf *obj)
 {
-	FILE *f;
-	time_t t;
-	struct tm *tm;
-	char ts[16], buf[256];
+	char buf[256];
 	static struct data_t datas[OUTPUT_ROWS_LIMIT];
-	int n, i, err = 0, rows = OUTPUT_ROWS_LIMIT;
+	int i, err = 0, rows = OUTPUT_ROWS_LIMIT;
 
-	f = fopen("/proc/loadavg", "r");
-	if (f) {
-		time(&t);
-		tm = localtime(&t);
-		strftime(ts, sizeof(ts), "%H:%M:%S", tm);
-		memset(buf, 0, sizeof(buf));
-		n = fread(buf, 1, sizeof(buf), f);
-		if (n)
-			printf("%8s loadavg: %s\n", ts, buf);
-		fclose(f);
-	}
+	err = str_loadavg(buf, sizeof(buf), true);
+	if (!err)
+		printf("%s\n", buf);
+
 	printf("%-7s %-16s %1s %-3s %-3s %-8s %5s %7s %6s\n",
 	       "PID", "COMM", "D", "MAJ", "MIN", "DISK", "I/O", "Kbytes", "AVGms");
 

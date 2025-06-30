@@ -1311,3 +1311,47 @@ int str_to_long(const char *src, void *dest)
 
 	return errno;
 }
+
+/**
+ * If @ts_pfx is true, the timestamp prefix will added. If the @buf_len is not
+ * long enough, we still provide a truncated string, but return -ERANGE.
+ */
+int str_loadavg(char *buf, size_t buf_len, bool ts_pfx)
+{
+	int n, err = 0;
+	time_t t;
+	struct tm *tm;
+	char ts[16], avg[64];
+	FILE *f;
+
+	if (!buf || buf_len == 0)
+		return -EINVAL;
+
+	f = fopen("/proc/loadavg", "r");
+	if (!f) {
+		return -errno;
+	}
+
+	n = fread(avg, 1, sizeof(avg), f);
+	if (!n) {
+		err = -errno;
+		goto cleanup;
+	}
+
+	memset(buf, 0, buf_len);
+	if (ts_pfx) {
+		time(&t);
+		tm = localtime(&t);
+		strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+		n = snprintf(buf, buf_len, "%8s loadavg: %s", ts, avg);
+	} else {
+		n = snprintf(buf, buf_len, "loadavg: %s", avg);
+	}
+
+	if (n >= buf_len)
+		err = -ERANGE;
+
+cleanup:
+	fclose(f);
+	return err;
+}
