@@ -17,7 +17,6 @@ const volatile bool full_path = false;
 
 struct create_arg {
 	u64 ts;
-	struct dentry *cwd_dentry;
 	struct vfsmount *cwd_vfsmnt;
 };
 
@@ -32,7 +31,6 @@ struct unlink_event {
 	__u64 delta_ns;
 	pid_t tgid;
 	struct dentry *dentry;
-	struct dentry *cwd_dentry;
 	struct vfsmount *cwd_vfsmnt;
 };
 
@@ -57,7 +55,6 @@ probe_create(struct dentry *dentry)
 	task = (struct task_struct *)bpf_get_current_task_btf();
 
 	arg.ts = bpf_ktime_get_ns();
-	arg.cwd_dentry = BPF_CORE_READ(task, fs, pwd.dentry);
 	arg.cwd_vfsmnt = BPF_CORE_READ(task, fs, pwd.mnt);
 
 	bpf_map_update_elem(&start, &dentry, &arg, 0);
@@ -138,7 +135,6 @@ int BPF_KPROBE(vfs_unlink, void *arg0, void *arg1, void *arg2)
 	unlink_event.delta_ns = delta_ns;
 	unlink_event.tgid = tgid;
 	unlink_event.dentry = has_arg ? arg2 : arg1;
-	unlink_event.cwd_dentry = arg->cwd_dentry;
 	unlink_event.cwd_vfsmnt = arg->cwd_vfsmnt;
 
 	bpf_map_update_elem(&currevent, &tid, &unlink_event, BPF_ANY);
@@ -181,9 +177,9 @@ int BPF_KRETPROBE(vfs_unlink_ret)
 
 	/* get full-path */
 	if (full_path && eventp->fname.pathes[0] != '/')
-		bpf_dentry_full_path(eventp->fname.pathes + NAME_MAX, NAME_MAX,
-				MAX_PATH_DEPTH - 1,
-				unlink_event->cwd_dentry,
+		bpf_dentry_full_path(eventp->fname.pathes, NAME_MAX,
+				MAX_PATH_DEPTH,
+				unlink_event->dentry,
 				unlink_event->cwd_vfsmnt,
 				&eventp->fname.failed, &eventp->fname.depth);
 
