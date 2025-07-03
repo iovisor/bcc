@@ -87,17 +87,6 @@ typedef struct ext_val {
     u64 count;
 } ext_val_t;
 
-struct tp_args {
-    u64 __unused__;
-    dev_t dev;
-    sector_t sector;
-    unsigned int nr_sector;
-    unsigned int bytes;
-    char rwbs[8];
-    char comm[16];
-    char cmd[];
-};
-
 struct start_key {
     dev_t dev;
     u32 _pad;
@@ -134,16 +123,6 @@ int trace_req_start(struct pt_regs *ctx, struct request *req)
     return __trace_req_start(key);
 }
 
-int trace_req_start_tp(struct tp_args *args)
-{
-    struct start_key key = {
-        .dev = args->dev,
-        .sector = args->sector
-    };
-
-    return __trace_req_start(key);
-}
-
 // output
 static int __trace_req_done(struct start_key key)
 {
@@ -176,8 +155,22 @@ int trace_req_done(struct pt_regs *ctx, struct request *req)
 
     return __trace_req_done(key);
 }
+"""
 
-int trace_req_done_tp(struct tp_args *args)
+tp_start_text = """
+TRACEPOINT_PROBE(block, START_TP)
+{
+    struct start_key key = {
+        .dev = args->dev,
+        .sector = args->sector
+    };
+
+    return __trace_req_start(key);
+}
+"""
+
+tp_done_text = """
+TRACEPOINT_PROBE(block, DONE_TP)
 {
     struct start_key key = {
         .dev = args->dev,
@@ -266,41 +259,54 @@ if debug or args.ebpf:
     if args.ebpf:
         exit()
 
-# load BPF program
-b = BPF(text=bpf_text)
+# Which kprobe/tracepoint to attach to.
+# We can attach to two IO start kprobes but only one of the other types.
+kprobe_start = set()
+tp_start = None
+kprobe_done = None
+tp_done = None
+
 if args.queued:
-    if BPF.tracepoint_exists("block", "block_io_start"):
-        b.attach_tracepoint(tp="block:block_io_start", fn_name="trace_req_start_tp")
-    elif BPF.get_kprobe_functions(b'__blk_account_io_start'):
-        b.attach_kprobe(event="__blk_account_io_start", fn_name="trace_req_start")
+    if BPF.get_kprobe_functions(b'__blk_account_io_start'):
+        kprobe_start.add("__blk_account_io_start")
     elif BPF.get_kprobe_functions(b'blk_account_io_start'):
-        b.attach_kprobe(event="blk_account_io_start", fn_name="trace_req_start")
+        kprobe_start.add("blk_account_io_start")
+    elif BPF.tracepoint_exists("block", "block_io_start"):
+        tp_start = "block_io_start"
     elif BPF.tracepoint_exists("block", "block_bio_queue"):
-        b.attach_tracepoint(tp="block:block_bio_queue", fn_name="trace_req_start_tp")
-    else:
-        if args.flags:
-            # Some flags are accessible in the rwbs field (RAHEAD, SYNC and META)
-            # but other aren't. Disable the -F option for tracepoint for now.
-            print("ERROR: blk_account_io_start probe not available. Can't use -F.")
-            exit()
+        tp_start = "block_bio_queue"
+
 else:
     if BPF.get_kprobe_functions(b'blk_start_request'):
-        b.attach_kprobe(event="blk_start_request", fn_name="trace_req_start")
-    b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_req_start")
+        kprobe_start.add("blk_start_request")
+    kprobe_start.add("blk_mq_start_request")
 
-if BPF.tracepoint_exists("block", "block_io_done"):
-    b.attach_tracepoint(tp="block:block_io_done", fn_name="trace_req_done_tp")
-elif BPF.get_kprobe_functions(b'__blk_account_io_done'):
-    b.attach_kprobe(event="__blk_account_io_done", fn_name="trace_req_done")
+if BPF.get_kprobe_functions(b'__blk_account_io_done'):
+    kprobe_done = "__blk_account_io_done"
 elif BPF.get_kprobe_functions(b'blk_account_io_done'):
-    b.attach_kprobe(event="blk_account_io_done", fn_name="trace_req_done")
+    kprobe_done = "blk_account_io_done"
+elif BPF.tracepoint_exists("block", "block_io_done"):
+    tp_done = "block_io_done"
 elif BPF.tracepoint_exists("block", "block_rq_complete"):
-    b.attach_tracepoint(tp="block:block_rq_complete", fn_name="trace_req_done_tp")
-else:
-    if args.flags:
-        print("ERROR: blk_account_io_done probe not available. Can't use -F.")
-        exit()
+    tp_done = "block_rq_complete"
 
+if args.flags and (tp_start or tp_done):
+            # Some flags are accessible in the rwbs field (RAHEAD, SYNC and META)
+            # but other aren't. Disable the -F option for tracepoint for now.
+            print("ERROR: blk_account_io_start/done probes not available. Can't use -F.")
+            exit()
+
+if tp_start:
+    bpf_text += tp_start_text.replace("START_TP", tp_start)
+if tp_done:
+    bpf_text += tp_done_text.replace("DONE_TP", tp_done)
+
+# load BPF program
+b = BPF(text=bpf_text)
+for i in kprobe_start:
+    b.attach_kprobe(event=i, fn_name="trace_req_start")
+if kprobe_done:
+    b.attach_kprobe(event=kprobe_done, fn_name="trace_req_done")
 
 if not args.json:
     print("Tracing block device I/O... Hit Ctrl-C to end.")

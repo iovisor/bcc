@@ -90,17 +90,6 @@ struct val_t {
     u32 io;
 };
 
-struct tp_args {
-    u64 __unused__;
-    dev_t dev;
-    sector_t sector;
-    unsigned int nr_sector;
-    unsigned int bytes;
-    char rwbs[8];
-    char comm[16];
-    char cmd[];
-};
-
 struct hash_key {
     dev_t dev;
     u32 _pad;
@@ -138,16 +127,6 @@ int trace_pid_start(struct pt_regs *ctx, struct request *req)
     struct hash_key key = {
         .dev = ddevt(req->__RQ_DISK__),
         .sector = req->__sector
-    };
-
-    return __trace_pid_start(key);
-}
-
-int trace_pid_start_tp(struct tp_args *args)
-{
-    struct hash_key key = {
-        .dev = args->dev,
-        .sector = args->sector
     };
 
     return __trace_pid_start(key);
@@ -246,8 +225,22 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
 
     return __trace_req_completion(key);
 }
+"""
 
-int trace_req_completion_tp(struct tp_args *args)
+tp_start_text = """
+TRACEPOINT_PROBE(block, block_io_start)
+{
+    struct hash_key key = {
+        .dev = args->dev,
+        .sector = args->sector
+    };
+
+    return __trace_pid_start(key);
+}
+"""
+
+tp_done_text = """
+TRACEPOINT_PROBE(block, block_io_done)
 {
     struct hash_key key = {
         .dev = args->dev,
@@ -272,30 +265,40 @@ if args.pid is not None:
 else:
     bpf_text = bpf_text.replace('FILTER_PID', '0')
 
-b = BPF(text=bpf_text)
 if BPF.tracepoint_exists("block", "block_io_start"):
-    b.attach_tracepoint(tp="block:block_io_start", fn_name="trace_pid_start_tp")
-elif BPF.get_kprobe_functions(b'__blk_account_io_start'):
-    b.attach_kprobe(event="__blk_account_io_start", fn_name="trace_pid_start")
-elif BPF.get_kprobe_functions(b'blk_account_io_start'):
-    b.attach_kprobe(event="blk_account_io_start", fn_name="trace_pid_start")
+    bpf_text += tp_start_text
+    tp_start = True
 else:
-    print("ERROR: No found any block io start probe/tp.")
-    exit()
+    tp_start = False
+
+if BPF.tracepoint_exists("block", "block_io_done"):
+    bpf_text += tp_done_text
+    tp_done = True
+else:
+    tp_done = False
+
+b = BPF(text=bpf_text)
+if not tp_start:
+    if BPF.get_kprobe_functions(b'__blk_account_io_start'):
+        b.attach_kprobe(event="__blk_account_io_start", fn_name="trace_pid_start")
+    elif BPF.get_kprobe_functions(b'blk_account_io_start'):
+        b.attach_kprobe(event="blk_account_io_start", fn_name="trace_pid_start")
+    else:
+        print("ERROR: No found any block io start probe/tp.")
+        exit()
 
 if BPF.get_kprobe_functions(b'blk_start_request'):
     b.attach_kprobe(event="blk_start_request", fn_name="trace_req_start")
 b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_req_start")
 
-if BPF.tracepoint_exists("block", "block_io_done"):
-    b.attach_tracepoint(tp="block:block_io_done", fn_name="trace_req_completion_tp")
-elif BPF.get_kprobe_functions(b'__blk_account_io_done'):
-    b.attach_kprobe(event="__blk_account_io_done", fn_name="trace_req_completion")
-elif BPF.get_kprobe_functions(b'blk_account_io_done'):
-    b.attach_kprobe(event="blk_account_io_done", fn_name="trace_req_completion")
-else:
-    print("ERROR: No found any block io done probe/tp.")
-    exit()
+if not tp_done:
+    if BPF.get_kprobe_functions(b'__blk_account_io_done'):
+        b.attach_kprobe(event="__blk_account_io_done", fn_name="trace_req_completion")
+    elif BPF.get_kprobe_functions(b'blk_account_io_done'):
+        b.attach_kprobe(event="blk_account_io_done", fn_name="trace_req_completion")
+    else:
+        print("ERROR: No found any block io done probe/tp.")
+        exit()
 
 # check whether hash table batch ops is supported
 htab_batch_ops = True if BPF.kernel_struct_has_field(b'bpf_map_ops',
