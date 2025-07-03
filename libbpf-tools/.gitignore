@@ -60,6 +60,7 @@
 /tcpconnect
 /tcpconnlat
 /tcplife
+/tcpdrop
 /tcppktlat
 /tcptracer
 /tcprtt

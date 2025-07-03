@@ -86,6 +86,7 @@ APPS = \
 	tcptracer \
 	tcpconnect \
 	tcpconnlat \
+	tcpdrop \
 	tcplife \
 	tcppktlat \
 	tcprtt \
