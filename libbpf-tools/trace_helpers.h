@@ -121,4 +121,7 @@ int str_to_int(const char *src, void *dest);
 /* converts a string to a long integer */
 int str_to_long(const char *src, void *dest);
 
+/* get loadavg string */
+int str_loadavg(char *buf, size_t buf_len, bool ts_pfx);
+
 #endif /* __TRACE_HELPERS_H */
