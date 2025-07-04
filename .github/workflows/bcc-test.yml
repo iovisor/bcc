@@ -35,6 +35,9 @@ jobs:
           RW_ENGINE_ENABLED: ON
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        fetch-tags: true
     - uses: dorny/paths-filter@v3
       id: changes
       with:
@@ -138,6 +141,9 @@ jobs:
           PYTHON_TEST_LOGFILE: critical.log
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        fetch-tags: true
     - uses: dorny/paths-filter@v3
       id: changes
       with:
