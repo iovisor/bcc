@@ -26,7 +26,7 @@ def setUpModule():
     # Build the memory leaking application.
     c_src = 'test_tools_memleak_leaker_app.c'
     tmp_dir = tempfile.mkdtemp(prefix='bcc-test-memleak-')
-    c_src_full = os.path.dirname(sys.argv[0]) + os.path.sep + c_src
+    c_src_full = os.path.abspath(os.path.dirname(sys.argv[0])) + os.path.sep + c_src
     exec_dst = tmp_dir + os.path.sep + 'leaker_app'
 
     if subprocess.call(['gcc', '-g', '-O0', '-o', exec_dst, c_src_full]) != 0:
