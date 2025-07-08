@@ -1,0 +1,129 @@
+.TH SOFTIRQSLOWER 8 "2025-07-08" "BCC Tools" "Linux Performance Analysis"
+.SH NAME
+softirqslower \- Trace slow soft IRQ (soft interrupt) handling events
+.SH SYNOPSIS
+.B softirqslower.py
+.RI [min_us]
+.br
+.B softirqslower.py
+[
+.B \-c
+.IR CPU ]
+[
+.I min_us
+]
+
+.SH DESCRIPTION
+The
+.B softirqslower
+tool traces and reports soft interrupt (softirq) events that exceed a specified latency threshold. It measures two critical performance metrics:
+
+1. \fBSoftirq Runtime\fR - Actual execution duration of the softirq handler
+2. \fBHardIRQ-to-SoftIRQ Latency\fR - Delay from when the softirq is triggered to when its execution begins
+
+This tool is essential for diagnosing performance issues related to network latency, disk I/O stalls, and CPU scheduling delays in the Linux kernel.
+
+.SH OPTIONS
+.TP
+.BI min_us
+Minimum softirq latency to trace, in microseconds (default: 10000)
+.TP
+.BR \-c ", " \-\-cpu " " \fICPU
+Trace only this specific CPU core. Useful for isolating per-CPU performance issues.
+
+.SH EXAMPLES
+.TP
+Trace softirqs exceeding default 10,000μs latency threshold:
+.B softirqslower.py
+.TP
+Trace softirqs with latency over 500μs:
+.B softirqslower.py 500
+.TP
+Trace latency events occurring only on CPU core 3:
+.B softirqslower.py \-c 3
+.TP
+Trace latency over 5ms on CPU 0:
+.B softirqslower.py \-c 0 5000
+
+.SH OUTPUT DESCRIPTION
+The tool outputs events in the following format:
+.RS
+.PP
+\fBTIME\fR [\fBCPU#\fR] \fBSOFTIRQ_TYPE\fR (runtime=\fBµs\fR wakeup=\fBµs\fR)
+.RE
+.PP
+Where:
+.TP
+.B TIME
+Timestamp when the event occurred (HH:MM:SS)
+.TP
+.B CPU#
+CPU core where the softirq was handled
+.TP
+.B SOFTIRQ_TYPE
+Softirq category (NET_RX, TASKLET, TIMER, etc.)
+.TP
+.B runtime
+Actual execution time in microseconds
+.TP
+.B wakeup
+Delay from trigger to execution start in microseconds
+
+.SH FIELDS
+.TP
+.B SOFIRQ TYPES
+Identified softirq categories include:
+.RS
+.TP 12
+.B NET_RX
+Network packet reception
+.TP
+.B NET_TX
+Network packet transmission
+.TP
+.B TIMER
+Timer callbacks
+.TP
+.B TASKLET
+Tasklet execution
+.TP
+.B SCHED
+Scheduler operations
+.TP
+.B HRTIMER
+High-resolution timers
+.TP
+.B RCU
+Read-Copy-Update synchronization
+.RE
+
+.SH INTERPRETATION
+.TP
+.B High runtime values (>1000µs)
+Indicate computationally expensive operations - review kernel handler functions
+.TP
+.B High wakeup latency (>200µs)
+Suggest scheduling delays - possible causes:
+.RS
+- CPU core saturation
+- Higher priority task preemption
+- Interrupt throttling
+- ksoftirqd scheduling delays
+.RE
+
+.SH SEE ALSO
+.BR runqslower (8),
+.BR hardirqs (8),
+.BR softirqs (8),
+.BR trace (8),
+.BR funclatency (8),
+.BR /usr/share/bcc/man/man8/softirqslower.8.gz
+
+.SH BUGS
+Submit bug reports via:
+.UR https://github.com/iovisor/bcc
+GitHub Issues
+.UE
+
+.SH AUTHOR
+Chenyue Zhou
