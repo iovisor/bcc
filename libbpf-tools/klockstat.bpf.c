@@ -832,6 +832,201 @@ int BPF_KPROBE(kprobe_up_write, struct rw_semaphore *lock)
 	return 0;
 }
 
+/* CONFIG_DEBUG_LOCK_ALLOC is enabled */
+
+SEC("kprobe/mutex_lock_nested")
+int BPF_KPROBE(kprobe_mutex_lock_nested, struct mutex *lock)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+
+	bpf_map_update_elem(&locks, &tid, &lock, BPF_ANY);
+	lock_contended(ctx, lock);
+	return 0;
+}
+
+SEC("kretprobe/mutex_lock_nested")
+int BPF_KRETPROBE(kprobe_mutex_lock_exit_nested, long ret)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+	void **lock;
+
+	lock = bpf_map_lookup_elem(&locks, &tid);
+	if (!lock)
+		return 0;
+
+	bpf_map_delete_elem(&locks, &tid);
+	lock_acquired(*lock);
+	return 0;
+}
+
+SEC("kprobe/mutex_lock_interruptible_nested")
+int BPF_KPROBE(kprobe_mutex_lock_interruptible_nested, struct mutex *lock)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+
+	bpf_map_update_elem(&locks, &tid, &lock, BPF_ANY);
+	lock_contended(ctx, lock);
+	return 0;
+}
+
+SEC("kretprobe/mutex_lock_interruptible_nested")
+int BPF_KRETPROBE(kprobe_mutex_lock_interruptible_exit_nested, long ret)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+	void **lock;
+
+	lock = bpf_map_lookup_elem(&locks, &tid);
+	if (!lock)
+		return 0;
+
+	bpf_map_delete_elem(&locks, &tid);
+
+	if (ret)
+		lock_aborted(*lock);
+	else
+		lock_acquired(*lock);
+	return 0;
+}
+
+SEC("kprobe/mutex_lock_killable_nested")
+int BPF_KPROBE(kprobe_mutex_lock_killable_nested, struct mutex *lock)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+
+	bpf_map_update_elem(&locks, &tid, &lock, BPF_ANY);
+	lock_contended(ctx, lock);
+	return 0;
+}
+
+SEC("kretprobe/mutex_lock_killable_nested")
+int BPF_KRETPROBE(kprobe_mutex_lock_killable_exit_nested, long ret)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+	void **lock;
+
+	lock = bpf_map_lookup_elem(&locks, &tid);
+	if (!lock)
+		return 0;
+
+	bpf_map_delete_elem(&locks, &tid);
+
+	if (ret)
+		lock_aborted(*lock);
+	else
+		lock_acquired(*lock);
+	return 0;
+}
+
+SEC("kprobe/down_read_nested")
+int BPF_KPROBE(kprobe_down_read_nested, struct rw_semaphore *lock)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+
+	bpf_map_update_elem(&locks, &tid, &lock, BPF_ANY);
+	lock_contended(ctx, lock);
+	return 0;
+}
+
+SEC("kretprobe/down_read_nested")
+int BPF_KRETPROBE(kprobe_down_read_exit_nested, long ret)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+	void **lock;
+
+	lock = bpf_map_lookup_elem(&locks, &tid);
+	if (!lock)
+		return 0;
+
+	bpf_map_delete_elem(&locks, &tid);
+
+	lock_acquired(*lock);
+	return 0;
+}
+
+SEC("kprobe/down_read_killable_nested")
+int BPF_KPROBE(kprobe_down_read_killable_nested, struct rw_semaphore *lock)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+
+	bpf_map_update_elem(&locks, &tid, &lock, BPF_ANY);
+	lock_contended(ctx, lock);
+	return 0;
+}
+
+SEC("kretprobe/down_read_killable_nested")
+int BPF_KRETPROBE(kprobe_down_read_killable_exit_nested, long ret)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+	void **lock;
+
+	lock = bpf_map_lookup_elem(&locks, &tid);
+	if (!lock)
+		return 0;
+
+	bpf_map_delete_elem(&locks, &tid);
+
+	if (ret)
+		lock_aborted(*lock);
+	else
+		lock_acquired(*lock);
+	return 0;
+}
+
+SEC("kprobe/down_write_nested")
+int BPF_KPROBE(kprobe_down_write_nested, struct rw_semaphore *lock)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+
+	bpf_map_update_elem(&locks, &tid, &lock, BPF_ANY);
+	lock_contended(ctx, lock);
+	return 0;
+}
+
+SEC("kretprobe/down_write_nested")
+int BPF_KRETPROBE(kprobe_down_write_exit_nested, long ret)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+	void **lock;
+
+	lock = bpf_map_lookup_elem(&locks, &tid);
+	if (!lock)
+		return 0;
+
+	bpf_map_delete_elem(&locks, &tid);
+
+	lock_acquired(*lock);
+	return 0;
+}
+
+SEC("kprobe/down_write_killable_nested")
+int BPF_KPROBE(kprobe_down_write_killable_nested, struct rw_semaphore *lock)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+
+	bpf_map_update_elem(&locks, &tid, &lock, BPF_ANY);
+	lock_contended(ctx, lock);
+	return 0;
+}
+
+SEC("kretprobe/down_write_killable_nested")
+int BPF_KRETPROBE(kprobe_down_write_killable_exit_nested, long ret)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+	void **lock;
+
+	lock = bpf_map_lookup_elem(&locks, &tid);
+	if (!lock)
+		return 0;
+
+	bpf_map_delete_elem(&locks, &tid);
+
+	if (ret)
+		lock_aborted(*lock);
+	else
+		lock_acquired(*lock);
+	return 0;
+}
+
 SEC("kprobe/rtnetlink_rcv_msg")
 int BPF_KPROBE(kprobe_rtnetlink_rcv_msg, struct sk_buff *skb, struct nlmsghdr *nlh,
 	       struct netlink_ext_ack *ext)
