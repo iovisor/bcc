@@ -200,7 +200,7 @@ const char argp_args_doc[] =
 "./memleak -s 5\n"
 "        Trace roughly every 5th allocation, to reduce overhead\n"
 "./memleak -p $(pidof allocs) -S je_\n"
-"        Trace task who sue jemalloc\n"
+"        Trace task who use jemalloc\n"
 "";
 
 static const struct argp_option argp_options[] = {
