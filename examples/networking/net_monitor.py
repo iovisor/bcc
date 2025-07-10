@@ -93,8 +93,8 @@ function_skb_matching = bpf.load_func("packet_monitor", BPF.SOCKET_FILTER)
 
 BPF.attach_raw_socket(function_skb_matching, INTERFACE)
 
-    # retrieeve packet_cnt map
-packet_cnt = bpf.get_table('packet_cnt')    # retrieeve packet_cnt map
+    # retrieve packet_cnt map
+packet_cnt = bpf.get_table('packet_cnt')    # retrieve packet_cnt map
 
 def decimal_to_human(input_value):
     try:
@@ -124,7 +124,7 @@ try:
             decimal_to_human(str(dst)) + ' ' + str(pkt_num) + ' ' + 'time : ' + formatted_time
             print(monitor_result)
 
-        packet_cnt.clear() # delete map entires after printing output. confiremd it deletes values and keys too 
+        packet_cnt.clear() # delete map entries after printing output. confirmed it deletes values and keys too 
         
 except KeyboardInterrupt:
     sys.stdout.close()
