@@ -19,10 +19,12 @@
 # 06-Jan-2019   Takuma Kume     Support filtering by UID
 # 21-Aug-2022   Rocky Xing      Support showing full path for an open file.
 # 06-Sep-2022   Rocky Xing      Support setting size of the perf ring buffer.
+# 13-Jul-2025   Rocky Xing      Execute a program and trace it's open() syscalls.
 
 from __future__ import print_function
 from bcc import ArgString, BPF
 from bcc.containers import filter_by_containers
+from bcc.exec import run_cmd, cmd_ready, cmd_exited
 from bcc.utils import printb
 import argparse
 from collections import defaultdict
@@ -82,8 +84,20 @@ parser.add_argument("-F", "--full-path", action="store_true",
 parser.add_argument("-b", "--buffer-pages", type=int, default=64,
     help="size of the perf ring buffer "
         "(must be a power of two number of pages and defaults to 64)")
+parser.add_argument('--exec', nargs=argparse.REMAINDER,
+    help="execute command (as the last parameter, "
+        "supports multiple parameters, for example: --exec ls -l /tmp")
 args = parser.parse_args()
 debug = 0
+
+if args.pid and args.exec:
+    print("ERROR: can only use -p or --exec. Exiting.")
+    exit()
+
+if args.exec is not None and len(args.exec) == 0:
+    print("ERROR: --exec without command. Exiting.")
+    exit()
+
 if args.duration:
     args.duration = timedelta(seconds=int(args.duration))
 flag_filter_mask = 0
@@ -399,6 +413,12 @@ elif args.pid:
         'if (pid != %s) { return 0; }' % args.pid)
     bpf_text = bpf_text.replace('KFUNC_PID_TID_FILTER',
         'if (pid != %s) { events.ringbuf_discard(data, 0); return 0; }' % args.pid)
+elif args.exec:
+    child_pid = run_cmd(args.exec)
+    bpf_text = bpf_text.replace('KPROBE_PID_TID_FILTER',
+        'if (pid != %s) { return 0; }' % child_pid)
+    bpf_text = bpf_text.replace('KFUNC_PID_TID_FILTER',
+        'if (pid != %s) { events.ringbuf_discard(data, 0); return 0; }' % child_pid)
 else:
     bpf_text = bpf_text.replace('KPROBE_PID_TID_FILTER', '')
     bpf_text = bpf_text.replace('KFUNC_PID_TID_FILTER', '')
@@ -514,6 +534,9 @@ if not is_support_kfunc:
         b.attach_kprobe(event=fnname_openat2, fn_name="syscall__trace_entry_openat2")
         b.attach_kretprobe(event=fnname_openat2, fn_name="trace_return")
 
+if args.exec:
+   cmd_ready()
+
 initial_ts = 0
 
 # header
@@ -603,4 +626,6 @@ while not args.duration or datetime.now() - start_time < args.duration:
     try:
         b.ring_buffer_poll()
     except KeyboardInterrupt:
+        exit()
+    if args.exec and cmd_exited():
         exit()
