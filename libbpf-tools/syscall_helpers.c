@@ -124,15 +124,16 @@ void free_syscall_names(void)
 }
 
 /*
- * Syscall table for Linux x86_64.
+ * Syscall table for Linux x86_64. Automatically generated from
+ * https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/arch/x86/entry/syscalls/syscall_64.tbl?h=v6.15.6
+ * using the following commands:
  *
- * Semi-automatically generated from strace/linux/x86_64/syscallent.h and
- * linux/syscallent-common.h using the following commands:
+ * cat arch/x86/entry/syscalls/syscall_64.tbl \
+ *     | awk 'BEGIN    { print "static const char *syscall_names_x86_64[] = {" }
+ *            /^[0-9]/ { print "\t["$1"] = \""$3"\","                          }
+ *            END      { print "};"                                            }'
  *
- *  awk -F\" '/SEN/{printf("%d %s\n", substr($0,2,3), $(NF-1));}' syscallent.h
- *  awk '/SEN/ { printf("%d %s\n", $3, $9); }' syscallent-common.h
- *
- * (The idea is taken from src/python/bcc/syscall.py.)
+ * (The idea is taken from src/python/bcc/syscall.py)
  */
 #ifdef __x86_64__
 static const char *syscall_names_x86_64[] = {
@@ -471,6 +472,7 @@ static const char *syscall_names_x86_64[] = {
 	[332] = "statx",
 	[333] = "io_pgetevents",
 	[334] = "rseq",
+	[335] = "uretprobe",
 	[424] = "pidfd_send_signal",
 	[425] = "io_uring_setup",
 	[426] = "io_uring_enter",
@@ -483,8 +485,74 @@ static const char *syscall_names_x86_64[] = {
 	[433] = "fspick",
 	[434] = "pidfd_open",
 	[435] = "clone3",
+	[436] = "close_range",
 	[437] = "openat2",
 	[438] = "pidfd_getfd",
+	[439] = "faccessat2",
+	[440] = "process_madvise",
+	[441] = "epoll_pwait2",
+	[442] = "mount_setattr",
+	[443] = "quotactl_fd",
+	[444] = "landlock_create_ruleset",
+	[445] = "landlock_add_rule",
+	[446] = "landlock_restrict_self",
+	[447] = "memfd_secret",
+	[448] = "process_mrelease",
+	[449] = "futex_waitv",
+	[450] = "set_mempolicy_home_node",
+	[451] = "cachestat",
+	[452] = "fchmodat2",
+	[453] = "map_shadow_stack",
+	[454] = "futex_wake",
+	[455] = "futex_wait",
+	[456] = "futex_requeue",
+	[457] = "statmount",
+	[458] = "listmount",
+	[459] = "lsm_get_self_attr",
+	[460] = "lsm_set_self_attr",
+	[461] = "lsm_list_modules",
+	[462] = "mseal",
+	[463] = "setxattrat",
+	[464] = "getxattrat",
+	[465] = "listxattrat",
+	[466] = "removexattrat",
+	[467] = "open_tree_attr",
+	[512] = "rt_sigaction",
+	[513] = "rt_sigreturn",
+	[514] = "ioctl",
+	[515] = "readv",
+	[516] = "writev",
+	[517] = "recvfrom",
+	[518] = "sendmsg",
+	[519] = "recvmsg",
+	[520] = "execve",
+	[521] = "ptrace",
+	[522] = "rt_sigpending",
+	[523] = "rt_sigtimedwait",
+	[524] = "rt_sigqueueinfo",
+	[525] = "sigaltstack",
+	[526] = "timer_create",
+	[527] = "mq_notify",
+	[528] = "kexec_load",
+	[529] = "waitid",
+	[530] = "set_robust_list",
+	[531] = "get_robust_list",
+	[532] = "vmsplice",
+	[533] = "move_pages",
+	[534] = "preadv",
+	[535] = "pwritev",
+	[536] = "rt_tgsigqueueinfo",
+	[537] = "recvmmsg",
+	[538] = "sendmmsg",
+	[539] = "process_vm_readv",
+	[540] = "process_vm_writev",
+	[541] = "setsockopt",
+	[542] = "getsockopt",
+	[543] = "io_setup",
+	[544] = "io_submit",
+	[545] = "execveat",
+	[546] = "preadv2",
+	[547] = "pwritev2",
 };
 size_t syscall_names_x86_64_size = sizeof(syscall_names_x86_64)/sizeof(char*);
 #elif defined(__aarch64__) || defined(__riscv) || defined(__loongarch64)

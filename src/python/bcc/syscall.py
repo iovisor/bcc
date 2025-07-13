@@ -18,16 +18,15 @@
 import subprocess
 import platform
 
+# Syscall table for Linux x86_64, not very recent. Automatically generated from
+# https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/arch/x86/entry/syscalls/syscall_64.tbl?h=v6.15.6
+# using the following command:
 #
-# Syscall table for Linux x86_64, not very recent.
-# Automatically generated from strace/linux/x86_64/syscallent.h using the
-# following command:
-#
-# cat syscallent.h | awk -F, '{ gsub(/[ \t"}]/, "", $4);
-#                               gsub(/[\[\] \t{]/, "", $1); split($1, a, "=");
-#                               print "    "a[1]": b\""$4"\","; }
-#                               BEGIN { print "syscalls = {" }
-#                               END { print "}" '}
+# cat arch/x86/entry/syscalls/syscall_64.tbl \
+#     | awk 'BEGIN    { print "syscalls = {"         }
+#            /^[0-9]/ { print "    "$1": b\""$3"\"," }
+#            END      { print "}"                    }'
+
 syscalls = {
     0: b"read",
     1: b"write",
@@ -364,6 +363,87 @@ syscalls = {
     332: b"statx",
     333: b"io_pgetevents",
     334: b"rseq",
+    335: b"uretprobe",
+    424: b"pidfd_send_signal",
+    425: b"io_uring_setup",
+    426: b"io_uring_enter",
+    427: b"io_uring_register",
+    428: b"open_tree",
+    429: b"move_mount",
+    430: b"fsopen",
+    431: b"fsconfig",
+    432: b"fsmount",
+    433: b"fspick",
+    434: b"pidfd_open",
+    435: b"clone3",
+    436: b"close_range",
+    437: b"openat2",
+    438: b"pidfd_getfd",
+    439: b"faccessat2",
+    440: b"process_madvise",
+    441: b"epoll_pwait2",
+    442: b"mount_setattr",
+    443: b"quotactl_fd",
+    444: b"landlock_create_ruleset",
+    445: b"landlock_add_rule",
+    446: b"landlock_restrict_self",
+    447: b"memfd_secret",
+    448: b"process_mrelease",
+    449: b"futex_waitv",
+    450: b"set_mempolicy_home_node",
+    451: b"cachestat",
+    452: b"fchmodat2",
+    453: b"map_shadow_stack",
+    454: b"futex_wake",
+    455: b"futex_wait",
+    456: b"futex_requeue",
+    457: b"statmount",
+    458: b"listmount",
+    459: b"lsm_get_self_attr",
+    460: b"lsm_set_self_attr",
+    461: b"lsm_list_modules",
+    462: b"mseal",
+    463: b"setxattrat",
+    464: b"getxattrat",
+    465: b"listxattrat",
+    466: b"removexattrat",
+    467: b"open_tree_attr",
+    512: b"rt_sigaction",
+    513: b"rt_sigreturn",
+    514: b"ioctl",
+    515: b"readv",
+    516: b"writev",
+    517: b"recvfrom",
+    518: b"sendmsg",
+    519: b"recvmsg",
+    520: b"execve",
+    521: b"ptrace",
+    522: b"rt_sigpending",
+    523: b"rt_sigtimedwait",
+    524: b"rt_sigqueueinfo",
+    525: b"sigaltstack",
+    526: b"timer_create",
+    527: b"mq_notify",
+    528: b"kexec_load",
+    529: b"waitid",
+    530: b"set_robust_list",
+    531: b"get_robust_list",
+    532: b"vmsplice",
+    533: b"move_pages",
+    534: b"preadv",
+    535: b"pwritev",
+    536: b"rt_tgsigqueueinfo",
+    537: b"recvmmsg",
+    538: b"sendmmsg",
+    539: b"process_vm_readv",
+    540: b"process_vm_writev",
+    541: b"setsockopt",
+    542: b"getsockopt",
+    543: b"io_setup",
+    544: b"io_submit",
+    545: b"execveat",
+    546: b"preadv2",
+    547: b"pwritev2",
 }
 
 # Try to use ausyscall if it is available, because it can give us an up-to-date
