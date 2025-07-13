@@ -227,9 +227,9 @@ bpf_text_kprobe_body = """
     u32 tid = id;       // Cast and get the lower part
     u32 uid = bpf_get_current_uid_gid();
 
-    PID_TID_FILTER
-    UID_FILTER
-    FLAGS_FILTER
+    KPROBE_PID_TID_FILTER
+    KPROBE_UID_FILTER
+    KPROBE_FLAGS_FILTER
 
     if (container_should_be_filtered()) {
         return 0;
@@ -327,10 +327,11 @@ bpf_text_kfunc_body = """
     if (!data)
         return 0;
 
-    PID_TID_FILTER
-    UID_FILTER
-    FLAGS_FILTER
+    KFUNC_PID_TID_FILTER
+    KFUNC_UID_FILTER
+    KFUNC_FLAGS_FILTER
     if (container_should_be_filtered()) {
+        events.ringbuf_discard(data, 0);
         return 0;
     }
 
@@ -389,28 +390,39 @@ else:
         bpf_text += bpf_text_kprobe_body
 
 if args.tid:  # TID trumps PID
-    bpf_text = bpf_text.replace('PID_TID_FILTER',
+    bpf_text = bpf_text.replace('KPROBE_PID_TID_FILTER',
         'if (tid != %s) { return 0; }' % args.tid)
+    bpf_text = bpf_text.replace('KFUNC_PID_TID_FILTER',
+        'if (tid != %s) { events.ringbuf_discard(data, 0); return 0; }' % args.tid)
 elif args.pid:
-    bpf_text = bpf_text.replace('PID_TID_FILTER',
+    bpf_text = bpf_text.replace('KPROBE_PID_TID_FILTER',
         'if (pid != %s) { return 0; }' % args.pid)
+    bpf_text = bpf_text.replace('KFUNC_PID_TID_FILTER',
+        'if (pid != %s) { events.ringbuf_discard(data, 0); return 0; }' % args.pid)
 else:
-    bpf_text = bpf_text.replace('PID_TID_FILTER', '')
+    bpf_text = bpf_text.replace('KPROBE_PID_TID_FILTER', '')
+    bpf_text = bpf_text.replace('KFUNC_PID_TID_FILTER', '')
 if args.uid:
-    bpf_text = bpf_text.replace('UID_FILTER',
+    bpf_text = bpf_text.replace('KPROBE_UID_FILTER',
         'if (uid != %s) { return 0; }' % args.uid)
+    bpf_text = bpf_text.replace('KFUNC_UID_FILTER',
+        'if (uid != %s) { events.ringbuf_discard(data, 0); return 0; }' % args.uid)
 else:
-    bpf_text = bpf_text.replace('UID_FILTER', '')
+    bpf_text = bpf_text.replace('KPROBE_UID_FILTER', '')
+    bpf_text = bpf_text.replace('KFUNC_UID_FILTER', '')
 if args.buffer_pages:
     bpf_text = bpf_text.replace('BUFFER_PAGES', '%s' % args.buffer_pages)
 else:
     bpf_text = bpf_text.replace('BUFFER_PAGES', '%d' % 64)
 bpf_text = filter_by_containers(args) + bpf_text
 if args.flag_filter:
-    bpf_text = bpf_text.replace('FLAGS_FILTER',
+    bpf_text = bpf_text.replace('KPROBE_FLAGS_FILTER',
         'if (!(flags & %d)) { return 0; }' % flag_filter_mask)
+    bpf_text = bpf_text.replace('KFUNC_FLAGS_FILTER',
+        'if (!(flags & %d)) { events.ringbuf_discard(data, 0); return 0; }' % flag_filter_mask)
 else:
-    bpf_text = bpf_text.replace('FLAGS_FILTER', '')
+    bpf_text = bpf_text.replace('KPROBE_FLAGS_FILTER', '')
+    bpf_text = bpf_text.replace('KFUNC_FLAGS_FILTER', '')
 if not (args.extended_fields or args.flag_filter):
     bpf_text = '\n'.join(x for x in bpf_text.split('\n')
         if 'EXTENDED_STRUCT_MEMBER' not in x)
