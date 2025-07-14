@@ -11,14 +11,17 @@
 # 15-Feb-2017   Sasha Goldshtein    Created this.
 # 16-May-2022   Rocky Xing          Added TID filter support.
 # 26-Jul-2022   Rocky Xing          Added syscall filter support.
+# 12-Jul-2025   Rocky Xing          Execute a program and trace it's syscalls.
 
 from time import sleep, strftime
 import argparse
 import errno
 import itertools
+import os
 import sys
 import signal
 from bcc import BPF
+from bcc.exec import run_cmd, cmd_ready, cmd_exited
 from bcc.utils import printb
 from bcc.syscall import syscall_name, syscalls
 
@@ -73,11 +76,22 @@ parser.add_argument("--syscall", type=str,
     help="trace this syscall only (use option -l to get all recognized syscalls)")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument('--exec', nargs=argparse.REMAINDER,
+    help="execute command (as the last parameter, "
+        "supports multiple parameters, for example: --exec ls -l /tmp")
 args = parser.parse_args()
 if args.duration and not args.interval:
     args.interval = args.duration
 if not args.interval:
     args.interval = 99999999
+
+if args.pid and args.exec:
+    print("ERROR: can only use -p or --exec. Exiting.")
+    exit()
+
+if args.exec is not None and len(args.exec) == 0:
+    print("ERROR: --exec without command. Exiting.")
+    exit()
 
 syscall_nr = -1
 if args.syscall is not None:
@@ -211,6 +225,8 @@ TRACEPOINT_PROBE(raw_syscalls, sys_exit) {
 
 if args.pid:
     text = ("#define FILTER_PID %d\n" % args.pid) + text
+elif args.exec:
+    text = ("#define FILTER_PID %d\n" % run_cmd(args.exec)) + text
 elif args.tid:
     text = ("#define FILTER_TID %d\n" % args.tid) + text
 elif args.ppid:
@@ -230,6 +246,9 @@ if args.ebpf:
     exit()
 
 bpf = BPF(text=text)
+
+if args.exec:
+   cmd_ready()
 
 def print_stats():
     if args.latency:
@@ -302,6 +321,8 @@ while True:
         exiting = 1
         signal.signal(signal.SIGINT, signal_ignore)
     if args.duration and seconds >= args.duration:
+        exiting = 1
+    if args.exec and cmd_exited():
         exiting = 1
 
     print_stats()
