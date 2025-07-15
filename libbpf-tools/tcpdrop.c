@@ -181,18 +181,6 @@ static int parse_reason_enum(void)
 	return 0;
 }
 
-static void print_drop_reasons(void)
-{
-	if (!drop_reason_inited) {
-		return;
-	}
-
-	printf("Parsed drop reasons:\n");
-	for (int i = 0; i <= drop_reason_max; i++) {
-		printf("  ID: %d, Name: %s\n", i, drop_reasons[i]);
-	}
-}
-
 static const char *get_drop_reason_name(int reason)
 {
 	if (reason >= 0 && reason <= drop_reason_max && drop_reason_inited)
@@ -399,8 +387,8 @@ int main(int argc, char **argv)
 	}
 
 	parse_reason_enum();
-	if (drop_reason_inited) {
-		print_drop_reasons();
+	if (!drop_reason_inited) {
+		warn("Failed to parse drop reasons, some reasons may show as UNKNOWN.\n");
 	}
 
 	rb = ring_buffer__new(bpf_map__fd(skel->maps.events), handle_event,
