@@ -396,11 +396,19 @@ int ClangLoader::do_compile(
                     flags_cstr_rem.end());
 
   // set up the error reporting class
+#if LLVM_VERSION_MAJOR >= 21
+  DiagnosticOptions diag_opts;
+  auto diag_client = new TextDiagnosticPrinter(llvm::errs(), diag_opts);
+
+  IntrusiveRefCntPtr<DiagnosticIDs> DiagID(new DiagnosticIDs());
+  DiagnosticsEngine diags(DiagID, diag_opts, diag_client);
+#else
   IntrusiveRefCntPtr<DiagnosticOptions> diag_opts(new DiagnosticOptions());
   auto diag_client = new TextDiagnosticPrinter(llvm::errs(), &*diag_opts);
 
   IntrusiveRefCntPtr<DiagnosticIDs> DiagID(new DiagnosticIDs());
   DiagnosticsEngine diags(DiagID, &*diag_opts, diag_client);
+#endif
 
   // set up the command line argument wrapper
 
