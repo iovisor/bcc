@@ -6,20 +6,20 @@
 # see https://help.github.com/articles/about-codeowners/ for syntax
 
 # Miscellaneous
-* @chenhengqi @yonghong-song @brendangregg
+* @chenhengqi @ekyooo @yonghong-song @brendangregg
 
 # Documentation
-/docs/ @chenhengqi @yonghong-song @brendangregg
-/man/ @chenhengqi @yonghong-song @brendangregg
+/docs/ @chenhengqi @ekyooo @yonghong-song @brendangregg
+/man/ @chenhengqi @ekyooo @yonghong-song @brendangregg
 
 # Tools
-/tools/ @chenhengqi @yonghong-song @brendangregg
+/tools/ @chenhengqi @ekyooo @yonghong-song @brendangregg
 
 # Compiler, C API
-/src/cc/ @chenhengqi @yonghong-song @brendangregg
+/src/cc/ @chenhengqi @ekyooo @yonghong-song @brendangregg
 
 # Python API
-/src/python/ @chenhengqi @yonghong-song @brendangregg
+/src/python/ @chenhengqi @ekyooo @yonghong-song @brendangregg
 
 # Tests
-/tests/ @chenhengqi @yonghong-song @brendangregg
+/tests/ @chenhengqi @ekyooo @yonghong-song @brendangregg
