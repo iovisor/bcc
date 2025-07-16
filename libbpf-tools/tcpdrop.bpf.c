@@ -33,19 +33,37 @@ struct {
 	__uint(value_size, MAX_STACK_DEPTH * sizeof(u64));
 } stack_traces SEC(".maps");
 
-char ipv4_only = 0;
-char ipv6_only = 0;
-__u32 netns_id = 0;
+const volatile char ipv4_only = 0;
+const volatile char ipv6_only = 0;
+const volatile __u32 netns_id = 0;
 
 SEC("tracepoint/skb/kfree_skb")
 int tp__skb_free_skb(struct trace_event_raw_kfree_skb *args)
 {
-	struct event *event = bpf_ringbuf_reserve(&events, sizeof(*event), 0);
+	struct event *event;
+	struct sk_buff *skb;
+	struct sock *sk;
+	void *head;
+	u16 network_header, transport_header, protocol;
+	u64 pid_tgid;
+	u32 pid;
+	struct net *net;
+	u32 inum;
+	u8 state;
+	struct iphdr ip;
+	struct ipv6hdr ip6;
+	struct tcphdr tcp;
+
+	skb = args->skbaddr;
+	if (!skb) {
+		return 0;
+	}
+
+	event = bpf_ringbuf_reserve(&events, sizeof(*event), 0);
 	if (!event) {
 		return 0;
 	}
 
-	// Check if reason field is available
 	if (bpf_core_field_exists(args->reason)) {
 		if (args->reason <= SKB_DROP_REASON_NOT_SPECIFIED) {
 			bpf_ringbuf_discard(event, 0);
@@ -61,20 +79,9 @@ int tp__skb_free_skb(struct trace_event_raw_kfree_skb *args)
 		return 0;
 	}
 
-	u64 pid_tgid = bpf_get_current_pid_tgid();
-	u32 pid = pid_tgid >> 32;
-
-	struct sk_buff *skb = args->skbaddr;
-	if (!skb) {
-		bpf_ringbuf_discard(event, 0);
-		return 0;
-	}
-	struct sock *sk = NULL;
+	sk = NULL;
 	bpf_core_read(&sk, sizeof(sk), &skb->sk);
 
-	// Get packet headers
-	void *head;
-	u16 network_header, transport_header;
 	if (bpf_core_read(&head, sizeof(head), &skb->head) ||
 	    bpf_core_read(&network_header, sizeof(network_header),
 			  &skb->network_header) ||
@@ -84,8 +91,7 @@ int tp__skb_free_skb(struct trace_event_raw_kfree_skb *args)
 		return 0;
 	}
 
-	// Check protocol and filter by IP family
-	u16 protocol = args->protocol;
+	protocol = args->protocol;
 	if (protocol != ETH_P_IP && protocol != ETH_P_IPV6) {
 		bpf_ringbuf_discard(event, 0);
 		return 0;
@@ -99,12 +105,10 @@ int tp__skb_free_skb(struct trace_event_raw_kfree_skb *args)
 		return 0;
 	}
 
-	// Filter by network namespace
 	if (netns_id && sk) {
-		struct net *net = NULL;
+		net = NULL;
 		bpf_core_read(&net, sizeof(net), &sk->__sk_common.skc_net.net);
 		if (net) {
-			u32 inum;
 			bpf_core_read(&inum, sizeof(inum), &net->ns.inum);
 			if (inum != netns_id) {
 				bpf_ringbuf_discard(event, 0);
@@ -113,13 +117,14 @@ int tp__skb_free_skb(struct trace_event_raw_kfree_skb *args)
 		}
 	}
 
+	pid_tgid = bpf_get_current_pid_tgid();
+	pid = pid_tgid >> 32;
 	event->timestamp = bpf_ktime_get_ns();
 	event->pid = pid;
 	bpf_get_current_comm(&event->comm, sizeof(event->comm));
 	event->stack_id = bpf_get_stackid(args, &stack_traces, 0);
 	event->state = 127;
 	if (sk) {
-		u8 state;
 		if (!bpf_core_read(&state, sizeof(state),
 				   &sk->__sk_common.skc_state)) {
 			event->state = state;
@@ -127,7 +132,6 @@ int tp__skb_free_skb(struct trace_event_raw_kfree_skb *args)
 	}
 
 	if (protocol == ETH_P_IP) {
-		struct iphdr ip;
 		if (bpf_core_read(&ip, sizeof(ip), head + network_header)) {
 			bpf_ringbuf_discard(event, 0);
 			return 0;
@@ -136,7 +140,6 @@ int tp__skb_free_skb(struct trace_event_raw_kfree_skb *args)
 			bpf_ringbuf_discard(event, 0);
 			return 0;
 		}
-		struct tcphdr tcp;
 		if (bpf_core_read(&tcp, sizeof(tcp), head + transport_header)) {
 			bpf_ringbuf_discard(event, 0);
 			return 0;
@@ -148,7 +151,6 @@ int tp__skb_free_skb(struct trace_event_raw_kfree_skb *args)
 		event->dport = bpf_ntohs(tcp.dest);
 		event->tcpflags = ((u8 *)&tcp)[13];
 	} else {
-		struct ipv6hdr ip6;
 		if (bpf_core_read(&ip6, sizeof(ip6), head + network_header)) {
 			bpf_ringbuf_discard(event, 0);
 			return 0;
@@ -157,7 +159,6 @@ int tp__skb_free_skb(struct trace_event_raw_kfree_skb *args)
 			bpf_ringbuf_discard(event, 0);
 			return 0;
 		}
-		struct tcphdr tcp;
 		if (bpf_core_read(&tcp, sizeof(tcp), head + transport_header)) {
 			bpf_ringbuf_discard(event, 0);
 			return 0;

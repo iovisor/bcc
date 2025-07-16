@@ -134,7 +134,7 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format,
 			   va_list args)
 {
 	if (level == LIBBPF_DEBUG)
-		return 0; /* Only print debug messages in verbose mode */
+		return 0;
 	return vfprintf(stderr, format, args);
 }
 
@@ -334,6 +334,9 @@ int main(int argc, char **argv)
 	};
 	struct ring_buffer *rb = NULL;
 	struct ksyms *ksyms = NULL;
+	LIBBPF_OPTS(bpf_object_open_opts, opts);
+	char path[64];
+	struct stat st;
 	int err = 0;
 
 	err = argp_parse(&argp, argc, argv, 0, NULL, &arguments);
@@ -341,9 +344,6 @@ int main(int argc, char **argv)
 		return err;
 
 	if (arguments.pid_netns) {
-		char path[64];
-		struct stat st;
-
 		snprintf(path, sizeof(path), "/proc/%u/ns/net",
 			 arguments.pid_netns);
 		if (stat(path, &st) < 0) {
@@ -362,7 +362,6 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	LIBBPF_OPTS(bpf_object_open_opts, opts);
 	skel = tcpdrop_bpf__open_opts(&opts);
 	if (!skel) {
 		warn("Failed to open BPF skeleton\n");
@@ -370,9 +369,9 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	skel->bss->ipv4_only = arguments.ipv4_only;
-	skel->bss->ipv6_only = arguments.ipv6_only;
-	skel->bss->netns_id = arguments.netns_id;
+	skel->rodata->ipv4_only = arguments.ipv4_only;
+	skel->rodata->ipv6_only = arguments.ipv6_only;
+	skel->rodata->netns_id = arguments.netns_id;
 
 	err = tcpdrop_bpf__load(skel);
 	if (err) {

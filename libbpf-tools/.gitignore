@@ -59,8 +59,8 @@
 /syscount
 /tcpconnect
 /tcpconnlat
-/tcplife
 /tcpdrop
+/tcplife
 /tcppktlat
 /tcptracer
 /tcprtt

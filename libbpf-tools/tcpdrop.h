@@ -8,6 +8,7 @@ struct event {
 	__u32 pid;
 	__s32 drop_reason;
 	__u32 ip_version;
+	__u32 stack_id;
 	union {
 		__u32 saddr_v4;
 		__u32 saddr_v6[4];
@@ -21,7 +22,6 @@ struct event {
 	__u8 state;
 	__u8 tcpflags;
 	char comm[TASK_COMM_LEN];
-	__u32 stack_id;
 };
 
 #endif /* __TCPDROP_H */
