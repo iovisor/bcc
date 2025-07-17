@@ -4,6 +4,7 @@
 // Based on biosnoop(8) from BCC by Brendan Gregg.
 // 29-Jun-2020   Wenbo Zhang   Created this.
 #include <argp.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -216,7 +217,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 
 void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 {
-	fprintf(stderr, "lost %llu events on CPU #%d\n", lost_cnt, cpu);
+	fprintf(stderr, "lost %" PRIu64" events on CPU #%d\n", (uint64_t)lost_cnt, cpu);
 }
 
 static void blk_account_io_set_attach_target(struct biosnoop_bpf *obj)
