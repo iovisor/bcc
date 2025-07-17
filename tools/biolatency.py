@@ -267,28 +267,28 @@ kprobe_done = None
 tp_done = None
 
 if args.queued:
-    if BPF.get_kprobe_functions(b'__blk_account_io_start'):
-        kprobe_start.add("__blk_account_io_start")
-    elif BPF.get_kprobe_functions(b'blk_account_io_start'):
-        kprobe_start.add("blk_account_io_start")
-    elif BPF.tracepoint_exists("block", "block_io_start"):
+    if BPF.tracepoint_exists("block", "block_io_start"):
         tp_start = "block_io_start"
     elif BPF.tracepoint_exists("block", "block_bio_queue"):
         tp_start = "block_bio_queue"
+    elif BPF.get_kprobe_functions(b'__blk_account_io_start'):
+        kprobe_start.add("__blk_account_io_start")
+    elif BPF.get_kprobe_functions(b'blk_account_io_start'):
+        kprobe_start.add("blk_account_io_start")
 
 else:
     if BPF.get_kprobe_functions(b'blk_start_request'):
         kprobe_start.add("blk_start_request")
     kprobe_start.add("blk_mq_start_request")
 
-if BPF.get_kprobe_functions(b'__blk_account_io_done'):
-    kprobe_done = "__blk_account_io_done"
-elif BPF.get_kprobe_functions(b'blk_account_io_done'):
-    kprobe_done = "blk_account_io_done"
-elif BPF.tracepoint_exists("block", "block_io_done"):
+if BPF.tracepoint_exists("block", "block_io_done"):
     tp_done = "block_io_done"
 elif BPF.tracepoint_exists("block", "block_rq_complete"):
     tp_done = "block_rq_complete"
+elif BPF.get_kprobe_functions(b'__blk_account_io_done'):
+    kprobe_done = "__blk_account_io_done"
+elif BPF.get_kprobe_functions(b'blk_account_io_done'):
+    kprobe_done = "blk_account_io_done"
 
 if args.flags and (tp_start or tp_done):
             # Some flags are accessible in the rwbs field (RAHEAD, SYNC and META)
