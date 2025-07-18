@@ -317,6 +317,10 @@ class SmokeTests(TestCase):
         self.run_with_duration("softirqs.py 1 1")
         pass
 
+    @skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
+    def test_softirqslower(self):
+        self.run_with_int("softirqslower.py")
+
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_solisten(self):
         self.run_with_int("solisten.py")
