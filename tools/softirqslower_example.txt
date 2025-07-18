@@ -13,21 +13,17 @@ For example:
 
 Tracing softirq latency higher than 10000 us... Hit Ctrl-C to end.
 
-19:55:25 softirq runtime: rcu took 360653 us (360 ms), on CPU:70, comm:swapper/70
-19:55:25 irq(hard) to softirq: net_rx took 93506 us (93 ms), on CPU:0, comm:cat
-19:55:25 irq(hard) to softirq: tasklet took 93659 us (93 ms), on CPU:0, comm:cat
-19:55:25 irq(hard) to softirq: rcu took 93651 us (93 ms), on CPU:0, comm:cat
-19:55:25 irq(hard) to softirq: timer took 49952 us (49 ms), on CPU:0, comm:cat
-19:55:25 irq(hard) to softirq: net_rx took 49906 us (49 ms), on CPU:0, comm:cat
-19:55:25 irq(hard) to softirq: rcu took 49949 us (49 ms), on CPU:0, comm:cat
-19:55:25 irq(hard) to softirq: net_rx took 11238 us (11 ms), on CPU:0, comm:cat
-19:55:25 irq(hard) to softirq: sched took 11460 us (11 ms), on CPU:0, comm:cat
-19:55:25 irq(hard) to softirq: net_rx took 10412 us (10 ms), on CPU:0, comm:cat
-19:55:25 irq(hard) to softirq: net_rx took 15964 us (15 ms), on CPU:0, comm:cat
-19:55:25 irq(hard) to softirq: net_rx took 12573 us (12 ms), on CPU:0, comm:cat
-19:55:25 irq(hard) to softirq: tasklet took 12632 us (12 ms), on CPU:0, comm:cat
-19:55:25 irq(hard) to softirq: net_rx took 11387 us (11 ms), on CPU:0, comm:cat
-19:55:25 irq(hard) to softirq: tasklet took 11476 us (11 ms), on CPU:0, comm:cat
+TIME     STAGE                SOFTIRQ  LAT(us)        CPU    COMM
+14:41:43 irq(hard) to softirq net_rx   50223          0      cat
+14:41:43 irq(hard) to softirq tasklet  50374          0      cat
+14:41:43 irq(hard) to softirq timer    15935          0      cat
+14:41:43 irq(hard) to softirq net_rx   15901          0      cat
+14:41:43 irq(hard) to softirq net_rx   10421          0      cat
+14:41:43 irq(hard) to softirq net_rx   21794          0      cat
+14:41:43 irq(hard) to softirq tasklet  21984          0      cat
+14:42:11 irq(hard) to softirq net_rx   95140          0      cat
+14:42:11 irq(hard) to softirq tasklet  95280          0      cat
+14:42:11 irq(hard) to softirq timer    50834          0      cat
 [...]
 
 The trace results reveal softirq events with measured latencies beyond the

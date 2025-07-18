@@ -169,10 +169,10 @@ def stage_to_name(stage):
 
 def print_event(cpu, data, size):
     event = b["softirq_events"].event(data)
-    print("%-8s %s: %s took %d us (%d ms), on CPU:%d, comm:%s" % (strftime("%H:%M:%S"),
+    print("%-8s %-20s %-8s %-14d %-6d %-6s" % (strftime("%H:%M:%S"),
             stage_to_name(event.stage), vec_to_name(event.vec),
-            event.delta_ns / 1000, event.delta_ns / 1000000, event.cpu,
-            event.task.decode("utf-8", "replace")))
+            event.delta_ns / 1000, event.cpu, event.task.decode("utf-8",
+                "replace")))
 
 if __name__ == "__main__":
     if args.cpu is not None:
@@ -191,8 +191,11 @@ if __name__ == "__main__":
     b = BPF(text=bpf_text)
     b["softirq_events"].open_perf_buffer(print_event, page_cnt=64)
 
-    print("Tracing softirq latency higher than %d us... Hit Ctrl-C to end.\n" % \
+    print("Tracing softirq latency higher than %d us... Hit Ctrl-C to end." % \
             int(args.min_us))
+
+    print("%-8s %-20s %-8s %-14s %-6s %-6s" % ("TIME", "STAGE", "SOFTIRQ",
+        "LAT(us)", "CPU", "COMM"))
     while (1):
         try:
             b.perf_buffer_poll()
