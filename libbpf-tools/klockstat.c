@@ -804,6 +804,22 @@ static void enable_fentry(struct klockstat_bpf *obj)
 	bpf_program__set_autoload(obj->progs.kprobe_down_write_killable_exit, false);
 	bpf_program__set_autoload(obj->progs.kprobe_up_write, false);
 
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_exit_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_interruptible_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_interruptible_exit_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_killable_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_killable_exit_nested, false);
+
+	bpf_program__set_autoload(obj->progs.kprobe_down_read_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_read_exit_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_read_killable_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_read_killable_exit_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_write_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_write_exit_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_write_killable_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_write_killable_exit_nested, false);
+
 	bpf_program__set_autoload(obj->progs.kprobe_rtnetlink_rcv_msg, false);
 	bpf_program__set_autoload(obj->progs.kprobe_rtnetlink_rcv_msg_exit, false);
 	bpf_program__set_autoload(obj->progs.kprobe_netlink_dump, false);
