@@ -150,14 +150,10 @@ static int handle_event(void *ctx, void *data, size_t data_sz)
 {
 	const struct event *e = data;
 	char saddr[48], daddr[48];
-	struct tm *tm;
 	char ts[32];
-	time_t t;
 
 	if (env.timestamp) {
-		time(&t);
-		tm = localtime(&t);
-		strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+		str_timestamp("%H:%M:%S", ts, sizeof(ts));
 		printf("%-8s ", ts);
 	}
 	inet_ntop(e->family, &e->saddr, saddr, sizeof(saddr));

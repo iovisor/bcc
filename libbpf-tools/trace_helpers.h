@@ -121,4 +121,20 @@ int str_to_int(const char *src, void *dest);
 /* converts a string to a long integer */
 int str_to_long(const char *src, void *dest);
 
+/*
+ * get loadavg string with or without timestamp
+ *
+ * If the @buf_len is not long enough, we still provide a truncated string,
+ * but return -ERANGE.
+ */
+int str_loadavg(char *buf, size_t buf_len);
+
+/*
+ * get format date and time
+ *
+ * this function encapsulates the strftime() function, and the return value
+ * is the same as strftime().
+ */
+int str_timestamp(const char *format, char *buf, size_t buf_len);
+
 #endif /* __TRACE_HELPERS_H */

@@ -60,27 +60,15 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 
 static int handle_event(void *ctx, void *data, size_t len)
 {
-	FILE *f;
-	char buf[256];
-	int n = 0;
-	struct tm *tm;
+	char loadavg[256];
 	char ts[32];
-	time_t t;
 	struct data_t *e = data;
 
-	f = fopen("/proc/loadavg", "r");
-	if (f) {
-		memset(buf, 0, sizeof(buf));
-		n = fread(buf, 1, sizeof(buf), f);
-		fclose(f);
-	}
-	time(&t);
-	tm = localtime(&t);
-	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+	str_timestamp("%H:%M:%S", ts, sizeof(ts));
 
-	if (n)
+	if (str_loadavg(loadavg, sizeof(loadavg)) > 0)
 		printf("%s Triggered by PID %d (\"%s\"), OOM kill of PID %d (\"%s\"), %lld pages, loadavg: %s",
-			ts, e->fpid, e->fcomm, e->tpid, e->tcomm, e->pages, buf);
+			ts, e->fpid, e->fcomm, e->tpid, e->tcomm, e->pages, loadavg);
 	else
 		printf("%s Triggered by PID %d (\"%s\"), OOM kill of PID %d (\"%s\"), %lld pages\n",
 			ts, e->fpid, e->fcomm, e->tpid, e->tcomm, e->pages);

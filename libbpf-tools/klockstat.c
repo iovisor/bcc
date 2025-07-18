@@ -944,9 +944,7 @@ int main(int argc, char **argv)
 	struct klockstat_bpf *obj = NULL;
 	struct ksyms *ksyms = NULL;
 	int i, err;
-	struct tm *tm;
 	char ts[32];
-	time_t t;
 	void *lock_addr = NULL;
 
 	err = argp_parse(&argp, argc, argv, 0, NULL, &env);
@@ -1023,9 +1021,7 @@ int main(int argc, char **argv)
 
 		printf("\n");
 		if (env.timestamp) {
-			time(&t);
-			tm = localtime(&t);
-			strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+			str_timestamp("%H:%M:%S", ts, sizeof(ts));
 			printf("%-8s\n", ts);
 		}
 

@@ -180,7 +180,6 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	struct event e;
 	char rwbs[RWBS_LEN];
 	struct timespec ct;
-	struct tm *tm;
 	char ts[32];
 
         if (data_sz < sizeof(e)) {
@@ -194,8 +193,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		/* Since `bpf_ktime_get_boot_ns` requires at least 5.8 kernel,
 		 * so get time from usespace instead */
 		clock_gettime(CLOCK_REALTIME, &ct);
-		tm = localtime(&ct.tv_sec);
-		strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+		str_timestamp("%H:%M:%S", ts, sizeof(ts));
 		printf("%-8s.%03ld ", ts, ct.tv_nsec / 1000000);
 	} else {
 		if (!start_ts) {

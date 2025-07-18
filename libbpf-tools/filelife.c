@@ -95,9 +95,7 @@ static void sig_int(int signo)
 int handle_event(void *ctx, void *data, size_t data_sz)
 {
 	struct event e;
-	struct tm *tm;
 	char ts[32];
-	time_t t;
 
 	if (data_sz < sizeof(e)) {
 		printf("Error: packet too small\n");
@@ -106,9 +104,7 @@ int handle_event(void *ctx, void *data, size_t data_sz)
 	/* Copy data as alignment in the ring buffer isn't guaranteed. */
 	memcpy(&e, data, sizeof(e));
 
-	time(&t);
-	tm = localtime(&t);
-	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+	str_timestamp("%H:%M:%S", ts, sizeof(ts));
 	printf("%-8s %-6d %-16s %-7.2f ",
 	       ts, e.tgid, e.task, (double)e.delta_ns / 1000000000);
 	if (env.full_path) {

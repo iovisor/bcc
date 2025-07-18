@@ -98,17 +98,13 @@ static void sig_int(int signo)
 static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	const struct event *e = data;
-	time_t t;
-	struct tm *tm;
 	char ts[32], proto[16], addr[48] = {};
 	__u16 family = e->proto >> 16;
 	__u16 type = (__u16)e->proto;
 	const char *prot;
 
 	if (emit_timestamp) {
-		time(&t);
-		tm = localtime(&t);
-		strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+		str_timestamp("%H:%M:%S", ts, sizeof(ts));
 		printf("%8s ", ts);
 	}
 

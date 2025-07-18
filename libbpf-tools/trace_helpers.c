@@ -1311,3 +1311,47 @@ int str_to_long(const char *src, void *dest)
 
 	return errno;
 }
+
+int str_loadavg(char *buf, size_t buf_len)
+{
+	int n, err = 0;
+	char avg[64] = {0};
+	FILE *f;
+
+	if (!buf || buf_len == 0)
+		return -EINVAL;
+
+	f = fopen("/proc/loadavg", "r");
+	if (!f)
+		return -errno;
+
+	n = fread(avg, 1, sizeof(avg) - 1, f);
+	if (!n) {
+		err = -errno;
+		goto cleanup;
+	}
+
+	n = snprintf(buf, buf_len, "loadavg: %s", avg);
+
+	if (n >= buf_len)
+		err = -ERANGE;
+
+cleanup:
+	fclose(f);
+	return err ?: n;
+}
+
+int str_timestamp(const char *format, char *buf, size_t buf_len)
+{
+	time_t t;
+	struct tm *tm;
+
+	if (!format || !buf || buf_len == 0)
+		return -EINVAL;
+
+	time(&t);
+	tm = localtime(&t);
+	if (!tm)
+		return -errno;
+	return strftime(buf, buf_len, format, tm);
+}

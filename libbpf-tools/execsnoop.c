@@ -229,8 +229,6 @@ static void print_args(const struct event *e, bool quote)
 static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	const struct event *e = data;
-	time_t t;
-	struct tm *tm;
 	char ts[32];
 
 	/* TODO: use pcre lib */
@@ -241,9 +239,7 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	if (env.line && strstr(e->comm, env.line) == NULL)
 		return;
 
-	time(&t);
-	tm = localtime(&t);
-	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+	str_timestamp("%H:%M:%S", ts, sizeof(ts));
 
 	if (env.time) {
 		printf("%-8s ", ts);

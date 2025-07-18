@@ -15,6 +15,7 @@
 #include <errno.h>
 #include "javagc.skel.h"
 #include "javagc.h"
+#include "trace_helpers.h"
 
 #define BINARY_PATH_SIZE (256)
 #define PERF_BUFFER_PAGES (32)
@@ -99,13 +100,9 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	struct data_t *e = (struct data_t *)data;
-	struct tm *tm = NULL;
 	char ts[16];
-	time_t t;
 
-	time(&t);
-	tm = localtime(&t);
-	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+	str_timestamp("%H:%M:%S", ts, sizeof(ts));
 	printf("%-8s %-7d %-7d %-7lld\n", ts, e->cpu, e->pid, e->ts/1000);
 }
 

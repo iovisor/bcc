@@ -277,9 +277,7 @@ int main(int argc, char **argv)
 		.doc = argp_program_doc,
 	};
 	struct biolatency_bpf *obj;
-	struct tm *tm;
 	char ts[32];
-	time_t t;
 	int err;
 	int idx, cg_map_fd;
 	int cgfd = -1;
@@ -370,9 +368,7 @@ int main(int argc, char **argv)
 		printf("\n");
 
 		if (env.timestamp) {
-			time(&t);
-			tm = localtime(&t);
-			strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+			str_timestamp("%H:%M:%S", ts, sizeof(ts));
 			printf("%-8s\n", ts);
 		}
 

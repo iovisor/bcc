@@ -214,13 +214,10 @@ static int sort_column(const void *obj1, const void *obj2)
 
 static int print_stat(struct tcptop_bpf *obj)
 {
-	FILE *f;
-	time_t t;
-	struct tm *tm;
-	char ts[16], buf[256];
+	char buf[256], ts[64];
 	struct ip_key_t key, *prev_key = NULL;
 	static struct info_t infos[OUTPUT_ROWS_LIMIT];
-	int n, i, err = 0;
+	int i, err = 0;
 	int fd = bpf_map__fd(obj->maps.ip_map);
 	int rows = 0;
 	bool ipv6_header_printed = false;
@@ -232,17 +229,10 @@ static int print_stat(struct tcptop_bpf *obj)
 	close(pid_max_fd);
 
 	if (!no_summary) {
-		f = fopen("/proc/loadavg", "r");
-		if (f) {
-			time(&t);
-			tm = localtime(&t);
-			strftime(ts, sizeof(ts), "%H:%M:%S", tm);
-			memset(buf, 0, sizeof(buf));
-			n = fread(buf, 1, sizeof(buf), f);
-			if (n)
-				printf("%8s loadavg: %s\n", ts, buf);
-			fclose(f);
-		}
+		err = str_loadavg(buf, sizeof(buf)) <= 0;
+		err = err ?: (str_timestamp("%H:%M:%S", ts, sizeof(ts)) <= 0);
+		if (!err)
+			printf("%8s %s\n", ts, buf);
 	}
 
 	while (1) {

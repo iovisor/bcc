@@ -198,9 +198,7 @@ int main(int argc, char **argv)
 	};
 	struct cpudist_bpf *obj;
 	int pid_max, fd, err;
-	struct tm *tm;
 	char ts[32];
-	time_t t;
 	int idx, cg_map_fd;
 	int cgfd = -1;
 
@@ -280,9 +278,7 @@ int main(int argc, char **argv)
 		printf("\n");
 
 		if (env.timestamp) {
-			time(&t);
-			tm = localtime(&t);
-			strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+			str_timestamp("%H:%M:%S", ts, sizeof(ts));
 			printf("%-8s\n", ts);
 		}
 
