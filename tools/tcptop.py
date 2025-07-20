@@ -166,16 +166,15 @@ static int tcp_sendstat(int size)
     return 0;
 }
 
-int tcp_send_ret(struct pt_regs *ctx)
+KRETFUNC_PROBE(tcp_sendmsg, struct sock *sk, struct msghdr *msg, size_t size, int ret)
 {
-    int size = PT_REGS_RC(ctx);
-    if (size > 0)
-        return tcp_sendstat(size);
+    if (ret > 0)
+        return tcp_sendstat(ret);
     else
         return 0;
 }
 
-int tcp_send_entry(struct pt_regs *ctx, struct sock *sk)
+KFUNC_PROBE(tcp_sendmsg, struct sock *sk, struct msghdr *msg, size_t size)
 {
     if (container_should_be_filtered()) {
         return 0;
@@ -284,11 +283,7 @@ b = BPF(text=bpf_text)
 htab_batch_ops = True if BPF.kernel_struct_has_field(b'bpf_map_ops',
         b'map_lookup_and_delete_batch') == 1 else False
 
-b.attach_kprobe(event='tcp_sendmsg', fn_name='tcp_send_entry')
-b.attach_kretprobe(event='tcp_sendmsg', fn_name='tcp_send_ret')
-if BPF.get_kprobe_functions(b'tcp_sendpage'):
-    b.attach_kprobe(event='tcp_sendpage', fn_name='tcp_send_entry')
-    b.attach_kretprobe(event='tcp_sendpage', fn_name='tcp_send_ret')
+# attached with fentry/exit macros
 
 ipv4_send_bytes = b["ipv4_send_bytes"]
 ipv4_recv_bytes = b["ipv4_recv_bytes"]
