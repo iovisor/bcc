@@ -112,7 +112,7 @@ BPF_HASH(ipv6_send_bytes, struct ipv6_key_t);
 BPF_HASH(ipv6_recv_bytes, struct ipv6_key_t);
 BPF_HASH(sock_store, u32, struct sock *);
 
-static int tcp_sendstat(int size)
+static int tcp_stat(int size, bool is_send)
 {
     if (container_should_be_filtered()) {
         return 0;
@@ -144,7 +144,11 @@ static int tcp_sendstat(int size)
         bpf_probe_read_kernel(&dport, sizeof(dport),
             &sk->__sk_common.skc_dport);
         ipv4_key.dport = ntohs(dport);
-        ipv4_send_bytes.increment(ipv4_key, size);
+        if (is_send) {
+            ipv4_send_bytes.increment(ipv4_key, size);
+        } else {
+            ipv4_recv_bytes.increment(ipv4_key, size);
+        }
 
     } else if (family == AF_INET6) {
         struct ipv6_key_t ipv6_key = {.pid = pid};
@@ -158,7 +162,11 @@ static int tcp_sendstat(int size)
         bpf_probe_read_kernel(&dport, sizeof(dport),
             &sk->__sk_common.skc_dport);
         ipv6_key.dport = ntohs(dport);
-        ipv6_send_bytes.increment(ipv6_key, size);
+        if (is_send) {
+            ipv6_send_bytes.increment(ipv6_key, size);
+        } else {
+            ipv6_recv_bytes.increment(ipv6_key, size);
+        }
     }
     sock_store.delete(&tid);
     // else drop
@@ -169,7 +177,7 @@ static int tcp_sendstat(int size)
 KRETFUNC_PROBE(tcp_sendmsg, struct sock *sk, struct msghdr *msg, size_t size, int ret)
 {
     if (ret > 0)
-        return tcp_sendstat(ret);
+        return tcp_stat(ret, true);
     else
         return 0;
 }
