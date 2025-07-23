@@ -136,6 +136,7 @@ pair of .c and .py files, and some are directories of files.
 - tools/[mysqld_qslower](tools/mysqld_qslower.py): Trace MySQL server queries slower than a threshold. [Examples](tools/mysqld_qslower_example.txt).
 - tools/[ppchcalls](tools/ppchcalls.py): Summarize ppc hcall counts and latencies. [Examples](tools/ppchcalls_example.txt).
 - tools/[softirqs](tools/softirqs.py):  Measure soft IRQ (soft interrupt) event time. [Examples](tools/softirqs_example.txt).
+- tools/[softirqslower](tools/softirqslower.py): Trace slow soft IRQ (interrupt). [Examples](tools/softirqslower_example.txt).
 - tools/[syscount](tools/syscount.py): Summarize syscall counts and latencies. [Examples](tools/syscount_example.txt).
 
 ##### CPU and Scheduler Tools
