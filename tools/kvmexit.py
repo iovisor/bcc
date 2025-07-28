@@ -23,9 +23,9 @@
 #
 # Copyright (c) 2021 ByteDance Inc. All rights reserved.
 #
-# Author(s):
-#   Fei Li <lifei.shirley@bytedance.com>
-
+# 31-Aug-2021  Fei Li <lifei.shirley@bytedance.com>  Initial implementation.
+# 28-Jul-2025  Matt Pelland <mpelland@akamai.com>    Implement support for AMD.
+# 28-Jul-2025  Matt Pelland <mpelland@akamai.com>    Parallelize postprocessing.
 
 from __future__ import print_function
 from time import sleep
