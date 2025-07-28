@@ -5,7 +5,7 @@ This tool traces the kernel function called when a program wants to listen
 for TCP connections. It will not see UDP neither UNIX domain sockets.
 
 It can be used to dynamically update a load balancer as a program is actually
-ready to accept connexion, hence avoiding the "downtime" while it is initializing.
+ready to accept connection, hence avoiding the "downtime" while it is initializing.
 
 # ./solisten.py --show-netns
 PID    COMM         NETNS        PROTO  BACKLOG  ADDR                                    PORT
