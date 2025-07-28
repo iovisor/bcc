@@ -55,6 +55,7 @@ examples = """examples:
     ./kvmexit -p 3195281 20                # Collpase all tids for pid 3195281 with exit reasons sorted in descending order, and display after sleeping 20s
     ./kvmexit -p 3195281 -v 0              # Display only vcpu0 for pid 3195281, descending sort by default
     ./kvmexit -p 3195281 -a                # Display all tids for pid 3195281
+    ./kvmexit -p 3195281 -a -m 2           # Display all tids for pid 3195281, limit post processing to two threads
     ./kvmexit -t 395490                    # Display only for tid 395490 with exit reasons sorted in descending order
     ./kvmexit -t 395490 20                 # Display only for tid 395490 with exit reasons sorted in descending order after sleeping 20s
     ./kvmexit -T '395490,395491'           # Display for a union like {395490, 395491}
@@ -70,6 +71,7 @@ exgroup.add_argument("-t", "--tid", type=int, help="trace this TID only")
 exgroup.add_argument("-T", "--tids", type=valid_args_list, help="trace a comma separated series of tids with no space in between")
 exgroup.add_argument("-v", "--vcpu", type=int, help="trace this vcpu only")
 exgroup.add_argument("-a", "--alltids", action="store_true", help="trace all tids for this pid")
+parser.add_argument("-m", "--max-parallelism", type=int, help="limit post processing parallelism to the given thread count", default=64)
 args = parser.parse_args()
 duration = int(args.duration)
 
@@ -430,19 +432,32 @@ print("%s%-35s %s" % (header_format, "KVM_EXIT_REASON", "COUNT"))
 
 pcpu_kvm_stat = b["pcpu_kvm_stat"]
 pcpu_cache = b["pcpu_cache"]
+
+def extract_pcpu_kvm_exit_reason_count(args):
+    pid_tgid, exit_reason, cpu_num = args
+    inner_cpu_cache = pcpu_cache[0][cpu_num]
+    cachePIDTGID = inner_cpu_cache.cache_pid_tgid
+    # Take priority to check if it is in cache
+
+    if cachePIDTGID == pid_tgid.value:
+        return inner_cpu_cache.cache_exit_ct.exit_ct[exit_reason]
+
+    # If not in cache, find from kvm_stat
+    return pcpu_kvm_stat[pid_tgid][cpu_num].exit_ct[exit_reason]
+
+cpu_count = multiprocessing.cpu_count()
+parallelism = min(max(1, int(cpu_count / 2)), args.max_parallelism)
+pool = multiprocessing.Pool(parallelism)
+
 for k, v in pcpu_kvm_stat.items():
     tgid = k.value >> 32
     pid = k.value & 0xffffffff
     for i in exit_reasons.keys():
-        sum1 = 0
-        for inner_cpu in range(0, multiprocessing.cpu_count()):
-            cachePIDTGID = pcpu_cache[0][inner_cpu].cache_pid_tgid
-            # Take priority to check if it is in cache
-            if cachePIDTGID == k.value:
-                sum1 += pcpu_cache[0][inner_cpu].cache_exit_ct.exit_ct[i]
-            # If not in cache, find from kvm_stat
-            else:
-                sum1 += v[inner_cpu].exit_ct[i]
+        sum1 = sum(pool.map(
+            extract_pcpu_kvm_exit_reason_count,
+            [(k, i, c) for c in range(cpu_count)]
+        ))
+
         if sum1 == 0:
             continue
 
