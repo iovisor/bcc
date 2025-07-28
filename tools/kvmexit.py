@@ -81,7 +81,6 @@ duration = int(args.duration)
 bpf_text = """
 #include <linux/delay.h>
 
-#define REASON_NUM 76
 #define TGID_NUM 1024
 
 struct exit_count {
@@ -163,97 +162,195 @@ TRACEPOINT_PROBE(kvm, kvm_exit) {
 }
 """
 
-# format output
-exit_reasons = (
-    "EXCEPTION_NMI",
-    "EXTERNAL_INTERRUPT",
-    "TRIPLE_FAULT",
-    "INIT_SIGNAL",
-    "N/A",
-    "N/A",
-    "N/A",
-    "INTERRUPT_WINDOW",
-    "NMI_WINDOW",
-    "TASK_SWITCH",
-    "CPUID",
-    "N/A",
-    "HLT",
-    "INVD",
-    "INVLPG",
-    "RDPMC",
-    "RDTSC",
-    "N/A",
-    "VMCALL",
-    "VMCLEAR",
-    "VMLAUNCH",
-    "VMPTRLD",
-    "VMPTRST",
-    "VMREAD",
-    "VMRESUME",
-    "VMWRITE",
-    "VMOFF",
-    "VMON",
-    "CR_ACCESS",
-    "DR_ACCESS",
-    "IO_INSTRUCTION",
-    "MSR_READ",
-    "MSR_WRITE",
-    "INVALID_STATE",
-    "MSR_LOAD_FAIL",
-    "N/A",
-    "MWAIT_INSTRUCTION",
-    "MONITOR_TRAP_FLAG",
-    "N/A",
-    "MONITOR_INSTRUCTION",
-    "PAUSE_INSTRUCTION",
-    "MCE_DURING_VMENTRY",
-    "N/A",
-    "TPR_BELOW_THRESHOLD",
-    "APIC_ACCESS",
-    "EOI_INDUCED",
-    "GDTR_IDTR",
-    "LDTR_TR",
-    "EPT_VIOLATION",
-    "EPT_MISCONFIG",
-    "INVEPT",
-    "RDTSCP",
-    "PREEMPTION_TIMER",
-    "INVVPID",
-    "WBINVD",
-    "XSETBV",
-    "APIC_WRITE",
-    "RDRAND",
-    "INVPCID",
-    "VMFUNC",
-    "ENCLS",
-    "RDSEED",
-    "PML_FULL",
-    "XSAVES",
-    "XRSTORS",
-    "N/A",
-    "N/A",
-    "UMWAIT",
-    "TPAUSE"
-    "N/A",
-    "N/A",
-    "N/A",
-    "N/A",
-    "N/A",
-    "BUS_LOCK",
-    "NOTIFY",
-)
+# Defines Intel (VMX) VM exit reason codes. Keep this in sync with
+# arch/x86/include/uapi/asm/vmx.h.
+VMX_EXIT_REASONS = {
+    0: "EXCEPTION_NMI",
+    1: "EXTERNAL_INTERRUPT",
+    2: "TRIPLE_FAULT",
+    3: "INIT_SIGNAL",
+    4: "SIPI_SIGNAL",
+    6: "OTHER_SMI",
+    7: "INTERRUPT_WINDOW",
+    8: "NMI_WINDOW",
+    9: "TASK_SWITCH",
+    10: "CPUID",
+    12: "HLT",
+    13: "INVD",
+    14: "INVLPG",
+    15: "RDPMC",
+    16: "RDTSC",
+    18: "VMCALL",
+    19: "VMCLEAR",
+    20: "VMLAUNCH",
+    21: "VMPTRLD",
+    22: "VMPTRST",
+    23: "VMREAD",
+    24: "VMRESUME",
+    25: "VMWRITE",
+    26: "VMOFF",
+    27: "VMON",
+    28: "CR_ACCESS",
+    29: "DR_ACCESS",
+    30: "IO_INSTRUCTION",
+    31: "MSR_READ",
+    32: "MSR_WRITE",
+    33: "INVALID_STATE",
+    34: "MSR_LOAD_FAIL",
+    36: "MWAIT_INSTRUCTION",
+    37: "MONITOR_TRAP_FLAG",
+    39: "MONITOR_INSTRUCTION",
+    40: "PAUSE_INSTRUCTION",
+    41: "MCE_DURING_VMENTRY",
+    43: "TPR_BELOW_THRESHOLD",
+    44: "APIC_ACCESS",
+    45: "EOI_INDUCED",
+    46: "GDTR_IDTR",
+    47: "LDTR_TR",
+    48: "EPT_VIOLATION",
+    49: "EPT_MISCONFIG",
+    50: "INVEPT",
+    51: "RDTSCP",
+    52: "PREEMPTION_TIMER",
+    53: "INVVPID",
+    54: "WBINVD",
+    55: "XSETBV",
+    56: "APIC_WRITE",
+    57: "RDRAND",
+    58: "INVPCID",
+    59: "VMFUNC",
+    60: "ENCLS",
+    61: "RDSEED",
+    62: "PML_FULL",
+    63: "XSAVES",
+    64: "XRSTORS",
+    67: "UMWAIT",
+    68: "TPAUSE",
+    74: "BUS_LOCK",
+    75: "NOTIFY",
+    76: "TDCALL"
+}
 
-#
+# Defines AMD (SVM) VM exit reason codes. Keep this in sync with
+# arch/x86/include/uapi/asm/svm.h.
+SVM_EXIT_REASONS = {
+    0x0: "READ_CR0",
+    0x2: "READ_CR2",
+    0x3: "READ_CR3",
+    0x4: "READ_CR4",
+    0x8: "READ_CR8",
+    0x10: "WRITE_CR0",
+    0x12: "WRITE_CR2",
+    0x13: "WRITE_CR3",
+    0x14: "WRITE_CR4",
+    0x18: "WRITE_CR8",
+    0x20: "READ_DR0",
+    0x21: "READ_DR1",
+    0x22: "READ_DR2",
+    0x23: "READ_DR3",
+    0x24: "READ_DR4",
+    0x25: "READ_DR5",
+    0x26: "READ_DR6",
+    0x27: "READ_DR7",
+    0x30: "WRITE_DR0",
+    0x31: "WRITE_DR1",
+    0x32: "WRITE_DR2",
+    0x33: "WRITE_DR3",
+    0x34: "WRITE_DR4",
+    0x35: "WRITE_DR5",
+    0x36: "WRITE_DR6",
+    0x37: "WRITE_DR7",
+    0x40: "EXCP_BASE",
+    0x5f: "LAST_EXCP",
+    0x60: "INTR",
+    0x61: "NMI",
+    0x62: "SMI",
+    0x63: "INIT",
+    0x64: "VINTR",
+    0x65: "CR0_SEL_WRITE",
+    0x66: "IDTR_READ",
+    0x67: "GDTR_READ",
+    0x68: "LDTR_READ",
+    0x69: "TR_READ",
+    0x6a: "IDTR_WRITE",
+    0x6b: "GDTR_WRITE",
+    0x6c: "LDTR_WRITE",
+    0x6d: "TR_WRITE",
+    0x6e: "RDTSC",
+    0x6f: "RDPMC",
+    0x70: "PUSHF",
+    0x71: "POPF",
+    0x72: "CPUID",
+    0x73: "RSM",
+    0x74: "IRET",
+    0x75: "SWINT",
+    0x76: "INVD",
+    0x77: "PAUSE",
+    0x78: "HLT",
+    0x79: "INVLPG",
+    0x7a: "INVLPGA",
+    0x7b: "IOIO",
+    0x7c: "MSR",
+    0x7d: "TASK_SWITCH",
+    0x7e: "FERR_FREEZE",
+    0x7f: "SHUTDOWN",
+    0x80: "VMRUN",
+    0x81: "VMMCALL",
+    0x82: "VMLOAD",
+    0x83: "VMSAVE",
+    0x84: "STGI",
+    0x85: "CLGI",
+    0x86: "SKINIT",
+    0x87: "RDTSCP",
+    0x88: "ICEBP",
+    0x89: "WBINVD",
+    0x8a: "MONITOR",
+    0x8b: "MWAIT",
+    0x8c: "MWAIT_COND",
+    0x8d: "XSETBV",
+    0x8e: "RDPRU",
+    0x8f: "EFER_WRITE_TRAP",
+    0x90: "CR0_WRITE_TRAP",
+    0x91: "CR1_WRITE_TRAP",
+    0x92: "CR2_WRITE_TRAP",
+    0x93: "CR3_WRITE_TRAP",
+    0x94: "CR4_WRITE_TRAP",
+    0x95: "CR5_WRITE_TRAP",
+    0x96: "CR6_WRITE_TRAP",
+    0x97: "CR7_WRITE_TRAP",
+    0x98: "CR8_WRITE_TRAP",
+    0x99: "CR9_WRITE_TRAP",
+    0x9a: "CR10_WRITE_TRAP",
+    0x9b: "CR11_WRITE_TRAP",
+    0x9c: "CR12_WRITE_TRAP",
+    0x9d: "CR13_WRITE_TRAP",
+    0x9e: "CR14_WRITE_TRAP",
+    0x9f: "CR15_WRITE_TRAP",
+    0xa2: "INVPCID",
+    0xa5: "BUS_LOCK",
+    0xa6: "IDLE_HLT",
+    0x400: "NPF",
+    0x401: "AVIC_INCOMPLETE_IPI",
+    0x402: "AVIC_UNACCELERATED_ACCESS",
+    0x403: "VMGEXIT"
+}
+
+KVM_EXIT_REASONS_BY_VENDOR = {
+    "GenuineIntel": VMX_EXIT_REASONS,
+    "AuthenticAMD": SVM_EXIT_REASONS
+}
+
+
 # Do some checks
 #
 try:
-    # Currently, only adapte on intel architecture
-    cmd = "cat /proc/cpuinfo | grep vendor_id | head -n 1"
-    arch_info = subprocess.check_output(cmd, shell=True).strip()
-    if b"Intel" in arch_info:
-        pass
-    else:
-        raise Exception("Currently we only support Intel architecture, please do expansion if needs more.")
+    with open("/proc/cpuinfo", "r") as cpuinfo:
+        for line in cpuinfo:
+            if line.startswith("vendor_id"):
+                cpu_vendor = line.split(":")[1].strip()
+                break
+    if cpu_vendor not in KVM_EXIT_REASONS_BY_VENDOR:
+        raise Exception("CPU vendor not supported: %s" % cpu_vendor)
 
     # Check if kvm module is loaded
     if os.access("/dev/kvm", os.R_OK | os.W_OK):
@@ -262,6 +359,8 @@ try:
         raise Exception("Please insmod kvm module to use kvmexit tool.")
 except Exception as e:
     raise Exception("Failed to do precondition check, due to: %s." % e)
+
+exit_reasons = KVM_EXIT_REASONS_BY_VENDOR[cpu_vendor]
 
 def find_tid(tgt_dir, tgt_vcpu):
     for tid in os.listdir(tgt_dir):
@@ -303,6 +402,7 @@ else:
     thread_filter = '0'
     header_format = "PID      TID      "
 bpf_text = bpf_text.replace('THREAD_FILTER', thread_filter)
+bpf_text = bpf_text.replace('REASON_NUM', str(max(exit_reasons.keys()) + 1))
 b = BPF(text=bpf_text)
 
 
@@ -323,7 +423,7 @@ except KeyboardInterrupt:
 if (args.pid or args.tid):
     ct_reason = []
     if args.pid:
-        tgid_exit = [0 for i in range(len(exit_reasons))]
+        tgid_exit = {k: 0 for k in exit_reasons}
 
 # output
 print("%s%-35s %s" % (header_format, "KVM_EXIT_REASON", "COUNT"))
@@ -333,7 +433,7 @@ pcpu_cache = b["pcpu_cache"]
 for k, v in pcpu_kvm_stat.items():
     tgid = k.value >> 32
     pid = k.value & 0xffffffff
-    for i in range(0, len(exit_reasons)):
+    for i in exit_reasons.keys():
         sum1 = 0
         for inner_cpu in range(0, multiprocessing.cpu_count()):
             cachePIDTGID = pcpu_cache[0][inner_cpu].cache_pid_tgid
@@ -367,8 +467,8 @@ for k, v in pcpu_kvm_stat.items():
 
 # Aggregate all tids' counts for this args.pid in descending sort
 if args.pid and need_collapse:
-    for i in range(0, len(exit_reasons)):
-        ct_reason.append((tgid_exit[i], i))
+    for k, v in tgid_exit.items():
+        ct_reason.append((v, k))
     ct_reason.sort(reverse=True)
     for i in range(0, len(ct_reason)):
         if ct_reason[i][0] == 0:
