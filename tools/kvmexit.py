@@ -26,6 +26,7 @@
 # 31-Aug-2021  Fei Li <lifei.shirley@bytedance.com>  Initial implementation.
 # 28-Jul-2025  Matt Pelland <mpelland@akamai.com>    Implement support for AMD.
 # 28-Jul-2025  Matt Pelland <mpelland@akamai.com>    Parallelize postprocessing.
+# 28-Jul-2025  Matt Pelland <mpelland@akamai.com>    Silence compiler warnings.
 
 from __future__ import print_function
 from time import sleep
@@ -72,6 +73,7 @@ exgroup.add_argument("-T", "--tids", type=valid_args_list, help="trace a comma s
 exgroup.add_argument("-v", "--vcpu", type=int, help="trace this vcpu only")
 exgroup.add_argument("-a", "--alltids", action="store_true", help="trace all tids for this pid")
 parser.add_argument("-m", "--max-parallelism", type=int, help="limit post processing parallelism to the given thread count", default=64)
+parser.add_argument("-d", "--debug", action="store_true", help="enable debug facilities")
 args = parser.parse_args()
 duration = int(args.duration)
 
@@ -405,7 +407,12 @@ else:
     header_format = "PID      TID      "
 bpf_text = bpf_text.replace('THREAD_FILTER', thread_filter)
 bpf_text = bpf_text.replace('REASON_NUM', str(max(exit_reasons.keys()) + 1))
-b = BPF(text=bpf_text)
+cflags = []
+
+if not args.debug:
+    cflags.append("-w")
+
+b = BPF(text=bpf_text, cflags=cflags)
 
 
 # header

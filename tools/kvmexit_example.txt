@@ -240,6 +240,7 @@ optional arguments:
   -a, --alltids         trace all tids for this pid
   -m MAX_PARALLELISM, --max-parallelism MAX_PARALLELISM
                         limit post processing parallelism to the given thread count
+  -d, --debug           enable debug facilities
 
 examples:
     ./kvmexit                              # Display kvm_exit_reason and its statistics in real-time until Ctrl-C
