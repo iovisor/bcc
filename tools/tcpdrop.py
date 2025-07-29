@@ -342,7 +342,7 @@ drop_reasons = {
 def print_ipv4_event(cpu, data, size):
     event = b["ipv4_events"].event(data)
     reason_str = drop_reasons.get(event.drop_reason, "UNKNOWN")
-    state_flag_str = "%s (%s)" % (tcp.tcpstate[event.state], tcp.flags2str(event.tcpflags))
+    state_flag_str = "%s (%s)" % (tcp.state2str(event.state), tcp.flags2str(event.tcpflags))
     print("%-8s %-7d %-2d %-20s > %-20s %-20s %s (%d)" % (
         strftime("%H:%M:%S"), event.pid, event.ip,
         "%s:%d" % (inet_ntop(AF_INET, pack('I', event.saddr)), event.sport),
@@ -356,7 +356,7 @@ def print_ipv4_event(cpu, data, size):
 def print_ipv6_event(cpu, data, size):
     event = b["ipv6_events"].event(data)
     reason_str = drop_reasons.get(event.drop_reason, "UNKNOWN")
-    state_flag_str = "%s (%s)" % (tcp.tcpstate[event.state], tcp.flags2str(event.tcpflags))
+    state_flag_str = "%s (%s)" % (tcp.state2str(event.state), tcp.flags2str(event.tcpflags))
     print("%-8s %-7d %-2d %-20s > %-20s %-20s %s (%d)" % (
         strftime("%H:%M:%S"), event.pid, event.ip,
         "%s:%d" % (inet_ntop(AF_INET6, event.saddr), event.sport),
