@@ -51,21 +51,33 @@ struct data_t {
     u64 delta;
     char comm[TASK_COMM_LEN];
     char fname[DNAME_INLINE_LEN];
-    /* private */
-    void *dentry;
 };
 
-BPF_HASH(birth, struct dentry *);
-BPF_HASH(unlink_data, u32, struct data_t);
-BPF_PERF_OUTPUT(events);
+struct create_arg {
+    u64 ts;
+};
+
+struct unlink_event {
+    u32 tid;
+    u64 delta;
+    struct dentry *dentry;
+};
+
+BPF_HASH(birth, struct dentry *, struct create_arg);
+BPF_HASH(unlink_data, u32, struct unlink_event);
+BPF_RINGBUF_OUTPUT(events, 64);
 
 static int probe_dentry(struct pt_regs *ctx, struct dentry *dentry)
 {
+    struct create_arg arg = {};
     u32 pid = bpf_get_current_pid_tgid() >> 32;
     FILTER
 
     u64 ts = bpf_ktime_get_ns();
-    birth.update(&dentry, &ts);
+
+    arg.ts = ts;
+
+    birth.update(&dentry, &arg);
 
     return 0;
 }
@@ -98,46 +110,40 @@ int trace_open(struct pt_regs *ctx, struct path *path, struct file *file)
 // trace file deletion and output details
 TRACE_UNLINK_FUNC
 {
-    struct data_t data = {};
+    struct create_arg *arg;
+    struct unlink_event event = {};
     u64 pid_tgid = bpf_get_current_pid_tgid();
     u32 pid = pid_tgid >> 32;
     u32 tid = (u32)pid_tgid;
 
     FILTER
 
-    u64 *tsp, delta;
-    tsp = birth.lookup(&dentry);
-    if (tsp == 0) {
+    u64 delta;
+    arg = birth.lookup(&dentry);
+    if (arg == 0) {
         return 0;   // missed create
     }
 
-    delta = (bpf_ktime_get_ns() - *tsp) / 1000000;
-
-    struct qstr d_name = dentry->d_name;
-    if (d_name.len == 0)
-        return 0;
-
-    if (bpf_get_current_comm(&data.comm, sizeof(data.comm)) == 0) {
-        data.pid = pid;
-        data.delta = delta;
-        bpf_probe_read_kernel(&data.fname, sizeof(data.fname), d_name.name);
-    }
+    delta = (bpf_ktime_get_ns() - arg->ts) / 1000000;
 
     /* record dentry, only delete from birth if unlink successful */
-    data.dentry = dentry;
+    event.delta = delta;
+    event.tid = tid;
+    event.dentry = dentry;
 
-    unlink_data.update(&tid, &data);
+    unlink_data.update(&tid, &event);
     return 0;
 }
 
 int trace_unlink_ret(struct pt_regs *ctx)
 {
     int ret = PT_REGS_RC(ctx);
+    struct unlink_event *unlink_event;
     struct data_t *data;
     u32 tid = (u32)bpf_get_current_pid_tgid();
 
-    data = unlink_data.lookup(&tid);
-    if (!data)
+    unlink_event = unlink_data.lookup(&tid);
+    if (!unlink_event)
         return 0;
 
     /* delete it any way */
@@ -147,8 +153,20 @@ int trace_unlink_ret(struct pt_regs *ctx)
     if (ret)
         return 0;
 
-    birth.delete((struct dentry **)&data->dentry);
-    events.perf_submit(ctx, data, sizeof(*data));
+    data = events.ringbuf_reserve(sizeof(struct data_t));
+    if (!data)
+        return 0;
+
+    data->pid = unlink_event->tid;
+    data->delta = unlink_event->delta;
+    bpf_get_current_comm(&data->comm, sizeof(data->comm));
+
+    struct qstr d_name = unlink_event->dentry->d_name;
+    bpf_probe_read_kernel_str(&data->fname, sizeof(data->fname), d_name.name);
+
+    birth.delete((struct dentry **)&unlink_event->dentry);
+
+    events.ringbuf_submit(data, sizeof(*data));
 
     return 0;
 }
@@ -220,9 +238,9 @@ def print_event(cpu, data, size):
         event.comm.decode('utf-8', 'replace'), float(event.delta) / 1000,
         event.fname.decode('utf-8', 'replace')))
 
-b["events"].open_perf_buffer(print_event)
+b["events"].open_ring_buffer(print_event)
 while 1:
     try:
-        b.perf_buffer_poll()
+        b.ring_buffer_poll()
     except KeyboardInterrupt:
         exit()
