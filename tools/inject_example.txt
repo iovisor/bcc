@@ -75,7 +75,7 @@ we want to fail the dentry allocation of a file creatively named 'bananas'. We
 can do the following:
 
 # ./inject.py kmalloc -v 'd_alloc_parallel(struct dentry *parent, const struct
-qstr *name)(STRCMP(name->name, 'bananas'))' 
+qstr *name)(STRCMP(name->name, 'bananas'))'
 
 While this script is executing, any operation that would cause a dentry
 allocation where the name is 'bananas' fails, as expected.

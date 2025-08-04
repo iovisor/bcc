@@ -47,7 +47,7 @@ print("%-14s %-12s %-6s %s" % ("TIME(s)", "COMMAND", "PID", "UID"))
 
 def print_event(cpu, data, size):
     event = b["events"].event(data)
-    printb(b"%-14.3f %-12s %-6d %d" % ((event.ts/1000000000), 
+    printb(b"%-14.3f %-12s %-6d %d" % ((event.ts/1000000000),
            event.comm, event.pid, event.uid))
 
 # loop with callback to print_event

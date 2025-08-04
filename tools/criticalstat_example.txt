@@ -12,12 +12,12 @@ Since this uses BPF, only the root user can use this tool. Further, the kernel
 has to be built with certain CONFIG options enabled inorder for it to work:
     - CONFIG_DEBUG_PREEMPT
     - CONFIG_PREEMPT_TRACER
-    
+
     For kernel 4.19 and later:
     - CONFIG_PREEMPTIRQ_TRACEPOINTS
     - CONFIG_TRACE_IRQFLAGS
     - CONFIG_TRACE_PREEMPT_TOGGLE
-    
+
     For kernel 4.15 to 4.18:
     - CONFIG_PREEMPTIRQ_EVENTS
     - CONFIG_PROVE_LOCKING

@@ -39,7 +39,7 @@ runqlat tool.
 Here's an example of an issue that runqlen can identify. Starting with the
 system-wide summary:
 
-# ./runqlen.py 
+# ./runqlen.py
 Sampling run queue length... Hit Ctrl-C to end.
 ^C
      runqlen       : count     distribution
@@ -204,7 +204,7 @@ quickly.
 The -O option prints run queue occupancy: the percentage of time that there
 was work queued waiting its turn. Eg:
 
-# ./runqlen.py -OT 1 
+# ./runqlen.py -OT 1
 Sampling run queue length... Hit Ctrl-C to end.
 
 19:54:53
@@ -225,7 +225,7 @@ runqocc: 40.83%
 
 This can also be examined per-CPU:
 
-# ./runqlen.py -COT 1 
+# ./runqlen.py -COT 1
 Sampling run queue length... Hit Ctrl-C to end.
 
 19:55:03

@@ -7,7 +7,7 @@ eBPF application that parses HTTP packets and extracts (and prints on screen) th
 ## Usage Example
 
 
-    $ sudo python http-parse-complete.py 
+    $ sudo python http-parse-complete.py
     GET /pipermail/iovisor-dev/ HTTP/1.1
     HTTP/1.1 200 OK
     GET /favicon.ico HTTP/1.1
@@ -42,6 +42,6 @@ Two versions of this code are available in this repository:
 ## How to execute this sample
 
 This sample can be executed by typing either one the two commands below:
- 
+
     $ sudo python http-parse-simple.py
     $ sudo python http-parse-complete.py

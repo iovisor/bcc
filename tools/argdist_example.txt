@@ -37,7 +37,7 @@ p:c:malloc(size_t size):size_t:size
 
 It seems that the application is allocating blocks of size 16. The COUNT
 column contains the number of occurrences of a particular event, and the
-EVENT column describes the event. In this case, the "size" parameter was 
+EVENT column describes the event. In this case, the "size" parameter was
 probed and its value was 16, repeatedly.
 
 Now, suppose you wanted a histogram of buffer sizes passed to the write()
@@ -152,7 +152,7 @@ p:c:puts(char *str):char*:str
 It looks like the message "Press ENTER to start." was printed twice during the
 10 seconds we were tracing.
 
-What about reads? You could trace gets() across the system and print the 
+What about reads? You could trace gets() across the system and print the
 strings input by the user (note how "r" is used instead of "p" to attach a
 probe to the function's return):
 
@@ -240,7 +240,7 @@ per byte allocated. Let's go:
        512 -> 1023       : 1        |****                                    |
       1024 -> 2047       : 1        |****                                    |
       2048 -> 4095       : 9        |****************************************|
-      4096 -> 8191       : 1        |****                                    | 
+      4096 -> 8191       : 1        |****                                    |
 
 It looks like a tri-modal distribution. Some allocations are extremely cheap,
 and take 2-15 nanoseconds per byte. Other allocations are slower, and take
@@ -434,7 +434,7 @@ argdist -C 'r::__vfs_read():u32:$PID:$latency > 100000'
 argdist -C 'r::__vfs_read():u32:$COMM:$latency > 100000'
         Print frequency of reads by process name where the latency was >0.1ms
 
-argdist -H 'r::__vfs_read(void *file, void *buf, size_t count):size_t:$entry(count):$latency > 1000000' 
+argdist -H 'r::__vfs_read(void *file, void *buf, size_t count):size_t:$entry(count):$latency > 1000000'
         Print a histogram of read sizes that were longer than 1ms
 
 argdist -H \
@@ -444,7 +444,7 @@ argdist -H \
 
 argdist -C 'p:c:fork()#fork calls'
         Count fork() calls in libc across all processes
-        Can also use funccount.py, which is easier and more flexible 
+        Can also use funccount.py, which is easier and more flexible
 
 argdist -H 't:block:block_rq_complete():u32:args->nr_sector'
         Print histogram of number of sectors in completing block I/O requests
@@ -463,7 +463,7 @@ argdist -H 'p:c:sleep(u32 seconds):u32:seconds' \
 argdist -p 2780 -z 120 \
         -C 'p:c:write(int fd, char* buf, size_t len):char*:buf:fd==1'
         Spy on writes to STDOUT performed by process 2780, up to a string size
-        of 120 characters 
+        of 120 characters
 
 argdist -I 'kernel/sched/sched.h' \
         -C 'p::__account_cfs_rq_runtime(struct cfs_rq *cfs_rq):s64:cfs_rq->runtime_remaining'

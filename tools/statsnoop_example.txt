@@ -4,7 +4,7 @@ Demonstrations of statsnoop, the Linux eBPF/bcc version.
 statsnoop traces the different stat() syscalls system-wide, and prints various
 details. Example output:
 
-# ./statsnoop 
+# ./statsnoop
 PID    COMM               FD ERR PATH
 31126  bash                0   0 .
 31126  bash               -1   2 /usr/local/sbin/iconfig

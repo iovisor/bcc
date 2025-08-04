@@ -4,7 +4,7 @@ Demonstrations of swapin, the Linux BCC/eBPF version.
 This tool counts swapins by process, to show which process is affected by
 swapping. For example:
 
-# swapin.py 
+# swapin.py
 Counting swap ins. Ctrl-C to end.
 13:36:58
 COMM             PID    COUNT

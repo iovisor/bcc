@@ -141,7 +141,7 @@ int trace_open_entry(struct pt_regs *ctx, struct inode *inode,
 
     if (FILTER_PID)
         return 0;
-    
+
     struct key_t key = {};
     key.id = id;
     key.type = TRACE_OPEN;

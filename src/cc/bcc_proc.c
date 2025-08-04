@@ -528,7 +528,7 @@ static bool which_so_in_ldconfig_cache(const char* libname, char* libpath) {
   for (i = 0; i < lib_cache_count; ++i) {
     if (!strncmp(lib_cache[i].libname, soname, soname_len) &&
         match_so_flags(lib_cache[i].flags)) {
-      
+
       const char* path = lib_cache[i].path;
       const size_t pathlen = strlen(path);
       if (pathlen >= PATH_MAX) {

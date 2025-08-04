@@ -38,11 +38,11 @@ def print_table(table, qnum):
 
     # ---- print headers ----------------
     headers = [
-		"QueueID", 
-		"avg_size", 
-		"[0, 64)", 
-		"[64, 512)", 
-		"[512, 2K)", 
+		"QueueID",
+		"avg_size",
+		"[0, 64)",
+		"[64, 512)",
+		"[512, 2K)",
 		"[2K, 16K)",
 		"[16K, 64K)"
 	]
@@ -94,7 +94,7 @@ def print_table(table, qnum):
             ]
         else:
             data = [k,0,0,0,0,0,0,0]
-        
+
         # print a line per queue
         avg = 0
         if data[2] != 0:
@@ -117,7 +117,7 @@ def print_table(table, qnum):
             ))
         else:
             print()
-    
+
     # ------- print total --------------
     print(" Total      %-11s%-11s%-11s%-11s%-11s%-11s" % (
         to_str(tAVG),

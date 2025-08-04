@@ -4,7 +4,7 @@ wakeuptime \- Summarize sleep to wakeup time by waker kernel stack. Uses Linux e
 .SH SYNOPSIS
 .B wakeuptime [\-h] [\-u] [\-p PID] [\-v] [\-f] [\-\-stack-storage-size STACK_STORAGE_SIZE] [\-m MIN_BLOCK_TIME] [\-M MAX_BLOCK_TIME] [duration]
 .SH DESCRIPTION
-This program shows the kernel stack traces for threads that woke up other 
+This program shows the kernel stack traces for threads that woke up other
 blocked threads, along with the process names of the waker and target, along
 with a sum of the time that the target was blocked: the "blocked time".
 It works by tracing when threads block and when they were then woken up, and

@@ -86,7 +86,7 @@ TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
 While tracing, the following commands were run in another window:
 
 # date > date.txt
-# cksum date.txt 
+# cksum date.txt
 
 The output of btrfsslower now includes open operations ("O"), and writes ("W").
 The first read from cksum(1) returned 29 bytes, and the second returned 0:

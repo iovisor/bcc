@@ -9,28 +9,28 @@ failed. For example, trace the open() function in libc when it is slower than
 # ./funcslower c:open -u 1
 Tracing function calls slower than 1 us... Ctrl+C to quit.
 COMM           PID    LAT(us)             RVAL FUNC
-less           27074    33.77                3 c:open 
-less           27074     9.96 ffffffffffffffff c:open 
-less           27074     5.92 ffffffffffffffff c:open 
-less           27074    15.88 ffffffffffffffff c:open 
-less           27074     8.89                3 c:open 
-less           27074    15.89                3 c:open 
-sh             27075    20.97                4 c:open 
-bash           27075    20.14                4 c:open 
-lesspipe.sh    27075    18.77                4 c:open 
-lesspipe.sh    27075    11.21                4 c:open 
-lesspipe.sh    27075    13.68                4 c:open 
-file           27076    14.83 ffffffffffffffff c:open 
-file           27076     8.02                4 c:open 
-file           27076    10.26                4 c:open 
-file           27076     6.55                4 c:open 
-less           27074    11.67                4 c:open 
+less           27074    33.77                3 c:open
+less           27074     9.96 ffffffffffffffff c:open
+less           27074     5.92 ffffffffffffffff c:open
+less           27074    15.88 ffffffffffffffff c:open
+less           27074     8.89                3 c:open
+less           27074    15.89                3 c:open
+sh             27075    20.97                4 c:open
+bash           27075    20.14                4 c:open
+lesspipe.sh    27075    18.77                4 c:open
+lesspipe.sh    27075    11.21                4 c:open
+lesspipe.sh    27075    13.68                4 c:open
+file           27076    14.83 ffffffffffffffff c:open
+file           27076     8.02                4 c:open
+file           27076    10.26                4 c:open
+file           27076     6.55                4 c:open
+less           27074    11.67                4 c:open
 ^C
 
 This shows several open operations performed by less and some helpers it invoked
 in the process. The latency (in microseconds) is shown, as well as the return
 value from the open() function, which helps indicate if there is a correlation
-between failures and slow invocations. Most open() calls seemed to have 
+between failures and slow invocations. Most open() calls seemed to have
 completed successfully (returning a valid file descriptor), but some have failed
 and returned -1.
 
@@ -39,14 +39,14 @@ You can also trace kernel functions:
 # ./funcslower -m 10 vfs_read
 Tracing function calls slower than 10 ms... Ctrl+C to quit.
 COMM           PID    LAT(ms)             RVAL FUNC
-bash           11527    78.97                1 vfs_read 
-bash           11527   101.26                1 vfs_read 
-bash           11527  1053.60                1 vfs_read 
-bash           11527    44.21                1 vfs_read 
-bash           11527    79.50                1 vfs_read 
-bash           11527    33.37                1 vfs_read 
-bash           11527   112.17                1 vfs_read 
-bash           11527   101.49                1 vfs_read 
+bash           11527    78.97                1 vfs_read
+bash           11527   101.26                1 vfs_read
+bash           11527  1053.60                1 vfs_read
+bash           11527    44.21                1 vfs_read
+bash           11527    79.50                1 vfs_read
+bash           11527    33.37                1 vfs_read
+bash           11527   112.17                1 vfs_read
+bash           11527   101.49                1 vfs_read
 ^C
 
 Occasionally, it is also useful to see the arguments passed to the functions.

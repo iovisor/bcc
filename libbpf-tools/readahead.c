@@ -120,7 +120,7 @@ static int attach_access(struct readahead_bpf *obj)
 
 	if (fentry_can_attach("mark_page_accessed", NULL))
 		return bpf_program__set_autoload(obj->progs.mark_page_accessed, true);
-	
+
 	fprintf(stderr, "failed to attach to access functions\n");
 	return -1;
 }

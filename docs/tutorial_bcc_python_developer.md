@@ -229,10 +229,10 @@ if BPF.get_kprobe_functions(b'blk_start_request'):
 b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_start")
 
 if BPF.get_kprobe_functions(b'__blk_account_io_done'):
-    # __blk_account_io_done is available before kernel v6.4. 
+    # __blk_account_io_done is available before kernel v6.4.
     b.attach_kprobe(event="__blk_account_io_done", fn_name="trace_completion")
 elif BPF.get_kprobe_functions(b'blk_account_io_done'):
-    # blk_account_io_done is traceable (not inline) before v5.16. 
+    # blk_account_io_done is traceable (not inline) before v5.16.
     b.attach_kprobe(event="blk_account_io_done", fn_name="trace_completion")
 else:
     b.attach_kprobe(event="blk_mq_end_request", fn_name="trace_completion")
@@ -531,7 +531,7 @@ print("%-14s %-12s %-6s %s" % ("TIME(s)", "COMMAND", "PID", "UID"))
 
 def print_event(cpu, data, size):
     event = b["events"].event(data)
-    printb(b"%-14.3f %-12s %-6d %d" % ((event.ts/1000000000), 
+    printb(b"%-14.3f %-12s %-6d %d" % ((event.ts/1000000000),
            event.comm, event.pid, event.uid))
 
 # loop with callback to print_event
@@ -553,8 +553,8 @@ list``` for a list of tracepoints. Linux >= 4.7 is required to attach BPF
 programs to tracepoints.
 1. ```args->uid```: ```args``` is auto-populated to be a structure of the
 tracepoint arguments. The comment above says where you can see that structure.
-Eg:  
-    
+Eg:
+
     ```
     # sudo cat /sys/kernel/debug/tracing/events/syscalls/sys_enter_setuid/format
     name: sys_enter_setuid
@@ -564,10 +564,10 @@ Eg:
         	field:unsigned char common_flags;       offset:2;       size:1; signed:0;
         	field:unsigned char common_preempt_count;       offset:3;       size:1; signed:0;
         	field:int common_pid;   offset:4;       size:4; signed:1;
-    
+
         	field:int __syscall_nr; offset:8;       size:4; signed:1;
         	field:uid_t uid;        offset:16;      size:8; signed:0;
-    
+
     print fmt: "uid: 0x%08lx", ((unsigned long)(REC->uid))
     ```
     In this case, there are only one member `uid` to be printed.
