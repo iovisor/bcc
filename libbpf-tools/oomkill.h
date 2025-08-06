@@ -8,6 +8,8 @@ struct data_t {
 	__u32 fpid;
 	__u32 tpid;
 	__u64 pages;
+	__u64 fcgroupid;
+	__u64 tcgroupid;
 	char fcomm[TASK_COMM_LEN];
 	char tcomm[TASK_COMM_LEN];
 };
