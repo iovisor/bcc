@@ -276,7 +276,7 @@ int trace_udp_recvmsg(struct pt_regs *ctx)
 {
     __u64 pid_tgid = bpf_get_current_pid_tgid();
     struct sock *sk = (struct sock *)PT_REGS_PARM1(ctx);
-    struct inet_sock *is = inet_sk(sk);
+    struct inet_sock *is = (struct inet_sock *)sk;
 
     // only grab port 53 packets, 13568 is ntohs(53)
     if (is->inet_dport == 13568) {
@@ -303,7 +303,7 @@ int trace_udp_ret_recvmsg(struct pt_regs *ctx)
         goto delete_and_return;
     size_t buflen = (size_t)copied;
 
-    if (buflen > msghdr->msg_iter.iov->iov_len)
+    if (buflen > msghdr->msg_iter.IOV_FIELD->iov_len)
         goto delete_and_return;
 
     if (buflen > MAX_PKT)
@@ -313,7 +313,7 @@ int trace_udp_ret_recvmsg(struct pt_regs *ctx)
     if (!data) // this should never happen, just making the verifier happy
         return 0;
 
-    void *iovbase = msghdr->msg_iter.iov->iov_base;
+    void *iovbase = msghdr->msg_iter.IOV_FIELD->iov_base;
     bpf_probe_read(data->pkt, buflen, iovbase);
     dns_events.perf_submit(ctx, data, buflen);
 
@@ -386,10 +386,14 @@ bpf_text = bpf_text.replace('FILTER_FAMILY', '')
 bpf_text = bpf_text.replace('FILTER_UID', '')
 
 if args.dns:
-    if BPF.kernel_struct_has_field(b'iov_iter', b'iter_type') == 1:
-        dns_bpf_text = dns_bpf_text.replace('TYPE_FIELD', 'iter_type')
-    else:
+    if BPF.kernel_struct_has_field(b'iov_iter', b'type') == 1:
         dns_bpf_text = dns_bpf_text.replace('TYPE_FIELD', 'type')
+    else:
+        dns_bpf_text = dns_bpf_text.replace('TYPE_FIELD', 'iter_type')
+    if BPF.kernel_struct_has_field(b'iov_iter', b'iov') == 1:
+        dns_bpf_text = dns_bpf_text.replace('IOV_FIELD', 'iov')
+    else:
+        dns_bpf_text = dns_bpf_text.replace('IOV_FIELD', '__iov')
     bpf_text += dns_bpf_text
 
 if debug or args.ebpf:
