@@ -16,7 +16,7 @@ TIME(s)            SYSCALL
         ret_from_fork
 
 This shows that submit_bio() was called by submit_bh(), which was called
-by jbd2_journal_commit_transaction(), and so on. 
+by jbd2_journal_commit_transaction(), and so on.
 
 For high frequency functions, see stackcount, which summarizes in-kernel for
 efficiency. If you don't know if your function is low or high frequency, try

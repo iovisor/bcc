@@ -4,7 +4,7 @@ Demonstrations of fileslower, the Linux eBPF/bcc version.
 fileslower shows file-based synchronous reads and writes slower than a
 threshold. For example:
 
-# ./fileslower 
+# ./fileslower
 Tracing sync read/writes slower than 10 ms
 TIME(s)  COMM           PID    D BYTES   LAT(ms) FILENAME
 0.000    randread.pl    4762   R 8192      12.70 data1

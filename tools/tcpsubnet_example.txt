@@ -53,7 +53,7 @@ to, Eg:
 
 With this information, we can come up with a reasonable range of IPs
 to monitor, Eg:
- 
+
 # tcpsubnet.py 192.30.253.110/27,0.0.0.0/0
 Tracing... Output every 1 secs. Hit Ctrl-C to end
 [03/05/18 22:38:58]

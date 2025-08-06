@@ -112,7 +112,7 @@ htab_batch_ops = True if BPF.kernel_struct_has_field(b'bpf_map_ops',
 exiting = 0 if args.interval else 1
 counters = b.get_table("counters")
 
-print("%-9s %-7s %5s %5s %8s %10s" % 
+print("%-9s %-7s %5s %5s %8s %10s" %
     ("TIME", "DISK", "%RND", "%SEQ", "COUNT", "KBYTES"))
 
 while True:
@@ -120,7 +120,7 @@ while True:
         sleep(int(args.interval))
     except KeyboardInterrupt:
         exiting = 1
-    
+
     for k, v in (counters.items_lookup_and_delete_batch()
                 if htab_batch_ops else counters.items()):
         total = v.random + v.sequential

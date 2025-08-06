@@ -2,8 +2,8 @@
 #
 # net_monitor.py Aggregates incoming network traffic
 # outputs source ip, destination ip, the number of their network traffic, and current time
-# how to use : net_monitor.py <net_interface> 
-# 
+# how to use : net_monitor.py <net_interface>
+#
 # Copyright (c) 2020 YoungEun Choe
 
 from bcc import BPF
@@ -34,7 +34,7 @@ bpf_text = """
 #define ETH_HLEN 14
 
 BPF_PERF_OUTPUT(skb_events);
-BPF_HASH(packet_cnt, u64, long, 256); 
+BPF_HASH(packet_cnt, u64, long, 256);
 
 int packet_monitor(struct __sk_buff *skb) {
     u8 *cursor = 0;
@@ -42,20 +42,20 @@ int packet_monitor(struct __sk_buff *skb) {
     long* count = 0;
     long one = 1;
     u64 pass_value = 0;
-    
+
     struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
     struct ip_t *ip = cursor_advance(cursor, sizeof(*ip));
     if (ip->ver != 4)
         return 0;
-    if (ip->nextp != IP_TCP) 
+    if (ip->nextp != IP_TCP)
     {
-        if (ip -> nextp != IP_UDP) 
+        if (ip -> nextp != IP_UDP)
         {
-            if (ip -> nextp != IP_ICMP) 
-                return 0; 
+            if (ip -> nextp != IP_ICMP)
+                return 0;
         }
     }
-    
+
     saddr = ip -> src;
     daddr = ip -> dst;
 
@@ -63,7 +63,7 @@ int packet_monitor(struct __sk_buff *skb) {
     pass_value = pass_value << 32;
     pass_value = pass_value + daddr;
 
-    count = packet_cnt.lookup(&pass_value); 
+    count = packet_cnt.lookup(&pass_value);
     if (count)  // check if this map exists
         *count += 1;
     else        // if the map for the key doesn't exist, create one
@@ -113,7 +113,7 @@ try:
         formatted_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
         if output_len != 0:
             print('\ncurrent packet nums:')
-        
+
         for i in range(0,output_len):
             srcdst = packet_cnt_output[i][0].value
             src = (srcdst >> 32) & 0xFFFFFFFF
@@ -124,8 +124,8 @@ try:
             decimal_to_human(str(dst)) + ' ' + str(pkt_num) + ' ' + 'time : ' + formatted_time
             print(monitor_result)
 
-        packet_cnt.clear() # delete map entries after printing output. confirmed it deletes values and keys too 
-        
+        packet_cnt.clear() # delete map entries after printing output. confirmed it deletes values and keys too
+
 except KeyboardInterrupt:
     sys.stdout.close()
     pass

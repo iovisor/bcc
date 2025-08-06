@@ -40,7 +40,7 @@ to the coarseness of its 99 Hertz samples.
 This is an 8 CPU system, with an 8 CPU-bound threaded application running that
 has been bound to one CPU (via taskset):
 
-# ./cpuunclaimed.py 
+# ./cpuunclaimed.py
 Sampling run queues... Output every 1 seconds. Hit Ctrl-C to end.
 %CPU  12.63%, unclaimed idle 86.36%
 %CPU  12.50%, unclaimed idle 87.50%

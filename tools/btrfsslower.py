@@ -63,7 +63,7 @@ csv = args.csv
 debug = 0
 if args.duration:
     args.duration = timedelta(seconds=int(args.duration))
-    
+
 # define BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>

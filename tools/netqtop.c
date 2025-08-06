@@ -1,7 +1,7 @@
 
 #include <linux/netdevice.h>
 #include <linux/ethtool.h>
-#if IFNAMSIZ != 16 
+#if IFNAMSIZ != 16
 #error "IFNAMSIZ != 16 is not supported"
 #endif
 #define MAX_QUEUE_NUM 1024
@@ -90,7 +90,7 @@ TRACEPOINT_PROBE(net, net_dev_start_xmit){
         return 0;
     }
     updata_data(data, skb->len);
-    
+
     return 0;
 }
 
@@ -122,6 +122,6 @@ TRACEPOINT_PROBE(net, netif_receive_skb){
         return 0;
     }
     updata_data(data, skb.len);
-    
+
     return 0;
 }

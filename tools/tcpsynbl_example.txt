@@ -6,7 +6,7 @@ This lets you see how close your applications are to hitting the backlog limit
 and dropping SYNs (causing performance issues with SYN retransmits). For
 example:
 
-# ./tcpsynbl.py 
+# ./tcpsynbl.py
 Tracing SYN backlog size. Ctrl-C to end.
 ^C
 

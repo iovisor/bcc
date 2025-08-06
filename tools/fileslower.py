@@ -225,7 +225,7 @@ print("%-8s %-14s %-6s %1s %-7s %7s %s" % ("TIME(s)", "COMM", "TID", "D",
     "BYTES", "LAT(ms)", "FILENAME"))
 
 start_ts = time.time()
-DNAME_INLINE_LEN = 32 
+DNAME_INLINE_LEN = 32
 def print_event(cpu, data, size):
     event = b["events"].event(data)
 

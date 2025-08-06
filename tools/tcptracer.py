@@ -190,7 +190,7 @@ int trace_connect_v4_entry(struct pt_regs *ctx, struct sock *sk)
   u64 pid = bpf_get_current_pid_tgid();
 
   ##FILTER_PID##
-  
+
   u16 family = sk->__sk_common.skc_family;
   ##FILTER_FAMILY##
 
@@ -296,7 +296,7 @@ int trace_tcp_set_state_entry(struct pt_regs *ctx, struct sock *skp, int state)
 
   u16 family = skp->__sk_common.skc_family;
   ##FILTER_FAMILY##
-  
+
   u8 ipver = 0;
   if (check_family(skp, AF_INET)) {
       ipver = 4;
@@ -385,7 +385,7 @@ int trace_close_entry(struct pt_regs *ctx, struct sock *skp)
   u64 pid = bpf_get_current_pid_tgid();
 
   ##FILTER_PID##
-  
+
   u16 family = skp->__sk_common.skc_family;
   ##FILTER_FAMILY##
 
@@ -473,7 +473,7 @@ int trace_accept_return(struct pt_regs *ctx)
 #endif
 
   ##FILTER_NETNS##
-  
+
   u16 family = newsk->__sk_common.skc_family;
   ##FILTER_FAMILY##
 

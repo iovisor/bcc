@@ -77,7 +77,7 @@ do \
       then \
         apt-get install -y libpolly-${version}-dev; \
       fi; \
-done \ 
+done \
 && \
       apt-get -y clean'
 

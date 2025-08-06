@@ -200,7 +200,7 @@ elif args.write_only:
 else:
     b.attach_kprobe(event="vfs_read", fn_name="trace_read_entry")
     b.attach_kprobe(event="vfs_write", fn_name="trace_write_entry")
-    
+
 
 # check whether hash table batch ops is supported
 htab_batch_ops = True if BPF.kernel_struct_has_field(b'bpf_map_ops',

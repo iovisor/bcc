@@ -2616,7 +2616,7 @@ cannot call GPL only function from proprietary program
 
 eBPF program compilation needs kernel sources or kernel headers with headers
 compiled. In case your kernel sources are at a non-standard location where BCC
-cannot find then, its possible to provide BCC the absolute path of the location
+cannot find then, it's possible to provide BCC the absolute path of the location
 by setting `BCC_KERNEL_SOURCE` to it.
 
 ## 2. Kernel version overriding

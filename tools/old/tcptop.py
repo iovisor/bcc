@@ -131,7 +131,7 @@ static int tcp_sendstat(int size)
     bpf_probe_read_kernel(&family, sizeof(family),
         &sk->__sk_common.skc_family);
     FILTER_FAMILY
-    
+
     if (family == AF_INET) {
         struct ipv4_key_t ipv4_key = {.pid = pid};
         bpf_get_current_comm(&ipv4_key.name, sizeof(ipv4_key.name));
@@ -211,7 +211,7 @@ int kprobe__tcp_cleanup_rbuf(struct pt_regs *ctx, struct sock *sk, int copied)
         return 0;
 
     FILTER_FAMILY
-    
+
     if (family == AF_INET) {
         struct ipv4_key_t ipv4_key = {.pid = pid};
         bpf_get_current_comm(&ipv4_key.name, sizeof(ipv4_key.name));

@@ -6,7 +6,7 @@ further investigation beyond dcstat(8). The output is likely verbose, as
 dcache lookups are likely frequent. By default, only failed lookups are shown.
 For example:
 
-# ./dcsnoop.py 
+# ./dcsnoop.py
 TIME(s)     PID    COMM             T FILE
 0.002837    1643   snmpd            M net/dev
 0.002852    1643   snmpd            M 1643

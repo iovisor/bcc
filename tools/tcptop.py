@@ -133,7 +133,7 @@ static int tcp_stat(int size, bool is_send)
     bpf_probe_read_kernel(&family, sizeof(family),
         &sk->__sk_common.skc_family);
     FILTER_FAMILY
-    
+
     if (family == AF_INET) {
         struct ipv4_key_t ipv4_key = {.pid = pid};
         bpf_get_current_comm(&ipv4_key.name, sizeof(ipv4_key.name));

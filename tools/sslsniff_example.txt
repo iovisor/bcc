@@ -191,7 +191,7 @@ optional arguments:
                         Size of captured buffer
   -l, --latency         show function latency
   --handshake           show SSL handshake latency, enabled only if latency
-                        option is on. 
+                        option is on.
   --extra-lib EXTRA_LIB
                         Intercept calls from extra library
                         (format: lib_type:lib_path)
