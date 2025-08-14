@@ -76,6 +76,10 @@ bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/blkdev.h>
 
+enum { __BCC_DNAME_INLINE_LEN = DNAME_INLINE_LEN };
+#undef DNAME_INLINE_LEN
+#define DNAME_INLINE_LEN __BCC_DNAME_INLINE_LEN
+
 // the key for the output summary
 struct info_t {
     unsigned long inode;
