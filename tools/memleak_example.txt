@@ -181,6 +181,23 @@ When using the --symbols-prefix argument, memleak can trace the third-party memo
 allocations, such as jemalloc whose symbols are usually identified by the "je_" prefix
 in redis project.
 
+# ./memleak.py  -p $(pgrep leak_test) -O /usr/local/lib/libjemalloc.so.2 -t 
+        --costom-malloc-uprobe=je_malloc_default --costom-free-uprobe=je_free_default
+Attaching to pid 2619464, Ctrl+C to quit.
+(b'leak_test', 2619464, 7, b'....', 501375.308951, b'alloc entered, size = 8192')
+(b'leak_test', 2619464, 7, b'....', 501375.309025, b'alloc exited, size = 8192, result = 7fb87b42b000')
+(b'leak_test', 2619464, 7, b'....', 501388.122185, b'alloc entered, size = 16384')
+(b'leak_test', 2619464, 7, b'....', 501388.122223, b'alloc exited, size = 16384, result = 7fb87b4373c0')
+(b'leak_test', 2619464, 2, b'....', 501413.748229, b'alloc entered, size = 63')
+(b'leak_test', 2619464, 2, b'....', 501413.748265, b'alloc exited, size = 63, result = 7fb87b41b000')
+(b'leak_test', 2619464, 2, b'....', 501413.748272, b'alloc entered, size = 32768')
+(b'leak_test', 2619464, 2, b'....', 501413.74831, b'alloc exited, size = 32768, result = 7fb87b43cf00')
+(b'leak_test', 2619464, 2, b'....', 501413.748358, b'free entered, address = 7fb87b4373c0, size = 16384')
+(b'leak_test', 2619464, 2, b'....', 501413.748373, b'free entered, address = 7fb87b41b000, size = 63')
+
+When using the --costom-malloc-uprobe and --costom-free-uprobe= parameters, we can use a third-party custom malloc and free entry,
+such as jemalloc 5.3.0,--costom-malloc-uprobe=je_malloc_default --costom-free-uprobe=je_free_default
+
 USAGE message:
 
 # ./memleak -h
