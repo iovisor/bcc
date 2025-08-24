@@ -70,23 +70,21 @@ int tp__skb_free_skb(struct trace_event_raw_kfree_skb *args)
 	if (ipv6_only && protocol != ETH_P_IPV6)
 		return 0;
 
-	bpf_core_read(&sk, sizeof(sk), &skb->sk);
+	sk = BPF_CORE_READ(skb, sk);
 
 	if (netns_id && sk) {
-		net = NULL;
-		bpf_core_read(&net, sizeof(net), &sk->__sk_common.skc_net.net);
+		net = BPF_CORE_READ(sk, __sk_common.skc_net.net);
 		if (net) {
-			bpf_core_read(&inum, sizeof(inum), &net->ns.inum);
+			inum = BPF_CORE_READ(net, ns.inum);
 			if (inum != netns_id)
 				return 0;
 		}
 	}
 
-	if (bpf_core_read(&head, sizeof(head), &skb->head) ||
-	    bpf_core_read(&network_header, sizeof(network_header),
-			  &skb->network_header) ||
-	    bpf_core_read(&transport_header, sizeof(transport_header),
-			  &skb->transport_header))
+	head = BPF_CORE_READ(skb, head);
+	network_header = BPF_CORE_READ(skb, network_header);
+	transport_header = BPF_CORE_READ(skb, transport_header);
+	if (!head)
 		return 0;
 
 	event = bpf_ringbuf_reserve(&events, sizeof(*event), 0);
@@ -114,10 +112,8 @@ int tp__skb_free_skb(struct trace_event_raw_kfree_skb *args)
 			return 0;
 		}
 		event->ip_version = 6;
-		bpf_core_read(&event->saddr_v6, sizeof(event->saddr_v6),
-			      &ip6.saddr.in6_u.u6_addr32);
-		bpf_core_read(&event->daddr_v6, sizeof(event->daddr_v6),
-			      &ip6.daddr.in6_u.u6_addr32);
+		__builtin_memcpy(&event->saddr_v6, &ip6.saddr.in6_u.u6_addr32, sizeof(event->saddr_v6));
+		__builtin_memcpy(&event->daddr_v6, &ip6.daddr.in6_u.u6_addr32, sizeof(event->daddr_v6));
 		event->sport = bpf_ntohs(tcp.source);
 		event->dport = bpf_ntohs(tcp.dest);
 		event->tcpflags = ((u8 *)&tcp)[13];
@@ -136,9 +132,7 @@ int tp__skb_free_skb(struct trace_event_raw_kfree_skb *args)
 	event->stack_id = bpf_get_stackid(args, &stack_traces, 0);
 	event->state = 127;
 	if (sk)
-		if (!bpf_core_read(&state, sizeof(state),
-				   &sk->__sk_common.skc_state))
-			event->state = state;
+		event->state = BPF_CORE_READ(sk, __sk_common.skc_state);
 
 	bpf_ringbuf_submit(event, 0);
 	return 0;
