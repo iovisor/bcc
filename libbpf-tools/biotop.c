@@ -225,7 +225,7 @@ static int sort_column(const void *obj1, const void *obj2)
 static void parse_disk_stat(void)
 {
 	FILE *fp;
-	char *line;
+	char *line = NULL;
 	size_t zero;
 
 	fp = fopen("/proc/diskstats", "r");
