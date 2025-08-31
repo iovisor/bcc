@@ -1,0 +1,49 @@
+.TH filewriteback 8  "2025-09-01" "USER COMMANDS"
+.SH NAME
+filewriteback \-  Summarize write IOPs/Bandwidth/times of cached files to disk 
+in folded stack format.
+.SH SYNOPSIS
+.B filewriteback [\-h] [duration]
+.SH DESCRIPTION
+This tool traces block device I/O (disk I/O) from cached files, and summarizes
+the write IOPs/Bandwidth/times in folded stack format. For each cached file, we
+restore the full path by the inode information. Then, the full file path with
+the write IOPs/Bandwidth/times is stored in files.
+
+The write information count the IOs from the block function
+"blk_mq_start_request". The full path are restored by inode and the dentry in
+page cache. 
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+duration
+Trace ends when the running time equals the duration value.
+.SH EXAMPLES
+.TP
+Summarize write IOPs/Bandwidth/times of cached files to disk in folded stack format.
+#
+.B filewriteback
+.TP
+.SH OVERHEAD
+The overhead for this tool is expected to be negligible if the IOPs of the
+system is relatively low (e.g., < 10K/s). For high IOPS storage systems, test 
+and quantify before use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Jie Xu

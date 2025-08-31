@@ -1,0 +1,34 @@
+Demonstrations of filewriteback, the Linux eBPF/bcc version.
+
+This program traces the writeback of cached files to disk.
+The data are in folded stack format and can be used to generate the flamegraph.
+
+How to run the script
+Run ./filewriteback.py with root permissions.
+The traced information will be stored in the "IOflamefiles" directory,
+which contains three files, i.e., "IOflame.write.iops",
+"IOflame.write.bandwidth", "IOflame.write.times".
+
+How to interpret the result
+Each line in the file contains the write information of the file path.
+E.g., the information stored in "IOflame.write.iops" of the directory
+"IOflamefiles" may be like this
+"""
+/;opt;log;tiger;tiger.log. 1
+/;etc;system;agent;log;log 1
+/;opt;log;tiger;dird 1
+/;opt;log;tiger;dirc 1
+/;opt;tiger;log;app;dira;dirb 1
+"""
+The fisrt line means that the file path "/;opt;log;tiger;tiger.log." has "1"
+iops.
+
+How to generate the flamegraph
+It's recommended to generate the flamegraph to visualize the result.
+Using the command "./flamegraph.pl IOflame.write.iops > write_iops.svg",
+we can get the flamegraph.
+
+The meaning of the three files
+(1)"IOflame.write.iops" is the write iops of the cached files to disk.
+(2)"IOflame.write.bandwidth" is write bandwidth of the cached files to disk.
+(3)"IOflame.write.times" is the write times of the cached files to disk.

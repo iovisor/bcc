@@ -195,6 +195,7 @@ pair of .c and .py files, and some are directories of files.
 - tools/[mdflush](tools/mdflush.py): Trace md flush events. [Examples](tools/mdflush_example.txt).
 - tools/[mountsnoop](tools/mountsnoop.py): Trace mount and umount syscalls system-wide. [Examples](tools/mountsnoop_example.txt).
 - tools/[virtiostat](tools/virtiostat.py): Show VIRTIO device IO statistics. [Examples](tools/virtiostat_example.txt).
+- tools/[filewriteback](tools/filewriteback.py): Summarize write IOPs/Bandwidth/times of cached files to disk as folded stack format. [Examples](tools/filewriteback.txt).
 
 ###### Filesystems Tools
 
