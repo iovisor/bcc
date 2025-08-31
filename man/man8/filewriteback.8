@@ -10,8 +10,8 @@ the write IOPs/Bandwidth/times in folded stack format. For each cached file, we
 restore the full path by the inode information. Then, the full file path with
 the write IOPs/Bandwidth/times is stored in files.
 
-The write information count the IOs from the block function
-"blk_mq_start_request". The full path are restored by inode and the dentry in
+The write information counts the IOs from the block function
+"blk_mq_start_request". The full path is restored by inode and the dentry in
 page cache. 
 
 Since this uses BPF, only the root user can use this tool.

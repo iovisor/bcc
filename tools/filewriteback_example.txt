@@ -20,7 +20,7 @@ E.g., the information stored in "IOflame.write.iops" of the directory
 /;opt;log;tiger;dirc 1
 /;opt;tiger;log;app;dira;dirb 1
 """
-The fisrt line means that the file path "/;opt;log;tiger;tiger.log." has "1"
+The first line means that the file path "/;opt;log;tiger;tiger.log." has "1"
 iops.
 
 How to generate the flamegraph
