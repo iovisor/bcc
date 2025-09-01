@@ -532,7 +532,7 @@ sudo zypper in lua51-luajit-devel # for lua support in openSUSE Tumbleweed
 git clone https://github.com/iovisor/bcc.git
 mkdir bcc/build; cd bcc/build
 cmake -DLUAJIT_INCLUDE_DIR=`pkg-config --variable=includedir luajit` \ # for lua support
-      ..
+      -DENABLE_LLVM_SHARED=1 ..
 make
 sudo make install
 cmake -DPYTHON_CMD=python3 .. # build python3 binding
