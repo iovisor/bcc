@@ -398,7 +398,7 @@ void Context::each_uprobe(each_uprobe_cb callback) {
 
     for (Location &loc : p->locations_) {
       callback(loc.bin_path_.c_str(), p->attached_to_->c_str(), loc.address_,
-               pid_.value_or(-1));
+               pid_.value_or(-1), p->semaphore_offset_);
     }
   }
 }
