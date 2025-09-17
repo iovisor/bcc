@@ -137,7 +137,7 @@ b.attach_kprobe(event_re=pattern, fn_name="trace_count")
 matched = b.num_open_kprobes()
 if matched == 0:
     print("0 functions matched by \"%s\". Exiting." % args.pattern)
-    exit()
+    exit(1)
 
 # header
 print("Tracing %d functions for \"%s\"... Hit Ctrl-C to end." %

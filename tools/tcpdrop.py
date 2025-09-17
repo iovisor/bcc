@@ -386,7 +386,7 @@ else:
     print("ERROR: tcp_drop() kernel function and tracepoint:skb:kfree_skb"
           " not found or traceable. "
           "The kernel might be too old or the the function has been inlined.")
-    exit()
+    exit(1)
 stack_traces = b.get_table("stack_traces")
 
 # header

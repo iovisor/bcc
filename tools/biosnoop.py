@@ -344,7 +344,7 @@ if not tp_start:
         b.attach_kprobe(event="blk_account_io_start", fn_name="trace_pid_start")
     else:
         print("ERROR: No found any block io start probe/tp.")
-        exit()
+        exit(1)
 
 if BPF.get_kprobe_functions(b'blk_start_request'):
     b.attach_kprobe(event="blk_start_request", fn_name="trace_req_start")
@@ -357,7 +357,7 @@ if not tp_done:
         b.attach_kprobe(event="blk_account_io_done", fn_name="trace_req_completion")
     else:
         print("ERROR: No found any block io done probe/tp.")
-        exit()
+        exit(1)
 
 
 # header

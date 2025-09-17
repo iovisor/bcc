@@ -185,7 +185,7 @@ if BPF.support_kfunc():
         ra_func = "page_cache_ra_order"
     else:
         print("Not found any kfunc for page cache readahead.")
-        exit()
+        exit(1)
     bpf_text += bpf_text_kfunc_cache_readahead.replace("RA_FUNC", ra_func)
     if BPF.get_kprobe_functions(b"__page_cache_alloc"):
         bpf_text += bpf_text_kfunc_cache_alloc_ret_page
@@ -196,7 +196,7 @@ if BPF.support_kfunc():
             bpf_text += bpf_text_kfunc_cache_alloc_ret_folio_noprof
         else:
             print("ERROR: No cache alloc function found. Exiting.")
-            exit()
+            exit(1)
         bpf_text += bpf_text_kfunc_cache_alloc_ret_folio_func_body
     if BPF.get_kprobe_functions(b"folio_mark_accessed"):
         ma_func_name = "folio_mark_accessed"
@@ -216,7 +216,7 @@ if BPF.support_kfunc():
             .replace("GET_PAGE_PTR_FROM_ARG0", get_page_ptr_code)
     else:
         print("Not found any kfunc for page cache mark accessed.")
-        exit()
+        exit(1)
     bpf_text += bpf_text_kfunc_mark_accessed
     b = BPF(text=bpf_text)
 else:
@@ -229,7 +229,7 @@ else:
         ra_event = "page_cache_ra_order"
     else:
         print("Not found any kprobe for page cache readahead.")
-        exit()
+        exit(1)
     if BPF.get_kprobe_functions(b"__page_cache_alloc"):
         cache_func = "__page_cache_alloc"
         bpf_text = bpf_text.replace('GET_RETVAL_PAGE', 'PT_REGS_RC(ctx)')
@@ -240,7 +240,7 @@ else:
             cache_func = "filemap_alloc_folio_noprof"
         else:
             print("ERROR: No cache alloc function found. Exiting.")
-            exit()
+            exit(1)
         bpf_text = bpf_text.replace('GET_RETVAL_PAGE', 'folio_page((struct folio *)PT_REGS_RC(ctx), 0)')
     if BPF.get_kprobe_functions(b"folio_mark_accessed"):
         ma_event = "folio_mark_accessed"
@@ -250,7 +250,7 @@ else:
         bpf_text = bpf_text.replace('GET_ARG1_PAGE', '(struct page *)PT_REGS_PARM1(ctx)')
     else:
         print("Not found any kprobe for page cache mark accessed.")
-        exit()
+        exit(1)
 
     b = BPF(text=bpf_text)
     b.attach_kprobe(event=ra_event, fn_name="entry__do_page_cache_readahead")

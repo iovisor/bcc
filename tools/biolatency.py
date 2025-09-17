@@ -294,7 +294,7 @@ if args.flags and (tp_start or tp_done):
             # Some flags are accessible in the rwbs field (RAHEAD, SYNC and META)
             # but other aren't. Disable the -F option for tracepoint for now.
             print("ERROR: blk_account_io_start/done probes not available. Can't use -F.")
-            exit()
+            exit(1)
 
 if tp_start:
     bpf_text += tp_start_text.replace("START_TP", tp_start)
