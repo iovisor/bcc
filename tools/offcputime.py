@@ -122,7 +122,7 @@ debug = 0
 
 if args.folded and args.offset:
     print("ERROR: can only use -f or -s. Exiting.")
-    exit()
+    exit(1)
 
 # signal handler
 def signal_ignore(signal, frame):

@@ -87,11 +87,11 @@ if not args.interval:
 
 if args.pid and args.exec:
     print("ERROR: can only use -p or --exec. Exiting.")
-    exit()
+    exit(1)
 
 if args.exec is not None and len(args.exec) == 0:
     print("ERROR: --exec without command. Exiting.")
-    exit()
+    exit(1)
 
 syscall_nr = -1
 if args.syscall is not None:

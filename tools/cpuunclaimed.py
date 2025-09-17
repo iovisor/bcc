@@ -164,7 +164,7 @@ if args.csv:
     interval = 0.2
 if args.interval != -1 and (args.fullcsv or args.csv):
     print("ERROR: cannot use interval with either -j or -J. Exiting.")
-    exit()
+    exit(1)
 if args.interval == -1:
     args.interval = "1"
 interval = float(args.interval)

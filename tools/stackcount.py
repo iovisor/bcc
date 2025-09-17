@@ -267,7 +267,7 @@ class Tool(object):
         if self.args.kernel_stacks_only and self.args.user_stacks_only:
             print("ERROR: -K and -U are mutually exclusive. If you want " +
                 "both stacks, that is the default.")
-            exit()
+            exit(1)
         if not self.args.kernel_stacks_only and not self.args.user_stacks_only:
             self.kernel_stack = True
             self.user_stack = True

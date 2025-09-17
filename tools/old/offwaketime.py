@@ -55,7 +55,7 @@ maxwdepth = 10    # and MAXWDEPTH
 maxtdepth = 20    # and MAXTDEPTH
 if args.pid and args.useronly:
     print("ERROR: use either -p or -u.")
-    exit()
+    exit(1)
 
 # signal handler
 def signal_ignore(signal, frame):
