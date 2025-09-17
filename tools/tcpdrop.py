@@ -209,7 +209,7 @@ else:
 if args.pid_netns != 0:
     if args.netns_id != 0:
         print("ERROR: --pid_netns and --netns-id not allowed together")
-        exit()
+        exit(1)
     args.netns_id = os.stat('/proc/{}/ns/net'.format(args.pid_netns)).st_ino
 
 if args.netns_id != 0:

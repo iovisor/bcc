@@ -65,7 +65,7 @@ debug = 0
 
 if args.flags and args.disks:
     print("ERROR: can only use -D or -F. Exiting.")
-    exit()
+    exit(1)
 
 # define BPF program
 bpf_text = """

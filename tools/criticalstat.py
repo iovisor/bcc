@@ -54,7 +54,7 @@ debugfs_path = subprocess.Popen ("cat /proc/mounts | grep -w debugfs" +
 
 if debugfs_path == "":
     print("ERROR: Unable to find debugfs mount point");
-    sys.exit(0);
+    sys.exit(1);
 
 trace_path = debugfs_path + b"/tracing/events/preemptirq/";
 
