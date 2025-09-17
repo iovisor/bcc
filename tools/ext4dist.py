@@ -165,7 +165,7 @@ else:
         if ext4_file_ops_addr == '':
             print("ERROR: no ext4_file_operations in /proc/kallsyms. Exiting.")
             print("HINT: the kernel should be built with CONFIG_KALLSYMS_ALL.")
-            exit()
+            exit(1)
     ext4_trace_read_code = """
 int trace_read_entry(struct pt_regs *ctx, struct kiocb *iocb)
 {
