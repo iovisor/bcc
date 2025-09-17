@@ -212,7 +212,7 @@ if not is_supported_raw_tp:
     matched = b.num_open_kprobes()
     if matched == 0:
         print("0 functions traced. Exiting.")
-        exit()
+        exit(1)
 
 # check whether hash table batch ops is supported
 htab_batch_ops = True if BPF.kernel_struct_has_field(b'bpf_map_ops',

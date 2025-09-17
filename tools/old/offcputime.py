@@ -163,7 +163,7 @@ b.attach_kprobe(event="finish_task_switch", fn_name="oncpu")
 matched = b.num_open_kprobes()
 if matched == 0:
     print("0 functions traced. Exiting.")
-    exit()
+    exit(1)
 
 # header
 if not folded:
