@@ -24,14 +24,15 @@ from subprocess import call
 
 # arguments
 examples = """examples:
-    ./filetop                 # file I/O top, 1 second refresh
-    ./filetop -C              # don't clear the screen
-    ./filetop -p 181          # PID 181 only
-    ./filetop -d /home/user   # trace files in /home/user directory only
-    ./filetop 5               # 5 second summaries
-    ./filetop 5 10            # 5 second summaries, 10 times only
-    ./filetop 5 --read-only   # 5 second summaries, only read operations traced
-    ./filetop 5 --write-only  # 5 second summaries, only write operations traced
+    ./filetop                    # file I/O top, 1 second refresh
+    ./filetop -C                 # don't clear the screen
+    ./filetop -p 181             # PID 181 only
+    ./filetop -d /home/user      # trace files in /home/user directory only
+    ./filetop -d /home/user -R   # trace files in /home/user and subdirectories
+    ./filetop 5                  # 5 second summaries
+    ./filetop 5 10               # 5 second summaries, 10 times only
+    ./filetop 5 --read-only      # 5 second summaries, only read operations traced
+    ./filetop 5 --write-only     # 5 second summaries, only write operations traced
 """
 parser = argparse.ArgumentParser(
     description="File reads and writes by process",
@@ -60,6 +61,8 @@ parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 parser.add_argument("-d", "--directory", type=str,
     help="trace this directory only")
+parser.add_argument("-R", "--recursive", action="store_true",
+    help="when used with -d, also trace files in subdirectories")
 
 args = parser.parse_args()
 interval = int(args.interval)
@@ -180,12 +183,25 @@ else:
 if args.directory:
     try:
         directory_inode = os.lstat(args.directory)[stat.ST_INO]
-        print(f'Tracing directory: {args.directory} (Inode: {directory_inode})')
-        bpf_text = bpf_text.replace('DIRECTORY_FILTER',  'file->f_path.dentry->d_parent->d_inode->i_ino != %d' % directory_inode)
+        if args.recursive:
+            print(f'Tracing directory recursively: {args.directory} (Inode: {directory_inode})')
+            directory_filter = ("({ struct dentry *pde = de; int found = 0; "
+                               "for (int i = 0; i < 50; i++) { "
+                               "if (!pde->d_parent) break; pde = pde->d_parent; "
+                               "if (pde->d_inode->i_ino == %d) { found = 1; break; } } "
+                               "!found; })") % directory_inode
+        else:
+            print(f'Tracing directory: {args.directory} (Inode: {directory_inode})')
+            directory_filter = "file->f_path.dentry->d_parent->d_inode->i_ino != %d" % directory_inode
+
+        bpf_text = bpf_text.replace('DIRECTORY_FILTER', directory_filter)
     except (FileNotFoundError, PermissionError) as e:
         print(f'Error accessing directory {args.directory}: {e}')
         exit(1)
 else:
+    if args.recursive:
+        print("Error: --recursive can only be used with -d/--directory option")
+        exit(1)
     bpf_text = bpf_text.replace('DIRECTORY_FILTER', '0')
 
 if debug or args.ebpf:
