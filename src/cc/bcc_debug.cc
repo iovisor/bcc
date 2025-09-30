@@ -147,7 +147,7 @@ void SourceDebugger::dump() {
     return;
   }
 
-#if LLVM_VERSION_MAJOR >+ 22
+#if LLVM_VERSION_MAJOR >= 22
   std::unique_ptr<MCSubtargetInfo> STI(
       T->createMCSubtargetInfo(TheTriple, "", ""));
 #else
