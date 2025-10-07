@@ -157,7 +157,7 @@ TRACEPOINT_PROBE(kvm, kvm_exit) {
             }
             // b.* As the cur_pid_tgid meets current pcpu_cache_array for the first time, save it.
             cache_p->cache_pid_tgid = cur_pid_tgid;
-            bpf_probe_read(&cache_p->cache_exit_ct, sizeof(*tmp_info), tmp_info);
+            bpf_probe_read_kernel(&cache_p->cache_exit_ct, sizeof(*tmp_info), tmp_info);
         }
         return 0;
     }

@@ -67,7 +67,7 @@ TRACE_VFS_UNLINK_FUNC
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
     data.pid = pid;
     data.action = 'D';
-    bpf_probe_read(&data.fname, sizeof(data.fname), d_name.name);
+    bpf_probe_read_kernel(&data.fname, sizeof(data.fname), d_name.name);
 
     currdata.update(&tid, &data);
 
@@ -92,8 +92,8 @@ TRACE_VFS_RENAME_FUNC
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
     data.pid = pid;
     data.action = 'R';
-    bpf_probe_read(&data.fname, sizeof(data.fname), s_name.name);
-    bpf_probe_read(&data.fname2, sizeof(data.fname), d_name.name);
+    bpf_probe_read_kernel(&data.fname, sizeof(data.fname), s_name.name);
+    bpf_probe_read_kernel(&data.fname2, sizeof(data.fname), d_name.name);
     currdata.update(&tid, &data);
 
     return 0;
