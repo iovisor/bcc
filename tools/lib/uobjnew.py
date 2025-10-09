@@ -92,6 +92,9 @@ int alloc_entry(struct pt_regs *ctx, size_t size) {
 #
 elif language == "java":
     program += """
+#ifndef MIN
+    #define MIN(x, y) ((x) < (y) ? (x) : (y))
+#endif
 int alloc_entry(struct pt_regs *ctx) {
     struct key_t key = {};
     struct val_t *valp, zero = {};
@@ -100,7 +103,7 @@ int alloc_entry(struct pt_regs *ctx) {
     bpf_usdt_readarg(2, ctx, &classptr);
     bpf_usdt_readarg(3, ctx, &length);
     bpf_usdt_readarg(4, ctx, &size);
-    bpf_probe_read_user(&key.name, min(sizeof(key.name), (size_t)length), (void *)classptr);
+    bpf_probe_read_user(&key.name, MIN(sizeof(key.name), (size_t)length), (void *)classptr);
     valp = allocs.lookup_or_try_init(&key, &zero);
     if (valp) {
         valp->total_size += size;
