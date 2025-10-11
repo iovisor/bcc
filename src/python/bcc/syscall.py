@@ -19,7 +19,7 @@ import subprocess
 import platform
 
 # Syscall table for Linux x86_64, not very recent. Automatically generated from
-# https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/arch/x86/entry/syscalls/syscall_64.tbl?h=v6.15.6
+# https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/arch/x86/entry/syscalls/syscall_64.tbl?h=linux-6.17.y
 # using the following command:
 #
 # cat arch/x86/entry/syscalls/syscall_64.tbl \
@@ -408,6 +408,8 @@ syscalls = {
     465: b"listxattrat",
     466: b"removexattrat",
     467: b"open_tree_attr",
+    468: b"file_getattr",
+    469: b"file_setattr",
     512: b"rt_sigaction",
     513: b"rt_sigreturn",
     514: b"ioctl",

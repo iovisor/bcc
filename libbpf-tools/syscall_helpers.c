@@ -125,7 +125,7 @@ void free_syscall_names(void)
 
 /*
  * Syscall table for Linux x86_64. Automatically generated from
- * https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/arch/x86/entry/syscalls/syscall_64.tbl?h=v6.15.6
+ * https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/arch/x86/entry/syscalls/syscall_64.tbl?h=linux-6.17.y
  * using the following commands:
  *
  * cat arch/x86/entry/syscalls/syscall_64.tbl \
@@ -517,6 +517,8 @@ static const char *syscall_names_x86_64[] = {
 	[465] = "listxattrat",
 	[466] = "removexattrat",
 	[467] = "open_tree_attr",
+	[468] = "file_getattr",
+	[469] = "file_setattr",
 	[512] = "rt_sigaction",
 	[513] = "rt_sigreturn",
 	[514] = "ioctl",
