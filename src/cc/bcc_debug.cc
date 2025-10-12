@@ -120,7 +120,11 @@ void SourceDebugger::dump() {
   string TripleStr(mod_->getTargetTriple());
 #endif
   Triple TheTriple(TripleStr);
+#if LLVM_VERSION_MAJOR >= 22
+  const Target *T = TargetRegistry::lookupTarget(TheTriple, Error);
+#else
   const Target *T = TargetRegistry::lookupTarget(TripleStr, Error);
+#endif
   if (!T) {
     errs() << "Debug Error: cannot get target\n";
     return;
