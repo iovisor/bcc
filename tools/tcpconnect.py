@@ -314,7 +314,7 @@ int trace_udp_ret_recvmsg(struct pt_regs *ctx)
         return 0;
 
     void *iovbase = msghdr->msg_iter.IOV_FIELD->iov_base;
-    bpf_probe_read(data->pkt, buflen, iovbase);
+    bpf_probe_read_user(data->pkt, buflen, iovbase);
     dns_events.perf_submit(ctx, data, buflen);
 
 delete_and_return:
@@ -343,7 +343,7 @@ int trace_udpv6_recvmsg(struct pt_regs *ctx)
     if (!event)
         return 0;
 
-    bpf_probe_read(event->pkt, sizeof(event->pkt), data);
+    bpf_probe_read_kernel(event->pkt, sizeof(event->pkt), data);
     dns_events.perf_submit(ctx, event, sizeof(*event));
     return 0;
 }

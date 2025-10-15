@@ -39,8 +39,8 @@ static inline int name_filter(struct sk_buff* skb){
     /* get device name from skb */
     union name_buf real_devname;
     struct net_device *dev;
-    bpf_probe_read(&dev, sizeof(skb->dev), ((char *)skb + offsetof(struct sk_buff, dev)));
-    bpf_probe_read(&real_devname, IFNAMSIZ, dev->name);
+    bpf_probe_read_kernel(&dev, sizeof(skb->dev), ((char *)skb + offsetof(struct sk_buff, dev)));
+    bpf_probe_read_kernel(&real_devname, IFNAMSIZ, dev->name);
 
     int key=0;
     union name_buf *leaf = name_map.lookup(&key);
@@ -97,7 +97,7 @@ TRACEPOINT_PROBE(net, net_dev_start_xmit){
 TRACEPOINT_PROBE(net, netif_receive_skb){
     struct sk_buff skb;
 
-    bpf_probe_read(&skb, sizeof(skb), args->skbaddr);
+    bpf_probe_read_kernel(&skb, sizeof(skb), args->skbaddr);
     if(!name_filter(&skb)){
         return 0;
     }
