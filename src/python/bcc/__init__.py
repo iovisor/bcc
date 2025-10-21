@@ -726,7 +726,7 @@ class BPF(object):
                 raise e
             blacklist = set([])
 
-        avail_filter_file = "%s/tracing/available_filter_functions" % DEBUGFS
+        avail_filter_file = "%s/available_filter_functions" % TRACEFS
         try:
             with open(avail_filter_file, "rb") as avail_filter_f:
                 avail_filter = set([line.rstrip().split()[0] for line in avail_filter_f])
