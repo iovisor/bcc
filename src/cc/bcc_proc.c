@@ -469,7 +469,8 @@ static bool which_so_in_process(const char* libname, int pid, char* libpath) {
   int ret, found = false;
   char endline[4096], *mapname = NULL, *newline;
   char mappings_file[128];
-  const size_t search_len = strlen(libname) + strlen("/lib.");
+  const bool has_so = strstr(libname, ".so");
+  const size_t search_len = strlen(libname) + strlen(has_so ? "/lib" : "/lib.");
   char search1[search_len + 1];
   char search2[search_len + 1];
 
@@ -478,8 +479,13 @@ static bool which_so_in_process(const char* libname, int pid, char* libpath) {
   if (!fp)
     return NULL;
 
-  snprintf(search1, search_len + 1, "/lib%s.", libname);
-  snprintf(search2, search_len + 1, "/lib%s-", libname);
+  if (has_so) {
+    snprintf(search1, search_len + 1, "/lib%s", libname);
+    search2[0] = '\0';
+  } else {
+    snprintf(search1, search_len + 1, "/lib%s.", libname);
+    snprintf(search2, search_len + 1, "/lib%s-", libname);
+  }
 
   do {
     ret = fscanf(fp, "%*x-%*x %*s %*x %*s %*d");
@@ -494,7 +500,7 @@ static bool which_so_in_process(const char* libname, int pid, char* libpath) {
     while (isspace(mapname[0])) mapname++;
 
     if (strstr(mapname, ".so") && (strstr(mapname, search1) ||
-                                   strstr(mapname, search2))) {
+                                   (!has_so && strstr(mapname, search2)))) {
       const size_t mapnamelen = strlen(mapname);
       if (mapnamelen >= PATH_MAX) {
         fprintf(stderr, "Found mapped library path is too long\n");
@@ -511,7 +517,8 @@ static bool which_so_in_process(const char* libname, int pid, char* libpath) {
 }
 
 static bool which_so_in_ldconfig_cache(const char* libname, char* libpath) {
-  const size_t soname_len = strlen(libname) + strlen("lib.so");
+  const bool has_so = strstr(libname, ".so");
+  const size_t soname_len = strlen(libname) + strlen(has_so ? "lib" : "lib.so");
   char soname[soname_len + 1];
   int i;
 
@@ -523,7 +530,7 @@ static bool which_so_in_ldconfig_cache(const char* libname, char* libpath) {
     return false;
   }
 
-  snprintf(soname, soname_len + 1, "lib%s.so", libname);
+  snprintf(soname, sizeof(soname), has_so ? "lib%s" : "lib%s.so", libname);
 
   for (i = 0; i < lib_cache_count; ++i) {
     if (!strncmp(lib_cache[i].libname, soname, soname_len) &&
