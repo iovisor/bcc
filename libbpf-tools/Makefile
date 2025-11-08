@@ -100,8 +100,8 @@ APPS = \
 # export variables that are used in Makefile.btfgen as well.
 export OUTPUT BPFTOOL ARCH BTFHUB_ARCHIVE APPS
 
-FSDIST_ALIASES = btrfsdist ext4dist nfsdist xfsdist f2fsdist bcachefsdist zfsdist
-FSSLOWER_ALIASES = btrfsslower ext4slower nfsslower xfsslower f2fsslower bcachefsslower zfsslower
+FSDIST_ALIASES = btrfsdist ext4dist fusedist nfsdist xfsdist f2fsdist bcachefsdist zfsdist
+FSSLOWER_ALIASES = btrfsslower ext4slower fuseslower nfsslower xfsslower f2fsslower bcachefsslower zfsslower
 SIGSNOOP_ALIAS = killsnoop
 APP_ALIASES = $(FSDIST_ALIASES) $(FSSLOWER_ALIASES) ${SIGSNOOP_ALIAS}
 
