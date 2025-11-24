@@ -132,10 +132,11 @@ int count_tcp(struct pt_regs *ctx, struct sk_buff *skb) {
         b = BPF(text=text)
         fn = b.load_func(b"count_tcp", BPF.KPROBE)
 
+    @skipUnless(kernel_version_ge(5,16), "requires kernel >= 5.16")
     def test_probe_read_keys(self):
         text = b"""
 #include <uapi/linux/ptrace.h>
-#include <linux/blkdev.h>
+#include <linux/blk-mq.h>
 BPF_HASH(start, struct request *);
 int do_request(struct pt_regs *ctx, struct request *req) {
     u64 ts = bpf_ktime_get_ns();
@@ -226,9 +227,10 @@ BPF_TABLE("array", int, struct Event, comms, 1);
         self.assertEqual(l.stack[0].name, name)
         self.assertEqual(l.stack[0].path, path)
 
+    @skipUnless(kernel_version_ge(5,16), "requires kernel >= 5.16")
     def test_iosnoop(self):
         text = b"""
-#include <linux/blkdev.h>
+#include <linux/blk-mq.h>
 #include <uapi/linux/ptrace.h>
 
 struct key_t {
@@ -315,10 +317,11 @@ int test(struct pt_regs *ctx, struct sock *skp) {
         b = BPF(text=text)
         fn = b.load_func(b"test", BPF.KPROBE)
 
+    @skipUnless(kernel_version_ge(5,16), "requires kernel >= 5.16")
     def test_char_array_probe(self):
-        BPF(text=b"""#include <linux/blkdev.h>
+        BPF(text=b"""#include <linux/blk-mq.h>
 int kprobe__blk_update_request(struct pt_regs *ctx, struct request *req) {
-    bpf_trace_printk("%s\\n", req->rq_disk->disk_name);
+    bpf_trace_printk("%s\\n", req->q->disk->disk_name);
     return 0;
 }""")
 
@@ -470,9 +473,10 @@ int test(struct pt_regs *ctx, struct sk_buff *skb) {
 }""")
         b.load_func(b"test", BPF.KPROBE)
 
+    @skipUnless(kernel_version_ge(5,16), "requires kernel >= 5.16")
     def test_unop_probe_read(self):
         text = b"""
-#include <linux/blkdev.h>
+#include <linux/blk-mq.h>
 int trace_entry(struct pt_regs *ctx, struct request *req) {
     if (!(req->bio->bi_flags & 1))
         return 1;
@@ -1294,11 +1298,11 @@ TRACEPOINT_PROBE(kmem, kmalloc) {
             self.assertEqual(st.a, 10)
             self.assertEqual(st.b, 20)
 
-    @skipUnless(kernel_version_ge(4,14), "requires kernel >= 4.14")
+    @skipUnless(kernel_version_ge(5,17), "requires kernel >= 5.17")
     def test_jump_table(self):
         text = b"""
 #include <linux/blk_types.h>
-#include <linux/blkdev.h>
+#include <linux/blk-mq.h>
 #include <linux/time64.h>
 
 BPF_PERCPU_ARRAY(rwdf_100ms, u64, 400);
@@ -1306,12 +1310,12 @@ BPF_PERCPU_ARRAY(rwdf_100ms, u64, 400);
 int do_request(struct pt_regs *ctx, struct request *rq) {
     u32 cmd_flags;
     u64 base, dur, slot, now = 100000;
+    struct gendisk *disk = rq->q->disk;
 
     if (!rq->start_time_ns)
       return 0;
 
-    if (!rq->rq_disk || rq->rq_disk->major != 5 ||
-        rq->rq_disk->first_minor != 6)
+    if (!disk || disk->major != 5 || disk->first_minor != 6)
       return 0;
 
     cmd_flags = rq->cmd_flags;
