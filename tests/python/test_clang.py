@@ -1249,7 +1249,7 @@ int test(struct pt_regs *ctx, struct sock *sk) {
         text = b"""
 #include <linux/mm_types.h>
 int test(struct pt_regs *ctx, struct mm_struct *mm) {
-    return mm->rss_stat.count[MM_ANONPAGES].counter;
+    return mm->rss_stat[MM_ANONPAGES].count;
 }
 """
         b = BPF(text=text)
