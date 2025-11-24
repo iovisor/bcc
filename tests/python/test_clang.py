@@ -1249,11 +1249,12 @@ int test(struct pt_regs *ctx, struct sock *sk) {
         b = BPF(text=text)
         fn = b.load_func(b"test", BPF.KPROBE)
 
+    @skipUnless(kernel_version_ge(6,2), "requires kernel >= 6.2")
     def test_probe_read_array_accesses8(self):
         text = b"""
 #include <linux/mm_types.h>
 int test(struct pt_regs *ctx, struct mm_struct *mm) {
-    return mm->rss_stat.count[MM_ANONPAGES].counter;
+    return mm->rss_stat[MM_ANONPAGES].count;
 }
 """
         b = BPF(text=text)
