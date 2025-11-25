@@ -106,12 +106,18 @@ class SmokeTests(TestCase):
 
     def test_btrfsdist(self):
         # Will attempt to do anything meaningful only when btrfs is installed.
-        self.run_with_duration("btrfsdist.py 1 1")
+        if (self.kmod_loaded("btrfs")):
+            self.run_with_duration("btrfsdist.py 1 1")
+        else:
+            pass
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_btrfsslower(self):
         # Will attempt to do anything meaningful only when btrfs is installed.
-        self.run_with_int("btrfsslower.py", allow_early=True)
+        if (self.kmod_loaded("btrfs")):
+            self.run_with_int("btrfsslower.py", allow_early=True)
+        else:
+            pass
 
     def test_cachestat(self):
         self.run_with_duration("cachestat.py 1 1")
@@ -181,7 +187,10 @@ class SmokeTests(TestCase):
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_f2fsslower(self):
-        self.run_with_int("f2fsslower.py", allow_early=True)
+        if (self.kmod_loaded("f2fs")):
+            self.run_with_int("f2fsslower.py", allow_early=True)
+        else:
+            pass
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_filelife(self):
