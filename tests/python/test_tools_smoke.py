@@ -106,12 +106,18 @@ class SmokeTests(TestCase):
 
     def test_btrfsdist(self):
         # Will attempt to do anything meaningful only when btrfs is installed.
-        self.run_with_duration("btrfsdist.py 1 1")
+        if (self.kmod_loaded("btrfs")):
+            self.run_with_duration("btrfsdist.py 1 1")
+        else:
+            self.skipTest("skipped 'btrfs module not loaded'")
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_btrfsslower(self):
         # Will attempt to do anything meaningful only when btrfs is installed.
-        self.run_with_int("btrfsslower.py", allow_early=True)
+        if (self.kmod_loaded("btrfs")):
+            self.run_with_int("btrfsslower.py", allow_early=True)
+        else:
+            self.skipTest("skipped 'btrfs module not loaded'")
 
     def test_cachestat(self):
         self.run_with_duration("cachestat.py 1 1")
@@ -181,7 +187,10 @@ class SmokeTests(TestCase):
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_f2fsslower(self):
-        self.run_with_int("f2fsslower.py", allow_early=True)
+        if (self.kmod_loaded("f2fs")):
+            self.run_with_int("f2fsslower.py", allow_early=True)
+        else:
+            self.skipTest("skipped 'f2fs module not loaded'")
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_filelife(self):
@@ -256,14 +265,14 @@ class SmokeTests(TestCase):
         if(self.kmod_loaded("nfs")):
             self.run_with_int("nfsslower.py")
         else:
-            pass
+            self.skipTest("skipped 'nfs module not loaded'")
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_nfsdist(self):
         if(self.kmod_loaded("nfs")):
             self.run_with_duration("nfsdist.py 1 1")
         else:
-            pass
+            self.skipTest("skipped 'nfs module not loaded'")
 
     @skipUnless(kernel_version_ge(4,6), "requires kernel >= 4.6")
     @mayFail("This fails on github actions environment, and needs to be fixed")
