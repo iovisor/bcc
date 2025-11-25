@@ -423,7 +423,7 @@ int count_sched(struct pt_regs *ctx, struct task_struct *prev) {
 #include <linux/gfp.h>
 struct leaf { size_t size; };
 BPF_HASH(simple_map, u32, struct leaf);
-int kprobe____kmalloc(struct pt_regs *ctx, size_t size) {
+int kprobe____kmalloc_noprof(struct pt_regs *ctx, size_t size) {
     u32 pid = bpf_get_current_pid_tgid();
     struct leaf* leaf = simple_map.lookup(&pid);
     if (leaf)
