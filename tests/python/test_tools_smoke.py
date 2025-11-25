@@ -195,15 +195,15 @@ class SmokeTests(TestCase):
         self.run_with_duration("filetop.py 1 1")
 
     def test_funccount(self):
-        self.run_with_int("funccount.py __kmalloc -i 1")
+        self.run_with_int("funccount.py __kmalloc_noprof -i 1")
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_funclatency(self):
-        self.run_with_int("funclatency.py __kmalloc -i 1")
+        self.run_with_int("funclatency.py __kmalloc_noprof -i 1")
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_funcslower(self):
-        self.run_with_int("funcslower.py __kmalloc")
+        self.run_with_int("funcslower.py __kmalloc_noprof")
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_gethostlatency(self):
@@ -332,7 +332,7 @@ class SmokeTests(TestCase):
 
     @skipUnless(kernel_version_ge(4,6), "requires kernel >= 4.6")
     def test_stackcount(self):
-        self.run_with_int("stackcount.py __kmalloc -i 1")
+        self.run_with_int("stackcount.py __kmalloc_noprof -i 1")
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_statsnoop(self):
