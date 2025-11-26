@@ -28,10 +28,10 @@ LONG, EXTREME as shown above.
 This example output shows the hint count distribution. You can find the definition
 about the hint in include/linux/rw_hint.h
 
-In the following example, the option -T is used to print timestamps with the
+In the following example, the option -t is used to print timestamps with the
 output, and to print 1 second summaries 5 times:
 
-#python3 biohint.py -T 1 5
+#python3 biohint.py -t 1 5
 the program is being configured!
 
     0: NOT_SET
@@ -75,9 +75,9 @@ configure complete! the program is running!
 
 How the hint count distribution changes over time can be seen.
 
-The -D option will print a histogram per disk. Eg:
+The -s option will print a histogram per disk. Eg:
 
-#python3 biohint.py -D
+#python3 biohint.py -s
 the program is being configured!
 
     0: NOT_SET
@@ -116,9 +116,9 @@ disk = dm-0
         5          : 285790   |*************************************** |
 
 
-The -d option trace the disk followed
+The -d option trace the disk which is mounted on the followed dir
 For example:
-#python3 biohint.py -d nvme0n1
+#python3 biohint.py -d /mnt/fdp
 the program is being configured!
 
     0: NOT_SET
@@ -138,23 +138,23 @@ configure complete! the program is running!
 
 
 #python3 biohint.py -h
-usage: biohint.py [-h] [-t] [-s] [-d <dev>] [interval] [count]
+usage: biohint.py [-h] [-t] [-s] [-d <dir>] [interval] [count]
 
-Summarize block device I/O hint as a histogram(only useful to FDP SSD write)
+Summarize write hint in block of FDP SSDs
 
 positional arguments:
-    interval                    output interval, in seconds
-    count                       number of outputs
+    interval                    Specify the amount of time in seconds between each report
+    count                       Limit the number of report, the default is ....
 
 options:
     -h, --help                  Show this help
-    -t, --ts                    Output with timestamp
-    -s, --devices               Print histogram of all devices
-    -d <dev>, --dev=<dev>       Trace the specific device
+    -t, --ts                    Print histogram with timestamp
+    -s, --devices               Print histograms of every device separately
+    -d <dir>, --dir             Trace the device which has been mounted on specific directory
 
 examples:
-    ./biohint                   # summarize block I/O hint as a histogram
-    ./biohint 1 10              # print 1 second summaries, 10 times
-    ./biohint -t 1              # 1s summaries,and timestamps
-    ./biohint -s                # show each disk device separately
-    ./biohint -d nvme0n1        # trace nvme0n1 only
+    ./biohint                   # Summarize block I/O hint in histogram.
+    ./biohint 1 10              # Print 10 reports at 1 second intervals.
+    ./biohint -t 1              # Print summary with timestamp at 1 second intervals.
+    ./biohint -s                # Show histograms of every device separately.
+    ./biohint -d /mnt/data      # Trace the device which has been mounted on '/mnt/data'.
