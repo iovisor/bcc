@@ -187,7 +187,7 @@ pair of .c and .py files, and some are directories of files.
 - tools/[biotop](tools/biotop.py): Top for disks: Summarize block device I/O by process. [Examples](tools/biotop_example.txt).
 - tools/[biopattern](tools/biopattern.py): Identify random/sequential disk access patterns. [Examples](tools/biopattern_example.txt).
 - tools/[biosnoop](tools/biosnoop.py): Trace block device I/O with PID and latency. [Examples](tools/biosnoop_example.txt).
-- tools/[biolatency](tools/biohint.py): Summarize block device I/O latency as a histogram. [Examples](tools/biohint_example.txt).
+- tools/[biohint](tools/biohint.py): Summarize block device I/O latency as a histogram. [Examples](tools/biohint_example.txt).
 - tools/[dirtop](tools/dirtop.py): File reads and writes by directory. Top for directories. [Examples](tools/dirtop_example.txt).
 - tools/[filelife](tools/filelife.py): Trace the lifespan of short-lived files. [Examples](tools/filelife_example.txt).
 - tools/[filegone](tools/filegone.py): Trace why file gone (deleted or renamed). [Examples](tools/filegone_example.txt).
