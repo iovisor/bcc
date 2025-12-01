@@ -30,7 +30,7 @@ optional arguments:
   -T TPID, --tpid TPID  trace this target PID only which is the receiver of
                         signal
   -s SIGNAL, --signal SIGNAL
-                        trace this signal only
+                        trace a signal or a signal list
 
 examples:
     ./killsnoop           # trace all kill() signals
@@ -38,3 +38,4 @@ examples:
     ./killsnoop -p 181    # only trace PID 181
     ./killsnoop -T 189    # only trace target PID 189
     ./killsnoop -s 9      # only trace signal 9
+    ./killsnoop -s 9,15   # trace signal 9 and 15

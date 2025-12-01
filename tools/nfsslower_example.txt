@@ -57,7 +57,7 @@ TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
 
 This shows all NFS_READS that were more than 1ms. Depending on your
 latency to your fileserver, you might need to tweak this value to
-remove 
+remove
 
 A threshold of 0 will trace all operations. Warning: the output will be
 verbose, as it will include all file system cache hits.

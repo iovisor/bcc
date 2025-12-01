@@ -238,6 +238,28 @@ shmat_flags = [
   { 'name' : 'SHM_EXEC',   'value' : 0o100000 },
 ]
 
+shmctl_cmds = [
+    ('IPC_RMID',     0),
+    ('IPC_SET',      1),
+    ('IPC_STAT',     2),
+    ('IPC_INFO',     3),
+    ('SHM_LOCK',     11),
+    ('SHM_UNLOCK',   12),
+    ('SHM_STAT',     13),
+    ('SHM_INFO',     14),
+    ('SHM_STAT_ANY', 15),
+]
+
+def _decode_cmd(cmd, cmd_list):
+    for str_cmd, cmd_val in cmd_list:
+        if cmd == cmd_val:
+            return str_cmd
+    return '0x{:x}'.format(cmd)
+
+def shmctl_cmd(cmd):
+    return _decode_cmd(cmd, shmctl_cmds)
+
+
 def shmflg_str(val, flags):
     cur = filter(lambda x : x['value'] & val, flags)
     str = "0x%x" % val
@@ -293,7 +315,8 @@ def print_event(cpu, data, size):
         print("shmaddr: 0x%lx" % (event.shmaddr))
 
     if event.sys == SYS_SHMCTL:
-        print("shmid: 0x%lx, cmd: %lu, buf: 0x%x" % (event.shmid, event.cmd, event.buf))
+        print("shmid: 0x%lx, cmd: %lu (%s), buf: 0x%x" % (event.shmid,
+              event.cmd, shmctl_cmd(event.cmd), event.buf))
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event, page_cnt=64)

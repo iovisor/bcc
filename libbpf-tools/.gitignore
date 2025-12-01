@@ -1,6 +1,8 @@
 /.output
 /btfhub-archive
 /bashreadline
+/bcachefsdist
+/bcachefsslower
 /bindsnoop
 /biolatency
 /biopattern
@@ -26,6 +28,8 @@
 /fsdist
 /fsslower
 /funclatency
+/fusedist
+/fuseslower
 /futexctn
 /gethostlatency
 /hardirqs
@@ -43,6 +47,7 @@
 /offcputime
 /oomkill
 /opensnoop
+/profile
 /readahead
 /runqlat
 /runqlen
@@ -52,6 +57,7 @@
 /softirqs
 /solisten
 /statsnoop
+/syncsnoop
 /syscount
 /tcpconnect
 /tcpconnlat
@@ -66,3 +72,5 @@
 /wakeuptime
 /xfsdist
 /xfsslower
+/zfsdist
+/zfsslower

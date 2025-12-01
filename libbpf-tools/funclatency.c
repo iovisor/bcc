@@ -74,18 +74,18 @@ static const char program_doc[] =
 ;
 
 static const struct argp_option opts[] = {
-	{ "milliseconds", 'm', NULL, 0, "Output in milliseconds"},
-	{ "microseconds", 'u', NULL, 0, "Output in microseconds"},
-	{0, 0, 0, 0, ""},
-	{ "pid", 'p', "PID", 0, "Process ID to trace"},
-	{0, 0, 0, 0, ""},
-	{ "interval", 'i', "INTERVAL", 0, "Summary interval in seconds"},
-	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path" },
-	{ "duration", 'd', "DURATION", 0, "Duration to trace"},
-	{ "timestamp", 'T', NULL, 0, "Print timestamp"},
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ "kprobes", 'k', NULL, 0, "Use kprobes instead of fentry" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help"},
+	{ "milliseconds", 'm', NULL, 0, "Output in milliseconds", 0 },
+	{ "microseconds", 'u', NULL, 0, "Output in microseconds", 0 },
+	{0, 0, 0, 0, "", 0 },
+	{ "pid", 'p', "PID", 0, "Process ID to trace", 0 },
+	{0, 0, 0, 0, "", 0 },
+	{ "interval", 'i', "INTERVAL", 0, "Summary interval in seconds", 0 },
+	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path", 0 },
+	{ "duration", 'd', "DURATION", 0, "Duration to trace", 0 },
+	{ "timestamp", 'T', NULL, 0, "Print timestamp", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ "kprobes", 'k', NULL, 0, "Use kprobes instead of fentry", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 
@@ -329,9 +329,7 @@ int main(int argc, char **argv)
 	};
 	struct funclatency_bpf *obj;
 	int i, err;
-	struct tm *tm;
 	char ts[32];
-	time_t t;
 	int idx, cg_map_fd;
 	int cgfd = -1;
 	bool used_fentry = false;
@@ -413,9 +411,7 @@ int main(int argc, char **argv)
 
 		printf("\n");
 		if (env.timestamp) {
-			time(&t);
-			tm = localtime(&t);
-			strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+			str_timestamp("%H:%M:%S", ts, sizeof(ts));
 			printf("%-8s\n", ts);
 		}
 

@@ -44,7 +44,7 @@ const unsigned long long kernelAddrSpace = 0x0;
 #endif
 
 char *bcc_procutils_which(const char *binpath) {
-  char buffer[4096];
+  char buffer[PATH_MAX];
   const char *PATH;
 
   if (strchr(binpath, '/'))
@@ -469,7 +469,8 @@ static bool which_so_in_process(const char* libname, int pid, char* libpath) {
   int ret, found = false;
   char endline[4096], *mapname = NULL, *newline;
   char mappings_file[128];
-  const size_t search_len = strlen(libname) + strlen("/lib.");
+  const bool has_so = strstr(libname, ".so");
+  const size_t search_len = strlen(libname) + strlen(has_so ? "/lib" : "/lib.");
   char search1[search_len + 1];
   char search2[search_len + 1];
 
@@ -478,8 +479,13 @@ static bool which_so_in_process(const char* libname, int pid, char* libpath) {
   if (!fp)
     return NULL;
 
-  snprintf(search1, search_len + 1, "/lib%s.", libname);
-  snprintf(search2, search_len + 1, "/lib%s-", libname);
+  if (has_so) {
+    snprintf(search1, search_len + 1, "/lib%s", libname);
+    search2[0] = '\0';
+  } else {
+    snprintf(search1, search_len + 1, "/lib%s.", libname);
+    snprintf(search2, search_len + 1, "/lib%s-", libname);
+  }
 
   do {
     ret = fscanf(fp, "%*x-%*x %*s %*x %*s %*d");
@@ -494,9 +500,14 @@ static bool which_so_in_process(const char* libname, int pid, char* libpath) {
     while (isspace(mapname[0])) mapname++;
 
     if (strstr(mapname, ".so") && (strstr(mapname, search1) ||
-                                   strstr(mapname, search2))) {
+                                   (!has_so && strstr(mapname, search2)))) {
+      const size_t mapnamelen = strlen(mapname);
+      if (mapnamelen >= PATH_MAX) {
+        fprintf(stderr, "Found mapped library path is too long\n");
+        break;
+      }
       found = true;
-      memcpy(libpath, mapname, strlen(mapname) + 1);
+      memcpy(libpath, mapname, mapnamelen + 1);
       break;
     }
   } while (ret != EOF);
@@ -505,11 +516,42 @@ static bool which_so_in_process(const char* libname, int pid, char* libpath) {
   return found;
 }
 
-char *bcc_procutils_which_so(const char *libname, int pid) {
-  const size_t soname_len = strlen(libname) + strlen("lib.so");
+static bool which_so_in_ldconfig_cache(const char* libname, char* libpath) {
+  const bool has_so = strstr(libname, ".so");
+  const size_t soname_len = strlen(libname) + strlen(has_so ? "lib" : "lib.so");
   char soname[soname_len + 1];
-  char libpath[4096];
   int i;
+
+  if (lib_cache_count < 0)
+    return false;
+
+  if (!lib_cache_count && load_ld_cache(LD_SO_CACHE) < 0) {
+    lib_cache_count = -1;
+    return false;
+  }
+
+  snprintf(soname, sizeof(soname), has_so ? "lib%s" : "lib%s.so", libname);
+
+  for (i = 0; i < lib_cache_count; ++i) {
+    if (!strncmp(lib_cache[i].libname, soname, soname_len) &&
+        match_so_flags(lib_cache[i].flags)) {
+
+      const char* path = lib_cache[i].path;
+      const size_t pathlen = strlen(path);
+      if (pathlen >= PATH_MAX) {
+        fprintf(stderr, "Found library path is too long\n");
+        return false;
+      }
+      memcpy(libpath, path, pathlen + 1);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+char *bcc_procutils_which_so(const char *libname, int pid) {
+  char libpath[PATH_MAX];
 
   if (strchr(libname, '/'))
     return strdup(libname);
@@ -517,22 +559,16 @@ char *bcc_procutils_which_so(const char *libname, int pid) {
   if (pid && which_so_in_process(libname, pid, libpath))
     return strdup(libpath);
 
-  if (lib_cache_count < 0)
-    return NULL;
+  if (which_so_in_ldconfig_cache(libname, libpath))
+    return strdup(libpath);
 
-  if (!lib_cache_count && load_ld_cache(LD_SO_CACHE) < 0) {
-    lib_cache_count = -1;
-    return NULL;
-  }
+  return NULL;
+}
 
-  snprintf(soname, soname_len + 1, "lib%s.so", libname);
-
-  for (i = 0; i < lib_cache_count; ++i) {
-    if (!strncmp(lib_cache[i].libname, soname, soname_len) &&
-        match_so_flags(lib_cache[i].flags)) {
-      return strdup(lib_cache[i].path);
-    }
-  }
+char *bcc_procutils_which_so_in_process(const char *libname, int pid) {
+  char libpath[PATH_MAX];
+  if (pid && which_so_in_process(libname, pid, libpath))
+    return strdup(libpath);
   return NULL;
 }
 
@@ -557,7 +593,6 @@ const char *bcc_procutils_language(int pid) {
       if (strstr(line, languages[i]))
         return languages[i];
   }
-
 
   snprintf(procfilename, sizeof(procfilename), "/proc/%ld/maps", (long)pid);
   procfile = fopen(procfilename, "r");

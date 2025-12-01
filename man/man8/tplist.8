@@ -5,7 +5,7 @@ tplist \- Display kernel tracepoints or USDT probes and their formats.
 .B tplist [-p PID] [-l LIB] [-v] [filter]
 .SH DESCRIPTION
 tplist lists all kernel tracepoints, and can optionally print out the tracepoint
-format; namely, the variables that you can trace when the tracepoint is hit. 
+format; namely, the variables that you can trace when the tracepoint is hit.
 tplist can also list USDT probes embedded in a specific library or executable,
 and can list USDT probes for all the libraries loaded by a specific process.
 These features are usually used in conjunction with the argdist and/or trace tools.
@@ -40,7 +40,7 @@ Print all net tracepoints with their format:
 .B tplist -v 'net:*'
 .TP
 Print all USDT probes in libpthread:
-$ 
+$
 .B tplist -l pthread
 .TP
 Print all USDT probes in process 4717 from the libc provider:

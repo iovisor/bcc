@@ -57,12 +57,12 @@ const char argp_program_doc[] =
 "    slabratetop 5 10       # 5s summaries, 10 times\n";
 
 static const struct argp_option opts[] = {
-	{ "pid", 'p', "PID", 0, "Process ID to trace" },
-	{ "noclear", 'C', NULL, 0, "Don't clear the screen" },
-	{ "sort", 's', "SORT", 0, "Sort columns, default size [name, count, size]" },
-	{ "rows", 'r', "ROWS", 0, "Maximum rows to print, default 20" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "pid", 'p', "PID", 0, "Process ID to trace", 0 },
+	{ "noclear", 'C', NULL, 0, "Don't clear the screen", 0 },
+	{ "sort", 's', "SORT", 0, "Sort columns, default size [name, count, size]", 0 },
+	{ "rows", 'r', "ROWS", 0, "Maximum rows to print, default 20", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 
@@ -169,26 +169,16 @@ static int sort_column(const void *obj1, const void *obj2)
 
 static int print_stat(struct slabratetop_bpf *obj)
 {
-	FILE *f;
-	time_t t;
-	struct tm *tm;
-	char ts[16], buf[256];
+	char loadavg[256], ts[64];
 	char *key, **prev_key = NULL;
 	static struct slabrate_info values[OUTPUT_ROWS_LIMIT];
-	int n, i, err = 0, rows = 0;
+	int i, err = 0, rows = 0;
 	int fd = bpf_map__fd(obj->maps.slab_entries);
 
-	f = fopen("/proc/loadavg", "r");
-	if (f) {
-		time(&t);
-		tm = localtime(&t);
-		strftime(ts, sizeof(ts), "%H:%M:%S", tm);
-		memset(buf, 0 , sizeof(buf));
-		n = fread(buf, 1, sizeof(buf), f);
-		if (n)
-			printf("%8s loadavg: %s\n", ts, buf);
-		fclose(f);
-	}
+	err = str_loadavg(loadavg, sizeof(loadavg)) <= 0;
+	err = err ?: (str_timestamp("%H:%M:%S", ts, sizeof(ts)) <= 0);
+	if (!err)
+		printf("%8s %s\n", ts, loadavg);
 
 	printf("%-32s %6s %10s\n", "CACHE", "ALLOCS", "BYTES");
 
@@ -259,6 +249,15 @@ int main(int argc, char **argv)
 	if (!obj) {
 		warn("failed to open BPF object\n");
 		return 1;
+	}
+
+	if (kprobe_exists("kmem_cache_alloc"))
+		bpf_program__set_autoload(obj->progs.kmem_cache_alloc_noprof, false);
+	else if (kprobe_exists("kmem_cache_alloc_noprof"))
+		bpf_program__set_autoload(obj->progs.kmem_cache_alloc, false);
+	else {
+		warn("kmem_cache_alloc and kmem_cache_alloc_noprof function not found\n");
+		goto cleanup;
 	}
 
 	obj->rodata->target_pid = target_pid;

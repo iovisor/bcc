@@ -70,3 +70,4 @@ for k, v in reversed(sorted(calls.items(), key=lambda c: c[1].value)):
     if k.value > 0 :
         for addr in stack_traces.walk(k.value):
             printb(b"\t%s" % b.sym(addr, pid, show_offset=True))
+        print("    %d\n" % v.value)

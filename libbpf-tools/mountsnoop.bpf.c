@@ -19,8 +19,7 @@ struct {
 	__type(value, struct arg);
 } args SEC(".maps");
 
-static int probe_entry(const char *src, const char *dest, const char *fs,
-		       __u64 flags, const char *data, enum op op)
+static int probe_entry(union sys_arg *sys_arg, enum op op)
 {
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 pid = pid_tgid >> 32;
@@ -31,13 +30,23 @@ static int probe_entry(const char *src, const char *dest, const char *fs,
 		return 0;
 
 	arg.ts = bpf_ktime_get_ns();
-	arg.flags = flags;
-	arg.src = src;
-	arg.dest = dest;
-	arg.fs = fs;
-	arg.data= data;
 	arg.op = op;
+
+	switch (op) {
+	case MOUNT:
+	case UMOUNT:
+	case FSOPEN:
+	case FSCONFIG:
+	case FSMOUNT:
+	case MOVE_MOUNT:
+		__builtin_memcpy(&arg.sys, sys_arg, sizeof(*sys_arg));
+		break;
+	default:
+		goto skip;
+	}
+
 	bpf_map_update_elem(&args, &tid, &arg, BPF_ANY);
+skip:
 	return 0;
 };
 
@@ -60,29 +69,68 @@ static int probe_exit(void *ctx, int ret)
 
 	task = (struct task_struct *)bpf_get_current_task();
 	eventp->delta = bpf_ktime_get_ns() - argp->ts;
-	eventp->flags = argp->flags;
+	eventp->op = argp->op;
 	eventp->pid = pid;
 	eventp->tid = tid;
 	eventp->mnt_ns = BPF_CORE_READ(task, nsproxy, mnt_ns, ns.inum);
 	eventp->ret = ret;
-	eventp->op = argp->op;
 	bpf_get_current_comm(&eventp->comm, sizeof(eventp->comm));
-	if (argp->src)
-		bpf_probe_read_user_str(eventp->src, sizeof(eventp->src), argp->src);
-	else
-		eventp->src[0] = '\0';
-	if (argp->dest)
-		bpf_probe_read_user_str(eventp->dest, sizeof(eventp->dest), argp->dest);
-	else
-		eventp->dest[0] = '\0';
-	if (argp->fs)
-		bpf_probe_read_user_str(eventp->fs, sizeof(eventp->fs), argp->fs);
-	else
-		eventp->fs[0] = '\0';
-	if (argp->data)
-		bpf_probe_read_user_str(eventp->data, sizeof(eventp->data), argp->data);
-	else
-		eventp->data[0] = '\0';
+
+	switch (argp->op) {
+	case MOUNT:
+		eventp->mount.flags = argp->sys.mount.flags;
+		bpf_probe_read_user_str(eventp->mount.src,
+					sizeof(eventp->mount.src),
+					argp->sys.mount.src);
+		bpf_probe_read_user_str(eventp->mount.dest,
+					sizeof(eventp->mount.dest),
+					argp->sys.mount.dest);
+		bpf_probe_read_user_str(eventp->mount.fs,
+					sizeof(eventp->mount.fs),
+					argp->sys.mount.fs);
+		bpf_probe_read_user_str(eventp->mount.data,
+					sizeof(eventp->mount.data),
+					argp->sys.mount.data);
+		break;
+	case UMOUNT:
+		eventp->umount.flags = argp->sys.umount.flags;
+		bpf_probe_read_user_str(eventp->umount.dest,
+					sizeof(eventp->umount.dest),
+					argp->sys.umount.dest);
+		break;
+	case FSOPEN:
+		eventp->fsopen.flags = argp->sys.fsopen.flags;
+		bpf_probe_read_user_str(eventp->fsopen.fs,
+					sizeof(eventp->fsopen.fs),
+					argp->sys.fsopen.fs);
+		break;
+	case FSCONFIG:
+		eventp->fsconfig.fd = argp->sys.fsconfig.fd;
+		eventp->fsconfig.cmd = argp->sys.fsconfig.cmd;
+		bpf_probe_read_user_str(eventp->fsconfig.key,
+					sizeof(eventp->fsconfig.key),
+					argp->sys.fsconfig.key);
+		bpf_probe_read_user_str(eventp->fsconfig.value,
+					sizeof(eventp->fsconfig.value),
+					argp->sys.fsconfig.value);
+		eventp->fsconfig.aux = argp->sys.fsconfig.aux;
+		break;
+	case FSMOUNT:
+		eventp->fsmount.fs_fd = argp->sys.fsmount.fs_fd;
+		eventp->fsmount.flags = argp->sys.fsmount.flags;
+		eventp->fsmount.attr_flags = argp->sys.fsmount.attr_flags;
+		break;
+	case MOVE_MOUNT:
+		eventp->move_mount.from_dfd = argp->sys.move_mount.from_dfd;
+		bpf_probe_read_user_str(eventp->move_mount.from_pathname,
+					sizeof(eventp->move_mount.from_pathname),
+					argp->sys.move_mount.from_pathname);
+		eventp->move_mount.to_dfd = argp->sys.move_mount.to_dfd;
+		bpf_probe_read_user_str(eventp->move_mount.to_pathname,
+					sizeof(eventp->move_mount.to_pathname),
+					argp->sys.move_mount.to_pathname);
+		break;
+	}
 
 	submit_buf(ctx, eventp, sizeof(*eventp));
 
@@ -92,34 +140,112 @@ cleanup:
 }
 
 SEC("tracepoint/syscalls/sys_enter_mount")
-int mount_entry(struct trace_event_raw_sys_enter *ctx)
+int mount_entry(struct syscall_trace_enter *ctx)
 {
-	const char *src = (const char *)ctx->args[0];
-	const char *dest = (const char *)ctx->args[1];
-	const char *fs = (const char *)ctx->args[2];
-	__u64 flags = (__u64)ctx->args[3];
-	const char *data = (const char *)ctx->args[4];
+	union sys_arg arg = {};
 
-	return probe_entry(src, dest, fs, flags, data, MOUNT);
+	arg.mount.src = (const char *)ctx->args[0];
+	arg.mount.dest = (const char *)ctx->args[1];
+	arg.mount.fs = (const char *)ctx->args[2];
+	arg.mount.flags = (__u64)ctx->args[3];
+	arg.mount.data = (const char *)ctx->args[4];
+
+	return probe_entry(&arg, MOUNT);
 }
 
 SEC("tracepoint/syscalls/sys_exit_mount")
-int mount_exit(struct trace_event_raw_sys_exit *ctx)
+int mount_exit(struct syscall_trace_exit *ctx)
 {
 	return probe_exit(ctx, (int)ctx->ret);
 }
 
 SEC("tracepoint/syscalls/sys_enter_umount")
-int umount_entry(struct trace_event_raw_sys_enter *ctx)
+int umount_entry(struct syscall_trace_enter *ctx)
 {
-	const char *dest = (const char *)ctx->args[0];
-	__u64 flags = (__u64)ctx->args[1];
+	union sys_arg arg = {};
 
-	return probe_entry(NULL, dest, NULL, flags, NULL, UMOUNT);
+	arg.umount.dest = (const char *)ctx->args[0];
+	arg.umount.flags = (__u64)ctx->args[1];
+
+	return probe_entry(&arg, UMOUNT);
 }
 
 SEC("tracepoint/syscalls/sys_exit_umount")
-int umount_exit(struct trace_event_raw_sys_exit *ctx)
+int umount_exit(struct syscall_trace_exit *ctx)
+{
+	return probe_exit(ctx, (int)ctx->ret);
+}
+
+SEC("tracepoint/syscalls/sys_enter_fsopen")
+int fsopen_entry(struct syscall_trace_enter *ctx)
+{
+	union sys_arg arg = {};
+
+	arg.fsopen.fs = (const char *)ctx->args[0];
+	arg.fsopen.flags = (__u32)ctx->args[1];
+
+	return probe_entry(&arg, FSOPEN);
+}
+
+SEC("tracepoint/syscalls/sys_exit_fsopen")
+int fsopen_exit(struct syscall_trace_exit *ctx)
+{
+	return probe_exit(ctx, (int)ctx->ret);
+}
+
+SEC("tracepoint/syscalls/sys_enter_fsconfig")
+int fsconfig_entry(struct syscall_trace_enter *ctx)
+{
+	union sys_arg arg = {};
+
+	arg.fsconfig.fd = (int)ctx->args[0];
+	arg.fsconfig.cmd = (int)ctx->args[1];
+	arg.fsconfig.key = (const char *)ctx->args[2];
+	arg.fsconfig.value = (const char *)ctx->args[3];
+	arg.fsconfig.aux = (int)ctx->args[4];
+
+	return probe_entry(&arg, FSCONFIG);
+}
+
+SEC("tracepoint/syscalls/sys_exit_fsconfig")
+int fsconfig_exit(struct syscall_trace_exit *ctx)
+{
+	return probe_exit(ctx, (int)ctx->ret);
+}
+
+SEC("tracepoint/syscalls/sys_enter_fsmount")
+int fsmount_entry(struct syscall_trace_enter *ctx)
+{
+	union sys_arg arg = {};
+
+	arg.fsmount.fs_fd = (__u32)ctx->args[0];
+	arg.fsmount.flags = (__u32)ctx->args[1];
+	arg.fsmount.attr_flags = (__u32)ctx->args[2];
+
+	return probe_entry(&arg, FSMOUNT);
+}
+
+SEC("tracepoint/syscalls/sys_exit_fsmount")
+int fsmount_exit(struct syscall_trace_exit *ctx)
+{
+	return probe_exit(ctx, (int)ctx->ret);
+}
+
+SEC("tracepoint/syscalls/sys_enter_move_mount")
+int move_mount_entry(struct syscall_trace_enter *ctx)
+{
+	union sys_arg arg = {};
+
+	arg.move_mount.from_dfd = (int)ctx->args[0];
+	arg.move_mount.from_pathname = (const char *)ctx->args[1];
+	arg.move_mount.to_dfd = (int)ctx->args[2];
+	arg.move_mount.to_pathname = (const char *)ctx->args[3];
+
+	return probe_entry(&arg, MOVE_MOUNT);
+}
+
+SEC("tracepoint/syscalls/sys_exit_move_mount")
+int move_mount_exit(struct syscall_trace_exit *ctx)
 {
 	return probe_exit(ctx, (int)ctx->ret);
 }

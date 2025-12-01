@@ -36,8 +36,8 @@ const char argp_program_doc[] =
 "USAGE: mdflush\n";
 
 static const struct argp_option opts[] = {
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 
@@ -71,13 +71,9 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	struct event *e = data;
-	time_t t;
-	struct tm *tm;
 	char ts[32];
 
-	time(&t);
-	tm = localtime(&t);
-	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+	str_timestamp("%H:%M:%S", ts, sizeof(ts));
 	printf("%-8s %-7d %-16s %-s\n",
 	       ts, e->pid, e->comm, e->disk);
 }

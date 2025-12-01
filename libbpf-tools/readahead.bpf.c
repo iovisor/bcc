@@ -34,8 +34,8 @@ int BPF_PROG(do_page_cache_ra)
 	return 0;
 }
 
-SEC("fexit/__page_cache_alloc")
-int BPF_PROG(page_cache_alloc_ret, gfp_t gfp, struct page *ret)
+static __always_inline
+int alloc_done(struct page *page)
 {
 	u32 pid = bpf_get_current_pid_tgid();
 	u64 ts;
@@ -44,11 +44,31 @@ int BPF_PROG(page_cache_alloc_ret, gfp_t gfp, struct page *ret)
 		return 0;
 
 	ts = bpf_ktime_get_ns();
-	bpf_map_update_elem(&birth, &ret, &ts, 0);
+	bpf_map_update_elem(&birth, &page, &ts, 0);
 	__sync_fetch_and_add(&hist.unused, 1);
 	__sync_fetch_and_add(&hist.total, 1);
 
 	return 0;
+}
+
+SEC("fexit/__page_cache_alloc")
+int BPF_PROG(page_cache_alloc_ret, gfp_t gfp, struct page *ret)
+{
+	return alloc_done(ret);
+}
+
+SEC("fexit/filemap_alloc_folio")
+int BPF_PROG(filemap_alloc_folio_ret, gfp_t gfp, unsigned int order,
+	struct folio *ret)
+{
+	return alloc_done(&ret->page);
+}
+
+SEC("fexit/filemap_alloc_folio_noprof")
+int BPF_PROG(filemap_alloc_folio_noprof_ret, gfp_t gfp, unsigned int order,
+	struct folio *ret)
+{
+	return alloc_done(&ret->page);
 }
 
 SEC("fexit/do_page_cache_ra")
@@ -60,8 +80,8 @@ int BPF_PROG(do_page_cache_ra_ret)
 	return 0;
 }
 
-SEC("fentry/mark_page_accessed")
-int BPF_PROG(mark_page_accessed, struct page *page)
+static __always_inline
+int mark_accessed(struct page *page)
 {
 	u64 *tsp, slot, ts = bpf_ktime_get_ns();
 	s64 delta;
@@ -82,6 +102,18 @@ update_and_cleanup:
 	bpf_map_delete_elem(&birth, &page);
 
 	return 0;
+}
+
+SEC("fentry/folio_mark_accessed")
+int BPF_PROG(folio_mark_accessed, struct folio *folio)
+{
+	return mark_accessed(&folio->page);
+}
+
+SEC("fentry/mark_page_accessed")
+int BPF_PROG(mark_page_accessed, struct page *page)
+{
+	return mark_accessed(page);
 }
 
 char LICENSE[] SEC("license") = "GPL";

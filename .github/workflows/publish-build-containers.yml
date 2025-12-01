@@ -24,13 +24,13 @@ jobs:
     strategy:
       matrix:
         os: [
-          {distro: "ubuntu", version: "20.04", nick: focal, installed_llvm_versions: "11 12 15"},
+          {distro: "ubuntu", version: "24.04", nick: noble, installed_llvm_versions: "15 17 19"},
           {distro: "fedora", version: "38", nick: "f38", installed_llvm_versions: "this is not used"},
         ]
 
     steps:
 
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
     - name: Build and push
       uses: ./.github/actions/build-container

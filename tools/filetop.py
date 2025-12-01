@@ -4,7 +4,8 @@
 # filetop  file reads and writes by process.
 #          For Linux, uses BCC, eBPF.
 #
-# USAGE: filetop.py [-h] [-C] [-r MAXROWS] [interval] [count]
+# USAGE: filetop.py [-h] [-a] [-C] [-r MAXROWS] [-p PID] [--read-only]
+#                   [--write-only] [interval] [count]
 #
 # This uses in-kernel eBPF maps to store per process summaries for efficiency.
 #
@@ -17,15 +18,20 @@ from __future__ import print_function
 from bcc import BPF
 from time import sleep, strftime
 import argparse
+import os
+import stat
 from subprocess import call
 
 # arguments
 examples = """examples:
-    ./filetop            # file I/O top, 1 second refresh
-    ./filetop -C         # don't clear the screen
-    ./filetop -p 181     # PID 181 only
-    ./filetop 5          # 5 second summaries
-    ./filetop 5 10       # 5 second summaries, 10 times only
+    ./filetop                 # file I/O top, 1 second refresh
+    ./filetop -C              # don't clear the screen
+    ./filetop -p 181          # PID 181 only
+    ./filetop -d /home/user   # trace files in /home/user directory only
+    ./filetop 5               # 5 second summaries
+    ./filetop 5 10            # 5 second summaries, 10 times only
+    ./filetop 5 --read-only   # 5 second summaries, only read operations traced
+    ./filetop 5 --write-only  # 5 second summaries, only write operations traced
 """
 parser = argparse.ArgumentParser(
     description="File reads and writes by process",
@@ -42,12 +48,19 @@ parser.add_argument("-s", "--sort", default="all",
     help="sort column, default all")
 parser.add_argument("-p", "--pid", type=int, metavar="PID", dest="tgid",
     help="trace this PID only")
+parser.add_argument("--read-only", action="store_true",
+    help="trace only reads")
+parser.add_argument("--write-only", action="store_true",
+    help="trace only writes")
 parser.add_argument("interval", nargs="?", default=1,
     help="output interval, in seconds")
 parser.add_argument("count", nargs="?", default=99999999,
     help="number of outputs")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
+parser.add_argument("-d", "--directory", type=str,
+    help="trace this directory only")
+
 args = parser.parse_args()
 interval = int(args.interval)
 countdown = int(args.count)
@@ -62,6 +75,10 @@ loadavg = "/proc/loadavg"
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <linux/blkdev.h>
+
+enum { __BCC_DNAME_INLINE_LEN = DNAME_INLINE_LEN };
+#undef DNAME_INLINE_LEN
+#define DNAME_INLINE_LEN __BCC_DNAME_INLINE_LEN
 
 // the key for the output summary
 struct info_t {
@@ -100,6 +117,10 @@ static int do_entry(struct pt_regs *ctx, struct file *file,
     int mode = file->f_inode->i_mode;
     struct qstr d_name = de->d_name;
     if (d_name.len == 0 || TYPE_FILTER)
+        return 0;
+
+    // skip if not in the specified directory
+    if (DIRECTORY_FILTER)
         return 0;
 
     // store counts and sizes by pid & file
@@ -156,6 +177,16 @@ if args.all_files:
     bpf_text = bpf_text.replace('TYPE_FILTER', '0')
 else:
     bpf_text = bpf_text.replace('TYPE_FILTER', '!S_ISREG(mode)')
+if args.directory:
+    try:
+        directory_inode = os.lstat(args.directory)[stat.ST_INO]
+        print(f'Tracing directory: {args.directory} (Inode: {directory_inode})')
+        bpf_text = bpf_text.replace('DIRECTORY_FILTER',  'file->f_path.dentry->d_parent->d_inode->i_ino != %d' % directory_inode)
+    except (FileNotFoundError, PermissionError) as e:
+        print(f'Error accessing directory {args.directory}: {e}')
+        exit(1)
+else:
+    bpf_text = bpf_text.replace('DIRECTORY_FILTER', '0')
 
 if debug or args.ebpf:
     print(bpf_text)
@@ -164,8 +195,16 @@ if debug or args.ebpf:
 
 # initialize BPF
 b = BPF(text=bpf_text)
-b.attach_kprobe(event="vfs_read", fn_name="trace_read_entry")
-b.attach_kprobe(event="vfs_write", fn_name="trace_write_entry")
+if args.read_only and args.write_only:
+    raise Exception("Both read-only and write-only flags passed")
+elif args.read_only:
+    b.attach_kprobe(event="vfs_read", fn_name="trace_read_entry")
+elif args.write_only:
+    b.attach_kprobe(event="vfs_write", fn_name="trace_write_entry")
+else:
+    b.attach_kprobe(event="vfs_read", fn_name="trace_read_entry")
+    b.attach_kprobe(event="vfs_write", fn_name="trace_write_entry")
+
 
 # check whether hash table batch ops is supported
 htab_batch_ops = True if BPF.kernel_struct_has_field(b'bpf_map_ops',

@@ -3,8 +3,10 @@
 //
 // Based on statsnoop(8) from BCC by Brendan Gregg.
 // 09-May-2021   Hengqi Chen   Created this.
+// 15-Mar-2025   Rong Tao      Support fd and dirfd.
 #include <argp.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <signal.h>
 #include <time.h>
 #include <unistd.h>
@@ -25,6 +27,7 @@ static volatile sig_atomic_t exiting = 0;
 static pid_t target_pid = 0;
 static bool trace_failed_only = false;
 static bool emit_timestamp = false;
+static bool emit_sysname = false;
 static bool verbose = false;
 
 const char *argp_program_version = "statsnoop 0.1";
@@ -33,21 +36,33 @@ const char *argp_program_bug_address =
 const char argp_program_doc[] =
 "Trace stat syscalls.\n"
 "\n"
-"USAGE: statsnoop [-h] [-t] [-x] [-p PID]\n"
+"USAGE: statsnoop [-h] [-t] [-s] [-x] [-p PID]\n"
 "\n"
 "EXAMPLES:\n"
 "    statsnoop             # trace all stat syscalls\n"
 "    statsnoop -t          # include timestamps\n"
+"    statsnoop -s          # include syscall name\n"
 "    statsnoop -x          # only show failed stats\n"
 "    statsnoop -p 1216     # only trace PID 1216\n";
 
 static const struct argp_option opts[] = {
-	{ "pid", 'p', "PID", 0, "Process ID to trace" },
-	{ "failed", 'x', NULL, 0, "Only show failed stats" },
-	{ "timestamp", 't', NULL, 0, "Include timestamp on output" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "pid", 'p', "PID", 0, "Process ID to trace", 0 },
+	{ "failed", 'x', NULL, 0, "Only show failed stats", 0 },
+	{ "timestamp", 't', NULL, 0, "Include timestamp on output", 0 },
+	{ "sysname", 's', NULL, 0, "Include syscall name on output", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
+};
+
+static char *sys_names[] = {
+	[0] = "N/A",
+	[SYS_STATFS] = "statfs",
+	[SYS_NEWSTAT] = "newstat",
+	[SYS_STATX] = "statx",
+	[SYS_NEWFSTAT] = "newfstat",
+	[SYS_NEWFSTATAT] = "newfstatat",
+	[SYS_NEWLSTAT] = "newlstat",
 };
 
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
@@ -69,6 +84,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 't':
 		emit_timestamp = true;
+		break;
+	case 's':
+		emit_sysname = true;
 		break;
 	case 'v':
 		verbose = true;
@@ -94,12 +112,44 @@ static void sig_int(int signo)
 	exiting = 1;
 }
 
+char *proc_fd_pathname(pid_t pid, int fd, int is_dir, char *buf, size_t buf_len)
+{
+	int err, n;
+	char fdpath[PATH_MAX];
+
+	if (fd == INVALID_FD)
+		goto skip;
+	else if (fd == AT_FDCWD)
+		snprintf(fdpath, PATH_MAX - 1, "/proc/%d/cwd", pid);
+	else
+		snprintf(fdpath, PATH_MAX - 1, "/proc/%d/fd/%d", pid, fd);
+
+	err = readlink(fdpath, buf, buf_len);
+	if (err == -1)
+		goto skip;
+
+	if (is_dir) {
+		/* Add '/' in the end of string */
+		n = strlen(buf);
+		buf[n] = '/';
+		buf[n + 1] = '\0';
+	}
+
+	return buf;
+
+skip:
+	/* maybe process already exit or fd already be closed, just ignore cwd
+	 * or skip no-exist pathname */
+	return "";
+}
+
 static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	static __u64 start_timestamp = 0;
 	struct event e;
 	int fd, err;
 	double ts = 0.0;
+	char fdpath[PATH_MAX] = {0}, dirfdpath[PATH_MAX] = {0};
 
 	if (data_sz < sizeof(e)) {
 		printf("Error: packet too small\n");
@@ -121,7 +171,14 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		ts = (double)(e.ts_ns - start_timestamp) / 1000000000;
 		printf("%-14.9f ", ts);
 	}
-	printf("%-7d %-20s %-4d %-4d %-s\n", e.pid, e.comm, fd, err, e.pathname);
+	printf("%-7d %-20s %-4d %-4d", e.pid, e.comm, fd, err);
+	if (emit_sysname)
+		printf(" %-10s", sys_names[e.type]);
+
+	printf(" %s%s%-s\n",
+		e.pathname[0] == '/' ? "" : proc_fd_pathname(e.pid, e.fd, 0, fdpath, PATH_MAX),
+		e.pathname[0] == '/' ? "" : proc_fd_pathname(e.pid, e.dirfd, 1, dirfdpath, PATH_MAX),
+		e.pathname);
 }
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
@@ -178,6 +235,10 @@ int main(int argc, char **argv)
 		bpf_program__set_autoload(obj->progs.handle_newfstatat_entry, false);
 		bpf_program__set_autoload(obj->progs.handle_newfstatat_return, false);
 	}
+	if (!tracepoint_exists("syscalls", "sys_enter_newfstat")) {
+		bpf_program__set_autoload(obj->progs.handle_newfstat_entry, false);
+		bpf_program__set_autoload(obj->progs.handle_newfstat_return, false);
+	}
 	if (!tracepoint_exists("syscalls", "sys_enter_newlstat")) {
 		bpf_program__set_autoload(obj->progs.handle_newlstat_entry, false);
 		bpf_program__set_autoload(obj->progs.handle_newlstat_return, false);
@@ -211,8 +272,11 @@ int main(int argc, char **argv)
 
 	if (emit_timestamp)
 		printf("%-14s ", "TIME(s)");
-	printf("%-7s %-20s %-4s %-4s %-s\n",
-	       "PID", "COMM", "RET", "ERR", "PATH");
+	printf("%-7s %-20s %-4s %-4s",
+	       "PID", "COMM", "RET", "ERR");
+	if (emit_sysname)
+		printf(" %-10s", "SYSCALL");
+	printf(" %-s\n", "PATH");
 
 	while (!exiting) {
 		err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS);

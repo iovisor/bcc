@@ -1535,7 +1535,7 @@ Check the [BPF helpers reference](kernel-versions.md#helpers) to see which helpe
 
 ## Rewriter
 
-One of jobs for rewriter is to turn implicit memory accesses to explicit ones using kernel helpers. Recent kernel introduced a config option ARCH_HAS_NON_OVERLAPPING_ADDRESS_SPACE which will be set for architectures who user address space and kernel address are disjoint. x86 and arm has this config option set while s390 does not. If ARCH_HAS_NON_OVERLAPPING_ADDRESS_SPACE is not set, the bpf old helper `bpf_probe_read()` will not be available. Some existing users may have implicit memory accesses to access user memory, so using `bpf_probe_read_kernel()` will cause their application to fail. Therefore, for non-s390, the rewriter will use `bpf_probe_read()` for these implicit memory accesses. For s390, `bpf_probe_read_kernel()` is used as default and users should use `bpf_probe_read_user()` explicitly when accessing user memories.
+One of jobs for rewriter is to turn implicit memory accesses to explicit ones using kernel helpers. Recent kernel introduced a config option ARCH_HAS_NON_OVERLAPPING_ADDRESS_SPACE which will be set for architectures whose user address space and kernel address are disjoint. x86 and arm has this config option set while s390 does not. If ARCH_HAS_NON_OVERLAPPING_ADDRESS_SPACE is not set, the bpf old helper `bpf_probe_read()` will not be available. Some existing users may have implicit memory accesses to access user memory, so using `bpf_probe_read_kernel()` will cause their application to fail. Therefore, for non-s390, the rewriter will use `bpf_probe_read()` for these implicit memory accesses. For s390, `bpf_probe_read_kernel()` is used as default and users should use `bpf_probe_read_user()` explicitly when accessing user memories.
 
 # bcc Python
 
@@ -1709,7 +1709,7 @@ Examples in situ:
 
 ### 4. attach_uprobe()
 
-Syntax: ```BPF.attach_uprobe(name="location", sym="symbol", fn_name="name" [, sym_off=int])```, ```BPF.attach_uprobe(name="location", sym_re="regex", fn_name="name")```, ```BPF.attach_uprobe(name="location", addr=int, fn_name="name")```
+Syntax: ```BPF.attach_uprobe(name="location", sym="symbol", fn_name="name" [, sym_off=int])```, ```BPF.attach_uprobe(name="location", sym_re="regex", fn_name="name")```, ```BPF.attach_uprobe(name="location", addr=int, fn_name="name"), BPF.attach_uprobe(name="location", sym="symbol", fn_name="name", [, pid=int])```
 
 
 Instruments the user-level function ```symbol()``` from either the library or binary named by ```location``` using user-level dynamic tracing of the function entry, and attach our C defined function ```name()``` to be called whenever the user-level function is called. If ```sym_off``` is given, the function is attached to the offset within the symbol.
@@ -1718,7 +1718,12 @@ The real address ```addr``` may be supplied in place of ```sym```, in which case
 
 Instead of a symbol name, a regular expression can be provided in ```sym_re```. The uprobe will then attach to symbols that match the provided regular expression.
 
-Libraries can be given in the name argument without the lib prefix, or with the full path (/usr/lib/...). Binaries can be given only with the full path (/bin/sh).
+Uprobes can be attached to a specific process by passing `pid` to `attach_uprobe`.
+By default `pid` is set to -1, indicating the `uprobe` will be attached to all processes.
+For libraries, the uprobe will attach to the version of the library used by the process if `pid` was given.
+For how `pid` is used, see examples in [funcinterval](https://github.com/iovisor/bcc/blob/78423e1667db202012bbb032c567589175a2796c/tools/funcinterval.py#L155-L156).
+
+Libraries can be given in the name argument without the lib prefix, with a versioned SONAME (c.so.6), or with the full path (/usr/lib/...). Binaries can be given only with the full path (/bin/sh).
 
 For example:
 
@@ -1765,6 +1770,7 @@ b.attach_uretprobe(name="/usr/bin/python", sym="main", fn_name="do_main")
 ```
 
 You can call attach_uretprobe() more than once, and attach your BPF function to multiple user-level functions.
+`BPF.attach_uretprobe` can also be used for a specific process.
 
 See the previous uretprobes section for how to instrument the return value from BPF.
 
@@ -2097,7 +2103,7 @@ These are equivalent.
 
 ### 2. open_perf_buffer()
 
-Syntax: ```table.open_perf_buffers(callback, page_cnt=N, lost_cb=None)```
+Syntax: ```table.open_perf_buffer(callback, page_cnt=N, lost_cb=None)```
 
 This operates on a table as defined in BPF as BPF_PERF_OUTPUT(), and associates the callback Python function ```callback``` to be called when data is available in the perf ring buffer. This is part of the recommended mechanism for transferring per-event data from kernel to user space. The size of the perf ring buffer can be specified via the ```page_cnt``` parameter, which must be a power of two number of pages and defaults to 8. If the callback is not processing data fast enough, some submitted data may be lost. ```lost_cb``` will be called to log / monitor the lost count. If ```lost_cb``` is the default ```None``` value, it will just print a line of message to ```stderr```.
 
@@ -2610,7 +2616,7 @@ cannot call GPL only function from proprietary program
 
 eBPF program compilation needs kernel sources or kernel headers with headers
 compiled. In case your kernel sources are at a non-standard location where BCC
-cannot find then, its possible to provide BCC the absolute path of the location
+cannot find then, it's possible to provide BCC the absolute path of the location
 by setting `BCC_KERNEL_SOURCE` to it.
 
 ## 2. Kernel version overriding

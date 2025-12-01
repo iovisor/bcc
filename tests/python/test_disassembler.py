@@ -116,7 +116,7 @@ class TestDisassembler(TestCase):
                (0xd5, "if %dst s<= %imm goto pc%off <%jmp>"),
                (0xdc, "%dst endian %src"),
                (0xdd, "if %dst s<= %imm goto pc%off <%jmp>"),]
-    
+
     @classmethod
     def build_instr(cls, op):
         dst = random.randint(0, 0xf)
@@ -124,7 +124,7 @@ class TestDisassembler(TestCase):
         offset = random.randint(0, 0xffff)
         imm = random.randint(0, 0xffffffff)
         return BPFInstr(op, dst, src, offset, imm)
-    
+
     @classmethod
     def format_instr(cls, instr, fmt):
         uimm = ct.c_uint32(instr.imm).value
@@ -135,7 +135,7 @@ class TestDisassembler(TestCase):
                    .replace("%sim", "%+d" % (instr.imm))
                    .replace("%off", "%+d" % (instr.offset))
                    .replace("%jmp", "%d" % (instr.offset + 1)))
-    
+
     def test_func(self):
         b = BPF(text=b"""
             struct key_t {int a; short b; struct {int c:4; int d:8;} e;} __attribute__((__packed__));
@@ -150,7 +150,7 @@ class TestDisassembler(TestCase):
    0: (b7) r0 = 1
    1: (95) exit""",
             b.disassemble_func(b"test_func"))
-        
+
         def _assert_equal_ignore_fd_id(s1, s2):
             # In first line of string like
             #    Layout of BPF map test_map (type HASH, FD 3, ID 0):
@@ -181,7 +181,7 @@ class TestDisassembler(TestCase):
   } key;
   unsigned long long value;""",
             b.decode_table(b"test_map"))
-    
+
     def test_bpf_isa(self):
         for op, instr_fmt in self.opcodes:
             instr_fmt
@@ -192,6 +192,6 @@ class TestDisassembler(TestCase):
             target_text = self.format_instr(instr, instr_fmt)
             self.assertEqual(disassembler.disassemble_str(instr_str)[0],
                              "%4d: (%02x) %s" % (0, op, target_text))
-        
+
 if __name__ == "__main__":
     main()

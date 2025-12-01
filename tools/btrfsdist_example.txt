@@ -4,7 +4,7 @@ Demonstrations of btrfsdist, the Linux eBPF/bcc version.
 btrfsdist traces btrfs reads, writes, opens, and fsyncs, and summarizes their
 latency as a power-of-2 histogram. For example:
 
-# ./btrfsdist 
+# ./btrfsdist
 Tracing btrfs operation latency... Hit Ctrl-C to end.
 ^C
 

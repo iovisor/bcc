@@ -40,11 +40,11 @@ const char argp_program_doc[] =
 
 static const struct argp_option opts[] = {
 	{ "sample_period", 'c', "SAMPLE_PERIOD", 0, "Sample one in this many "
-	  "number of cache reference / miss events" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
+	  "number of cache reference / miss events", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
 	{ "tid", 't', NULL, 0,
-	  "Summarize cache references and misses by PID/TID" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	  "Summarize cache references and misses by PID/TID", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 
@@ -139,9 +139,9 @@ static void print_map(struct bpf_map *map)
 {
 	__u64 total_ref = 0, total_miss = 0, total_hit, hit;
 	__u32 pid, cpu, tid;
-	struct key_info lookup_key = { .cpu = -1 }, next_key;
+	struct llcstat_key_info lookup_key = { .cpu = -1 }, next_key;
 	int err, fd = bpf_map__fd(map);
-	struct value_info info;
+	struct llcstat_value_info info;
 
 	while (!bpf_map_get_next_key(fd, &lookup_key, &next_key)) {
 		err = bpf_map_lookup_elem(fd, &next_key, &info);

@@ -23,8 +23,8 @@ static const char argp_program_doc[] =
 static char args_doc[] = "[interval [count]]";
 
 static const struct argp_option opts[] = {
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 
@@ -86,30 +86,15 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 	return vfprintf(stderr, format, args);
 }
 
-static const char *strftime_now(char *s, size_t max, const char *format)
-{
-	struct tm *tm;
-	time_t t;
-
-	t = time(NULL);
-	tm = localtime(&t);
-	if (tm == NULL) {
-		fprintf(stderr, "localtime: %s\n", strerror(errno));
-		return "<failed>";
-	}
-	if (strftime(s, max, format, tm) == 0) {
-		fprintf(stderr, "strftime error\n");
-		return "<failed>";
-	}
-	return s;
-}
-
 static const char *stat_types_names[] = {
 	[S_READ] = "READ",
 	[S_WRITE] = "WRITE",
 	[S_FSYNC] = "FSYNC",
 	[S_OPEN] = "OPEN",
 	[S_CREATE] = "CREATE",
+	[S_UNLINK] = "UNLINK",
+	[S_MKDIR] = "MKDIR",
+	[S_RMDIR] = "RMDIR",
 };
 
 static void print_header(void)
@@ -128,7 +113,8 @@ static void print_and_reset_stats(__u64 stats[S_MAXSTAT])
 	__u64 val;
 	int i;
 
-	printf("%-8s: ", strftime_now(s, sizeof(s), "%H:%M:%S"));
+	str_timestamp("%H:%M:%S", s, sizeof(s));
+	printf("%-8s: ", s);
 	for (i = 0; i < S_MAXSTAT; i++) {
 		val = __atomic_exchange_n(&stats[i], 0, __ATOMIC_RELAXED);
 		printf(" %8llu", val / env.interval);
@@ -174,12 +160,18 @@ int main(int argc, char **argv)
 		bpf_program__set_autoload(skel->progs.kprobe_vfs_fsync, false);
 		bpf_program__set_autoload(skel->progs.kprobe_vfs_open, false);
 		bpf_program__set_autoload(skel->progs.kprobe_vfs_create, false);
+		bpf_program__set_autoload(skel->progs.kprobe_vfs_unlink, false);
+		bpf_program__set_autoload(skel->progs.kprobe_vfs_mkdir, false);
+		bpf_program__set_autoload(skel->progs.kprobe_vfs_rmdir, false);
 	} else {
 		bpf_program__set_autoload(skel->progs.fentry_vfs_read, false);
 		bpf_program__set_autoload(skel->progs.fentry_vfs_write, false);
 		bpf_program__set_autoload(skel->progs.fentry_vfs_fsync, false);
 		bpf_program__set_autoload(skel->progs.fentry_vfs_open, false);
 		bpf_program__set_autoload(skel->progs.fentry_vfs_create, false);
+		bpf_program__set_autoload(skel->progs.fentry_vfs_unlink, false);
+		bpf_program__set_autoload(skel->progs.fentry_vfs_mkdir, false);
+		bpf_program__set_autoload(skel->progs.fentry_vfs_rmdir, false);
 	}
 
 	err = vfsstat_bpf__load(skel);

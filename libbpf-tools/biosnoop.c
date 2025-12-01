@@ -54,13 +54,13 @@ const char argp_program_doc[] =
 "    biosnoop -m 1         # trace for slower than 1ms\n";
 
 static const struct argp_option opts[] = {
-	{ "queued", 'Q', NULL, 0, "Include OS queued time in I/O time" },
-	{ "disk",  'd', "DISK",  0, "Trace this disk only" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ "cgroup", 'c', "/sys/fs/cgroup/unified/CG", 0, "Trace process in cgroup path"},
-	{ "min", 'm', "MIN", 0, "Min latency to trace, in ms" },
-	{ "timestamp", 't', NULL, 0, "Include timestamp on output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "queued", 'Q', NULL, 0, "Include OS queued time in I/O time", 0 },
+	{ "disk",  'd', "DISK",  0, "Trace this disk only", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ "cgroup", 'c', "/sys/fs/cgroup/unified/CG", 0, "Trace process in cgroup path", 0 },
+	{ "min", 'm', "MIN", 0, "Min latency to trace, in ms", 0 },
+	{ "timestamp", 't', NULL, 0, "Include timestamp on output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 
@@ -180,7 +180,6 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	struct event e;
 	char rwbs[RWBS_LEN];
 	struct timespec ct;
-	struct tm *tm;
 	char ts[32];
 
         if (data_sz < sizeof(e)) {
@@ -194,8 +193,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		/* Since `bpf_ktime_get_boot_ns` requires at least 5.8 kernel,
 		 * so get time from usespace instead */
 		clock_gettime(CLOCK_REALTIME, &ct);
-		tm = localtime(&ct.tv_sec);
-		strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+		str_timestamp("%H:%M:%S", ts, sizeof(ts));
 		printf("%-8s.%03ld ", ts, ct.tv_nsec / 1000000);
 	} else {
 		if (!start_ts) {

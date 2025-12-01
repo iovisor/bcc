@@ -35,9 +35,9 @@ const char argp_program_doc[] =
 "    bashreadline -s /usr/lib/libreadline.so\n";
 
 static const struct argp_option opts[] = {
-	{ "shared", 's', "PATH", 0, "the location of libreadline.so library" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "shared", 's', "PATH", 0, "the location of libreadline.so library", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 
@@ -74,13 +74,9 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 static void handle_event(void *ctx, int cpu, void *data, __u32 data_size)
 {
 	struct str_t *e = data;
-	struct tm *tm;
 	char ts[16];
-	time_t t;
 
-	time(&t);
-	tm = localtime(&t);
-	strftime(ts, sizeof(ts), "%H:%m:%S", tm);
+	str_timestamp("%H:%M:%S", ts, sizeof(ts));
 
 	printf("%-9s %-7d %s\n", ts, e->pid, e->str);
 }
@@ -88,6 +84,41 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_size)
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 {
 	warn("lost %llu events on CPU #%d\n", lost_cnt, cpu);
+}
+
+static char *find_readline_function_name(const char *bash_path)
+{
+  bool found = false;
+  int fd = -1;
+  Elf *elf = NULL;
+  Elf_Scn *scn = NULL;
+  GElf_Shdr shdr;
+
+
+  elf = open_elf(bash_path, &fd);
+
+  while ((scn = elf_nextscn(elf, scn)) != NULL && !found) {
+    gelf_getshdr(scn, &shdr);
+    if (shdr.sh_type == SHT_SYMTAB || shdr.sh_type == SHT_DYNSYM) {
+      Elf_Data *data = elf_getdata(scn, NULL);
+      if (data != NULL) {
+        GElf_Sym *symtab = (GElf_Sym *) data->d_buf;
+        int sym_count = shdr.sh_size / shdr.sh_entsize;
+        for (int i = 0; i < sym_count; ++i) {
+          if(strcmp("readline_internal_teardown", elf_strptr(elf, shdr.sh_link, symtab[i].st_name)) == 0){
+            found = true;
+            break;
+          }
+        }
+    	}
+    }
+  }
+
+  close_elf(elf,fd);
+  if (found)
+    return "readline_internal_teardown";
+  else
+    return "readline";
 }
 
 static char *find_readline_so()
@@ -100,7 +131,7 @@ static char *find_readline_so()
 	char path[128];
 	char *result = NULL;
 
-	func_off = get_elf_func_offset(bash_path, "readline");
+	func_off = get_elf_func_offset(bash_path, find_readline_function_name(bash_path));
 	if (func_off >= 0)
 		return strdup(bash_path);
 
@@ -159,7 +190,6 @@ int main(int argc, char **argv)
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
 	if (err)
 		return err;
-
 	if (libreadline_path) {
 		readline_so_path = libreadline_path;
 	} else if ((readline_so_path = find_readline_so()) == NULL) {
@@ -187,7 +217,7 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	func_off = get_elf_func_offset(readline_so_path, "readline");
+	func_off = get_elf_func_offset(readline_so_path, find_readline_function_name(readline_so_path));
 	if (func_off < 0) {
 		warn("cound not find readline in %s\n", readline_so_path);
 		goto cleanup;

@@ -17,6 +17,7 @@
 # 12-Feb-2016    Allan McAleavy migrated to BPF_PERF_OUTPUT
 
 from __future__ import print_function
+from elftools.elf.elffile import ELFFile
 from bcc import BPF
 from time import strftime
 import argparse
@@ -31,6 +32,19 @@ parser.add_argument("-s", "--shared", nargs="?",
 args = parser.parse_args()
 
 name = args.shared if args.shared else "/bin/bash"
+
+
+def get_sym(filename):
+    with open(filename, 'rb') as f:
+        elf = ELFFile(f)
+        symbol_table = elf.get_section_by_name(".dynsym")
+        for symbol in symbol_table.iter_symbols():
+            if symbol.name == "readline_internal_teardown":
+                return "readline_internal_teardown"
+    return "readline"
+
+
+sym = get_sym(name)
 
 # load BPF program
 bpf_text = """
@@ -63,15 +77,17 @@ int printret(struct pt_regs *ctx) {
 """
 
 b = BPF(text=bpf_text)
-b.attach_uretprobe(name=name, sym="readline", fn_name="printret")
+b.attach_uretprobe(name=name, sym=sym, fn_name="printret")
 
 # header
 print("%-9s %-7s %s" % ("TIME", "PID", "COMMAND"))
+
 
 def print_event(cpu, data, size):
     event = b["events"].event(data)
     print("%-9s %-7d %s" % (strftime("%H:%M:%S"), event.pid,
                             event.str.decode('utf-8', 'replace')))
+
 
 b["events"].open_perf_buffer(print_event)
 while 1:

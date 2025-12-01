@@ -2,16 +2,15 @@
 #ifndef __FILELIFE_H
 #define __FILELIFE_H
 
-#define DNAME_INLINE_LEN	32
+#include "path_helpers.h"
+
 #define TASK_COMM_LEN		16
 
 struct event {
-	char file[DNAME_INLINE_LEN];
+	struct full_path fname;
 	char task[TASK_COMM_LEN];
 	__u64 delta_ns;
 	pid_t tgid;
-	/* private */
-	void *dentry;
 };
 
 #endif /* __FILELIFE_H */

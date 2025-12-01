@@ -156,30 +156,27 @@ to the '-n' option.
 The -e option prints out extra columns; for example, the following output
 contains the flags passed to open(2), in octal:
 
-# ./opensnoop -e
-PID    COMM               FD ERR FLAGS    PATH
-28512  sshd               10   0 00101101 /proc/self/oom_score_adj
-28512  sshd                3   0 02100000 /etc/ld.so.cache
-28512  sshd                3   0 02100000 /lib/x86_64-linux-gnu/libwrap.so.0
-28512  sshd                3   0 02100000 /lib/x86_64-linux-gnu/libaudit.so.1
-28512  sshd                3   0 02100000 /lib/x86_64-linux-gnu/libpam.so.0
-28512  sshd                3   0 02100000 /lib/x86_64-linux-gnu/libselinux.so.1
-28512  sshd                3   0 02100000 /lib/x86_64-linux-gnu/libsystemd.so.0
-28512  sshd                3   0 02100000 /usr/lib/x86_64-linux-gnu/libcrypto.so.1.0.2
-28512  sshd                3   0 02100000 /lib/x86_64-linux-gnu/libutil.so.1
-
+# ./opensnoop.py -e
+PID    COMM               FD ERR FLAGS    MODE PATH
+12458  open                3   0 02000000 n/a  /etc/ld.so.cache
+12458  open                3   0 02000000 n/a  /lib/x86_64-linux-gnu/libc.so.6
+12458  open                3   0 00000301 0664 tmp.txt
+12459  openat              3   0 02000000 n/a  /etc/ld.so.cache
+12459  openat              3   0 02000000 n/a  /lib/x86_64-linux-gnu/libc.so.6
+12459  openat              3   0 00000301 0664 tmp.txt
+12460  openat2             3   0 02000000 n/a  /etc/ld.so.cache
+12460  openat2             3   0 02000000 n/a  /lib/x86_64-linux-gnu/libc.so.6
+12460  openat2             3   0 00000000 n/a  .
+12460  openat2             3   0 00000000 n/a  .
+12460  openat2             4   0 00000000 n/a  ..
 
 The -f option filters based on flags to the open(2) call, for example:
 
-# ./opensnoop -e -f O_WRONLY -f O_RDWR
-PID    COMM               FD ERR FLAGS    PATH
-28084  clear_console       3   0 00100002 /dev/tty
-28084  clear_console      -1  13 00100002 /dev/tty0
-28084  clear_console      -1  13 00100001 /dev/tty0
-28084  clear_console      -1  13 00100002 /dev/console
-28084  clear_console      -1  13 00100001 /dev/console
-28051  sshd                8   0 02100002 /var/run/utmp
-28051  sshd                7   0 00100001 /var/log/wtmp
+# ./opensnoop.py -e -f O_WRONLY -f O_RDWR
+PID    COMM               FD ERR FLAGS    MODE PATH
+12540  open                3   0 00000301 0664 tmp.txt
+12541  openat              3   0 00000301 0664 tmp.txt
+9039   openat              3   0 00000301 0000 tmp.txt
 
 
 The --cgroupmap option filters based on a cgroup set. It is meant to be used

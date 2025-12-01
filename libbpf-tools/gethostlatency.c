@@ -45,10 +45,10 @@ const char argp_program_doc[] =
 "    gethostlatency -p 1216     # only trace PID 1216\n";
 
 static const struct argp_option opts[] = {
-	{ "pid", 'p', "PID", 0, "Process ID to trace" },
-	{ "libc", 'l', "LIBC", 0, "Specify which libc.so to use" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "pid", 'p', "PID", 0, "Process ID to trace", 0 },
+	{ "libc", 'l', "LIBC", 0, "Specify which libc.so to use", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 
@@ -100,9 +100,7 @@ static void sig_int(int signo)
 static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	struct event e;
-	struct tm *tm;
 	char ts[16];
-	time_t t;
 
 	if (data_sz < sizeof(e)) {
 		printf("Error: packet too small\n");
@@ -110,9 +108,7 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	}
 	/* Copy data as alignment in the perf buffer isn't guaranteed. */
 	memcpy(&e, data, sizeof(e));
-	time(&t);
-	tm = localtime(&t);
-	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+	str_timestamp("%H:%M:%S", ts, sizeof(ts));
 	printf("%-8s %-7d %-16s %-10.3f %-s\n",
 	       ts, e.pid, e.comm, (double)e.time/1000000, e.host);
 }
@@ -124,12 +120,11 @@ static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 
 static int get_libc_path(char *path)
 {
-	FILE *f;
+	char proc_path[PATH_MAX + 32] = {};
 	char buf[PATH_MAX] = {};
-	char map_fname[PATH_MAX] = {};
-	char proc_path[PATH_MAX] = {};
 	char *filename;
 	float version;
+	FILE *f;
 
 	if (libc_path) {
 		memcpy(path, libc_path, strlen(libc_path));
@@ -139,8 +134,8 @@ static int get_libc_path(char *path)
 	if (target_pid == 0) {
 		f = fopen("/proc/self/maps", "r");
 	} else {
-		snprintf(map_fname, sizeof(map_fname), "/proc/%d/maps", target_pid);
-		f = fopen(map_fname, "r");
+		snprintf(buf, sizeof(buf), "/proc/%d/maps", target_pid);
+		f = fopen(buf, "r");
 	}
 	if (!f)
 		return -errno;

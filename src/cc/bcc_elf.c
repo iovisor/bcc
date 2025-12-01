@@ -1013,12 +1013,52 @@ int bcc_elf_get_type(const char *path) {
     return hdr.e_type;
 }
 
+int bcc_elf_is_pie(const char *path) {
+  int i, j, res;
+  struct bcc_elf_file elf_file;
+
+  if (bcc_elf_file_open(path, &elf_file) < 0)
+    return false;
+
+  Elf *elf = elf_file.elf;
+  size_t shdrnum;
+
+  elf_getshdrnum(elf, &shdrnum);
+  res = false;
+
+  for (i = 0; i < shdrnum; i++) {
+    Elf_Scn *scn = elf_getscn(elf, i);
+    Elf64_Shdr *shdr = elf64_getshdr(scn);
+    Elf_Data *data = elf_getdata(scn, NULL);
+
+    if (shdr->sh_type != SHT_DYNAMIC)
+      continue;
+
+    Elf64_Dyn *dyns = data->d_buf;
+    for (j = 0; j * shdr->sh_entsize < shdr->sh_size; j++) {
+      Elf64_Dyn *dyn = &dyns[j];
+      if (dyn->d_tag == DT_FLAGS_1) {
+        if (dyn->d_un.d_val & DF_1_PIE) {
+          res = true;
+          goto done;
+        }
+      }
+    }
+  }
+
+done:
+  bcc_elf_file_close(&elf_file);
+  return res;
+}
+
 int bcc_elf_is_exe(const char *path) {
   return (bcc_elf_get_type(path) != -1) && (access(path, X_OK) == 0);
 }
 
 int bcc_elf_is_shared_obj(const char *path) {
-  return bcc_elf_get_type(path) == ET_DYN;
+  int is_dyn = bcc_elf_get_type(path) == ET_DYN;
+  int is_pie = bcc_elf_is_pie(path);
+  return is_dyn ? (is_pie ? false : true) : false;
 }
 
 int bcc_elf_is_vdso(const char *name) {

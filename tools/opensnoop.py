@@ -19,10 +19,12 @@
 # 06-Jan-2019   Takuma Kume     Support filtering by UID
 # 21-Aug-2022   Rocky Xing      Support showing full path for an open file.
 # 06-Sep-2022   Rocky Xing      Support setting size of the perf ring buffer.
+# 13-Jul-2025   Rocky Xing      Execute a program and trace it's open() syscalls.
 
 from __future__ import print_function
 from bcc import ArgString, BPF
 from bcc.containers import filter_by_containers
+from bcc.exec import run_cmd, cmd_ready, cmd_exited
 from bcc.utils import printb
 import argparse
 from collections import defaultdict
@@ -82,8 +84,20 @@ parser.add_argument("-F", "--full-path", action="store_true",
 parser.add_argument("-b", "--buffer-pages", type=int, default=64,
     help="size of the perf ring buffer "
         "(must be a power of two number of pages and defaults to 64)")
+parser.add_argument('--exec', nargs=argparse.REMAINDER,
+    help="execute command (as the last parameter, "
+        "supports multiple parameters, for example: --exec ls -l /tmp")
 args = parser.parse_args()
 debug = 0
+
+if args.pid and args.exec:
+    print("ERROR: can only use -p or --exec. Exiting.")
+    exit(1)
+
+if args.exec is not None and len(args.exec) == 0:
+    print("ERROR: --exec without command. Exiting.")
+    exit(1)
+
 if args.duration:
     args.duration = timedelta(seconds=int(args.duration))
 flag_filter_mask = 0
@@ -99,24 +113,33 @@ for flag in args.flag_filter or []:
 bpf_text = """
 #include <uapi/linux/ptrace.h>
 #include <uapi/linux/limits.h>
+#include <linux/fcntl.h>
 #include <linux/sched.h>
 #ifdef FULLPATH
 #include <linux/fs_struct.h>
 #include <linux/dcache.h>
+#include <linux/fs.h>
+#include <linux/mount.h>
 
-#define MAX_ENTRIES 32
-
-enum event_type {
-    EVENT_ENTRY,
-    EVENT_END,
+/* see https://github.com/torvalds/linux/blob/master/fs/mount.h */
+struct mount {
+    struct hlist_node mnt_hash;
+    struct mount *mnt_parent;
+    struct dentry *mnt_mountpoint;
+    struct vfsmount mnt;
+    /* ... */
 };
 #endif
+
+#define NAME_MAX 255
+#define MAX_ENTRIES 32
 
 struct val_t {
     u64 id;
     char comm[TASK_COMM_LEN];
     const char *fname;
     int flags; // EXTENDED_STRUCT_MEMBER
+    u32 mode; // EXTENDED_STRUCT_MEMBER
 };
 
 struct data_t {
@@ -125,14 +148,26 @@ struct data_t {
     u32 uid;
     int ret;
     char comm[TASK_COMM_LEN];
+    u32 path_depth;
 #ifdef FULLPATH
-    enum event_type type;
-#endif
+    /**
+     * Example: "/CCCCC/BB/AAAA"
+     * name[]: "AAAA000000000000BB0000000000CCCCC00000000000"
+     *          |<- NAME_MAX ->|
+     *
+     * name[] must be u8, because char [] will be truncated by ctypes.cast(),
+     * such as above example, will be truncated to "AAAA0".
+     */
+    u8 name[NAME_MAX * MAX_ENTRIES];
+#else
+    /* If not fullpath, avoid transfer big data */
     char name[NAME_MAX];
+#endif
     int flags; // EXTENDED_STRUCT_MEMBER
+    u32 mode; // EXTENDED_STRUCT_MEMBER
 };
 
-BPF_PERF_OUTPUT(events);
+BPF_RINGBUF_OUTPUT(events, BUFFER_PAGES);
 """
 
 bpf_text_kprobe = """
@@ -142,7 +177,7 @@ int trace_return(struct pt_regs *ctx)
 {
     u64 id = bpf_get_current_pid_tgid();
     struct val_t *valp;
-    struct data_t data = {};
+    struct data_t *data;
 
     u64 tsp = bpf_ktime_get_ns();
 
@@ -152,16 +187,23 @@ int trace_return(struct pt_regs *ctx)
         return 0;
     }
 
-    bpf_probe_read_kernel(&data.comm, sizeof(data.comm), valp->comm);
-    bpf_probe_read_user_str(&data.name, sizeof(data.name), (void *)valp->fname);
-    data.id = valp->id;
-    data.ts = tsp / 1000;
-    data.uid = bpf_get_current_uid_gid();
-    data.flags = valp->flags; // EXTENDED_STRUCT_MEMBER
-    data.ret = PT_REGS_RC(ctx);
+    data = events.ringbuf_reserve(sizeof(struct data_t));
+    if (!data)
+        goto cleanup;
+
+    bpf_probe_read_kernel(&data->comm, sizeof(data->comm), valp->comm);
+    data->path_depth = 0;
+    bpf_probe_read_user_str(&data->name, sizeof(data->name), (void *)valp->fname);
+    data->id = valp->id;
+    data->ts = tsp / 1000;
+    data->uid = bpf_get_current_uid_gid();
+    data->flags = valp->flags; // EXTENDED_STRUCT_MEMBER
+    data->mode = valp->mode; // EXTENDED_STRUCT_MEMBER
+    data->ret = PT_REGS_RC(ctx);
 
     SUBMIT_DATA
 
+cleanup:
     infotmp.delete(&id);
 
     return 0;
@@ -169,12 +211,15 @@ int trace_return(struct pt_regs *ctx)
 """
 
 bpf_text_kprobe_header_open = """
-int syscall__trace_entry_open(struct pt_regs *ctx, const char __user *filename, int flags)
+int syscall__trace_entry_open(struct pt_regs *ctx, const char __user *filename,
+                              int flags, u32 mode)
 {
 """
 
 bpf_text_kprobe_header_openat = """
-int syscall__trace_entry_openat(struct pt_regs *ctx, int dfd, const char __user *filename, int flags)
+int syscall__trace_entry_openat(struct pt_regs *ctx, int dfd,
+                                const char __user *filename, int flags,
+                                u32 mode)
 {
 """
 
@@ -183,6 +228,10 @@ bpf_text_kprobe_header_openat2 = """
 int syscall__trace_entry_openat2(struct pt_regs *ctx, int dfd, const char __user *filename, struct open_how *how)
 {
     int flags = how->flags;
+    u32 mode = 0;
+
+    if (flags & O_CREAT || (flags & O_TMPFILE) == O_TMPFILE)
+        mode = how->mode;
 """
 
 bpf_text_kprobe_body = """
@@ -192,9 +241,9 @@ bpf_text_kprobe_body = """
     u32 tid = id;       // Cast and get the lower part
     u32 uid = bpf_get_current_uid_gid();
 
-    PID_TID_FILTER
-    UID_FILTER
-    FLAGS_FILTER
+    KPROBE_PID_TID_FILTER
+    KPROBE_UID_FILTER
+    KPROBE_FLAGS_FILTER
 
     if (container_should_be_filtered()) {
         return 0;
@@ -204,6 +253,7 @@ bpf_text_kprobe_body = """
         val.id = id;
         val.fname = filename;
         val.flags = flags; // EXTENDED_STRUCT_MEMBER
+        val.mode = mode; // EXTENDED_STRUCT_MEMBER
         infotmp.update(&id, &val);
     }
 
@@ -217,8 +267,20 @@ KRETFUNC_PROBE(FNNAME, struct pt_regs *regs, int ret)
 {
     const char __user *filename = (char *)PT_REGS_PARM1(regs);
     int flags = PT_REGS_PARM2(regs);
+    u32 mode = 0;
+
+    /**
+     * open(2): The mode argument must be supplied if O_CREAT or O_TMPFILE is
+     * specified in flags; if it is not supplied, some arbitrary bytes from
+     * the stack will be applied as the file mode.
+     *
+     * Other O_CREAT | O_TMPFILE checks about flags are also for this reason.
+     */
+    if (flags & O_CREAT || (flags & O_TMPFILE) == O_TMPFILE)
+        mode = PT_REGS_PARM3(regs);
 #else
-KRETFUNC_PROBE(FNNAME, const char __user *filename, int flags, int ret)
+KRETFUNC_PROBE(FNNAME, const char __user *filename, int flags,
+               u32 mode, int ret)
 {
 #endif
 """
@@ -230,8 +292,13 @@ KRETFUNC_PROBE(FNNAME, struct pt_regs *regs, int ret)
     int dfd = PT_REGS_PARM1(regs);
     const char __user *filename = (char *)PT_REGS_PARM2(regs);
     int flags = PT_REGS_PARM3(regs);
+    u32 mode = 0;
+
+    if (flags & O_CREAT || (flags & O_TMPFILE) == O_TMPFILE)
+        mode = PT_REGS_PARM4(regs);
 #else
-KRETFUNC_PROBE(FNNAME, int dfd, const char __user *filename, int flags, int ret)
+KRETFUNC_PROBE(FNNAME, int dfd, const char __user *filename, int flags,
+               u32 mode, int ret)
 {
 #endif
 """
@@ -245,13 +312,21 @@ KRETFUNC_PROBE(FNNAME, struct pt_regs *regs, int ret)
     const char __user *filename = (char *)PT_REGS_PARM2(regs);
     struct open_how __user how;
     int flags;
+    u32 mode = 0;
 
     bpf_probe_read_user(&how, sizeof(struct open_how), (struct open_how*)PT_REGS_PARM3(regs));
     flags = how.flags;
+
+    if (flags & O_CREAT || (flags & O_TMPFILE) == O_TMPFILE)
+        mode = how.mode;
 #else
 KRETFUNC_PROBE(FNNAME, int dfd, const char __user *filename, struct open_how __user *how, int ret)
 {
     int flags = how->flags;
+    u32 mode = 0;
+
+    if (flags & O_CREAT || (flags & O_TMPFILE) == O_TMPFILE)
+        mode = how->mode;
 #endif
 """
 
@@ -260,25 +335,32 @@ bpf_text_kfunc_body = """
     u32 pid = id >> 32; // PID is higher part
     u32 tid = id;       // Cast and get the lower part
     u32 uid = bpf_get_current_uid_gid();
+    struct data_t *data;
 
-    PID_TID_FILTER
-    UID_FILTER
-    FLAGS_FILTER
+    data = events.ringbuf_reserve(sizeof(struct data_t));
+    if (!data)
+        return 0;
+
+    KFUNC_PID_TID_FILTER
+    KFUNC_UID_FILTER
+    KFUNC_FLAGS_FILTER
     if (container_should_be_filtered()) {
+        events.ringbuf_discard(data, 0);
         return 0;
     }
 
-    struct data_t data = {};
-    bpf_get_current_comm(&data.comm, sizeof(data.comm));
+    bpf_get_current_comm(&data->comm, sizeof(data->comm));
 
     u64 tsp = bpf_ktime_get_ns();
 
-    bpf_probe_read_user_str(&data.name, sizeof(data.name), (void *)filename);
-    data.id    = id;
-    data.ts    = tsp / 1000;
-    data.uid   = bpf_get_current_uid_gid();
-    data.flags = flags; // EXTENDED_STRUCT_MEMBER
-    data.ret   = ret;
+    data->path_depth = 0;
+    bpf_probe_read_user_str(&data->name, sizeof(data->name), (void *)filename);
+    data->id    = id;
+    data->ts    = tsp / 1000;
+    data->uid   = bpf_get_current_uid_gid();
+    data->flags = flags; // EXTENDED_STRUCT_MEMBER
+    data->mode  = mode; // EXTENDED_STRUCT_MEMBER
+    data->ret   = ret;
 
     SUBMIT_DATA
 
@@ -322,60 +404,116 @@ else:
         bpf_text += bpf_text_kprobe_body
 
 if args.tid:  # TID trumps PID
-    bpf_text = bpf_text.replace('PID_TID_FILTER',
+    bpf_text = bpf_text.replace('KPROBE_PID_TID_FILTER',
         'if (tid != %s) { return 0; }' % args.tid)
+    bpf_text = bpf_text.replace('KFUNC_PID_TID_FILTER',
+        'if (tid != %s) { events.ringbuf_discard(data, 0); return 0; }' % args.tid)
 elif args.pid:
-    bpf_text = bpf_text.replace('PID_TID_FILTER',
+    bpf_text = bpf_text.replace('KPROBE_PID_TID_FILTER',
         'if (pid != %s) { return 0; }' % args.pid)
+    bpf_text = bpf_text.replace('KFUNC_PID_TID_FILTER',
+        'if (pid != %s) { events.ringbuf_discard(data, 0); return 0; }' % args.pid)
+elif args.exec:
+    child_pid = run_cmd(args.exec)
+    bpf_text = bpf_text.replace('KPROBE_PID_TID_FILTER',
+        'if (pid != %s) { return 0; }' % child_pid)
+    bpf_text = bpf_text.replace('KFUNC_PID_TID_FILTER',
+        'if (pid != %s) { events.ringbuf_discard(data, 0); return 0; }' % child_pid)
 else:
-    bpf_text = bpf_text.replace('PID_TID_FILTER', '')
+    bpf_text = bpf_text.replace('KPROBE_PID_TID_FILTER', '')
+    bpf_text = bpf_text.replace('KFUNC_PID_TID_FILTER', '')
 if args.uid:
-    bpf_text = bpf_text.replace('UID_FILTER',
+    bpf_text = bpf_text.replace('KPROBE_UID_FILTER',
         'if (uid != %s) { return 0; }' % args.uid)
+    bpf_text = bpf_text.replace('KFUNC_UID_FILTER',
+        'if (uid != %s) { events.ringbuf_discard(data, 0); return 0; }' % args.uid)
 else:
-    bpf_text = bpf_text.replace('UID_FILTER', '')
+    bpf_text = bpf_text.replace('KPROBE_UID_FILTER', '')
+    bpf_text = bpf_text.replace('KFUNC_UID_FILTER', '')
+if args.buffer_pages:
+    bpf_text = bpf_text.replace('BUFFER_PAGES', '%s' % args.buffer_pages)
+else:
+    bpf_text = bpf_text.replace('BUFFER_PAGES', '%d' % 64)
 bpf_text = filter_by_containers(args) + bpf_text
 if args.flag_filter:
-    bpf_text = bpf_text.replace('FLAGS_FILTER',
+    bpf_text = bpf_text.replace('KPROBE_FLAGS_FILTER',
         'if (!(flags & %d)) { return 0; }' % flag_filter_mask)
+    bpf_text = bpf_text.replace('KFUNC_FLAGS_FILTER',
+        'if (!(flags & %d)) { events.ringbuf_discard(data, 0); return 0; }' % flag_filter_mask)
 else:
-    bpf_text = bpf_text.replace('FLAGS_FILTER', '')
+    bpf_text = bpf_text.replace('KPROBE_FLAGS_FILTER', '')
+    bpf_text = bpf_text.replace('KFUNC_FLAGS_FILTER', '')
 if not (args.extended_fields or args.flag_filter):
     bpf_text = '\n'.join(x for x in bpf_text.split('\n')
         if 'EXTENDED_STRUCT_MEMBER' not in x)
 
 if args.full_path:
     bpf_text = bpf_text.replace('SUBMIT_DATA', """
-    data.type = EVENT_ENTRY;
-    events.perf_submit(ctx, &data, sizeof(data));
-
-    if (data.name[0] != '/') { // relative path
+    if (data->name[0] != '/') { // relative path
         struct task_struct *task;
-        struct dentry *dentry;
+        struct dentry *dentry, *parent_dentry, *mnt_root;
+        struct vfsmount *vfsmnt;
+        struct fs_struct *fs;
+        struct path *path;
+        struct mount *mnt;
+        size_t filepart_length;
+        char *payload = data->name;
+        struct qstr d_name;
         int i;
 
         task = (struct task_struct *)bpf_get_current_task_btf();
-        dentry = task->fs->pwd.dentry;
 
-        for (i = 1; i < MAX_ENTRIES; i++) {
-            bpf_probe_read_kernel(&data.name, sizeof(data.name), (void *)dentry->d_name.name);
-            data.type = EVENT_ENTRY;
-            events.perf_submit(ctx, &data, sizeof(data));
+        fs = task->fs;
+        path = &fs->pwd;
+        dentry = path->dentry;
+        vfsmnt = path->mnt;
 
-            if (dentry == dentry->d_parent) { // root directory
+        mnt = container_of(vfsmnt, struct mount, mnt);
+
+        for (i = 1, payload += NAME_MAX; i < MAX_ENTRIES; i++) {
+            bpf_probe_read_kernel(&d_name, sizeof(d_name), &dentry->d_name);
+            filepart_length =
+                bpf_probe_read_kernel_str(payload, NAME_MAX, (void *)d_name.name);
+
+            if (filepart_length < 0 || filepart_length > NAME_MAX)
                 break;
+
+            bpf_probe_read_kernel(&mnt_root, sizeof(mnt_root), &vfsmnt->mnt_root);
+            bpf_probe_read_kernel(&parent_dentry, sizeof(parent_dentry), &dentry->d_parent);
+
+            if (dentry == parent_dentry || dentry == mnt_root) {
+                struct mount *mnt_parent;
+                bpf_probe_read_kernel(&mnt_parent, sizeof(mnt_parent), &mnt->mnt_parent);
+
+                if (mnt != mnt_parent) {
+                    bpf_probe_read_kernel(&dentry, sizeof(dentry), &mnt->mnt_mountpoint);
+
+                    mnt = mnt_parent;
+                    vfsmnt = &mnt->mnt;
+
+                    bpf_probe_read_kernel(&mnt_root, sizeof(mnt_root), &vfsmnt->mnt_root);
+
+                    data->path_depth++;
+                    payload += NAME_MAX;
+                    continue;
+                } else {
+                    /* Real root directory */
+                    break;
+                }
             }
 
-            dentry = dentry->d_parent;
+            payload += NAME_MAX;
+
+            dentry = parent_dentry;
+            data->path_depth++;
         }
     }
 
-    data.type = EVENT_END;
-    events.perf_submit(ctx, &data, sizeof(data));
+    events.ringbuf_submit(data, sizeof(*data));
     """)
 else:
     bpf_text = bpf_text.replace('SUBMIT_DATA', """
-    events.perf_submit(ctx, &data, sizeof(data));
+    events.ringbuf_submit(data, sizeof(*data));
     """)
 
 if debug or args.ebpf:
@@ -396,6 +534,9 @@ if not is_support_kfunc:
         b.attach_kprobe(event=fnname_openat2, fn_name="syscall__trace_entry_openat2")
         b.attach_kretprobe(event=fnname_openat2, fn_name="trace_return")
 
+if args.exec:
+   cmd_ready()
+
 initial_ts = 0
 
 # header
@@ -406,75 +547,85 @@ if args.print_uid:
 print("%-6s %-16s %4s %3s " %
       ("TID" if args.tid else "PID", "COMM", "FD", "ERR"), end="")
 if args.extended_fields:
-    print("%-9s" % ("FLAGS"), end="")
+    print("%-8s %-4s " % ("FLAGS", "MODE"), end="")
 print("PATH")
 
-class EventType(object):
-    EVENT_ENTRY = 0
-    EVENT_END = 1
-
 entries = defaultdict(list)
+
+def split_names(str):
+    NAME_MAX = 255
+    MAX_ENTRIES = 32
+    chunks = [str[i:i + NAME_MAX] for i in range(0, NAME_MAX * MAX_ENTRIES, NAME_MAX)]
+    return [chunk.split(b'\x00', 1)[0] for chunk in chunks]
 
 # process event
 def print_event(cpu, data, size):
     event = b["events"].event(data)
     global initial_ts
 
-    if not args.full_path or event.type == EventType.EVENT_END:
-        skip = False
+    skip = False
 
-        # split return value into FD and errno columns
-        if event.ret >= 0:
-            fd_s = event.ret
-            err = 0
-        else:
-            fd_s = -1
-            err = - event.ret
+    # split return value into FD and errno columns
+    if event.ret >= 0:
+        fd_s = event.ret
+        err = 0
+    else:
+        fd_s = -1
+        err = - event.ret
 
-        if not initial_ts:
-            initial_ts = event.ts
+    if not initial_ts:
+        initial_ts = event.ts
 
-        if args.failed and (event.ret >= 0):
-            skip = True
+    if args.failed and (event.ret >= 0):
+        skip = True
 
-        if args.name and bytes(args.name) not in event.comm:
-            skip = True
+    if args.name and bytes(args.name) not in event.comm:
+        skip = True
 
-        if not skip:
-            if args.timestamp:
-                delta = event.ts - initial_ts
-                printb(b"%-14.9f" % (float(delta) / 1000000), nl="")
+    if not skip:
+        if args.timestamp:
+            delta = event.ts - initial_ts
+            printb(b"%-14.9f" % (float(delta) / 1000000), nl="")
 
-            if args.print_uid:
-                printb(b"%-6d" % event.uid, nl="")
+        if args.print_uid:
+            printb(b"%-6d" % event.uid, nl="")
 
-            printb(b"%-6d %-16s %4d %3d " %
-                   (event.id & 0xffffffff if args.tid else event.id >> 32,
-                    event.comm, fd_s, err), nl="")
+        printb(b"%-6d %-16s %4d %3d " %
+               (event.id & 0xffffffff if args.tid else event.id >> 32,
+                event.comm, fd_s, err), nl="")
 
-            if args.extended_fields:
-                printb(b"%08o " % event.flags, nl="")
-
-            if not args.full_path:
-                printb(b"%s" % event.name)
+        if args.extended_fields:
+            # If neither O_CREAT nor O_TMPFILE is specified in flags, then
+            # mode is ignored, see open(2).
+            if event.mode == 0 and event.flags & os.O_CREAT == 0 and \
+               (event.flags & os.O_TMPFILE) != os.O_TMPFILE:
+                printb(b"%08o n/a  " % event.flags, nl="")
             else:
-                paths = entries[event.id]
-                paths.reverse()
-                printb(b"%s" % os.path.join(*paths))
+                printb(b"%08o %04o " % (event.flags, event.mode), nl="")
 
         if args.full_path:
-            try:
-                del(entries[event.id])
-            except Exception:
-                pass
-    elif event.type == EventType.EVENT_ENTRY:
-        entries[event.id].append(event.name)
+            # see struct data_t::name field comment.
+            names = split_names(bytes(event.name))
+            picked = names[:event.path_depth + 1]
+            picked_str = []
+            for x in picked:
+                s = x.decode('utf-8', 'ignore') if isinstance(x, bytes) else str(x)
+                # remove mountpoint '/' and empty string
+                if s != "/" and s != "":
+                    picked_str.append(s)
+            joined = '/'.join(picked_str[::-1])
+            result = joined if joined.startswith('/') else '/' + joined
+            printb(b"%s" % result.encode("utf-8"))
+        else:
+            printb(b"%s" % event.name)
 
 # loop with callback to print_event
-b["events"].open_perf_buffer(print_event, page_cnt=args.buffer_pages)
+b["events"].open_ring_buffer(print_event)
 start_time = datetime.now()
 while not args.duration or datetime.now() - start_time < args.duration:
     try:
-        b.perf_buffer_poll()
+        b.ring_buffer_poll()
     except KeyboardInterrupt:
+        exit()
+    if args.exec and cmd_exited():
         exit()

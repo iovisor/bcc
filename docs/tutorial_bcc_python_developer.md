@@ -227,10 +227,15 @@ void trace_completion(struct pt_regs *ctx, struct request *req) {
 if BPF.get_kprobe_functions(b'blk_start_request'):
         b.attach_kprobe(event="blk_start_request", fn_name="trace_start")
 b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_start")
+
 if BPF.get_kprobe_functions(b'__blk_account_io_done'):
+    # __blk_account_io_done is available before kernel v6.4.
     b.attach_kprobe(event="__blk_account_io_done", fn_name="trace_completion")
-else:
+elif BPF.get_kprobe_functions(b'blk_account_io_done'):
+    # blk_account_io_done is traceable (not inline) before v5.16.
     b.attach_kprobe(event="blk_account_io_done", fn_name="trace_completion")
+else:
+    b.attach_kprobe(event="blk_mq_end_request", fn_name="trace_completion")
 [...]
 ```
 
@@ -240,6 +245,7 @@ Things to learn:
 1. ```trace_start(struct pt_regs *ctx, struct request *req)```: This function will later be attached to kprobes. The arguments to kprobe functions are ```struct pt_regs *ctx```, for registers and BPF context, and then the actual arguments to the function. We'll attach this to blk_start_request(), where the first argument is ```struct request *```.
 1. ```start.update(&req, &ts)```: We're using the pointer to the request struct as a key in our hash. What? This is commonplace in tracing. Pointers to structs turn out to be great keys, as they are unique: two structs can't have the same pointer address. (Just be careful about when it gets free'd and reused.) So what we're really doing is tagging the request struct, which describes the disk I/O, with our own timestamp, so that we can time it. There's two common keys used for storing timestamps: pointers to structs, and, thread IDs (for timing function entry to return).
 1. ```req->__data_len```: We're dereferencing members of ```struct request```. See its definition in the kernel source for what members are there. bcc actually rewrites these expressions to be a series of ```bpf_probe_read_kernel()``` calls. Sometimes bcc can't handle a complex dereference, and you need to call ```bpf_probe_read_kernel()``` directly.
+1. ```if BPF.get_kprobe_functions(b'__blk_account_io_done'):...```: Different functions are attached here depending on kernel versions. Legacy functions ```__blk_account_io_done``` and  ```blk_account_io_done``` are not available on newer kernels, so instead, we use ```blk_mq_end_request``` as a workaround.
 
 This is a pretty interesting program, and if you can understand all the code, you'll understand many important basics. We're still using the bpf_trace_printk() hack, so let's fix that next.
 
@@ -368,6 +374,15 @@ int kprobe__blk_account_io_done(struct pt_regs *ctx, struct request *req)
 }
 """)
 
+if BPF.get_kprobe_functions(b'__blk_account_io_done'):
+    # __blk_account_io_done is available before kernel v6.4.
+    b.attach_kprobe(event="__blk_account_io_done", fn_name="trace_req_done")
+elif BPF.get_kprobe_functions(b'blk_account_io_done'):
+    # blk_account_io_done is traceable (not inline) before v5.16.
+    b.attach_kprobe(event="blk_account_io_done", fn_name="trace_req_done")
+else:
+    b.attach_kprobe(event="blk_mq_end_request", fn_name="trace_req_done")
+
 # header
 print("Tracing... Hit Ctrl-C to end.")
 
@@ -446,71 +461,119 @@ Browse the code in [examples/tracing/vfsreadlat.py](../examples/tracing/vfsreadl
 1. ```b.attach_kretprobe(event="vfs_read", fn_name="do_return")```: Attaches the BPF C function ```do_return()``` to the return of the kernel function ```vfs_read()```. This is a kretprobe: instrumenting the return from a function, rather than its entry.
 1. ```b["dist"].clear()```: Clears the histogram.
 
-### Lesson 12. urandomread.py
+### Lesson 12. setuid_monitor.py
 
-Tracing while a ```dd if=/dev/urandom of=/dev/null bs=8k count=5``` is run:
+It monitors the using of setuid syscall on the system in the runtime.
+As triggers, from another shell session we run some commands that use
+the setuid syscall, such as `su`, `sudo`, and `passwd`.
 
 ```
-# ./urandomread.py
-TIME(s)            COMM             PID    GOTBITS
-24652832.956994001 smtp             24690  384
-24652837.726500999 dd               24692  65536
-24652837.727111001 dd               24692  65536
-24652837.727703001 dd               24692  65536
-24652837.728294998 dd               24692  65536
-24652837.728888001 dd               24692  65536
+# ./setuid_monitor.py
+TIME(s)            COMM             PID    UID
+7615.997           su               2989   0
+7616.005           su               2990   0
+7616.008           su               2991   0
+7621.446           passwd           3008   0
+7624.655           passwd           3009   0
+7624.664           passwd           3010   0
+7629.624           master           1262   0
+7640.942           sudo             3012   0
 ```
 
-Hah! I caught smtp by accident. Code is [examples/tracing/urandomread.py](../examples/tracing/urandomread.py):
+Except the commands we issued, we caught one named 'master' by accident. By
+checking the process we can see it belongs to postfix. So, setuid is invovled
+somewhere in its code.
+
+```
+# ps -o command -p 1262
+COMMAND
+/usr/lib/postfix/bin//master -w
+```
+
+Code is [examples/tracing/setuid_monitor.py](../examples/tracing/setuid_monitor.py):
 
 ```Python
 from __future__ import print_function
 from bcc import BPF
+from bcc.utils import printb
 
-# load BPF program
+# define BPF program
 b = BPF(text="""
-TRACEPOINT_PROBE(random, urandom_read) {
-    // args is from /sys/kernel/debug/tracing/events/random/urandom_read/format
-    bpf_trace_printk("%d\\n", args->got_bits);
+#include <linux/sched.h>
+
+// define output data structure in C
+struct data_t {
+    u32 pid;
+    u32 uid;
+    u64 ts;
+    char comm[TASK_COMM_LEN];
+};
+BPF_PERF_OUTPUT(events);
+
+TRACEPOINT_PROBE(syscalls, sys_enter_setuid) {
+    struct data_t data = {};
+
+    // Check /sys/kernel/debug/tracing/events/syscalls/sys_enter_setuid/format
+    // for the args format
+    data.uid = args->uid;
+    data.ts = bpf_ktime_get_ns();
+    data.pid = bpf_get_current_pid_tgid();
+    bpf_get_current_comm(&data.comm, sizeof(data.comm));
+
+    events.perf_submit(args, &data, sizeof(data));
+
     return 0;
 }
 """)
 
 # header
-print("%-18s %-16s %-6s %s" % ("TIME(s)", "COMM", "PID", "GOTBITS"))
+print("%-14s %-12s %-6s %s" % ("TIME(s)", "COMMAND", "PID", "UID"))
 
-# format output
+def print_event(cpu, data, size):
+    event = b["events"].event(data)
+    printb(b"%-14.3f %-12s %-6d %d" % ((event.ts/1000000000),
+           event.comm, event.pid, event.uid))
+
+# loop with callback to print_event
+b["events"].open_perf_buffer(print_event)
 while 1:
     try:
-        (task, pid, cpu, flags, ts, msg) = b.trace_fields()
-    except ValueError:
-        continue
-    print("%-18.9f %-16s %-6d %s" % (ts, task, pid, msg))
+        b.perf_buffer_poll()
+    except KeyboardInterrupt:
+        exit()
+
 ```
 
 Things to learn:
 
-1. ```TRACEPOINT_PROBE(random, urandom_read)```: Instrument the kernel tracepoint ```random:urandom_read```. These have a stable API, and thus are recommend to use instead of kprobes, wherever possible. You can run ```perf list``` for a list of tracepoints. Linux >= 4.7 is required to attach BPF programs to tracepoints.
-1. ```args->got_bits```: ```args``` is auto-populated to be a structure of the tracepoint arguments. The comment above says where you can see that structure. Eg:
+1. ```TRACEPOINT_PROBE(syscalls, sys_enter_setuid)```: Instrument the kernel
+tracepoint ```syscalls:sys_enter_setuid```. These have a stable API, and thus
+are recommend to use instead of kprobes, wherever possible. You can run ```perf
+list``` for a list of tracepoints. Linux >= 4.7 is required to attach BPF
+programs to tracepoints.
+1. ```args->uid```: ```args``` is auto-populated to be a structure of the
+tracepoint arguments. The comment above says where you can see that structure.
+Eg:
 
-```
-# cat /sys/kernel/debug/tracing/events/random/urandom_read/format
-name: urandom_read
-ID: 972
-format:
-	field:unsigned short common_type;	offset:0;	size:2;	signed:0;
-	field:unsigned char common_flags;	offset:2;	size:1;	signed:0;
-	field:unsigned char common_preempt_count;	offset:3;	size:1;	signed:0;
-	field:int common_pid;	offset:4;	size:4;	signed:1;
+    ```
+    # sudo cat /sys/kernel/debug/tracing/events/syscalls/sys_enter_setuid/format
+    name: sys_enter_setuid
+    ID: 256
+    format:
+        	field:unsigned short common_type;       offset:0;       size:2; signed:0;
+        	field:unsigned char common_flags;       offset:2;       size:1; signed:0;
+        	field:unsigned char common_preempt_count;       offset:3;       size:1; signed:0;
+        	field:int common_pid;   offset:4;       size:4; signed:1;
 
-	field:int got_bits;	offset:8;	size:4;	signed:1;
-	field:int pool_left;	offset:12;	size:4;	signed:1;
-	field:int input_left;	offset:16;	size:4;	signed:1;
+        	field:int __syscall_nr; offset:8;       size:4; signed:1;
+        	field:uid_t uid;        offset:16;      size:8; signed:0;
 
-print fmt: "got_bits %d nonblocking_pool_entropy_left %d input_entropy_left %d", REC->got_bits, REC->pool_left, REC->input_left
-```
-
-In this case, we were printing the ```got_bits``` member.
+    print fmt: "uid: 0x%08lx", ((unsigned long)(REC->uid))
+    ```
+    In this case, there are only one member `uid` to be printed.
+1. The BPF_PERF_OUTPUT() interface we have learned from previous lessons is
+applied here. However, we put ```args``` there as the first parameter of
+```events.perf_submit``` instead of ```pt_reg* ctx``` from krpobes.
 
 ### Lesson 13. disksnoop.py fixed
 

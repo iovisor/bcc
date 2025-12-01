@@ -46,7 +46,7 @@ TEST_CASE("language detection", "[c_api]") {
   REQUIRE(string(c).compare("c") == 0);
 }
 
-TEST_CASE("shared object resolution", "[c_api]") {
+TEST_CASE("shared object resolution with the generalized function", "[c_api]") {
   char *libm = bcc_procutils_which_so("m", 0);
   REQUIRE(libm);
   REQUIRE(libm[0] == '/');
@@ -55,11 +55,43 @@ TEST_CASE("shared object resolution", "[c_api]") {
 }
 
 TEST_CASE("shared object resolution using loaded libraries", "[c_api]") {
+  char *libelf = bcc_procutils_which_so_in_process("elf", getpid());
+  REQUIRE(libelf);
+  REQUIRE(libelf[0] == '/');
+  REQUIRE(string(libelf).find("libelf") != string::npos);
+  free(libelf);
+}
+
+TEST_CASE("shared object resolution using loaded libraries with the generalized function", "[c_api]") {
   char *libelf = bcc_procutils_which_so("elf", getpid());
   REQUIRE(libelf);
   REQUIRE(libelf[0] == '/');
   REQUIRE(string(libelf).find("libelf") != string::npos);
   free(libelf);
+}
+
+TEST_CASE("versioned shared object resolution with the generalized function", "[c_api]") {
+  char *libc = bcc_procutils_which_so("c.so.6", 0);
+  REQUIRE(libc);
+  REQUIRE(libc[0] == '/');
+  REQUIRE(string(libc).find("libc.so.6") != string::npos);
+  free(libc);
+}
+
+TEST_CASE("versioned shared object resolution using loaded libraries", "[c_api]") {
+  char *libc = bcc_procutils_which_so_in_process("c.so.6", getpid());
+  REQUIRE(libc);
+  REQUIRE(libc[0] == '/');
+  REQUIRE(string(libc).find("libc.so.6") != string::npos);
+  free(libc);
+}
+
+TEST_CASE("versioned shared object resolution using loaded libraries with the generalized function", "[c_api]") {
+  char *libc = bcc_procutils_which_so("c.so.6", getpid());
+  REQUIRE(libc);
+  REQUIRE(libc[0] == '/');
+  REQUIRE(string(libc).find("libc.so.6") != string::npos);
+  free(libc);
 }
 
 TEST_CASE("binary resolution with `which`", "[c_api]") {

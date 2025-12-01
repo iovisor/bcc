@@ -6,8 +6,8 @@ Perl, PHP, Python, Ruby, Tcl, and Linux system calls. It displays statistics on
 the most frequently called methods, as well as the latency (duration) of these
 methods.
 
-Through the syscalls support, ucalls can provide basic information on a 
-process' interaction with the system including syscall counts and latencies. 
+Through the syscalls support, ucalls can provide basic information on a
+process' interaction with the system including syscall counts and latencies.
 This can then be used for further exploration with other BCC tools like trace,
 argdist, biotop, fileslower, and others.
 
@@ -24,7 +24,7 @@ slowy/App.isPrime                                      8969 4841017.64
 ^C
 
 
-To trace only syscalls in a particular process and print the top 10 most 
+To trace only syscalls in a particular process and print the top 10 most
 frequently-invoked ones:
 
 # ucalls -l none -ST 10 7913

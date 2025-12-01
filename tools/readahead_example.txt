@@ -4,7 +4,7 @@ Read-ahead mechanism is used by operation sytems to optimize sequential operatio
 by reading ahead some pages to avoid more expensive filesystem operations. This tool
 shows the performance of the read-ahead caching on the system under a given load to
 investigate any caching issues. It shows a count for unused pages in the cache and
-also prints a histogram showing how long they have remianed there.
+also prints a histogram showing how long they have remained there.
 
 Usage Scenario
 ==============

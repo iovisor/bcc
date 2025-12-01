@@ -13,7 +13,8 @@
 const volatile bool filter_cg = false;
 const volatile bool targ_dist = false;
 const volatile bool targ_ns = false;
-const volatile bool do_count = false;
+const volatile bool cpu = false;
+const volatile int targ_cpu = -1;
 
 struct {
 	__uint(type, BPF_MAP_TYPE_CGROUP_ARRAY);
@@ -38,31 +39,26 @@ struct {
 
 static struct info zero;
 
+static __always_inline bool is_target_cpu() {
+	if (targ_cpu < 0)
+		return true;
+
+	return targ_cpu == bpf_get_smp_processor_id();
+}
+
 static int handle_entry(int irq, struct irqaction *action)
 {
 	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
 		return 0;
-
-	if (do_count) {
-		struct irq_key key = {};
-		struct info *info;
-
-		bpf_probe_read_kernel_str(&key.name, sizeof(key.name), BPF_CORE_READ(action, name));
-		info = bpf_map_lookup_or_try_init(&infos, &key, &zero);
-		if (!info)
-			return 0;
-		info->count += 1;
+	if (!is_target_cpu())
 		return 0;
-	} else {
-		u64 ts = bpf_ktime_get_ns();
-		u32 key = 0;
 
-		if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
-			return 0;
+	u64 ts = bpf_ktime_get_ns();
+	u32 key = 0;
 
-		bpf_map_update_elem(&start, &key, &ts, BPF_ANY);
-		return 0;
-	}
+	bpf_map_update_elem(&start, &key, &ts, BPF_ANY);
+
+	return 0;
 }
 
 static int handle_exit(int irq, struct irqaction *action)
@@ -76,6 +72,9 @@ static int handle_exit(int irq, struct irqaction *action)
 	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
 		return 0;
 
+	if (!is_target_cpu())
+		return 0;
+
 	tsp = bpf_map_lookup_elem(&start, &key);
 	if (!tsp)
 		return 0;
@@ -85,16 +84,22 @@ static int handle_exit(int irq, struct irqaction *action)
 		delta /= 1000U;
 
 	bpf_probe_read_kernel_str(&ikey.name, sizeof(ikey.name), BPF_CORE_READ(action, name));
+	if (cpu)
+		ikey.cpu = bpf_get_smp_processor_id();
 	info = bpf_map_lookup_or_try_init(&infos, &ikey, &zero);
 	if (!info)
 		return 0;
 
+	info->count += 1;
+
 	if (!targ_dist) {
-		info->count += delta;
+		info->total_time += delta;
+		if (delta > info->max_time)
+			info->max_time = delta;
 	} else {
 		u64 slot;
 
-		slot = log2(delta);
+		slot = log2l(delta);
 		if (slot >= MAX_SLOTS)
 			slot = MAX_SLOTS - 1;
 		info->slots[slot]++;

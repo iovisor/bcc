@@ -43,10 +43,10 @@ const char argp_program_doc[] =
 "    biopattern -d sdc       # trace sdc only\n";
 
 static const struct argp_option opts[] = {
-	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
-	{ "disk",  'd', "DISK",  0, "Trace this disk only" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "timestamp", 'T', NULL, 0, "Include timestamp on output", 0 },
+	{ "disk",  'd', "DISK",  0, "Trace this disk only", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 
@@ -116,9 +116,7 @@ static int print_map(struct bpf_map *counters, struct partitions *partitions)
 	int err, fd = bpf_map__fd(counters);
 	const struct partition *partition;
 	struct counter counter;
-	struct tm *tm;
 	char ts[32];
-	time_t t;
 
 	while (!bpf_map_get_next_key(fd, &lookup_key, &next_key)) {
 		err = bpf_map_lookup_elem(fd, &next_key, &counter);
@@ -131,9 +129,7 @@ static int print_map(struct bpf_map *counters, struct partitions *partitions)
 		if (!total)
 			continue;
 		if (env.timestamp) {
-			time(&t);
-			tm = localtime(&t);
-			strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+			str_timestamp("%H:%M:%S", ts, sizeof(ts));
 			printf("%-9s ", ts);
 		}
 		partition = partitions__get_by_dev(partitions, next_key);

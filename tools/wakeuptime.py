@@ -212,7 +212,7 @@ if not is_supported_raw_tp:
     matched = b.num_open_kprobes()
     if matched == 0:
         print("0 functions traced. Exiting.")
-        exit()
+        exit(1)
 
 # check whether hash table batch ops is supported
 htab_batch_ops = True if BPF.kernel_struct_has_field(b'bpf_map_ops',
@@ -264,7 +264,7 @@ while (1):
             # print default multi-line stack output
             printb(b"    %-16s %s" % (b"target:", k.target))
             for addr in waker_kernel_stack:
-                printb(b"    %-16x %s" % (addr, b.ksym(addr)))
+                printb(b"    %-16x %s" % (addr, b.ksym(addr, False, True)))
             printb(b"    %-16s %s" % (b"waker:", k.waker))
             print("        %d\n" % v.value)
 

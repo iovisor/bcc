@@ -10,6 +10,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 #
 # 30-Jul-2018   Jiri Olsa   Created this.
+# 31-Mar-2025   yu410621    Add argument "--ebpf".
 
 from __future__ import print_function
 from bcc import ArgString, BPF
@@ -42,6 +43,8 @@ parser.add_argument("-n", "--name",
     help="only print process names containing this name")
 parser.add_argument("-d", "--duration",
     help="total duration of trace in seconds")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 debug = 0
 
@@ -78,6 +81,11 @@ BPF_HASH(detach_ptr, u64, struct cmsghdr *);
 BPF_HASH(sock_fd, u64, int);
 BPF_PERF_OUTPUT(events);
 
+__attribute__((always_inline))
+static inline u32 bpf_min(u32 a, u32 b) {
+    return (a < b) ? a : b;
+}
+
 static void set_fd(int fd)
 {
     u64 id = bpf_get_current_pid_tgid();
@@ -103,7 +111,7 @@ static void put_fd(void)
 
 static int sent_1(struct pt_regs *ctx, struct val_t *val, int num, void *data)
 {
-    val->fd_cnt = min(num, MAX_FD);
+    val->fd_cnt = bpf_min(num, MAX_FD);
 
     if (bpf_probe_read_kernel(&val->fd[0], MAX_FD * sizeof(int), data))
         return -1;
@@ -260,6 +268,12 @@ elif args.pid:
         'if (pid != %s) { return 0; }' % args.pid)
 else:
     bpf_text = bpf_text.replace('FILTER', '')
+
+# output eBPF program C code after it is replaced, used by debugging
+if debug or args.ebpf:
+    print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # initialize BPF
 b = BPF(text=bpf_text)

@@ -106,18 +106,18 @@ const char argp_program_doc[] =
 #define OPT_STACK_STORAGE_SIZE		2 /* --stack-storage-size */
 
 static const struct argp_option opts[] = {
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ "pid", 'p', "PID", 0, "Trace this PID only" },
-	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path" },
-	{ "kernel-stack", 'K', NULL, 0, "output kernel stack trace" },
-	{ "user-stack", 'U', NULL, 0, "output user stack trace" },
-	{ "extra-fields", 'x', NULL, 0, "extra fields: show TID and INSETID columns" },
-	{ "unique", 'u', "off", 0, "Print unique output for <pid> or <cgroup> (default:off)" },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ "pid", 'p', "PID", 0, "Trace this PID only", 0 },
+	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path", 0 },
+	{ "kernel-stack", 'K', NULL, 0, "output kernel stack trace", 0 },
+	{ "user-stack", 'U', NULL, 0, "output user stack trace", 0 },
+	{ "extra-fields", 'x', NULL, 0, "extra fields: show TID and INSETID columns", 0 },
+	{ "unique", 'u', "off", 0, "Print unique output for <pid> or <cgroup> (default:off)", 0 },
 	{ "perf-max-stack-depth", OPT_PERF_MAX_STACK_DEPTH,
-	  "PERF-MAX-STACK-DEPTH", 0, "the limit for both kernel and user stack traces (default 127)" },
+	  "PERF-MAX-STACK-DEPTH", 0, "the limit for both kernel and user stack traces (default 127)", 0 },
 	{ "stack-storage-size", OPT_STACK_STORAGE_SIZE, "STACK-STORAGE-SIZE", 0,
-	  "the number of unique stack traces that can be stored and displayed (default 1024)" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	  "the number of unique stack traces that can be stored and displayed (default 1024)", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 
@@ -195,6 +195,8 @@ static void print_map(struct ksyms *ksyms, struct syms_cache *syms_cache)
 	const struct ksym *ksym;
 	const struct syms *syms;
 	const struct sym *sym;
+	struct sym_info sinfo;
+	int idx;
 	int err, i;
 	unsigned long *ip;
 	struct cap_event val;
@@ -206,6 +208,8 @@ static void print_map(struct ksyms *ksyms, struct syms_cache *syms_cache)
 	}
 
 	while (!bpf_map_get_next_key(ifd, &lookup_key, &next_key)) {
+		idx = 0;
+
 		err = bpf_map_lookup_elem(ifd, &next_key, &val);
 		if (err < 0) {
 			fprintf(stderr, "failed to lookup info: %d\n", err);
@@ -218,7 +222,14 @@ static void print_map(struct ksyms *ksyms, struct syms_cache *syms_cache)
 				fprintf(stderr, "    [Missed Kernel Stack]\n");
 			for (i = 0; i < env.perf_max_stack_depth && ip[i]; i++) {
 				ksym = ksyms__map_addr(ksyms, ip[i]);
-				printf("    %s\n", ksym ? ksym->name : "Unknown");
+				if (!env.verbose) {
+					printf("    %s\n", ksym ? ksym->name : "Unknown");
+				} else {
+					if (ksym)
+						printf("    #%-2d 0x%lx %s+0x%lx\n", idx++, ip[i], ksym->name, ip[i] - ksym->addr);
+					else
+						printf("    #%-2d 0x%lx [unknown]\n", idx++, ip[i]);
+				}
 			}
 		}
 
@@ -237,11 +248,22 @@ static void print_map(struct ksyms *ksyms, struct syms_cache *syms_cache)
 				goto skip_ustack;
 			}
 			for (i = 0; i < env.perf_max_stack_depth && ip[i]; i++) {
-				sym = syms__map_addr(syms, ip[i]);
-				if (sym)
-					printf("    %s\n", sym->name);
-				else
-					printf("    [unknown]\n");
+				if (!env.verbose) {
+					sym = syms__map_addr(syms, ip[i]);
+					if (sym)
+						printf("    %s\n", sym->name);
+					else
+						printf("    [unknown]\n");
+				} else {
+					err = syms__map_addr_dso(syms, ip[i], &sinfo);
+					printf("    #%-2d 0x%016lx", idx++, ip[i]);
+					if (err == 0) {
+						if (sinfo.sym_name)
+							printf(" %s+0x%lx", sinfo.sym_name, sinfo.sym_offset);
+						printf(" (%s+0x%lx)", sinfo.dso_name, sinfo.dso_offset);
+					}
+					printf("\n");
+				}
 			}
 		}
 
@@ -256,13 +278,9 @@ cleanup:
 static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	const struct cap_event *e = data;
-	struct tm *tm;
 	char ts[32];
-	time_t t;
 
-	time(&t);
-	tm = localtime(&t);
-	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+	str_timestamp("%H:%M:%S", ts, sizeof(ts));
 
 	char *verdict = "deny";
 	if (!e->ret)

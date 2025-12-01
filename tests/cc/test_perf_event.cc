@@ -98,7 +98,7 @@ TEST_CASE("test attach perf event", "[bpf_perf_event]") {
 
     int on_event(void *ctx) {
       int zero = 0;
-      
+
       u64 p = bpf_get_current_pid_tgid();
       pid.update(&zero, &p);
     #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)

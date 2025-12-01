@@ -9,6 +9,7 @@
 
 const volatile bool targ_dist = false;
 const volatile bool targ_ns = false;
+const volatile int targ_cpu = -1;
 
 struct {
 	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
@@ -21,8 +22,18 @@ __u64 counts[NR_SOFTIRQS] = {};
 __u64 time[NR_SOFTIRQS] = {};
 struct hist hists[NR_SOFTIRQS] = {};
 
+static bool is_target_cpu() {
+	if (targ_cpu < 0)
+		return true;
+
+	return bpf_get_smp_processor_id() == targ_cpu;
+}
+
 static int handle_entry(unsigned int vec_nr)
 {
+	if (!is_target_cpu())
+		return 0;
+
 	u64 ts = bpf_ktime_get_ns();
 	u32 key = 0;
 
@@ -32,6 +43,9 @@ static int handle_entry(unsigned int vec_nr)
 
 static int handle_exit(unsigned int vec_nr)
 {
+	if (!is_target_cpu())
+		return 0;
+
 	u64 delta, *tsp;
 	u32 key = 0;
 
@@ -52,7 +66,7 @@ static int handle_exit(unsigned int vec_nr)
 		u64 slot;
 
 		hist = &hists[vec_nr];
-		slot = log2(delta);
+		slot = log2l(delta);
 		if (slot >= MAX_SLOTS)
 			slot = MAX_SLOTS - 1;
 		__sync_fetch_and_add(&hist->slots[slot], 1);

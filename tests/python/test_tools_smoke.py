@@ -181,7 +181,7 @@ class SmokeTests(TestCase):
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_f2fsslower(self):
-        self.run_with_int("f2fsslower.py")
+        self.run_with_int("f2fsslower.py", allow_early=True)
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_filelife(self):
@@ -272,7 +272,7 @@ class SmokeTests(TestCase):
 
     @skipUnless(kernel_version_ge(4,6), "requires kernel >= 4.6")
     def test_offwaketime(self):
-        self.run_with_duration("offwaketime.py 1")
+        self.run_with_duration("offwaketime.py 1", timeout=30)
 
     @skipUnless(kernel_version_ge(4,9), "requires kernel >= 4.9")
     def test_oomkill(self):
@@ -316,6 +316,10 @@ class SmokeTests(TestCase):
     def test_softirqs(self):
         self.run_with_duration("softirqs.py 1 1")
         pass
+
+    @skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
+    def test_softirqslower(self):
+        self.run_with_int("softirqslower.py")
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_solisten(self):
@@ -423,6 +427,10 @@ class SmokeTests(TestCase):
     @skipUnless(kernel_version_ge(4,6), "requires kernel >= 4.6")
     def test_wakeuptime(self):
         self.run_with_duration("wakeuptime.py 1")
+
+    @skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
+    def test_wqlat(self):
+        self.run_with_int("wqlat.py 1 1", allow_early=True)
 
     def test_xfsdist(self):
         # Doesn't work on build bot because xfs functions not present in the

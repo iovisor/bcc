@@ -22,8 +22,14 @@ from __future__ import print_function
 from bcc import BPF
 from bcc.utils import printb
 from time import sleep, strftime
-import argparse
+import argparse, platform
 from subprocess import call
+
+rel = platform.release().split('.')
+if int(rel[0]) > 6 or (int(rel[0]) == 6 and int(rel[1]) >= 8):
+    print("Linux 6.8 and later are not supported due to kernel internal data structure changes.")
+    print("Please use libbpf-tool version of slabratetop instead.")
+    exit()
 
 # arguments
 examples = """examples:

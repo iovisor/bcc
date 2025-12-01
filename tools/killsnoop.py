@@ -25,6 +25,7 @@ examples = """examples:
     ./killsnoop -p 181    # only trace PID 181
     ./killsnoop -T 189    # only trace target PID 189
     ./killsnoop -s 9      # only trace signal 9
+    ./killsnoop -s 9,15   # trace signal 9 and 15
 """
 parser = argparse.ArgumentParser(
     description="Trace signals issued by the kill() syscall",
@@ -37,7 +38,7 @@ parser.add_argument("-p", "--pid",
 parser.add_argument("-T", "--tpid",
     help="trace this target PID only which is the receiver of signal")
 parser.add_argument("-s", "--signal",
-    help="trace this signal only")
+    help="trace a signal or a signal list")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
@@ -126,8 +127,10 @@ else:
     bpf_text = bpf_text.replace('PID_FILTER', '')
 
 if args.signal:
+    signals = args.signal.split(',')
+    signal_filter = ' && '.join(['sig != %s' % signal for signal in signals])
     bpf_text = bpf_text.replace('SIGNAL_FILTER',
-        'if (sig != %s) { return 0; }' % args.signal)
+        'if (%s) { return 0; }' % signal_filter)
 else:
     bpf_text = bpf_text.replace('SIGNAL_FILTER', '')
 

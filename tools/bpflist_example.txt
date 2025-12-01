@@ -7,10 +7,10 @@ are currently running on the system. For example:
 
 # bpflist
 PID    COMM             TYPE     COUNT
-4058   fileslower       prog     4   
-4058   fileslower       map      2   
-4106   bashreadline     map      1   
-4106   bashreadline     prog     1   
+4058   fileslower       prog     4
+4058   fileslower       map      2
+4106   bashreadline     map      1
+4106   bashreadline     prog     1
 
 From the output above, the fileslower and bashreadline tools are running.
 fileslower has installed 4 BPF programs (functions) and has opened 2 BPF maps
@@ -22,12 +22,12 @@ include the process id in the name of the probe. For example:
 
 # bpflist -v
 PID    COMM             TYPE     COUNT
-4058   fileslower       prog     4   
-4058   fileslower       kprobe   4   
-4058   fileslower       map      2   
-4106   bashreadline     uprobe   1   
-4106   bashreadline     prog     1   
-4106   bashreadline     map      1   
+4058   fileslower       prog     4
+4058   fileslower       kprobe   4
+4058   fileslower       map      2
+4106   bashreadline     uprobe   1
+4106   bashreadline     prog     1
+4106   bashreadline     map      1
 
 In double-verbose mode, the probe definitions are also displayed:
 
@@ -42,12 +42,12 @@ open uprobes:
 r:uprobes/r__bin_bash_0xa4dd0_bcc_4106 /bin/bash:0x00000000000a4dd0
 
 PID    COMM             TYPE     COUNT
-4058   fileslower       prog     4   
-4058   fileslower       kprobe   4   
-4058   fileslower       map      2   
-4106   bashreadline     uprobe   1   
-4106   bashreadline     prog     1   
-4106   bashreadline     map      1   
+4058   fileslower       prog     4
+4058   fileslower       kprobe   4
+4058   fileslower       map      2
+4106   bashreadline     uprobe   1
+4106   bashreadline     prog     1
+4106   bashreadline     map      1
 
 
 USAGE:

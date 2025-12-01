@@ -37,9 +37,12 @@ enum fs_type {
 	NONE,
 	BTRFS,
 	EXT4,
+	FUSE,
 	NFS,
 	XFS,
 	F2FS,
+	BCACHEFS,
+	ZFS,
 };
 
 static struct fs_config {
@@ -58,6 +61,12 @@ static struct fs_config {
 		[F_OPEN] = "ext4_file_open",
 		[F_FSYNC] = "ext4_sync_file",
 	}},
+	[FUSE] = { "fuse", {
+		[F_READ] = "fuse_file_read_iter",
+		[F_WRITE] = "fuse_file_write_iter",
+		[F_OPEN] = "fuse_open",
+		[F_FSYNC] = "fuse_fsync",
+	}},
 	[NFS] = { "nfs", {
 		[F_READ] = "nfs_file_read",
 		[F_WRITE] = "nfs_file_write",
@@ -75,6 +84,18 @@ static struct fs_config {
 		[F_WRITE] = "f2fs_file_write_iter",
 		[F_OPEN] = "f2fs_file_open",
 		[F_FSYNC] = "f2fs_sync_file",
+	}},
+	[BCACHEFS] = { "bcachefs", {
+		[F_READ] = "bch2_read_iter",
+		[F_WRITE] = "bch2_write_iter",
+		[F_OPEN] = "bch2_open",
+		[F_FSYNC] = "bch2_fsync",
+	}},
+	[ZFS] = { "zfs", {
+		[F_READ] = "zpl_iter_read",
+		[F_WRITE] = "zpl_iter_write",
+		[F_OPEN] = "zpl_open",
+		[F_FSYNC] = "zpl_fsync",
 	}},
 };
 
@@ -109,13 +130,13 @@ const char argp_program_doc[] =
 "    fsslower -t xfs -c -d 1      # trace xfs operations for 1s with csv output\n";
 
 static const struct argp_option opts[] = {
-	{ "csv", 'c', NULL, 0, "Output as csv" },
-	{ "duration", 'd', "DURATION", 0, "Total duration of trace in seconds" },
-	{ "pid", 'p', "PID", 0, "Process ID to trace" },
-	{ "min", 'm', "MIN", 0, "Min latency to trace, in ms (default 10)" },
-	{ "type", 't', "Filesystem", 0, "Which filesystem to trace, [btrfs/ext4/nfs/xfs/f2fs]" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "csv", 'c', NULL, 0, "Output as csv", 0 },
+	{ "duration", 'd', "DURATION", 0, "Total duration of trace in seconds", 0 },
+	{ "pid", 'p', "PID", 0, "Process ID to trace", 0 },
+	{ "min", 'm', "MIN", 0, "Min latency to trace, in ms (default 10)", 0 },
+	{ "type", 't', "Filesystem", 0, "Which filesystem to trace, [btrfs/ext4/fuse/nfs/xfs/f2fs/bcachefs/zfs]", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 
@@ -148,12 +169,18 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			fs_type = BTRFS;
 		} else if (!strcmp(arg, "ext4")) {
 			fs_type = EXT4;
+		} else if (!strcmp(arg, "fuse")) {
+			fs_type = FUSE;
 		} else if (!strcmp(arg, "nfs")) {
 			fs_type = NFS;
 		} else if (!strcmp(arg, "xfs")) {
 			fs_type = XFS;
 		} else if (!strcmp(arg, "f2fs")) {
 			fs_type = F2FS;
+		} else if (!strcmp(arg, "bcachefs")) {
+			fs_type = BCACHEFS;
+		} else if (!strcmp(arg, "zfs")) {
+			fs_type = ZFS;
 		} else {
 			warn("invalid filesystem\n");
 			argp_usage(state);
@@ -180,16 +207,22 @@ static void alias_parse(char *prog)
 {
 	char *name = basename(prog);
 
-	if (!strcmp(name, "btrfsslower")) {
+	if (strstr(name, "btrfsslower")) {
 		fs_type = BTRFS;
-	} else if (!strcmp(name, "ext4slower")) {
+	} else if (strstr(name, "ext4slower")) {
 		fs_type = EXT4;
-	} else if (!strcmp(name, "nfsslower")) {
+	} else if (strstr(name, "fuseslower")) {
+		fs_type = FUSE;
+	} else if (strstr(name, "nfsslower")) {
 		fs_type = NFS;
-	} else if (!strcmp(name, "xfsslower")) {
+	} else if (strstr(name, "xfsslower")) {
 		fs_type = XFS;
-	} else if (!strcmp(name, "f2fsslower")){
+	} else if (strstr(name, "f2fsslower")){
 		fs_type = F2FS;
+	} else if (strstr(name, "bcachefsslower")){
+		fs_type = BCACHEFS;
+	} else if (!strcmp(name, "zfsslower")) {
+		fs_type = ZFS;
 	}
 }
 
@@ -329,9 +362,7 @@ static void print_headers()
 static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	struct event e;
-	struct tm *tm;
 	char ts[32];
-	time_t t;
 
 	if (data_sz < sizeof(e)) {
    	   	printf("Error: packet too small\n");
@@ -350,9 +381,7 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		return;
 	}
 
-	time(&t);
-	tm = localtime(&t);
-	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+	str_timestamp("%H:%M:%S", ts, sizeof(ts));
 
 	printf("%-8s %-16s %-7d %c ", ts, e.task, e.pid, file_op[e.op]);
 	if (e.size == LLONG_MAX)

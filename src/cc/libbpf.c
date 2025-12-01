@@ -1540,6 +1540,78 @@ static int find_member_by_name(struct btf *btf, const struct btf_type *btf_type,
   return 0;
 }
 
+static int find_val_in_enum(struct btf *btf, const struct btf_type *btf_type, const char * val_name)
+{
+  const struct btf_enum *enums = btf_enum(btf_type);
+  uint16_t vlen = BTF_INFO_VLEN(btf_type->info);
+  int found = 0;
+
+  for (uint16_t i = 0; i < vlen; i++) {
+    const struct btf_enum *e = &enums[i];
+    const char *member_name = btf__name_by_offset(btf, e->name_off);
+
+    if (member_name && strcmp(member_name, val_name) == 0) {
+      found = 1;
+      break;
+    }
+  }
+  return found;
+}
+
+static int find_enum_by_name(struct btf *btf, const char *enum_name, const char *val_name)
+{
+  const struct btf_type *btf_type;
+  int ret, btf_id;
+
+  btf_id = btf__find_by_name_kind(btf, enum_name, BTF_KIND_ENUM);
+  if (btf_id < 0) {
+    ret = -1;
+  } else {
+    btf_type = btf__type_by_id(btf, btf_id);
+    ret = find_val_in_enum(btf, btf_type, val_name);
+  }
+  return ret;
+}
+
+static int find_enum_by_anony(struct btf *btf, const char *val_name)
+{
+  __u32 nr_types;
+  int ret = 0;
+
+  nr_types = btf__type_cnt(btf);
+
+  for (int i = 1; i < nr_types; i++) {
+    const struct btf_type *btf_type = btf__type_by_id(btf, i);
+
+    if (!btf_type || btf_kind(btf_type) != BTF_KIND_ENUM || btf_type->name_off != 0)
+      continue;
+
+    ret = find_val_in_enum(btf, btf_type, val_name);
+    if (ret)
+      break;
+  }
+  return ret;
+}
+
+int kernel_enum_has_val(const char *enum_name, const char *val_name)
+{
+  struct btf *btf;
+  int ret;
+
+  btf = btf__load_vmlinux_btf();
+  ret = libbpf_get_error(btf);
+  if (ret)
+    return -1;
+
+  if (!enum_name || strlen(enum_name) == 0)
+    ret = find_enum_by_anony(btf, val_name);
+  else
+    ret = find_enum_by_name(btf, enum_name, val_name);
+
+  btf__free(btf);
+  return ret;
+}
+
 int kernel_struct_has_field(const char *struct_name, const char *field_name)
 {
   const struct btf_type *btf_type;

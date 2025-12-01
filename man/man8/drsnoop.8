@@ -4,12 +4,12 @@ drsnoop \- Trace direct reclaim events. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
 .B drsnoop [\-h] [\-T] [\-U] [\-p PID] [\-t TID] [\-u UID] [\-d DURATION] [-n name] [-v]
 .SH DESCRIPTION
-drsnoop trace direct reclaim events, showing which processes are allocing pages 
+drsnoop trace direct reclaim events, showing which processes are allocing pages
 with direct reclaiming. This can be useful for discovering when allocstall (/p-
 roc/vmstat) continues to increase, whether it is caused by some critical proc-
 esses or not.
 
-This works by tracing the direct reclaim events using kernel tracepoints. 
+This works by tracing the direct reclaim events using kernel tracepoints.
 
 This makes use of a Linux 4.4 feature (bpf_perf_event_output());
 for kernels older than 4.4, see the version under tools/old,
@@ -43,7 +43,7 @@ Total duration of trace in seconds.
 .TP
 \-n name
 Only print processes where its name partially matches 'name'
-\-v verbose         
+\-v verbose
 Run in verbose mode. Will output system memory state
 .TP
 \-v
@@ -95,9 +95,9 @@ Thread ID
 COMM
 Process name
 .SH OVERHEAD
-This traces the kernel direct reclaim tracepoints and prints output for each 
-event. As the rate of this is generally expected to be low (< 1000/s), the 
-overhead is also expected to be negligible. 
+This traces the kernel direct reclaim tracepoints and prints output for each
+event. As the rate of this is generally expected to be low (< 1000/s), the
+overhead is also expected to be negligible.
 .SH SOURCE
 This is from bcc.
 .IP

@@ -1,7 +1,7 @@
 Demonstrations of vfscount, the Linux eBPF/bcc version.
 
 
-This counts VFS calls  during time, by tracing all kernel functions beginning 
+This counts VFS calls  during time, by tracing all kernel functions beginning
 with "vfs_", By defaults, the time is 99999999s
 # ./vfscount
 Tracing... Ctrl-C to end.

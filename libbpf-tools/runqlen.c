@@ -60,13 +60,13 @@ const char argp_program_doc[] =
 "    runqlen -f 199  # sample at 199HZ\n";
 
 static const struct argp_option opts[] = {
-	{ "cpus", 'C', NULL, 0, "Print output for each CPU separately" },
-	{ "frequency", 'f', "FREQUENCY", 0, "Sample with a certain frequency" },
-	{ "runqocc", 'O', NULL, 0, "Report run queue occupancy" },
-	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ "host", 'H', NULL, 0, "Report nr_running from host's rq" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "cpus", 'C', NULL, 0, "Print output for each CPU separately", 0 },
+	{ "frequency", 'f', "FREQUENCY", 0, "Sample with a certain frequency", 0 },
+	{ "runqocc", 'O', NULL, 0, "Report run queue occupancy", 0 },
+	{ "timestamp", 'T', NULL, 0, "Include timestamp on output", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ "host", 'H', NULL, 0, "Report nr_running from host's rq", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 
@@ -229,10 +229,8 @@ int main(int argc, char **argv)
 	};
 	struct bpf_link *links[MAX_CPU_NR] = {};
 	struct runqlen_bpf *obj;
-	struct tm *tm;
 	char ts[32];
 	int err, i;
-	time_t t;
 
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
 	if (err)
@@ -292,9 +290,7 @@ int main(int argc, char **argv)
 		printf("\n");
 
 		if (env.timestamp) {
-			time(&t);
-			tm = localtime(&t);
-			strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+			str_timestamp("%H:%M:%S", ts, sizeof(ts));
 			printf("%-8s\n", ts);
 		}
 

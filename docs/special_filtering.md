@@ -73,7 +73,7 @@ removed from the BPF hash map without restarting the bcc tool.
 
 This feature is useful for integrating bcc tools in external projects.
 
-## Filtering by mount by namespace
+## Filtering by mount namespace
 
 The BPF hash map can be created by:
 

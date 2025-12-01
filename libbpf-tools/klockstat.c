@@ -25,12 +25,15 @@
 
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
+#include <bpf/btf.h>
 #include "klockstat.h"
 #include "klockstat.skel.h"
 #include "compat.h"
 #include "trace_helpers.h"
+#include "ioctl_names.h"
 
 #define warn(...) fprintf(stderr, __VA_ARGS__)
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
 
 enum {
 	SORT_ACQ_MAX,
@@ -93,27 +96,160 @@ static const char program_doc[] =
 "  klockstat -P                  # print stats per thread\n"
 ;
 
-static const struct argp_option opts[] = {
-	{ "pid", 'p', "PID", 0, "Filter by process ID" },
-	{ "tid", 't', "TID", 0, "Filter by thread ID" },
-	{ 0, 0, 0, 0, "" },
-	{ "caller", 'c', "FUNC", 0, "Filter by caller string prefix" },
-	{ "lock", 'L', "LOCK", 0, "Filter by specific ksym lock name" },
-	{ 0, 0, 0, 0, "" },
-	{ "locks", 'n', "NR_LOCKS", 0, "Number of locks or threads to print" },
-	{ "stacks", 's', "NR_STACKS", 0, "Number of stack entries to print per lock" },
-	{ "sort", 'S', "SORT", 0, "Sort by field:\n  acq_[max|total|count]\n  hld_[max|total|count]" },
-	{ 0, 0, 0, 0, "" },
-	{ "duration", 'd', "SECONDS", 0, "Duration to trace" },
-	{ "interval", 'i', "SECONDS", 0, "Print interval" },
-	{ "reset", 'R', NULL, 0, "Reset stats each interval" },
-	{ "timestamp", 'T', NULL, 0, "Print timestamp" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ "per-thread", 'P', NULL, 0, "Print per-thread stats" },
+static const char *lock_ksym_names[] = {
+	"mutex_lock",
+	"mutex_lock_nested",
+	"mutex_lock_interruptible",
+	"mutex_lock_interruptible_nested",
+	"mutex_lock_killable",
+	"mutex_lock_killable_nested",
+	"mutex_trylock",
+	"down_read",
+	"down_read_nested",
+	"down_read_interruptible",
+	"down_read_killable",
+	"down_read_killable_nested",
+	"down_read_trylock",
+	"down_write",
+	"down_write_nested",
+	"down_write_killable",
+	"down_write_killable_nested",
+	"down_write_trylock",
+};
 
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+static unsigned long lock_ksym_addr[ARRAY_SIZE(lock_ksym_names)];
+
+static struct btf *vmlinux_btf;
+static const char **nltype_map;
+static size_t nltype_max = 0;
+
+static const struct argp_option opts[] = {
+	{ "pid", 'p', "PID", 0, "Filter by process ID", 0 },
+	{ "tid", 't', "TID", 0, "Filter by thread ID", 0 },
+	{ 0, 0, 0, 0, "", 0 },
+	{ "caller", 'c', "FUNC", 0, "Filter by caller string prefix", 0 },
+	{ "lock", 'L', "LOCK", 0, "Filter by specific ksym lock name", 0 },
+	{ 0, 0, 0, 0, "", 0 },
+	{ "locks", 'n', "NR_LOCKS", 0, "Number of locks or threads to print", 0 },
+	{ "stacks", 's', "NR_STACKS", 0, "Number of stack entries to print per lock", 0 },
+	{ "sort", 'S', "SORT", 0, "Sort by field:\n  acq_[max|total|count]\n  hld_[max|total|count]", 0 },
+	{ 0, 0, 0, 0, "", 0 },
+	{ "duration", 'd', "SECONDS", 0, "Duration to trace", 0 },
+	{ "interval", 'i', "SECONDS", 0, "Print interval", 0 },
+	{ "reset", 'R', NULL, 0, "Reset stats each interval", 0 },
+	{ "timestamp", 'T', NULL, 0, "Print timestamp", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ "per-thread", 'P', NULL, 0, "Print per-thread stats", 0 },
+
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
+
+static const char *get_ioctl_name(unsigned long ioctl)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(ioctl_names); i++)
+		if (ioctl == ioctl_names[i].value)
+			return ioctl_names[i].name;
+	return NULL;
+}
+
+static char *get_nltype_ioctl(unsigned long nltype, unsigned long ioctl)
+{
+	static char buf[100];
+
+	if (!nltype && !ioctl)
+		return "";
+
+	if (nltype) {
+		if (nltype >= nltype_max || !nltype_map[nltype])
+			snprintf(buf, sizeof(buf), " nltype %lu", nltype);
+		else
+			snprintf(buf, sizeof(buf), " nltype %s", nltype_map[nltype]);
+
+	} else {
+		const char *ioctl_name = get_ioctl_name(ioctl);
+		if (ioctl_name)
+			snprintf(buf, sizeof(buf), " ioctl %s", ioctl_name);
+		else
+			snprintf(buf, sizeof(buf), " ioctl 0x%lx", ioctl);
+	}
+
+	buf[sizeof(buf)-1] = '\0';
+	return buf;
+}
+
+static int build_nlmsg_name_table(const struct btf_type *t)
+{
+	const struct btf_enum *e;
+	unsigned short vlen;
+	size_t max_val = 0;
+	const char *name;
+	int i;
+
+	vlen = btf_vlen(t);
+	e = btf_enum(t);
+
+	/* first pass - find the value of __RTM_MAX to size the allocation */
+	for (i = 0; i < vlen; i++) {
+		name = btf__name_by_offset(vmlinux_btf, e[i].name_off);
+		if (!strcmp(name, "__RTM_MAX")) {
+			max_val = e[i].val;
+			break;
+		}
+	}
+
+	if (!max_val)
+		return -ENOENT;
+
+	nltype_map = calloc(max_val, sizeof(void *));
+	if (!nltype_map)
+		return -ENOMEM;
+
+	nltype_max = max_val;
+
+	for (i = 0; i < vlen; i++) {
+		if (e[i].val >= max_val)
+			break;
+
+		nltype_map[e[i].val] = btf__name_by_offset(vmlinux_btf, e[i].name_off);
+	}
+
+	return 0;
+}
+
+static int resolve_nlmsg_names(void)
+{
+	const struct btf_type *t;
+	const struct btf_enum *e;
+	int nr_types, i, j, err;
+	unsigned short vlen;
+	const char *name;
+
+	if (!vmlinux_btf)
+		vmlinux_btf = btf__load_vmlinux_btf();
+
+	if ((err = libbpf_get_error(vmlinux_btf)))
+		return err;
+
+	nr_types = btf__type_cnt(vmlinux_btf);
+	for (i = 1; i < nr_types; i++) {
+		t = btf__type_by_id(vmlinux_btf, i);
+		if (!btf_is_enum(t))
+			continue;
+
+		vlen = btf_vlen(t);
+		e = btf_enum(t);
+		for (j = 0; j < vlen; j++) {
+			name = btf__name_by_offset(vmlinux_btf, e[j].name_off);
+			if (!strcmp(name, "RTM_BASE"))
+				return build_nlmsg_name_table(t);
+		}
+	}
+
+	return -ENOENT;
+}
 
 static void *parse_lock_addr(const char *lock_name)
 {
@@ -359,6 +495,40 @@ static char *symname(struct ksyms *ksyms, uint64_t pc, char *buf, size_t n)
 	return buf;
 }
 
+static int resolve_lock_ksyms(struct ksyms *ksyms)
+{
+	const struct ksym *ksym;
+	int i, j = 0;
+
+	for (i = 0; i < ARRAY_SIZE(lock_ksym_names); i++) {
+		ksym = ksyms__get_symbol(ksyms, lock_ksym_names[i]);
+		if (!ksym)
+			continue;
+
+		lock_ksym_addr[j++] = ksym->addr;
+	}
+
+	return !j;
+}
+
+static int find_stack_offset(struct ksyms *ksyms, struct stack_stat *ss)
+{
+	const struct ksym *ksym;
+        int i, j;
+
+	for (i = 0; i < PERF_MAX_STACK_DEPTH && ss->bt[i]; i++) {
+		ksym = ksyms__map_addr(ksyms, ss->bt[i]);
+		if (!ksym)
+			continue;
+
+		for (j = 0; j < ARRAY_SIZE(lock_ksym_addr) && lock_ksym_addr[j]; j++)
+			if (ksym->addr == lock_ksym_addr[j])
+				return i + 1;
+	}
+
+	return 0;
+}
+
 static char *print_caller(char *buf, int size, struct stack_stat *ss)
 {
 	snprintf(buf, size, "%u  %16s", ss->stack_id, ss->ls.acq_max_comm);
@@ -404,6 +574,7 @@ static void print_acq_header(void)
 static void print_acq_stat(struct ksyms *ksyms, struct stack_stat *ss,
 			   int nr_stack_entries)
 {
+	int offset = find_stack_offset(ksyms, ss);
 	char buf[40];
 	char avg[40];
 	char max[40];
@@ -411,22 +582,23 @@ static void print_acq_stat(struct ksyms *ksyms, struct stack_stat *ss,
 	int i;
 
 	printf("%37s %9s %8llu %10s %12s\n",
-	       symname(ksyms, ss->bt[0], buf, sizeof(buf)),
+	       symname(ksyms, ss->bt[offset], buf, sizeof(buf)),
 	       print_time(avg, sizeof(avg), ss->ls.acq_total_time / ss->ls.acq_count),
 	       ss->ls.acq_count,
 	       print_time(max, sizeof(max), ss->ls.acq_max_time),
 	       print_time(tot, sizeof(tot), ss->ls.acq_total_time));
-	for (i = 1; i < nr_stack_entries; i++) {
+	for (i = offset + 1; i < nr_stack_entries + offset; i++) {
 		if (!ss->bt[i] || env.per_thread)
 			break;
 		printf("%37s\n", symname(ksyms, ss->bt[i], buf, sizeof(buf)));
 	}
 	if (nr_stack_entries > 1 && !env.per_thread)
-		printf("                              Max PID %llu, COMM %s, Lock %s (0x%llx)\n",
+		printf("                              Max PID %llu, COMM %s, Lock %s (0x%llx)%s\n",
 		       ss->ls.acq_max_id >> 32,
 		       ss->ls.acq_max_comm,
-			   get_lock_name(ksyms, ss->ls.acq_max_lock_ptr),
-			   ss->ls.acq_max_lock_ptr);
+		       get_lock_name(ksyms, ss->ls.acq_max_lock_ptr),
+		       ss->ls.acq_max_lock_ptr,
+		       get_nltype_ioctl(ss->ls.acq_max_nltype, ss->ls.acq_max_ioctl));
 }
 
 static void print_acq_task(struct stack_stat *ss)
@@ -457,6 +629,7 @@ static void print_hld_header(void)
 static void print_hld_stat(struct ksyms *ksyms, struct stack_stat *ss,
 			   int nr_stack_entries)
 {
+	int offset = find_stack_offset(ksyms, ss);
 	char buf[40];
 	char avg[40];
 	char max[40];
@@ -464,22 +637,23 @@ static void print_hld_stat(struct ksyms *ksyms, struct stack_stat *ss,
 	int i;
 
 	printf("%37s %9s %8llu %10s %12s\n",
-	       symname(ksyms, ss->bt[0], buf, sizeof(buf)),
+	       symname(ksyms, ss->bt[offset], buf, sizeof(buf)),
 	       print_time(avg, sizeof(avg), ss->ls.hld_total_time / ss->ls.hld_count),
 	       ss->ls.hld_count,
 	       print_time(max, sizeof(max), ss->ls.hld_max_time),
 	       print_time(tot, sizeof(tot), ss->ls.hld_total_time));
-	for (i = 1; i < nr_stack_entries; i++) {
+	for (i = offset + 1; i < nr_stack_entries + offset; i++) {
 		if (!ss->bt[i] || env.per_thread)
 			break;
 		printf("%37s\n", symname(ksyms, ss->bt[i], buf, sizeof(buf)));
 	}
 	if (nr_stack_entries > 1 && !env.per_thread)
-		printf("                              Max PID %llu, COMM %s, Lock %s (0x%llx)\n",
+		printf("                              Max PID %llu, COMM %s, Lock %s (0x%llx)%s\n",
 		       ss->ls.hld_max_id >> 32,
 		       ss->ls.hld_max_comm,
-			   get_lock_name(ksyms, ss->ls.hld_max_lock_ptr),
-			   ss->ls.hld_max_lock_ptr);
+		       get_lock_name(ksyms, ss->ls.hld_max_lock_ptr),
+		       ss->ls.hld_max_lock_ptr,
+		       get_nltype_ioctl(ss->ls.hld_max_nltype, ss->ls.hld_max_ioctl));
 }
 
 static void print_hld_task(struct stack_stat *ss)
@@ -504,7 +678,7 @@ static int print_stats(struct ksyms *ksyms, int stack_map, int stat_map)
 	size_t stats_sz = 1;
 	uint32_t lookup_key = 0;
 	uint32_t stack_id;
-	int ret, i;
+	int ret, i, offset;
 	int nr_stack_entries;
 
 	stats = calloc(stats_sz, sizeof(void *));
@@ -538,7 +712,9 @@ static int print_stats(struct ksyms *ksyms, int stack_map, int stat_map)
 			/* Can still report the results without a backtrace. */
 			warn("failed to lookup stack_id %u\n", stack_id);
 		}
-		if (!env.per_thread && !caller_is_traced(ksyms, ss->bt[0])) {
+
+		offset = find_stack_offset(ksyms, ss);
+		if (!env.per_thread && !caller_is_traced(ksyms, ss->bt[offset])) {
 			free(ss);
 			continue;
 		}
@@ -570,8 +746,10 @@ static int print_stats(struct ksyms *ksyms, int stack_map, int stat_map)
 	}
 
 	for (i = 0; i < stat_idx; i++) {
-		if (env.reset)
+		if (env.reset) {
+			ss = stats[i];
 			bpf_map_delete_elem(stat_map, &ss->stack_id);
+		}
 		free(stats[i]);
         }
 	free(stats);
@@ -625,6 +803,29 @@ static void enable_fentry(struct klockstat_bpf *obj)
 	bpf_program__set_autoload(obj->progs.kprobe_down_write_killable, false);
 	bpf_program__set_autoload(obj->progs.kprobe_down_write_killable_exit, false);
 	bpf_program__set_autoload(obj->progs.kprobe_up_write, false);
+
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_exit_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_interruptible_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_interruptible_exit_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_killable_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_killable_exit_nested, false);
+
+	bpf_program__set_autoload(obj->progs.kprobe_down_read_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_read_exit_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_read_killable_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_read_killable_exit_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_write_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_write_exit_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_write_killable_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_write_killable_exit_nested, false);
+
+	bpf_program__set_autoload(obj->progs.kprobe_rtnetlink_rcv_msg, false);
+	bpf_program__set_autoload(obj->progs.kprobe_rtnetlink_rcv_msg_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_netlink_dump, false);
+	bpf_program__set_autoload(obj->progs.kprobe_netlink_dump_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_sock_do_ioctl, false);
+	bpf_program__set_autoload(obj->progs.kprobe_sock_do_ioctl_exit, false);
 
 	/* CONFIG_DEBUG_LOCK_ALLOC is on */
 	debug_lock = fentry_can_attach("mutex_lock_nested", NULL);
@@ -687,6 +888,65 @@ static void enable_kprobes(struct klockstat_bpf *obj)
 	bpf_program__set_autoload(obj->progs.down_write_killable, false);
 	bpf_program__set_autoload(obj->progs.down_write_killable_exit, false);
 	bpf_program__set_autoload(obj->progs.up_write, false);
+
+	bpf_program__set_autoload(obj->progs.rtnetlink_rcv_msg, false);
+	bpf_program__set_autoload(obj->progs.rtnetlink_rcv_msg_exit, false);
+	bpf_program__set_autoload(obj->progs.netlink_dump, false);
+	bpf_program__set_autoload(obj->progs.netlink_dump_exit, false);
+	bpf_program__set_autoload(obj->progs.sock_do_ioctl, false);
+	bpf_program__set_autoload(obj->progs.sock_do_ioctl_exit, false);
+
+        /* CONFIG_DEBUG_LOCK_ALLOC is on */
+	if (kprobe_exists("mutex_lock_nested")) {
+		bpf_program__set_autoload(obj->progs.kprobe_mutex_lock, false);
+		bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_exit, false);
+		bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_interruptible, false);
+		bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_interruptible_exit, false);
+		bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_killable, false);
+		bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_killable_exit, false);
+
+		bpf_program__set_autoload(obj->progs.kprobe_down_read, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_read_exit, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_read_killable, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_read_killable_exit, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_write, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_write_exit, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_write_killable, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_write_killable_exit, false);
+	} else {
+		bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_nested, false);
+		bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_exit_nested, false);
+		bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_interruptible_nested, false);
+		bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_interruptible_exit_nested, false);
+		bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_killable_nested, false);
+		bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_killable_exit_nested, false);
+
+		bpf_program__set_autoload(obj->progs.kprobe_down_read_nested, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_read_exit_nested, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_read_killable_nested, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_read_killable_exit_nested, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_write_nested, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_write_exit_nested, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_write_killable_nested, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_write_killable_exit_nested, false);
+	}
+}
+
+static void disable_nldump_ioctl_probes(struct klockstat_bpf *obj)
+{
+	bpf_program__set_autoload(obj->progs.rtnetlink_rcv_msg, false);
+	bpf_program__set_autoload(obj->progs.rtnetlink_rcv_msg_exit, false);
+	bpf_program__set_autoload(obj->progs.netlink_dump, false);
+	bpf_program__set_autoload(obj->progs.netlink_dump_exit, false);
+	bpf_program__set_autoload(obj->progs.sock_do_ioctl, false);
+	bpf_program__set_autoload(obj->progs.sock_do_ioctl_exit, false);
+
+	bpf_program__set_autoload(obj->progs.kprobe_rtnetlink_rcv_msg, false);
+	bpf_program__set_autoload(obj->progs.kprobe_rtnetlink_rcv_msg_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_netlink_dump, false);
+	bpf_program__set_autoload(obj->progs.kprobe_netlink_dump_exit, false);
+	bpf_program__set_autoload(obj->progs.kprobe_sock_do_ioctl, false);
+	bpf_program__set_autoload(obj->progs.kprobe_sock_do_ioctl_exit, false);
 }
 
 int main(int argc, char **argv)
@@ -700,9 +960,7 @@ int main(int argc, char **argv)
 	struct klockstat_bpf *obj = NULL;
 	struct ksyms *ksyms = NULL;
 	int i, err;
-	struct tm *tm;
 	char ts[32];
-	time_t t;
 	void *lock_addr = NULL;
 
 	err = argp_parse(&argp, argc, argv, 0, NULL, &env);
@@ -719,6 +977,13 @@ int main(int argc, char **argv)
 		err = 1;
 		goto cleanup;
 	}
+
+	err = resolve_lock_ksyms(ksyms);
+	if (err) {
+		warn("failed to resolve lock ksyms\n");
+		goto cleanup;
+	}
+
 	if (env.lock_name) {
 		lock_addr = get_lock_addr(ksyms, env.lock_name);
 		if (!lock_addr) {
@@ -746,6 +1011,14 @@ int main(int argc, char **argv)
 	else
 		enable_kprobes(obj);
 
+	if (env.nr_stack_entries != 1) {
+		err = resolve_nlmsg_names();
+		if (err)
+			warn("failed to resolve nlmsg names\n");
+	} else {
+		disable_nldump_ioctl_probes(obj);
+	}
+
 	err = klockstat_bpf__load(obj);
 	if (err) {
 		warn("failed to load BPF object\n");
@@ -764,9 +1037,7 @@ int main(int argc, char **argv)
 
 		printf("\n");
 		if (env.timestamp) {
-			time(&t);
-			tm = localtime(&t);
-			strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+			str_timestamp("%H:%M:%S", ts, sizeof(ts));
 			printf("%-8s\n", ts);
 		}
 

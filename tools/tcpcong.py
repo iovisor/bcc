@@ -15,7 +15,6 @@ from bcc import BPF
 from time import sleep, strftime
 from struct import pack
 from socket import inet_ntop, AF_INET, AF_INET6
-from struct import pack
 import argparse
 
 examples = """examples:
@@ -200,7 +199,6 @@ static int ret_state_update_func(struct sock *sk)
 {
     u64 ts, ts1;
     u16 family, last_cong_state;
-    u16 dport = 0, lport = 0;
     u32 tid = bpf_get_current_pid_tgid();
     process_key_t key = {0};
     bpf_get_current_comm(&key.comm, sizeof(key.comm));
@@ -217,16 +215,12 @@ static int ret_state_update_func(struct sock *sk)
     if (family == AF_INET) {
         ipv4_flow_val_t *val4 = start_ipv4.lookup(&key);
         if (val4 == 0) {
-            SOCK_STORE_DEL
             return 0; //missed
         }
         ipv4_flow_key_t keyv4 = {0};
         bpf_probe_read_kernel(&keyv4, sizeof(ipv4_flow_key_t),
             &(val4->ipv4_key));
-        dport = keyv4.dport;
-        lport = keyv4.lport;
-        FILTER_LPORT
-        FILTER_DPORT
+
         datap = ipv4_stat.lookup(&keyv4);
         if (datap == 0) {
             data.last_ts = bpf_ktime_get_ns();
@@ -247,16 +241,12 @@ static int ret_state_update_func(struct sock *sk)
     } else if (family == AF_INET6) {
         ipv6_flow_val_t *val6 = start_ipv6.lookup(&key);
         if (val6 == 0) {
-            SOCK_STORE_DEL
             return 0; //missed
         }
         ipv6_flow_key_t keyv6 = {0};
         bpf_probe_read_kernel(&keyv6, sizeof(ipv6_flow_key_t),
             &(val6->ipv6_key));
-        dport = keyv6.dport;
-        lport = keyv6.lport;
-        FILTER_LPORT
-        FILTER_DPORT
+
         datap = ipv6_stat.lookup(&keyv6);
         if (datap == 0) {
             data.last_ts = bpf_ktime_get_ns();
@@ -275,7 +265,7 @@ static int ret_state_update_func(struct sock *sk)
         }
         start_ipv6.delete(&key);
     }
-    SOCK_STORE_DEL
+
     return 0;
 }
 """
@@ -367,6 +357,7 @@ int ret_func(struct pt_regs *ctx)
         return 0; //miss the entry
     }
     struct sock *sk = *sockpp;
+    SOCK_STORE_DEL
     return ret_state_update_func(sk);
 }
 """

@@ -103,7 +103,8 @@ static struct trace *get_trace(struct pt_regs *ctx, bool entry)
 		/* get address of last function we called */
 		if (last_stack_depth >= 0 &&
 		    last_stack_depth < FUNC_MAX_STACK_DEPTH)
-			last_ip = func_stack->ips[last_stack_depth];
+			bpf_probe_read_kernel(&last_ip, sizeof(last_ip),
+					      &func_stack->ips[last_stack_depth]);
 		/* push ip onto stack. return will pop it. */
 		func_stack->ips[stack_depth] = ip;
 		/* mask used in case bounds checks are optimized out */
@@ -202,7 +203,7 @@ static struct trace *get_trace(struct pt_regs *ctx, bool entry)
 
 static void output_trace(struct pt_regs *ctx, struct trace *trace)
 {
-	__u16 trace_len;
+	__u64 trace_len;
 
 	if (trace->buf_len == 0)
 		goto skip;

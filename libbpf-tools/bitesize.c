@@ -44,11 +44,11 @@ const char argp_program_doc[] =
 "    bitesize -c fio       # trace fio only\n";
 
 static const struct argp_option opts[] = {
-	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
-	{ "comm",  'c', "COMM",  0, "Trace this comm only" },
-	{ "disk",  'd', "DISK",  0, "Trace this disk only" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "timestamp", 'T', NULL, 0, "Include timestamp on output", 0 },
+	{ "comm",  'c', "COMM",  0, "Trace this comm only", 0 },
+	{ "disk",  'd', "DISK",  0, "Trace this disk only", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 
@@ -158,10 +158,8 @@ int main(int argc, char **argv)
 		.doc = argp_program_doc,
 	};
 	struct bitesize_bpf *obj;
-	struct tm *tm;
 	char ts[32];
 	int fd, err;
-	time_t t;
 
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
 	if (err)
@@ -218,9 +216,7 @@ int main(int argc, char **argv)
 		printf("\n");
 
 		if (env.timestamp) {
-			time(&t);
-			tm = localtime(&t);
-			strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+			str_timestamp("%H:%M:%S", ts, sizeof(ts));
 			printf("%-8s\n", ts);
 		}
 

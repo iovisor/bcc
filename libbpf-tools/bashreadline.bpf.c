@@ -14,7 +14,7 @@ struct {
 } events SEC(".maps");
 
 SEC("uretprobe/readline")
-int BPF_KRETPROBE(printret, const void *ret) {
+int BPF_URETPROBE(printret, const void *ret) {
 	struct str_t data;
 	char comm[TASK_COMM_LEN];
 	u32 pid;

@@ -42,15 +42,15 @@ const char argp_program_doc[] =
 "    drsnoop -p 123  # trace pid 123\n"
 "    drsnoop -t 123  # trace tid 123 (use for threads only)\n"
 "    drsnoop -d 10   # trace for 10 seconds only\n"
-"    drsnoop -e      # trace all direct reclaim events with extended faileds\n";
+"    drsnoop -e      # trace all direct reclaim events with extended fields\n";
 
 static const struct argp_option opts[] = {
-	{ "duration", 'd', "DURATION", 0, "Total duration of trace in seconds" },
-	{ "extended", 'e', NULL, 0, "Extended fields output" },
-	{ "pid", 'p', "PID", 0, "Process PID to trace" },
-	{ "tid", 't', "TID", 0, "Thread TID to trace" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "duration", 'd', "DURATION", 0, "Total duration of trace in seconds", 0 },
+	{ "extended", 'e', NULL, 0, "Extended fields output", 0 },
+	{ "pid", 'p', "PID", 0, "Process PID to trace", 0 },
+	{ "tid", 't', "TID", 0, "Thread TID to trace", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 
@@ -119,9 +119,7 @@ static void sig_int(int signo)
 void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	struct event e;
-	struct tm *tm;
 	char ts[32];
-	time_t t;
 
 	if (data_sz < sizeof(e)) {
 		printf("Error: packet too small\n");
@@ -130,9 +128,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	/* Copy data as alignment in the perf buffer isn't guaranteed. */
 	memcpy(&e, data, sizeof(e));
 
-	time(&t);
-	tm = localtime(&t);
-	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+	str_timestamp("%H:%M:%S", ts, sizeof(ts));
 	printf("%-8s %-16s %-6d %8.3f %5lld",
 	       ts, e.task, e.pid, e.delta_ns / 1000000.0,
 	       e.nr_reclaimed);

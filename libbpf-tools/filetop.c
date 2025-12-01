@@ -59,13 +59,13 @@ const char argp_program_doc[] =
 "    filetop 5 10       # 5s summaries, 10 times\n";
 
 static const struct argp_option opts[] = {
-	{ "pid", 'p', "PID", 0, "Process ID to trace" },
-	{ "noclear", 'C', NULL, 0, "Don't clear the screen" },
-	{ "all", 'a', NULL, 0, "Include special files" },
-	{ "sort", 's', "SORT", 0, "Sort columns, default all [all, reads, writes, rbytes, wbytes]" },
-	{ "rows", 'r', "ROWS", 0, "Maximum rows to print, default 20" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "pid", 'p', "PID", 0, "Process ID to trace", 0 },
+	{ "noclear", 'C', NULL, 0, "Don't clear the screen", 0 },
+	{ "all", 'a', NULL, 0, "Include special files", 0 },
+	{ "sort", 's', "SORT", 0, "Sort columns, default all [all, reads, writes, rbytes, wbytes]", 0 },
+	{ "rows", 'r', "ROWS", 0, "Maximum rows to print, default 20", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 
@@ -182,26 +182,16 @@ static int sort_column(const void *obj1, const void *obj2)
 
 static int print_stat(struct filetop_bpf *obj)
 {
-	FILE *f;
-	time_t t;
-	struct tm *tm;
-	char ts[16], buf[256];
+	char loadavg[256], ts[64];
 	struct file_id key, *prev_key = NULL;
 	static struct file_stat values[OUTPUT_ROWS_LIMIT];
-	int n, i, err = 0, rows = 0;
+	int i, err = 0, rows = 0;
 	int fd = bpf_map__fd(obj->maps.entries);
 
-	f = fopen("/proc/loadavg", "r");
-	if (f) {
-		time(&t);
-		tm = localtime(&t);
-		strftime(ts, sizeof(ts), "%H:%M:%S", tm);
-		memset(buf, 0, sizeof(buf));
-		n = fread(buf, 1, sizeof(buf), f);
-		if (n)
-			printf("%8s loadavg: %s\n", ts, buf);
-		fclose(f);
-	}
+	err = str_loadavg(loadavg, sizeof(loadavg)) <= 0;
+	err = err ?: (str_timestamp("%H:%M:%S", ts, sizeof(ts)) <= 0);
+	if (!err)
+		printf("%8s %s\n", ts, loadavg);
 
 	printf("%-7s %-16s %-6s %-6s %-7s %-7s %1s %s\n",
 	       "TID", "COMM", "READS", "WRITES", "R_Kb", "W_Kb", "T", "FILE");

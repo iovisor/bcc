@@ -53,15 +53,15 @@ const char argp_program_doc[] =
 "    cpudist -p 185       # trace PID 185 only";
 
 static const struct argp_option opts[] = {
-	{ "offcpu", 'O', NULL, 0, "Measure off-CPU time" },
-	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
-	{ "milliseconds", 'm', NULL, 0, "Millisecond histogram" },
-	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path" },
-	{ "pids", 'P', NULL, 0, "Print a histogram per process ID" },
-	{ "tids", 'L', NULL, 0, "Print a histogram per thread ID" },
-	{ "pid", 'p', "PID", 0, "Trace this PID only" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "offcpu", 'O', NULL, 0, "Measure off-CPU time", 0 },
+	{ "timestamp", 'T', NULL, 0, "Include timestamp on output", 0 },
+	{ "milliseconds", 'm', NULL, 0, "Millisecond histogram", 0 },
+	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path", 0 },
+	{ "pids", 'P', NULL, 0, "Print a histogram per process ID", 0 },
+	{ "tids", 'L', NULL, 0, "Print a histogram per thread ID", 0 },
+	{ "pid", 'p', "PID", 0, "Trace this PID only", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 
@@ -198,9 +198,7 @@ int main(int argc, char **argv)
 	};
 	struct cpudist_bpf *obj;
 	int pid_max, fd, err;
-	struct tm *tm;
 	char ts[32];
-	time_t t;
 	int idx, cg_map_fd;
 	int cgfd = -1;
 
@@ -280,9 +278,7 @@ int main(int argc, char **argv)
 		printf("\n");
 
 		if (env.timestamp) {
-			time(&t);
-			tm = localtime(&t);
-			strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+			str_timestamp("%H:%M:%S", ts, sizeof(ts));
 			printf("%-8s\n", ts);
 		}
 

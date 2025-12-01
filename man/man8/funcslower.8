@@ -96,13 +96,13 @@ between slow and failed function calls.
 FUNC
 The function name, followed by its arguments if requested.
 .SH OVERHEAD
-Depending on the function(s) being traced, overhead can become severe. For 
+Depending on the function(s) being traced, overhead can become severe. For
 example, tracing a common function like malloc() can slow down a C/C++ program
 by a factor of 2 or more. On the other hand, tracing a low-frequency event like
 the SyS_setreuid() function will probably not be as prohibitive, and in fact
 negligible for functions that are called up to 100-1000 times per second.
 
-You should first use the funclatency and argdist tools for investigation, 
+You should first use the funclatency and argdist tools for investigation,
 because they summarize data in-kernel and have a much lower overhead than this
 tool. To get a general idea of the number of times a particular function is
 called (and estimate the overhead), use the funccount tool, e.g.:

@@ -29,14 +29,6 @@ class SourceDebugger {
         prog_func_info_(prog_func_info),
         mod_src_(mod_src),
         src_dbg_fmap_(src_dbg_fmap) {}
-// Only support dump for llvm 6.x and later.
-//
-// The llvm 5.x, but not earlier versions, also supports create
-// a dwarf context for source debugging based
-// on a set of in-memory sections with slightly different interfaces.
-// FIXME: possibly to support 5.x
-//
-#if LLVM_VERSION_MAJOR >= 6
   void dump();
 
  private:
@@ -47,10 +39,6 @@ class SourceDebugger {
                    uint32_t &CurrentSrcLine, llvm::raw_ostream &os);
   void getDebugSections(
       llvm::StringMap<std::unique_ptr<llvm::MemoryBuffer>> &DebugSections);
-#else
-  void dump() {
-  }
-#endif
 
  private:
   llvm::Module *mod_;

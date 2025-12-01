@@ -27,7 +27,7 @@ static __always_inline bool comm_allowed(const char *comm)
 {
 	int i;
 
-	for (i = 0; targ_comm[i] != '\0' && i < TASK_COMM_LEN; i++) {
+	for (i = 0; i < TASK_COMM_LEN && targ_comm[i] != '\0'; i++) {
 		if (comm[i] != targ_comm[i])
 			return false;
 	}
@@ -72,11 +72,14 @@ SEC("tp_btf/block_rq_issue")
 int BPF_PROG(block_rq_issue)
 {
 	/**
-	 * commit a54895fa (v5.11-rc1) changed tracepoint argument list
+	 * commit a54895fa (block: remove the request_queue to argument
+	 * request based tracepoints) changed tracepoint argument list
 	 * from TP_PROTO(struct request_queue *q, struct request *rq)
 	 * to TP_PROTO(struct request *rq)
+	 * see:
+	 *     https://github.com/torvalds/linux/commit/a54895fa
 	 */
-	if (LINUX_KERNEL_VERSION >= KERNEL_VERSION(5, 11, 0))
+	if (LINUX_KERNEL_VERSION >= KERNEL_VERSION(5, 10, 137))
 		return trace_rq_issue((void *)ctx[0]);
 	else
 		return trace_rq_issue((void *)ctx[1]);

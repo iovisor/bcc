@@ -18,11 +18,11 @@ permissions:
 
 jobs:
   test_bcc:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
-        os: [{distro: "ubuntu", version: "20.04", nick: focal}]
-        llvm_version: [11, 12, 15]
+        os: [{distro: "ubuntu", version: "24.04", nick: noble}]
+        llvm_version: [15, 17, 19]
         env:
         - TYPE: Debug
           PYTHON_TEST_LOGFILE: critical.log
@@ -34,8 +34,8 @@ jobs:
           PYTHON_TEST_LOGFILE: critical.log
           RW_ENGINE_ENABLED: ON
     steps:
-    - uses: actions/checkout@v2
-    - uses: dorny/paths-filter@v2
+    - uses: actions/checkout@v4
+    - uses: dorny/paths-filter@v3
       id: changes
       with:
         filters: |
@@ -120,13 +120,14 @@ jobs:
         echo "There were $critical_count critical tests skipped with @mayFail:"
         grep -A2 @mayFail tests/python/critical.log
 
-    - uses: actions/upload-artifact@v1
+    - uses: actions/upload-artifact@v4
       with:
         name: critical-tests-${{ matrix.env['TYPE'] }}-${{ matrix.os.version }}
         path: tests/python/critical.log
+        overwrite: true
 
   test_bcc_fedora:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         os: [{distro: "fedora", version: "38", nick: "f38"}]
@@ -136,8 +137,8 @@ jobs:
         - TYPE: Release
           PYTHON_TEST_LOGFILE: critical.log
     steps:
-    - uses: actions/checkout@v2
-    - uses: dorny/paths-filter@v2
+    - uses: actions/checkout@v4
+    - uses: dorny/paths-filter@v3
       id: changes
       with:
         filters: |

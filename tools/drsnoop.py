@@ -80,7 +80,7 @@ with open(kallsyms) as syms:
     if vm_stat_addr == '':
         print("ERROR: no vm_stat or vm_zone_stat in /proc/kallsyms. Exiting.")
         print("HINT: the kernel should be built with CONFIG_KALLSYMS_ALL.")
-        exit()
+        exit(1)
 
 NR_FREE_PAGES = 0
 

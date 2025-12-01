@@ -16,6 +16,7 @@
 #include <sys/socket.h>
 
 #include "btf_helpers.h"
+#include "trace_helpers.h"
 #include "tcplife.h"
 #include "tcplife.skel.h"
 
@@ -45,15 +46,15 @@ const char argp_program_doc[] =
 "    tcplife -p 1215 -4          # trace IPv4 only\n";
 
 static const struct argp_option opts[] = {
-	{ "pid", 'p', "PID", 0, "Process ID to trace" },
-	{ "ipv4", '4', NULL, 0, "Trace IPv4 only" },
-	{ "ipv6", '6', NULL, 0, "Trace IPv6 only" },
-	{ "wide", 'w', NULL, 0, "Wide column output (fits IPv6 addresses)" },
-	{ "time", 'T', NULL, 0, "Include timestamp on output" },
-	{ "localport", 'L', "LOCALPORT", 0, "Comma-separated list of local ports to trace." },
-	{ "remoteport", 'D', "REMOTEPORT", 0, "Comma-separated list of remote ports to trace." },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "pid", 'p', "PID", 0, "Process ID to trace", 0 },
+	{ "ipv4", '4', NULL, 0, "Trace IPv4 only", 0 },
+	{ "ipv6", '6', NULL, 0, "Trace IPv6 only", 0 },
+	{ "wide", 'w', NULL, 0, "Wide column output (fits IPv6 addresses)", 0 },
+	{ "time", 'T', NULL, 0, "Include timestamp on output", 0 },
+	{ "localport", 'L', "LOCALPORT", 0, "Comma-separated list of local ports to trace.", 0 },
+	{ "remoteport", 'D', "REMOTEPORT", 0, "Comma-separated list of remote ports to trace.", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 
@@ -117,8 +118,6 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	char ts[32], saddr[48], daddr[48];
 	struct event e;
-	struct tm *tm;
-	time_t t;
 
 	if (data_sz < sizeof(e)) {
 		printf("Error: packet too small\n");
@@ -128,9 +127,7 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	memcpy(&e, data, sizeof(e));
 
 	if (emit_timestamp) {
-		time(&t);
-		tm = localtime(&t);
-		strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+		str_timestamp("%H:%M:%S", ts, sizeof(ts));
 		printf("%8s ", ts);
 	}
 

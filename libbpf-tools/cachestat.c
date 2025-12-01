@@ -42,9 +42,9 @@ const char argp_program_doc[] =
 "    cachestat 1 10     # print 1 second summaries, 10 times\n";
 
 static const struct argp_option opts[] = {
-	{ "timestamp", 'T', NULL, 0, "Print timestamp" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "timestamp", 'T', NULL, 0, "Print timestamp", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 
@@ -132,10 +132,8 @@ int main(int argc, char **argv)
 	__u64 buffers, cached, mbd;
 	struct cachestat_bpf *obj;
 	__s64 total, misses, hits;
-	struct tm *tm;
 	float ratio;
 	char ts[32];
-	time_t t;
 	int err;
 
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
@@ -262,9 +260,7 @@ int main(int argc, char **argv)
 			goto cleanup;
 		}
 		if (env.timestamp) {
-			time(&t);
-			tm = localtime(&t);
-			strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+			str_timestamp("%H:%M:%S", ts, sizeof(ts));
 			printf("%-8s ", ts);
 		}
 		printf("%8lld %8lld %8llu %7.2f%% %12llu %10llu\n",

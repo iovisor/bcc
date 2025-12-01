@@ -65,14 +65,14 @@ const char argp_program_doc[] =
 "    tcpstates -D 80            # only trace remote port 80\n";
 
 static const struct argp_option opts[] = {
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
-	{ "ipv4", '4', NULL, 0, "Trace IPv4 family only" },
-	{ "ipv6", '6', NULL, 0, "Trace IPv6 family only" },
-	{ "wide", 'w', NULL, 0, "Wide column output (fits IPv6 addresses)" },
-	{ "localport", 'L', "LPORT", 0, "Comma-separated list of local ports to trace." },
-	{ "remoteport", 'D', "DPORT", 0, "Comma-separated list of remote ports to trace." },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ "timestamp", 'T', NULL, 0, "Include timestamp on output", 0 },
+	{ "ipv4", '4', NULL, 0, "Trace IPv4 family only", 0 },
+	{ "ipv6", '6', NULL, 0, "Trace IPv6 family only", 0 },
+	{ "wide", 'w', NULL, 0, "Wide column output (fits IPv6 addresses)", 0 },
+	{ "localport", 'L', "LPORT", 0, "Comma-separated list of local ports to trace.", 0 },
+	{ "remoteport", 'D', "DPORT", 0, "Comma-separated list of remote ports to trace.", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 
@@ -155,9 +155,7 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	char ts[32], saddr[39], daddr[39];
 	struct event e;
-	struct tm *tm;
 	int family;
-	time_t t;
 
 	if (data_sz < sizeof(e)) {
 		printf("Error: packet too small\n");
@@ -167,9 +165,7 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	memcpy(&e, data, sizeof(e));
 
 	if (emit_timestamp) {
-		time(&t);
-		tm = localtime(&t);
-		strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+		str_timestamp("%H:%M:%S", ts, sizeof(ts));
 		printf("%8s ", ts);
 	}
 

@@ -86,8 +86,13 @@ void BMapDeclVisitor::genJSONForField(FieldDecl *F) {
 #else
     result_ += ", [" + T->getSize().toString(10, false) + "]";
 #endif
-  if (F->isBitField())
+  if (F->isBitField()) {
+#if LLVM_VERSION_MAJOR >= 20
+    result_ += ", " + to_string(F->getBitWidthValue());
+#else
     result_ += ", " + to_string(F->getBitWidthValue(C));
+#endif
+  }
   result_ += "], ";
 }
 

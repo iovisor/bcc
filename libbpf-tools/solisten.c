@@ -47,10 +47,10 @@ const char argp_program_doc[] =
 "    solisten -p 1216   # only trace PID 1216\n";
 
 static const struct argp_option opts[] = {
-	{ "pid", 'p', "PID", 0, "Process ID to trace" },
-	{ "timestamp", 't', NULL, 0, "Include timestamp on output" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "pid", 'p', "PID", 0, "Process ID to trace", 0 },
+	{ "timestamp", 't', NULL, 0, "Include timestamp on output", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 
@@ -98,17 +98,13 @@ static void sig_int(int signo)
 static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	const struct event *e = data;
-	time_t t;
-	struct tm *tm;
 	char ts[32], proto[16], addr[48] = {};
 	__u16 family = e->proto >> 16;
 	__u16 type = (__u16)e->proto;
 	const char *prot;
 
 	if (emit_timestamp) {
-		time(&t);
-		tm = localtime(&t);
-		strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+		str_timestamp("%H:%M:%S", ts, sizeof(ts));
 		printf("%8s ", ts);
 	}
 

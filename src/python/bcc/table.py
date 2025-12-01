@@ -24,6 +24,7 @@ import os
 import errno
 import re
 import sys
+import platform
 
 from .libbcc import lib, _RAW_CB_TYPE, _LOST_CB_TYPE, _RINGBUF_CB_TYPE, bcc_perf_buffer_opts
 from .utils import get_online_cpus
@@ -1193,8 +1194,9 @@ class StackTrace(TableBase):
             else:
               addr = self.stack.ip[self.n]
 
-            if addr == 0 :
-                raise StopIteration()
+            # powerpc populates optional, potentially-null second and third entries
+            if addr == 0 and (not platform.machine().startswith('ppc') or (self.n != 1 and self.n != 2)) :
+                    raise StopIteration()
 
             return self.resolve(addr) if self.resolve else addr
 

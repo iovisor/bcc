@@ -104,18 +104,18 @@ static int get_uint(const char *arg, unsigned int *ret,
 }
 
 static const struct argp_option opts[] = {
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ "timestamp", 't', NULL, 0, "Include timestamp on output" },
-	{ "count", 'c', NULL, 0, "Count connects per src ip and dst ip/port" },
-	{ "print-uid", 'U', NULL, 0, "Include UID on output" },
-	{ "pid", 'p', "PID", 0, "Process PID to trace" },
-	{ "uid", 'u', "UID", 0, "Process UID to trace" },
-	{ "source-port", 's', NULL, 0, "Consider source port when counting" },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ "timestamp", 't', NULL, 0, "Include timestamp on output", 0 },
+	{ "count", 'c', NULL, 0, "Count connects per src ip and dst ip/port", 0 },
+	{ "print-uid", 'U', NULL, 0, "Include UID on output", 0 },
+	{ "pid", 'p', "PID", 0, "Process PID to trace", 0 },
+	{ "uid", 'u', "UID", 0, "Process UID to trace", 0 },
+	{ "source-port", 's', NULL, 0, "Consider source port when counting", 0 },
 	{ "port", 'P', "PORTS", 0,
-	  "Comma-separated list of destination ports to trace" },
-	{ "cgroupmap", 'C', "PATH", 0, "trace cgroups in this map" },
-	{ "mntnsmap", 'M', "PATH", 0, "trace mount namespaces in this map" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	  "Comma-separated list of destination ports to trace", 0 },
+	{ "cgroupmap", 'C', "PATH", 0, "trace cgroups in this map", 0 },
+	{ "mntnsmap", 'M', "PATH", 0, "trace mount namespaces in this map", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 
@@ -217,7 +217,7 @@ static void print_count_ipv4(int map_fd)
 	struct in_addr src;
 	struct in_addr dst;
 
-	if (dump_hash(map_fd, keys, key_size, counts, value_size, &n, &zero)) {
+	if (dump_hash(map_fd, keys, key_size, counts, value_size, &n, &zero, false)) {
 		warn("dump_hash: %s", strerror(errno));
 		return;
 	}
@@ -250,7 +250,7 @@ static void print_count_ipv6(int map_fd)
 	struct in6_addr src;
 	struct in6_addr dst;
 
-	if (dump_hash(map_fd, keys, key_size, counts, value_size, &n, &zero)) {
+	if (dump_hash(map_fd, keys, key_size, counts, value_size, &n, &zero, false)) {
 		warn("dump_hash: %s", strerror(errno));
 		return;
 	}
@@ -296,7 +296,7 @@ static void print_events_header()
 		printf("%-9s", "TIME(s)");
 	if (env.print_uid)
 		printf("%-6s", "UID");
-	printf("%-6s %-12s %-2s %-16s %-16s",
+	printf("%-6s %-16s %-2s %-16s %-16s",
 	       "PID", "COMM", "IP", "SADDR", "DADDR");
 	if (env.source_port)
 		printf(" %-5s", "SPORT");
@@ -341,7 +341,7 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	if (env.print_uid)
 		printf("%-6d", event.uid);
 
-	printf("%-6d %-12.12s %-2d %-16s %-16s",
+	printf("%-6d %-16.16s %-2d %-16s %-16s",
 	       event.pid, event.task,
 	       event.af == AF_INET ? 4 : 6,
 	       inet_ntop(event.af, &s, src, sizeof(src)),

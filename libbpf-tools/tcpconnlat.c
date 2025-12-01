@@ -45,11 +45,11 @@ const char argp_program_doc[] =
 "    tcpconnlat -L           # include LPORT while printing outputs\n";
 
 static const struct argp_option opts[] = {
-	{ "timestamp", 't', NULL, 0, "Include timestamp on output" },
-	{ "pid", 'p', "PID", 0, "Trace this PID only" },
-	{ "lport", 'L', NULL, 0, "Include LPORT on output" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "timestamp", 't', NULL, 0, "Include timestamp on output", 0 },
+	{ "pid", 'p', "PID", 0, "Trace this PID only", 0 },
+	{ "lport", 'L', NULL, 0, "Include LPORT on output", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 

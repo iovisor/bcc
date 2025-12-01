@@ -69,18 +69,18 @@ const char argp_program_doc[] =
 #define OPT_STACK_STORAGE_SIZE		2 /* --stack-storage-size */
 
 static const struct argp_option opts[] = {
-	{ "pid", 'p', "PID", 0, "Trace this PID only" },
-	{ "tid", 't', "TID", 0, "Trace this TID only" },
-	{ "lock", 'l', "LOCK", 0, "Trace this lock only" },
-	{ "timestamp", 'T', NULL, 0, "Include timestamp on output" },
-	{ "milliseconds", 'm', NULL, 0, "Millisecond histogram" },
+	{ "pid", 'p', "PID", 0, "Trace this PID only", 0 },
+	{ "tid", 't', "TID", 0, "Trace this TID only", 0 },
+	{ "lock", 'l', "LOCK", 0, "Trace this lock only", 0 },
+	{ "timestamp", 'T', NULL, 0, "Include timestamp on output", 0 },
+	{ "milliseconds", 'm', NULL, 0, "Millisecond histogram", 0 },
 	{ "perf-max-stack-depth", OPT_PERF_MAX_STACK_DEPTH,
-	  "PERF-MAX-STACK-DEPTH", 0, "the limit for the stack traces (default 127)" },
+	  "PERF-MAX-STACK-DEPTH", 0, "the limit for the stack traces (default 127)", 0 },
 	{ "stack-storage-size", OPT_STACK_STORAGE_SIZE, "STACK-STORAGE-SIZE", 0,
-	  "the number of unique stack traces that can be stored and displayed (default 1024)" },
-	{ "summary", 's', NULL, 0, "Summary futex contention latency" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	  "the number of unique stack traces that can be stored and displayed (default 1024)", 0 },
+	{ "summary", 's', NULL, 0, "Summary futex contention latency", 0 },
+	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
 
@@ -194,8 +194,7 @@ static int print_stack(struct futexctn_bpf *obj, struct hist_key *info)
 #else
 	const struct syms *syms;
 	const struct sym *sym;
-	char *dso_name;
-	unsigned long dso_offset;
+	struct sym_info sinfo;
 	int idx = 0;
 #endif
 	int i, err = 0, fd;
@@ -245,12 +244,13 @@ static int print_stack(struct futexctn_bpf *obj, struct hist_key *info)
 			else
 				printf("    [unknown]\n");
 		} else {
-			sym = syms__map_addr_dso(syms, ip[i], &dso_name, &dso_offset);
+			err = syms__map_addr_dso(syms, ip[i], &sinfo);
 			printf("    #%-2d 0x%016lx", idx++, ip[i]);
-			if (sym)
-				printf(" %s+0x%lx", sym->name, sym->offset);
-			if (dso_name)
-				printf(" (%s+0x%lx)", dso_name, dso_offset);
+			if (err == 0) {
+				if (sinfo.sym_name)
+					printf(" %s+0x%lx", sinfo.sym_name, sinfo.sym_offset);
+				printf(" (%s+0x%lx)", sinfo.dso_name, sinfo.dso_offset);
+			}
 			printf("\n");
 		}
 	}
@@ -316,9 +316,7 @@ int main(int argc, char **argv)
 		.doc = argp_program_doc,
 	};
 	struct futexctn_bpf *obj;
-	struct tm *tm;
 	char ts[32];
-	time_t t;
 	int err;
 
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
@@ -367,15 +365,15 @@ int main(int argc, char **argv)
 
 	signal(SIGINT, sig_handler);
 
+	fprintf(stderr, "Summarize futex contention latency, hit ctrl-c to exit\n");
+
 	/* main: poll */
 	while (1) {
 		sleep(env.interval);
 		printf("\n");
 
 		if (env.timestamp) {
-			time(&t);
-			tm = localtime(&t);
-			strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+			str_timestamp("%H:%M:%S", ts, sizeof(ts));
 			printf("%-8s\n", ts);
 		}
 
