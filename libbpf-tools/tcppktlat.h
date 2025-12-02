@@ -2,7 +2,8 @@
 #ifndef __TCPPKGLAT_H
 #define __TCPPKGLAT_H
 
-#define TASK_COMM_LEN	16
+#define TASK_COMM_LEN 16
+#define MAX_SLOTS 26
 
 struct event {
 	__u32 saddr[4];
@@ -13,6 +14,11 @@ struct event {
 	__u16 dport;
 	__u16 sport;
 	__u16 family;
+	char comm[TASK_COMM_LEN];
+};
+
+struct hist {
+	__u32 slots[MAX_SLOTS];
 	char comm[TASK_COMM_LEN];
 };
 
