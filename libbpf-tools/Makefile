@@ -9,7 +9,7 @@ LIBBPF_SRC := $(abspath ../src/cc/libbpf/src)
 LIBBPF_OBJ := $(abspath $(OUTPUT)/libbpf.a)
 LIBBLAZESYM_SRC := $(abspath blazesym/target/release/libblazesym.a)
 INCLUDES := -I$(OUTPUT) -I../src/cc/libbpf/include/uapi
-CFLAGS := -g -O2 -Wall -Wmissing-field-initializers -Werror -Werror=undef
+CFLAGS := -g -O2 -lm -Wall -Wmissing-field-initializers -Werror -Werror=undef
 BPFCFLAGS := -g -O2 -Wall -Werror=undef
 BPFCFLAGS_softirqs := $(BPFCFLAGS) -mcpu=v3
 INSTALL ?= install
@@ -94,6 +94,7 @@ APPS = \
 	tcptop \
 	vfsstat \
 	wakeuptime \
+	ext4File \
 	$(BZ_APPS) \
 	#
 
@@ -120,7 +121,6 @@ COMMON_OBJ = \
 ifeq ($(USE_BLAZESYM),1)
 COMMON_OBJ += \
 	$(OUTPUT)/libblazesym.a \
-	$(OUTPUT)/blazesym.h \
 	#
 endif
 
@@ -156,7 +156,7 @@ CFLAGS += -DUSE_BLAZESYM=1
 endif
 
 ifeq ($(USE_BLAZESYM),1)
-LDFLAGS += $(OUTPUT)/libblazesym.a -lrt -lpthread -ldl
+LDFLAGS += -lrt -lpthread -ldl
 endif
 
 .PHONY: clean
