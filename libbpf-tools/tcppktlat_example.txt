@@ -42,7 +42,7 @@ PID     COMM             LADDR           LPORT RADDR           RPORT MS
 The -H option can be used to show latency as a histogram, grouped by PID.
 
 # tcppktlat -H
-Tracing TCP packet latency. Hit Ctrl-C to end.
+Summarize TCP packet latency as a histogram. Hit Ctrl-C to end.
 ^C
 
 pid = 2333671 sshd-session
@@ -71,7 +71,7 @@ pid = 1357503 verge-mihomo
 The -H option can also take an interval argument to print histograms periodically.
 
 # tcppktlat -H 5
-Tracing TCP packet latency. Hit Ctrl-C to end.
+Summarize TCP packet latency as a histogram. Hit Ctrl-C to end.
 
 pid = 1357503 verge-mihomo
      usecs               : count    distribution
@@ -100,7 +100,7 @@ pid = 1357503 verge-mihomo
 The -p option can be combined with -H to show histogram for a specific PID only.
 
 # tcppktlat -p 1357503 -H
-Tracing TCP packet latency. Hit Ctrl-C to end.
+Summarize TCP packet latency as a histogram. Hit Ctrl-C to end.
 ^C
 
 pid = 1357503 verge-mihomo

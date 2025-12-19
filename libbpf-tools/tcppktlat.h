@@ -4,6 +4,7 @@
 
 #define TASK_COMM_LEN 16
 #define MAX_SLOTS 26
+#define MAX_ENTRIES 10240
 
 struct event {
 	__u32 saddr[4];

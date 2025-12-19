@@ -61,15 +61,81 @@ static int handle_tcp_probe(struct sock *sk, struct sk_buff *skb)
 	return 0;
 }
 
-static int handle_tcp_rcv_space_adjust(void *ctx, struct sock *sk)
+static int handle_hist_event(struct sock *sk, u32 pid, u32 tid, s64 delta_us)
+{
+	struct hist *histp;
+	struct task_struct *current;
+	u32 hkey;
+	u64 slot;
+
+	/* Use TID for per-thread, PID (tgid) for per-process */
+	if (targ_per_thread)
+		hkey = tid;
+	else
+		hkey = pid;
+
+	histp = bpf_map_lookup_or_try_init(&hists, &hkey, &zero);
+	if (!histp)
+		return -1;
+
+	/* Store comm if not already set */
+	if (!histp->comm[0]) {
+		if (targ_per_thread) {
+			/* For per-thread, use current thread comm */
+			bpf_get_current_comm(&histp->comm, TASK_COMM_LEN);
+		} else {
+			/* For per-process, use process group leader comm */
+			current = (struct task_struct *)bpf_get_current_task();
+			BPF_CORE_READ_STR_INTO(&histp->comm, current,
+					       group_leader, comm);
+		}
+	}
+	slot = log2l(delta_us);
+	if (slot >= MAX_SLOTS)
+		slot = MAX_SLOTS - 1;
+	__sync_fetch_and_add(&histp->slots[slot], 1);
+	return 0;
+}
+
+static int handle_event_output(void *ctx, struct sock *sk, u32 pid, u32 tid,
+			       s64 delta_us)
 {
 	const struct inet_sock *inet = (struct inet_sock *)(sk);
+	struct event *eventp;
+	u16 family;
+
+	eventp = reserve_buf(sizeof(*eventp));
+	if (!eventp)
+		return -1;
+
+	eventp->pid = pid;
+	eventp->tid = tid;
+	eventp->delta_us = delta_us;
+	eventp->sport = BPF_CORE_READ(inet, inet_sport);
+	eventp->dport = BPF_CORE_READ(sk, __sk_common.skc_dport);
+	bpf_get_current_comm(&eventp->comm, TASK_COMM_LEN);
+	family = BPF_CORE_READ(sk, __sk_common.skc_family);
+	if (family == AF_INET) {
+		eventp->saddr[0] = BPF_CORE_READ(sk, __sk_common.skc_rcv_saddr);
+		eventp->daddr[0] = BPF_CORE_READ(sk, __sk_common.skc_daddr);
+	} else { /* family == AF_INET6 */
+		BPF_CORE_READ_INTO(
+			eventp->saddr, sk,
+			__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
+		BPF_CORE_READ_INTO(eventp->daddr, sk,
+				   __sk_common.skc_v6_daddr.in6_u.u6_addr32);
+	}
+	eventp->family = family;
+	submit_buf(ctx, eventp, sizeof(*eventp));
+	return 0;
+}
+
+static int handle_tcp_rcv_space_adjust(void *ctx, struct sock *sk)
+{
 	u64 sock_ident = get_sock_ident(sk);
 	u64 id = bpf_get_current_pid_tgid(), *tsp;
 	u32 pid = id >> 32, tid = id;
-	struct event *eventp;
 	s64 delta_us;
-	u16 family;
 
 	tsp = bpf_map_lookup_elem(&start, &sock_ident);
 	if (!tsp)
@@ -84,70 +150,10 @@ static int handle_tcp_rcv_space_adjust(void *ctx, struct sock *sk)
 	if (delta_us < 0 || delta_us <= targ_min_us)
 		goto cleanup;
 
-	if (targ_hist) {
-		struct hist *histp;
-		struct task_struct *current;
-		u32 hkey;
-		u64 slot;
-
-		/* Use TID for per-thread, PID (tgid) for per-process */
-		if (targ_per_thread)
-			hkey = tid;
-		else
-			hkey = pid;
-
-		histp = bpf_map_lookup_or_try_init(&hists, &hkey, &zero);
-		if (!histp)
-			goto cleanup;
-
-		/* Store comm if not already set */
-		if (!histp->comm[0]) {
-			if (targ_per_thread) {
-				/* For per-thread, use current thread comm */
-				bpf_get_current_comm(&histp->comm,
-						     TASK_COMM_LEN);
-			} else {
-				/* For per-process, use process group leader comm */
-				current = (struct task_struct *)
-					bpf_get_current_task();
-				BPF_CORE_READ_STR_INTO(&histp->comm,
-						       current,
-						       group_leader,
-						       comm);
-			}
-		}
-		slot = log2l(delta_us);
-		if (slot >= MAX_SLOTS)
-			slot = MAX_SLOTS - 1;
-		__sync_fetch_and_add(&histp->slots[slot], 1);
-	} else {
-		eventp = reserve_buf(sizeof(*eventp));
-		if (!eventp)
-			goto cleanup;
-
-		eventp->pid = pid;
-		eventp->tid = tid;
-		eventp->delta_us = delta_us;
-		eventp->sport = BPF_CORE_READ(inet, inet_sport);
-		eventp->dport = BPF_CORE_READ(sk, __sk_common.skc_dport);
-		bpf_get_current_comm(&eventp->comm, TASK_COMM_LEN);
-		family = BPF_CORE_READ(sk, __sk_common.skc_family);
-		if (family == AF_INET) {
-			eventp->saddr[0] =
-				BPF_CORE_READ(sk, __sk_common.skc_rcv_saddr);
-			eventp->daddr[0] =
-				BPF_CORE_READ(sk, __sk_common.skc_daddr);
-		} else { /* family == AF_INET6 */
-			BPF_CORE_READ_INTO(
-				eventp->saddr, sk,
-				__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
-			BPF_CORE_READ_INTO(
-				eventp->daddr, sk,
-				__sk_common.skc_v6_daddr.in6_u.u6_addr32);
-		}
-		eventp->family = family;
-		submit_buf(ctx, eventp, sizeof(*eventp));
-	}
+	if (targ_hist)
+		handle_hist_event(sk, pid, tid, delta_us);
+	else
+		handle_event_output(ctx, sk, pid, tid, delta_us);
 
 cleanup:
 	bpf_map_delete_elem(&start, &sock_ident);

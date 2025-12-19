@@ -17,6 +17,9 @@
 #include "tcppktlat.skel.h"
 #include "compat.h"
 #include "trace_helpers.h"
+#include "map_helpers.h"
+
+#define DEFAULT_INTERVAL 99999999 /* Only print on Ctrl-C by default */
 
 static struct env {
 	pid_t pid;
@@ -31,8 +34,8 @@ static struct env {
 	__u32 interval;
 	int times;
 } env = {
-	.interval = 99999999, /* Default: only print on exit */
-	.times = 99999999, /* Default: print indefinitely */
+	.interval = DEFAULT_INTERVAL,
+	.times = DEFAULT_INTERVAL,
 };
 
 static volatile sig_atomic_t exiting = 0;
@@ -70,8 +73,7 @@ static const struct argp_option opts[] = {
 	{ "tid", 't', "TID", 0, "Thread TID to trace", 0 },
 	{ "timestamp", 'T', NULL, 0, "include timestamp on output", 0 },
 	{ "histogram", 'H', NULL, 0,
-	  "Show latency histogram. Positional args become interval/count",
-	  0 },
+	  "Show latency histogram. Positional args become interval/count", 0 },
 	{ "threads", 'L', NULL, 0, "Print a histogram per thread ID", 0 },
 	{ "lport", 'l', "LPORT", 0, "filter for local port", 0 },
 	{ "rport", 'r', "RPORT", 0, "filter for remote port", 0 },
@@ -230,9 +232,9 @@ static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 	fprintf(stderr, "lost %llu events on CPU #%d\n", lost_cnt, cpu);
 }
 
-static void calc_hist_stats(__u32 *slots, int slots_size, double *min,
-			    double *max, double *avg, double *mean, double *p95,
-			    double *p99)
+static int calc_hist_stats(__u32 *slots, int slots_size, double *min,
+			   double *max, double *avg, double *mean, double *p95,
+			   double *p99)
 {
 	unsigned long long total = 0;
 	unsigned long long sum = 0;
@@ -250,8 +252,8 @@ static void calc_hist_stats(__u32 *slots, int slots_size, double *min,
 	}
 
 	if (min_slot < 0) {
-		*min = *max = *avg = *mean = *p95 = *p99 = 0;
-		return;
+		/* No data available */
+		return -1;
 	}
 
 	/* Calculate min (low bound of first slot) */
@@ -304,58 +306,108 @@ static void calc_hist_stats(__u32 *slots, int slots_size, double *min,
 			}
 		}
 	}
+	return 0;
 }
 
 static int print_hist(struct bpf_map *hists_map)
 {
 	const char *units = "usecs";
 	int err, fd = bpf_map__fd(hists_map);
-	__u32 lookup_key = -2, next_key;
-	struct hist hist;
+	__u32 keys[MAX_ENTRIES];
+	struct hist values[MAX_ENTRIES];
+	__u32 count = MAX_ENTRIES;
+	__u32 invalid_key = -1;
 	double min, max, avg, mean, p95, p99;
 	char ts[32];
+	static time_t start_time = 0;
+	time_t now = time(NULL);
+	int i;
 
-	while (!bpf_map_get_next_key(fd, &lookup_key, &next_key)) {
-		err = bpf_map_lookup_elem(fd, &next_key, &hist);
-		if (err < 0) {
-			fprintf(stderr, "failed to lookup hist: %d\n", err);
-			return -1;
+	/* Print timestamp header for interval-based output */
+	if (env.interval < DEFAULT_INTERVAL) {
+		if (start_time == 0) {
+			start_time = now;
 		}
+		str_timestamp("%Y-%m-%d %H:%M:%S", ts, sizeof(ts));
+		printf("[%s] (elapsed: %ld seconds)\n", ts, now - start_time);
+	}
 
+	/* Use atomic lookup_and_delete to avoid race conditions */
+	err = dump_hash(fd, keys, sizeof(__u32), values, sizeof(struct hist),
+			&count, &invalid_key, true);
+	if (err) {
+		fprintf(stderr, "failed to dump hist map: %d\n", err);
+		return -1;
+	}
+
+	/* Print all histograms */
+	for (i = 0; i < count; i++) {
 		if (env.timestamp) {
 			str_timestamp("%H:%M:%S", ts, sizeof(ts));
 			printf("%-8s ", ts);
 		}
 
 		if (env.per_thread)
-			printf("\ntid = %d %s\n", next_key, hist.comm);
+			printf("\ntid = %d %s\n", keys[i], values[i].comm);
 		else
-			printf("\npid = %d %s\n", next_key, hist.comm);
-		print_log2_hist(hist.slots, MAX_SLOTS, units);
+			printf("\npid = %d %s\n", keys[i], values[i].comm);
+		print_log2_hist(values[i].slots, MAX_SLOTS, units);
 
 		/* Calculate and print statistics */
-		calc_hist_stats(hist.slots, MAX_SLOTS, &min, &max, &avg, &mean,
-				&p95, &p99);
-		printf("    min = %.2f %s, max = %.2f %s, mean = %.2f %s, "
-		       "avg = %.2f %s, p95 = %.2f %s, p99 = %.2f %s\n",
-		       min, units, max, units, mean, units, avg, units, p95,
-		       units, p99, units);
-
-		lookup_key = next_key;
-	}
-
-	/* Clear all histograms after printing - use delete_elem like biolatency */
-	lookup_key = -2;
-	while (!bpf_map_get_next_key(fd, &lookup_key, &next_key)) {
-		err = bpf_map_delete_elem(fd, &next_key);
-		if (err < 0) {
-			fprintf(stderr, "failed to cleanup hist: %d\n", err);
-			return -1;
+		err = calc_hist_stats(values[i].slots, MAX_SLOTS, &min, &max,
+				      &avg, &mean, &p95, &p99);
+		if (err == 0) {
+			printf("    min = %.2f %s, max = %.2f %s, mean = %.2f %s, "
+			       "avg = %.2f %s, p95 = %.2f %s, p99 = %.2f %s\n",
+			       min, units, max, units, mean, units, avg, units,
+			       p95, units, p99, units);
 		}
-		lookup_key = next_key;
 	}
 
 	return 0;
+}
+
+static void run_histogram_mode(struct tcppktlat_bpf *obj)
+{
+	bool is_interval_mode = (env.interval < DEFAULT_INTERVAL);
+
+	while (!exiting && env.times > 0) {
+		if (is_interval_mode) {
+			sleep(env.interval);
+			if (!exiting) {
+				printf("\n");
+				print_hist(obj->maps.hists);
+				env.times--;
+			}
+		} else {
+			/* Default: wait for Ctrl-C */
+			sleep(1);
+		}
+	}
+
+	/* Print histogram on exit only for default mode (no interval specified) */
+	if (!is_interval_mode) {
+		printf("\n");
+		print_hist(obj->maps.hists);
+	}
+}
+
+static int run_event_mode(struct bpf_buffer *buf)
+{
+	int err = 0;
+
+	while (!exiting) {
+		err = bpf_buffer__poll(buf, POLL_TIMEOUT_MS);
+		if (err < 0 && err != -EINTR) {
+			fprintf(stderr, "error polling ring/perf buffer: %s\n",
+				strerror(-err));
+			return err;
+		}
+		/* reset err to return 0 if exiting */
+		err = 0;
+	}
+
+	return err;
 }
 
 int main(int argc, char **argv)
@@ -372,6 +424,12 @@ int main(int argc, char **argv)
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
 	if (err)
 		return err;
+
+	if (env.per_thread && !env.histogram) {
+		fprintf(stderr,
+			"Error: -L option requires -H (histogram mode)\n");
+		return 1;
+	}
 
 	libbpf_set_print(libbpf_print_fn);
 
@@ -437,7 +495,7 @@ int main(int argc, char **argv)
 	}
 
 	if (env.histogram) {
-		printf("Tracing TCP packet latency. Hit Ctrl-C to end.\n");
+		printf("Summarize TCP packet latency as a histogram. Hit Ctrl-C to end.\n");
 	} else {
 		if (env.timestamp)
 			printf("%-8s ", "TIME(s)");
@@ -447,40 +505,11 @@ int main(int argc, char **argv)
 	}
 
 	if (env.histogram) {
-		/* In histogram mode, we don't need to poll events */
-		/* BPF program directly updates the histogram map */
-		if (env.interval < 99999999) {
-			/* Print at specified interval */
-			while (!exiting && env.times > 0) {
-				sleep(env.interval);
-				if (exiting)
-					break;
-				printf("\n");
-				print_hist(obj->maps.hists);
-				if (--env.times == 0)
-					break;
-			}
-		} else {
-			/* Default: wait for Ctrl-C, then print */
-			while (!exiting) {
-				sleep(1);
-			}
-		}
-		/* Print final histogram on exit */
-		printf("\n");
-		print_hist(obj->maps.hists);
+		run_histogram_mode(obj);
 	} else {
-		while (!exiting) {
-			err = bpf_buffer__poll(buf, POLL_TIMEOUT_MS);
-			if (err < 0 && err != -EINTR) {
-				fprintf(stderr,
-					"error polling ring/perf buffer: %s\n",
-					strerror(-err));
-				goto cleanup;
-			}
-			/* reset err to return 0 if exiting */
-			err = 0;
-		}
+		err = run_event_mode(buf);
+		if (err)
+			goto cleanup;
 	}
 cleanup:
 	bpf_buffer__free(buf);
