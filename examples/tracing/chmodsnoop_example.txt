@@ -1,0 +1,54 @@
+Demonstrations of chmodsnoop, the Linux eBPF/bcc version.
+
+chmodsnoop traces chmod() system calls and prints details including:
+- Process name (COMM) and PID
+- File path
+- Mode (permissions) being set
+- Optional timestamp
+
+This can be useful for:
+- Monitoring file permission changes
+- Security auditing
+- Debugging permission issues
+- Understanding application behavior
+
+EXAMPLES:
+
+# Trace all chmod() syscalls:
+# ./chmodsnoop
+COMM             PID    MODE       PATH
+chmod            12345  0755       /tmp/testfile
+bash             12346  0644       /tmp/config.txt
+sudo             12347  0700       /home/user/.ssh
+
+# Include timestamps:
+# ./chmodsnoop -T
+TIME(s)          COMM             PID    MODE       PATH
+0.000000000      chmod            12345  0755       /tmp/testfile
+1.234567890      bash             12346  0644       /tmp/config.txt
+2.345678901      sudo             12347  0700       /home/user/.ssh
+
+# Only show failed chmod calls:
+# ./chmodsnoop -x
+COMM             PID    MODE       PATH
+chmod            12345  0755       /readonly/file
+bash             12346  0644       /protected/dir/file
+
+# Trace only a specific PID:
+# ./chmodsnoop -p 12345
+COMM             PID    MODE       PATH
+chmod            12345  0755       /tmp/testfile
+chmod            12345  0644       /tmp/config.txt
+
+# Combine options:
+# ./chmodsnoop -T -p 12345
+TIME(s)          COMM             PID    MODE       PATH
+0.000000000      chmod            12345  0755       /tmp/testfile
+1.234567890      chmod            12345  0644       /tmp/config.txt
+
+USAGE:
+    ./chmodsnoop              # trace all chmod() syscalls
+    ./chmodsnoop -T           # include timestamps
+    ./chmodsnoop -x           # only show failed chmod calls
+    ./chmodsnoop -p 181       # only trace PID 181
+
