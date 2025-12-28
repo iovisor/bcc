@@ -10,7 +10,7 @@ struct event {
 	unsigned __int128 daddr;
 	__u64 skaddr;
 	__u64 ts_us;
-	__u64 delta_us;
+	__u64 delta_ns;
 	__u32 pid;
 	int oldstate;
 	int newstate;
