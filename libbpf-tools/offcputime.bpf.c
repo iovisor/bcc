@@ -12,8 +12,8 @@
 
 const volatile bool kernel_threads_only = false;
 const volatile bool user_threads_only = false;
-const volatile __u64 max_block_ns = -1;
-const volatile __u64 min_block_ns = 1;
+const volatile __u64 max_block_us = -1;
+const volatile __u64 min_block_us = 1;
 const volatile bool filter_by_tgid = false;
 const volatile bool filter_by_pid = false;
 const volatile long state = -1;
@@ -108,9 +108,9 @@ static int handle_sched_switch(void *ctx, bool preempt, struct task_struct *prev
 	delta = (s64)(bpf_ktime_get_ns() - i_keyp->start_ts);
 	if (delta < 0)
 		goto cleanup;
-	if (delta < min_block_ns || delta > max_block_ns)
-		goto cleanup;
 	delta /= 1000U;
+	if (delta < min_block_us || delta > max_block_us)
+		goto cleanup;
 	valp = bpf_map_lookup_elem(&info, &i_keyp->key);
 	if (!valp)
 		goto cleanup;
