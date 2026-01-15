@@ -7,14 +7,15 @@
 #include <unistd.h>
 #include <math.h>
 #include <bpf/bpf.h>
-#include "ext4File.skel.h"
+#include "ext4file.skel.h"
 #include "trace_helpers.h"
-#include "ext4File.h"
+#include "ext4file.h"
 
 #define BG_LIST_NUM 57232
 
 struct config {
 	char* dir;
+    char* output_file;
 	char* dev;
 	time_t interval;
 	int times;
@@ -27,20 +28,22 @@ static volatile bool exiting;
 
 void print_usage(FILE* fp, int argc, char** argv) {
     fprintf(fp,
-        "Show ext4 files information.\n"
+        "Show I/O pattern of every ext4 file.\n"
         "\n"
-        "Usage: %s [-h, --help] [-d <dir>, --dir==<dir>] [interval] [count]\n"
+        "Usage: %s [-h, --help] [-d <dir>, --dir==<dir>] [-o <file>, --output==<file>] [interval] [count]\n"
         "\n"
         "Options:\n"
-        "  -d, --dir=<dir>              Trace the specific device\n"
+        "  -d, --dir=<dir>              Trace the specific device(FS) mounted on this dir\n"
+        "  -o, --output=<file>          Output to a specific file(selective)\n"
         "  -h, --help                   Show this help\n"
         "  interval                     Specify the amount of time in seconds between each report\n"
         "  count                        Limit the number of reports (default: unlimited)\n"
         "\n"
         "Examples:\n"
-        "  %s -d /mnt/ext4              # Trace the device mounted on '/mnt/ext4'\n"
-        "  %s -d /mnt/ext4 1 10         # Print 10 reports at 1 second intervals\n",
-        argv[0], argv[0], argv[0]);
+        "  %s -d /mnt/ext4                      # Trace the device mounted on '/mnt/ext4'\n"
+        "  %s -d /mnt/ext4 1 10                 # Print 10 reports at 1 second intervals\n"
+        "  %s -d /mnt/ext4 -o output 1 10       # Print 10 reports at 1 second intervals to ./output\n",
+        argv[0], argv[0], argv[0], argv[0]);
 }
 
 int parse_opt(int argc, char** argv) {
@@ -48,11 +51,12 @@ int parse_opt(int argc, char** argv) {
     int option_index = 0;
     static struct option long_options[] = {
         {"dir", required_argument, 0, 'd'},
+        {"output", required_argument, 0, 'o'},
         {"help", no_argument, 0, 'h'},
         {0, 0, 0, 0}
     };
 
-    while ((c = getopt_long(argc, argv, "d:h", long_options, &option_index)) != -1) {
+    while ((c = getopt_long(argc, argv, "d:o:h", long_options, &option_index)) != -1) {
         switch (c) {
         case 'd':
             config.dir = optarg;
@@ -60,6 +64,12 @@ int parse_opt(int argc, char** argv) {
         case 'h':
             print_usage(stdout, argc, argv);
             exit(0);
+        case 'o':
+            if (optarg)
+                config.output_file = optarg;
+            else
+                config.output_file = NULL;
+            break;
         case '?':
             print_usage(stderr, argc, argv);
             exit(1);
@@ -84,23 +94,21 @@ int parse_opt(int argc, char** argv) {
     return 0;
 }
 
-__u64 get_system_boot_time() {
-    FILE *fp = fopen("/proc/stat", "r");
-    if (!fp) {
-        perror("Failed to open /proc/stat");
-        return -1;
-    }
-    char line[256];
-    __u64 boot_time = -1;
+void my_printf(int fd_output, const char *format, ...){
+    va_list args;
+    va_start(args, format);
 
-    while (fgets(line, sizeof(line), fp)) {
-        if (strncmp(line, "btime", 5) == 0) {
-            sscanf(line + 6, "%lld", &boot_time);
-            break;
-        }
-    }
-    fclose(fp);
-    return boot_time;
+    char buf[1024];
+    int len;
+    len = vsnprintf(buf, sizeof(buf), format, args);
+
+    va_end(args);
+    if (fd_output >= 0)
+        write(fd_output, buf, len);
+    else if (fd_output == FD_STDOUT)
+        fwrite(buf, 1, len, stdout);
+    else if (fd_output == FD_STDERR)
+        fwrite(buf, 1, len, stderr);
 }
 
 void sig_handler(int sig) {
@@ -156,7 +164,7 @@ void ext4_info_get(struct ext4_config* ext4_config) {
 
     fd_ext4_dev = open(config.dev, O_RDONLY);
     if (fd_ext4_dev < 0) {
-        fprintf(stderr, "failed to open %s\n", config.dev);
+        my_printf(FD_STDERR, "failed to open %s\n", config.dev);
         goto cleanup;
     }
     pread(fd_ext4_dev, &ext4_config->blocks_per_group, 4, 1056);
@@ -169,153 +177,105 @@ cleanup:
         close(fd_ext4_dev);
 }
 
-void print_file_infos(int fdT, int fd_bg, char* time_buffer, FILE* fp_output) {
+void print_file_infos(int fdT, char* time_buffer, int fd_output) {
     int err;
-    char time_zero[] = "---- -- -- --:--:--";
     struct file_info_key lookup_key = {}, next_key;
     struct file_info_val fiv;
-    struct file_bg_key fbgk = {};
-    int read_cnt, write_cnt;
-    fprintf(fp_output, "%s\n", time_buffer);
-    fprintf(fp_output, "%-10s %-20s %-10s %15s %10s %10s"
-        " %10s %10s %10s %20s %20s %20s %20s %20s\n",
-        "inode", "file_name", "pa_inode", "size", "hint", 
-        "write", "read", "update", "access",
-        "create_time", "access_time", "modify_time", "delete_time", "bg_id");
+    my_printf(fd_output, "%s\n", time_buffer);
+    my_printf(fd_output, "%-10s %-20s %-10s %-6s "
+        "%-15s %-15s %-15s %-15s %-8s\n",
+        "file_name", "inode", "pa_inode", "hint", 
+        "buffer_read", "direct_read", "buffer_write", "direct_write", "delete");
     while (!bpf_map_get_next_key(fdT, &lookup_key, &next_key)) {
         err = bpf_map_lookup_elem(fdT, &next_key, &fiv);
         if (err < 0) {
-            fprintf(stderr, 
+            my_printf(FD_STDERR, 
                 "failed to lookup err: %u\n", err);
             return;
         }
-        char ts[TS_TYPE_CNT][20];
-        struct tm* time_info;
-        for (int i = 0; i < TS_TYPE_CNT; i++) {
-            if (fiv.fv_ts[i] == 0) {
-                memcpy(ts[i], time_zero, sizeof(ts[i]));
-            }
-            else {
-                time_t time_val = (time_t)fiv.fv_ts[i];
-                time_info = localtime(&time_val);
-                strftime(ts[i], 20, "%Y-%m-%d %H:%M:%S", time_info);
-            }
-        }
-        write_cnt = fiv.fv_rw_cnt[RW_TYPE_DIRECT_WRITE] +
-            fiv.fv_rw_cnt[RW_TYPE_BUFFER_WRITE];
-        read_cnt = fiv.fv_rw_cnt[RW_TYPE_DIRECT_READ] +
-            fiv.fv_rw_cnt[RW_TYPE_BUFFER_READ];
-        fprintf(fp_output, "%-10u %-20s %-10u %15lld %10d ",
-            next_key.fk_ino, next_key.fk_name, next_key.fk_pa_ino,
-            fiv.fv_size, fiv.fv_hint);
-        fprintf(fp_output, "%10d %10d %10d %10d",
-            write_cnt, read_cnt, fiv.fv_update_cnt, fiv.fv_access_cnt);
-        fprintf(fp_output, "%20s %20s %20s %20s",
-            ts[TS_TYPE_CREATE], ts[TS_TYPE_ACCESS],
-            ts[TS_TYPE_MODIFY], ts[TS_TYPE_DELETE]);
-        fbgk.bgk_fik = next_key;
-        fprintf(fp_output, "      [");
-        int flag1 = 0;
-        __u64 bg_bit;
-        for (int k = 0; k < 1024; k++) {
-            fbgk.bgk_index = k;
-            err = bpf_map_lookup_elem(fd_bg, &fbgk, &bg_bit);
-            if (err < 0) {
-                continue;
-            }
-
-            while(bg_bit) {
-                __u64 last_index = bg_bit;
-                bg_bit = (bg_bit - 1) & bg_bit;
-                int res = log2((last_index - bg_bit));
-                int bg_id = fbgk.bgk_index * 64 + res;
-                if (flag1 == 0) {
-                    fprintf(fp_output, "%d", bg_id);
-                    flag1++;
-                } else {
-                    fprintf(fp_output, ",%d", bg_id);
-                }
-
-            }
-        }
-        fprintf(fp_output, "]\n");
+        my_printf(fd_output, "%-10u %-20s %-10u %-6u ",
+            next_key.fk_name, next_key.fk_ino, next_key.fk_pa_ino, fiv.fv_hint);
+        my_printf(fd_output, "%-15d %-15d %-15d %-15d ",
+            fiv.fv_rw_cnt[RW_TYPE_BUFFER_READ], fiv.fv_rw_cnt[RW_TYPE_DIRECT_READ], 
+            fiv.fv_rw_cnt[RW_TYPE_BUFFER_WRITE], fiv.fv_rw_cnt[RW_TYPE_DIRECT_WRITE]);
+        my_printf(fd_output, "%-8s\n",
+            fiv.fv_delete ? "True": "False");
         lookup_key = next_key;
     }
 }
 
-int program_configure(int argc, char** argv, FILE** fp_output,
+int program_configure(int argc, char** argv, int* fd_output,
     struct partitions** partitions, const struct partition** partition) {
     const char* fs_type = "ext4";
-    const char* log_path = "files_info.txt";
     char device_name[20];
-    char mount_type[50];
+    char mount_type[10];
     config.dev = malloc(256);
     memset(config.dev, 0, 256);
 
     if (parse_opt(argc, argv)) {
-        fprintf(stderr, "error: parse_opt failed!\n");
+        my_printf(FD_STDERR, "error: parse_opt failed!\n");
         return -1;
     }
     if (!config.dir) {
-        fprintf(stderr, "error: the FS mouned dir is needed\n");
+        my_printf(FD_STDERR, "error: the FS mounted dir is needed\n");
         return -1;
     }
 
     //if the dev is mounted or made by ext4
     if (get_mounts_dev_by_dir(config.dev, config.dir, mount_type)) {
-        fprintf(stderr, "error: failed to find %s\n", config.dir);
+        my_printf(FD_STDERR, 
+            "error: failed to find %s, you can refer to \"df -h\"\n", config.dir);
         return -1;
     }
     if (strcmp(fs_type, mount_type)) {
-        fprintf(stderr, "error: the fs is not ext4\n");
+        my_printf(FD_STDERR, "error: the fs is not ext4\n");
         return -1;
     }
 
     // get the device_name(eg. get 'nvme0n1' from '/dev/nvme0n1')
     get_device_name_from_path(config.dev, device_name);
-    // get the dev num, which will be send to eBPF program
+
     *partitions = partitions__load();
     if (!*partitions) {
-        fprintf(stderr, "error: failed to load partitions\n");
+        my_printf(FD_STDERR, "error: failed to load partitions\n");
         return -1;
     }
     *partition = partitions__get_by_name(*partitions, device_name);
     if (!*partition) {
-        fprintf(stderr, "error: failed to find the %s in partitions\n", device_name);
+        my_printf(FD_STDERR, "error: failed to find the %s in partitions\n", device_name);
         return -1;
     }
-    // output
-    *fp_output = fopen(log_path, "w");
-    if (!*fp_output) {
-        fprintf(stderr, "error: failed to open %s\n", log_path);
-        return -1;
+    if (config.output_file) {
+        *fd_output = open(config.output_file, O_WRONLY | O_CREAT);
+        if (*fd_output == -1) {
+            my_printf(FD_STDERR, "error: failed to open %s\n", config.output_file);
+            return -1;
+        }
     }
-
     /* INT EVENT */
     signal(SIGINT, sig_handler);
     return 0;
 }
 
-int bpf_initialize_and_load(struct ext4File_bpf** objp, const struct partition* partition, struct ext4_config* ext4_config) {
+int bpf_initialize_and_load(struct ext4file_bpf** objp, const struct partition* partition, struct ext4_config* ext4_config) {
     LIBBPF_OPTS(bpf_object_open_opts, open_opts);
-    *objp = ext4File_bpf__open_opts(&open_opts);
+    *objp = ext4file_bpf__open_opts(&open_opts);
     if (!*objp) {
-        fprintf(stderr, "failed to open BPF object\n");
+        my_printf(FD_STDERR, "failed to open BPF object\n");
         return -1;
     }
 
-    if (ext4File_bpf__load(*objp)) {
-        fprintf(stderr, "failed to load BPF object\n");
+    if (ext4file_bpf__load(*objp)) {
+        my_printf(FD_STDERR, "failed to load BPF object\n");
         return -1;
     }
 
     ext4_info_get(ext4_config);
-    (*objp)->bss->system_up = get_system_boot_time();
     (*objp)->bss->blocks_per_group = ext4_config->blocks_per_group;
-    (*objp)->bss->device_num = partition->dev;
+    (*objp)->bss->dev_target = partition->dev;
 
-    if (ext4File_bpf__attach(*objp)) {
-        fprintf(stderr, "failed to attach BPF programs\n");
+    if (ext4file_bpf__attach(*objp)) {
+        my_printf(FD_STDERR, "failed to attach BPF programs\n");
         return -1;
     }
 
@@ -323,43 +283,43 @@ int bpf_initialize_and_load(struct ext4File_bpf** objp, const struct partition* 
 }
 
 int main(int argc, char **argv) {
-    FILE* fp_output = NULL;
+    int fd_output = FD_STDOUT;
     char time_buffer[20];
     struct ext4_config ext4_config = {};
     struct partitions* partitions = NULL;
     const struct partition* partition = NULL;
-    struct ext4File_bpf* obj = NULL;
+    struct ext4file_bpf* obj = NULL;
     time_t cur_time;
     struct tm* info;
-    if (program_configure(argc, argv, &fp_output, &partitions, &partition))
+    if (program_configure(argc, argv, &fd_output, &partitions, &partition))
         goto cleanup;
     if (bpf_initialize_and_load(&obj, partition, &ext4_config))
         goto cleanup; 
     
-    int fdT = bpf_map__fd(obj->maps.file_info_map);
-	int fd_bg = bpf_map__fd(obj->maps.file_bg_map);
+    int fd_map_ffm = bpf_map__fd(obj->maps.file_info_map);
 
-    printf("blocks_count:%d blocks_per_group:%d bg_cnt:%d\n", ext4_config.blocks_count, ext4_config.blocks_per_group, ext4_config.bg_cnt);
-    printf("Tracing Ext4 read/write... Hit Ctrl-C to end.\n");
+    my_printf(FD_STDOUT, "interval: %u\n", config.interval);
+    my_printf(FD_STDOUT, "EXT4 FS Info: blocks_count=%u blocks_per_group=%u bg_cnt=%u\n", ext4_config.blocks_count, ext4_config.blocks_per_group, ext4_config.bg_cnt);
+    my_printf(FD_STDOUT, "Tracing Ext4 read/write... Hit Ctrl-C to end.\n");
+    
 	while (!exiting) {
         sleep(config.interval);
         time(&cur_time);
         info = localtime(&cur_time);
         strftime(time_buffer, 80, "%Y-%m-%d %H:%M:%S", info);
 
-        print_file_infos(fdT, fd_bg, time_buffer, fp_output);
+        print_file_infos(fd_map_ffm, time_buffer, fd_output);
         config.times--;
         if (config.times <= 0)
             break;
     }
-    close(fd_bg);
-    close(fdT);
+    close(fd_map_ffm);
 cleanup:
     if(obj)
-        ext4File_bpf__destroy(obj);
+        ext4file_bpf__destroy(obj);
     if(partitions)
         partitions__free(partitions);
-    if(fp_output)
-        fclose(fp_output);
+    if(fd_output > -1)
+        close(fd_output);
     return 0;
 }
