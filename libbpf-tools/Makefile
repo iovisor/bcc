@@ -165,7 +165,7 @@ clean:
 	$(Q)rm -rf $(OUTPUT) $(APPS) $(APP_ALIASES)
 
 $(LIBBLAZESYM_SRC)::
-	$(Q)cd blazesym && cargo build --release --features=cheader
+	$(Q)cd blazesym && cargo build --release
 
 $(OUTPUT)/libblazesym.a: $(LIBBLAZESYM_SRC) | $(OUTPUT)
 	$(call msg,LIB,$@)
@@ -173,7 +173,14 @@ $(OUTPUT)/libblazesym.a: $(LIBBLAZESYM_SRC) | $(OUTPUT)
 
 $(OUTPUT)/blazesym.h: $(LIBBLAZESYM_SRC) | $(OUTPUT)
 	$(call msg,INC,$@)
-	$(Q)cp blazesym/target/release/blazesym.h $@
+	$(Q)if [ -f blazesym/target/release/blazesym.h ]; then \
+		cp blazesym/target/release/blazesym.h $@; \
+	elif [ -f blazesym/include/blazesym.h ]; then \
+		cp blazesym/include/blazesym.h $@; \
+	else \
+		echo "Error: blazesym.h not found. Please check blazesym version."; \
+		exit 1; \
+	fi
 
 $(OUTPUT) $(OUTPUT)/libbpf $(BPFTOOL_OUTPUT):
 	$(call msg,MKDIR,$@)
