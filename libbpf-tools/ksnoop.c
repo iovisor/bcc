@@ -668,6 +668,13 @@ static int alloc_traces(int argc, struct trace **traces)
 	return 0;
 }
 
+static void free_traces(struct trace *traces)
+{
+	btf_dump__free(traces->dump);
+	btf__free(traces->btf);
+	free(traces);
+}
+
 static int cmd_info(int argc, char **argv)
 {
 	struct trace *traces = NULL;
@@ -681,7 +688,7 @@ static int cmd_info(int argc, char **argv)
 
 	nr_traces = parse_traces(argc, argv, traces);
 	if (nr_traces < 0) {
-		free(traces);
+		free_traces(traces);
 		return nr_traces;
 	}
 
@@ -703,7 +710,7 @@ static int cmd_info(int argc, char **argv)
 			       func->nr_args - MAX_ARGS);
 		printf(");\n");
 	}
-	free(traces);
+	free_traces(traces);
 	return 0;
 }
 
@@ -868,7 +875,7 @@ static int cmd_trace(int argc, char **argv)
 
 	nr_traces = parse_traces(argc, argv, traces);
 	if (nr_traces < 0) {
-		free(traces);
+		free_traces(traces);
 		return nr_traces;
 	}
 
@@ -931,7 +938,7 @@ cleanup:
 		bpf_link__destroy(traces[i].links[0]);
 		bpf_link__destroy(traces[i].links[1]);
 	}
-	free(traces);
+	free_traces(traces);
 	perf_buffer__free(pb);
 	ksnoop_bpf__destroy(skel);
 
