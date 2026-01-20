@@ -639,7 +639,7 @@ static int parse_traces(int argc, char **argv, struct trace *traces)
 
 	for (i = 0; i < argc; i++) {
 		if (parse_trace(argv[i], &(traces[i])))
-			return -EINVAL;
+			return -i - 1;
 
 		if (!stack_mode || i == 0)
 			continue;
@@ -668,6 +668,19 @@ static int alloc_traces(int argc, struct trace **traces)
 	return 0;
 }
 
+static void free_traces(struct trace *traces, __u8 num)
+{
+	__u8 i;
+
+	for (i = 0; i < num; ++i) {
+		btf_dump__free(traces[i].dump);
+		if (traces[i].btf != vmlinux_btf)
+			btf__free(traces[i].btf);
+	}
+	btf__free(vmlinux_btf);
+	free(traces);
+}
+
 static int cmd_info(int argc, char **argv)
 {
 	struct trace *traces = NULL;
@@ -681,8 +694,8 @@ static int cmd_info(int argc, char **argv)
 
 	nr_traces = parse_traces(argc, argv, traces);
 	if (nr_traces < 0) {
-		free(traces);
-		return nr_traces;
+		free_traces(traces, -nr_traces);
+		return -EINVAL;
 	}
 
 	for (i = 0; i < nr_traces; i++) {
@@ -703,7 +716,7 @@ static int cmd_info(int argc, char **argv)
 			       func->nr_args - MAX_ARGS);
 		printf(");\n");
 	}
-	free(traces);
+	free_traces(traces, nr_traces);
 	return 0;
 }
 
@@ -868,8 +881,8 @@ static int cmd_trace(int argc, char **argv)
 
 	nr_traces = parse_traces(argc, argv, traces);
 	if (nr_traces < 0) {
-		free(traces);
-		return nr_traces;
+		free_traces(traces, -nr_traces);
+		return -EINVAL;
 	}
 
 	skel = ksnoop_bpf__open_and_load();
@@ -931,7 +944,7 @@ cleanup:
 		bpf_link__destroy(traces[i].links[0]);
 		bpf_link__destroy(traces[i].links[1]);
 	}
-	free(traces);
+	free_traces(traces, nr_traces);
 	perf_buffer__free(pb);
 	ksnoop_bpf__destroy(skel);
 
