@@ -153,22 +153,31 @@ static inline bool file_exists(const char *f)
   return (stat(f, &buffer) == 0);
 }
 
-static inline bool file_exists_and_ownedby(const char *f, uid_t uid)
+static inline int check_privileged_dir(const char *f)
 {
-  struct stat buffer;
-  int ret = stat(f, &buffer) == 0;
-  if (ret) {
-    if (buffer.st_uid != uid) {
-      std::cout << "ERROR: header file ownership unexpected: " << std::string(f) << "\n";
-      return false;
-    }
+  struct stat buf;
+  if (lstat(f, &buf) != 0)
+    return -errno;
+
+  if (!S_ISDIR(buf.st_mode)) {
+    std::cout << "ERROR: not a directory: " << std::string(f) << "\n";
+    return -ENOTDIR;
   }
-  return ret;
+  if (buf.st_uid != 0) {
+    std::cout << "ERROR: not owned by root: " << std::string(f) << "\n";
+    return -EACCES;
+  }
+  return 0;
 }
 
 static inline bool proc_kheaders_exists(void)
 {
-  return file_exists_and_ownedby(PROC_KHEADERS_PATH, 0);
+  return file_exists(PROC_KHEADERS_PATH);
+}
+
+static inline bool dir_has_kheaders(const std::string &dirpath)
+{
+  return file_exists((dirpath + "/include/linux/kconfig.h").c_str());
 }
 
 static inline const char *get_tmp_dir() {
@@ -216,11 +225,16 @@ static inline int extract_kheaders(const std::string &dirpath,
 
   /*
    * If the new directory exists, it could have raced with a parallel
-   * extraction, in this case just delete the old directory and ignore.
+   * extraction, in this case just delete the old directory and reuse the
+   * existing directory if valid.
    */
   ret = rename(dirpath_tmp, dirpath.c_str());
-  if (ret)
-    ret = system(("rm -rf " + std::string(dirpath_tmp)).c_str());
+  if (ret) {
+    system(("rm -rf " + std::string(dirpath_tmp)).c_str());
+
+    if (check_privileged_dir(dirpath.c_str()) == 0 && dir_has_kheaders(dirpath))
+      ret = 0;
+  }
 
 cleanup:
   if (module) {
@@ -244,14 +258,20 @@ int get_proc_kheaders(std::string &dirpath)
            uname_data.release);
   dirpath = std::string(dirpath_tmp);
 
-  if (file_exists(dirpath_tmp)) {
-    if (file_exists_and_ownedby(dirpath_tmp, 0))
+  int ret = check_privileged_dir(dirpath_tmp);
+  if (ret == 0) {
+    // Previously extracted directory still exists, reuse it.
+    if (dir_has_kheaders(dirpath_tmp))
       return 0;
-    else
-      // The path exists, but is owned by a non-root user
-      // Something fishy is going on
-      return -EEXIST;
-  }
+
+    // Existing directories without headers could be caused by tmpfiles
+    // cleanups. Just remove all empty directories, and retry.
+    ret = system(("rm -rf " + dirpath).c_str());
+    if (ret)
+      return ret;
+  } else if (ret != -ENOENT)
+    // Missing directories are fine, wrong ownership or I/O errors are not.
+    return ret;
 
   // First time so extract it
   return extract_kheaders(dirpath, uname_data);
