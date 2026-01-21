@@ -94,7 +94,7 @@ APPS = \
 	tcptop \
 	vfsstat \
 	wakeuptime \
-	ext4File \
+	ext4file \
 	$(BZ_APPS) \
 	#
 
