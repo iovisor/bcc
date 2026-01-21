@@ -94,7 +94,7 @@ int parse_opt(int argc, char** argv) {
     return 0;
 }
 
-void my_printf(int fd_output, const char *format, ...){
+void targeted_printf(int fd_output, const char *format, ...){
     va_list args;
     va_start(args, format);
 
@@ -149,7 +149,7 @@ int get_mounts_dev_by_dir(const char* dev, char* dir, char* type) {
     return -1;
 }
 
-void get_device_name_from_path(const char* mount_dev, char* device_name) {
+void get_device_nMAX_FILE_NAME ame_from_path(const char* mount_dev, char* device_name) {
     int len = strlen(mount_dev);
     int pos;
     for (pos = len - 1; pos >= 0; pos--) {
@@ -164,7 +164,7 @@ void ext4_info_get(struct ext4_config* ext4_config) {
 
     fd_ext4_dev = open(config.dev, O_RDONLY);
     if (fd_ext4_dev < 0) {
-        my_printf(FD_STDERR, "failed to open %s\n", config.dev);
+        targeted_printf(FD_STDERR, "failed to open %s\n", config.dev);
         goto cleanup;
     }
     pread(fd_ext4_dev, &ext4_config->blocks_per_group, 4, 1056);
@@ -181,24 +181,24 @@ void print_file_infos(int fdT, char* time_buffer, int fd_output) {
     int err;
     struct file_info_key lookup_key = {}, next_key;
     struct file_info_val fiv;
-    my_printf(fd_output, "%s\n", time_buffer);
-    my_printf(fd_output, "%-10s %-20s %-10s %-6s "
+    targeted_printf(fd_output, "%s\n", time_buffer);
+    targeted_printf(fd_output, "%-10s %-20s %-10s %-6s "
         "%-15s %-15s %-15s %-15s %-8s\n",
         "file_name", "inode", "pa_inode", "hint", 
         "buffer_read", "direct_read", "buffer_write", "direct_write", "delete");
     while (!bpf_map_get_next_key(fdT, &lookup_key, &next_key)) {
         err = bpf_map_lookup_elem(fdT, &next_key, &fiv);
         if (err < 0) {
-            my_printf(FD_STDERR, 
+            targeted_printf(FD_STDERR, 
                 "failed to lookup err: %u\n", err);
             return;
         }
-        my_printf(fd_output, "%-10u %-20s %-10u %-6u ",
+        targeted_printf(fd_output, "%-10u %-20s %-10u %-6u ",
             next_key.fk_name, next_key.fk_ino, next_key.fk_pa_ino, fiv.fv_hint);
-        my_printf(fd_output, "%-15d %-15d %-15d %-15d ",
+        targeted_printf(fd_output, "%-15d %-15d %-15d %-15d ",
             fiv.fv_rw_cnt[RW_TYPE_BUFFER_READ], fiv.fv_rw_cnt[RW_TYPE_DIRECT_READ], 
             fiv.fv_rw_cnt[RW_TYPE_BUFFER_WRITE], fiv.fv_rw_cnt[RW_TYPE_DIRECT_WRITE]);
-        my_printf(fd_output, "%-8s\n",
+        targeted_printf(fd_output, "%-8s\n",
             fiv.fv_delete ? "True": "False");
         lookup_key = next_key;
     }
@@ -213,22 +213,22 @@ int program_configure(int argc, char** argv, int* fd_output,
     memset(config.dev, 0, 256);
 
     if (parse_opt(argc, argv)) {
-        my_printf(FD_STDERR, "error: parse_opt failed!\n");
+        targeted_printf(FD_STDERR, "error: parse_opt failed!\n");
         return -1;
     }
     if (!config.dir) {
-        my_printf(FD_STDERR, "error: the FS mounted dir is needed\n");
+        targeted_printf(FD_STDERR, "error: the FS mounted dir is needed\n");
         return -1;
     }
 
     //if the dev is mounted or made by ext4
     if (get_mounts_dev_by_dir(config.dev, config.dir, mount_type)) {
-        my_printf(FD_STDERR, 
+        targeted_printf(FD_STDERR, 
             "error: failed to find %s, you can refer to \"df -h\"\n", config.dir);
         return -1;
     }
     if (strcmp(fs_type, mount_type)) {
-        my_printf(FD_STDERR, "error: the fs is not ext4\n");
+        targeted_printf(FD_STDERR, "error: the fs is not ext4\n");
         return -1;
     }
 
@@ -237,18 +237,18 @@ int program_configure(int argc, char** argv, int* fd_output,
 
     *partitions = partitions__load();
     if (!*partitions) {
-        my_printf(FD_STDERR, "error: failed to load partitions\n");
+        targeted_printf(FD_STDERR, "error: failed to load partitions\n");
         return -1;
     }
     *partition = partitions__get_by_name(*partitions, device_name);
     if (!*partition) {
-        my_printf(FD_STDERR, "error: failed to find the %s in partitions\n", device_name);
+        targeted_printf(FD_STDERR, "error: failed to find the %s in partitions\n", device_name);
         return -1;
     }
     if (config.output_file) {
         *fd_output = open(config.output_file, O_WRONLY | O_CREAT);
         if (*fd_output == -1) {
-            my_printf(FD_STDERR, "error: failed to open %s\n", config.output_file);
+            targeted_printf(FD_STDERR, "error: failed to open %s\n", config.output_file);
             return -1;
         }
     }
@@ -261,12 +261,12 @@ int bpf_initialize_and_load(struct ext4file_bpf** objp, const struct partition* 
     LIBBPF_OPTS(bpf_object_open_opts, open_opts);
     *objp = ext4file_bpf__open_opts(&open_opts);
     if (!*objp) {
-        my_printf(FD_STDERR, "failed to open BPF object\n");
+        targeted_printf(FD_STDERR, "failed to open BPF object\n");
         return -1;
     }
 
     if (ext4file_bpf__load(*objp)) {
-        my_printf(FD_STDERR, "failed to load BPF object\n");
+        targeted_printf(FD_STDERR, "failed to load BPF object\n");
         return -1;
     }
 
@@ -275,7 +275,7 @@ int bpf_initialize_and_load(struct ext4file_bpf** objp, const struct partition* 
     (*objp)->bss->dev_target = partition->dev;
 
     if (ext4file_bpf__attach(*objp)) {
-        my_printf(FD_STDERR, "failed to attach BPF programs\n");
+        targeted_printf(FD_STDERR, "failed to attach BPF programs\n");
         return -1;
     }
 
@@ -298,9 +298,9 @@ int main(int argc, char **argv) {
     
     int fd_map_ffm = bpf_map__fd(obj->maps.file_info_map);
 
-    my_printf(FD_STDOUT, "interval: %u\n", config.interval);
-    my_printf(FD_STDOUT, "EXT4 FS Info: blocks_count=%u blocks_per_group=%u bg_cnt=%u\n", ext4_config.blocks_count, ext4_config.blocks_per_group, ext4_config.bg_cnt);
-    my_printf(FD_STDOUT, "Tracing Ext4 read/write... Hit Ctrl-C to end.\n");
+    targeted_printf(FD_STDOUT, "interval: %u\n", config.interval);
+    targeted_printf(FD_STDOUT, "EXT4 FS Info: blocks_count=%u blocks_per_group=%u bg_cnt=%u\n", ext4_config.blocks_count, ext4_config.blocks_per_group, ext4_config.bg_cnt);
+    targeted_printf(FD_STDOUT, "Tracing Ext4 read/write... Hit Ctrl-C to end.\n");
     
 	while (!exiting) {
         sleep(config.interval);

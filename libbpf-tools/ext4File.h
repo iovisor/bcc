@@ -8,7 +8,7 @@
 #define FD_STDOUT -1
 #define FD_STDERR -2
 
-#define MAX_FILE_NAME 48
+#define NAME_MAX 255
 
 enum rw_type {
     RW_TYPE_BUFFER_READ,
@@ -21,7 +21,7 @@ enum rw_type {
 struct file_info_key{
     __u32 fk_ino;
     __u32 fk_pa_ino;
-    char fk_name[MAX_FILE_NAME];
+    char fk_name[NAME_MAX];
 };
 
 struct file_info_val {
@@ -32,7 +32,7 @@ struct file_info_val {
 
 struct unique_file {
     int ino;
-    char filename[MAX_FILE_NAME];
+    char filename[NAME_MAX];
 };
 
 struct ext4_config {
