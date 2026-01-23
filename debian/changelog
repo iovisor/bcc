@@ -1,3 +1,55 @@
+bcc (0.36.0-1) unstable; urgency=low
+
+  * Support for kernel up to 6.18
+
+  * New Tools
+    tools/softirqslower: New tool to trace slow software interrupt handlers (#5356)
+
+  * Enhanced Functionality
+    libbpf-tools/opensnoop: Added full-path support with `-F` option (#5323, #5333)
+    libbpf-tools/filelife: Added full-path support (#5347, ab8e0616)
+    libbpf-tools: Introduced path helpers (ab8e0616)
+    libbpf-tools/trace_helpers: Added str_loadavg() and str_timestamp() common functions (694de9f9)
+    libbpf-tools/filetop: Added directory filter capability (#5300)
+    libbpf-tools/runqslower: Added `-c` option to filter by process name prefix (673911cf)
+    libbpf-tools/runqlat: Dynamically size pid/pidns histogram map (#5342)
+    libbpf-tools/fsdist, fsslower: Added support for fuse filesystem (9691c568)
+    libbpf-tools/tcptop: Major refactoring using fentry/fexit for better performance (75bb73a5, e2c79176, d786eaa3, da3a4746)
+    tools/opensnoop: Added full-path support with `-F` option (#5334, #5339)
+    tools/kvmexit: Added AMD processor support and parallel post-processing (13a4e5a4, c2af2eea)
+    tools/offwaketime: Added raw tracepoint support to reduce overhead (380ee018)
+    Python uprobe API: Added functionality to detach all uprobes for a binary (#5325)
+    Python API: Added support for executing a program and tracing it (#5362)
+
+  * Bug Fixes
+    libbpf-tools/filelife: Fixed wrong full-path handling (#5347)
+    libbpf-tools/filelife: Fixed problem when using perf-buffer (ec8415b2)
+    libbpf-tools/funclatency: Delete the element from the `starts` map after it has been used (06ce1345)
+    libbpf-tools/offcputime: Fixed min/max_block_ns unit conversion error (#5327, d507a53e)
+    libbpf-tools/syncsnoop: Added support for sync_file_range2 and arm_sync_file_range() (42879217)
+    libbpf-tools/ksnoop: Fixed two invalid access to map value (#5361)
+    libbpf-tools/klockstat: Allows kprobe fallback to work with lock debugging (#5359)
+    libbpf-tools/biotop: Fixed segmentation fault with musl libc build (52d2d098)
+    libbpf-tools/syscall_helpers, Python BCC: Updated syscall list (add file_getattr/file_setattr) (b63d7e38, a9c6650e)
+    tools/tcpaccept: Fixed on recent kernels (c208d0e6)
+    tools/tcpconnect: Fixed iov field for DNS with Linux>=6.4 (#5382)
+    tools/javaobjnew: Use MIN macro instead of min function (fb8910a8)
+    tools/biolatency, biosnoop, biotop: Use TRACEPOINT_PROBE() for tracepoints (#5366)
+    Various tools: Don't use the old bpf_probe_read() helper (1cc15c3d)
+    CC: Support versioned SONAME in shared library resolution (beb1fe40, c3512104)
+    Python TCP: Added state2str() and applied to tools (bfa05d28)
+    s390 architecture: Prevent invalid mem access when reading PAGE_OFFSET (d8595ee3)
+
+  * Build & Test Fixes
+    Fixed build failure with clang21 (#5369)
+    Fixed build for LLVM 23 by avoiding deprecated TargetRegistry overloads (#5401)
+    ci: Make version.cmake handle shallow clone (2232b7eb)
+    ci: Various test fixes for proper CI operation (blk probes, rss_stat, kmalloc, btrfs/f2fs) (a4991816, c3385476, 6b7dd5de, ea5cf836)
+    tests: Added coverage for versioned SONAME resolution (c3512104)
+    Removed luajit options to ensure no errors (26eaf13b)
+
+  * Doc update, other bug fixes and tools improvement
+
 bcc (0.35.0-1) unstable; urgency=low
 
   * Support for kernel up to 6.14
