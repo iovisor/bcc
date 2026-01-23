@@ -431,7 +431,7 @@ def display(sort, maxs, totals, counts):
 
         avg = totals[k].value / counts[k].value
 
-        print("%40s %10lu %6lu %10lu %10lu" % (caller, avg, counts[k].value, maxs[k].value, totals[k].value))
+        print("%40s %10d %6d %10d %10d" % (caller.decode('utf-8', 'replace'), avg, counts[k].value, maxs[k].value, totals[k].value))
 
         for addr in stack[2:args.stacks]:
             print("%40s" %  b.ksym(addr, show_offset=True))

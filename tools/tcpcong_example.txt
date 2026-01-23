@@ -1,16 +1,16 @@
 Demonstrations of tcpcong, the Linux eBPF/bcc version.
 
 This tool traces linux kernel's tcp congestion control status change functions,
-then calculate duration of every status and record it, at last prints it as 
-tables or histogram, which can be used for evaluating the tcp congestion 
+then calculate duration of every status and record it, at last prints it as
+tables or histogram, which can be used for evaluating the tcp congestion
 algorithm's performance.
 
 For example:
 
-./tcpcong 
+./tcpcong
 Tracing tcp congestion control status duration... Hit Ctrl-C to end.
 ^C
-LAddrPort            RAddrPort             Open_ms Dod_ms Rcov_ms Cwr_ms  Los_ms Chgs 
+LAddrPort            RAddrPort             Open_ms Dod_ms Rcov_ms Cwr_ms  Los_ms Chgs
 192.168.219.3/34968   192.168.219.4/19230   884     12     102     507     0      2721
 192.168.219.3/34976   192.168.219.4/19230   869     12     133     490     0      2737
 192.168.219.3/34982   192.168.219.4/19230   807     0      0       699     0      3158
@@ -50,20 +50,20 @@ LAddrPort            RAddrPort             Open_ms Dod_ms Rcov_ms Cwr_ms  Los_ms
 
 The example shows all tcp socket's congestion status duration for milliseconds,
 open_ms column is the duration of tcp connection in open status whose cwnd can
-increase; dod_ms column is the duration of tcp connection in disorder status 
-who receives disordered packet; rcov_ms column is the duration of tcp 
-connection in recovery status who receives 3 duplicated acks; cwr_ms column 
+increase; dod_ms column is the duration of tcp connection in disorder status
+who receives disordered packet; rcov_ms column is the duration of tcp
+connection in recovery status who receives 3 duplicated acks; cwr_ms column
 is the duration of tcp connection who receives explicitly congest notifier and
-two acks to reduce the cwnd. the last column chgs prints total status change 
+two acks to reduce the cwnd. the last column chgs prints total status change
 number of the socket.
 
 An interval can be provided, and also optionally a count. Eg, printing output
 every 1 second, and including timestamps (-T):
-./tcpcong -T 1 3 
+./tcpcong -T 1 3
 Tracing tcp congestion control status duration... Hit Ctrl-C to end.
 
 07:37:55
-LAddrPort            RAddrPort             Open_ms Dod_ms Rcov_ms Cwr_ms  Los_ms Chgs 
+LAddrPort            RAddrPort             Open_ms Dod_ms Rcov_ms Cwr_ms  Los_ms Chgs
 192.168.219.3/34968   192.168.219.4/19230   742     15     82      311     0      1678
 192.168.219.3/34976   192.168.219.4/19230   700     12     98      340     0      1965
 192.168.219.3/34982   192.168.219.4/19230   634     0      1       516     0      2471
@@ -102,7 +102,7 @@ LAddrPort            RAddrPort             Open_ms Dod_ms Rcov_ms Cwr_ms  Los_ms
 192.168.219.3/60948   192.168.219.4/19228   597     11     76      293     0      1641
 
 07:37:57
-LAddrPort            RAddrPort             Open_ms Dod_ms Rcov_ms Cwr_ms  Los_ms Chgs 
+LAddrPort            RAddrPort             Open_ms Dod_ms Rcov_ms Cwr_ms  Los_ms Chgs
 192.168.219.3/34968   192.168.219.4/19230   469     9      255     265     0      1305
 192.168.219.3/34976   192.168.219.4/19230   580     11     91      316     0      1916
 192.168.219.3/34982   192.168.219.4/19230   566     0      0       433     0      2092
@@ -182,52 +182,52 @@ LAddrPort            RAddrPort             Open_ms Dod_ms Rcov_ms Cwr_ms  Los_ms
 An local port and remote port can be specified, and also optionally a count.
 Eg printing output every 1 second, and including timestamps (-T) for local
 ports 30000-40000 and remote ports 19225-19227:
-./tcpcong -T -L 30000-40000 -R 19225-19227 1 3    
+./tcpcong -T -L 30000-40000 -R 19225-19227 1 3
 Tracing tcp congestion control status duration... Hit Ctrl-C to end.
 
 07:39:11
-LAddrPort            RAddrPort             Open_ms Dod_ms Rcov_ms Cwr_ms  Los_ms Chgs 
+LAddrPort            RAddrPort             Open_ms Dod_ms Rcov_ms Cwr_ms  Los_ms Chgs
 192.168.219.3/39070   192.168.219.1/19225   668     4      32      455     0      1706
 192.168.219.3/39098   192.168.219.1/19225   692     4      38      424     0      2110
 192.168.219.3/39112   192.168.219.1/19225   564     0      2       593     0      2291
 192.168.219.3/39120   192.168.219.1/19225   599     0      4       555     0      2387
 
 07:39:12
-LAddrPort            RAddrPort             Open_ms Dod_ms Rcov_ms Cwr_ms  Los_ms Chgs 
+LAddrPort            RAddrPort             Open_ms Dod_ms Rcov_ms Cwr_ms  Los_ms Chgs
 192.168.219.3/39070   192.168.219.1/19225   576     3      27      391     0      1525
 192.168.219.3/39098   192.168.219.1/19225   580     3      36      379     0      1893
 192.168.219.3/39112   192.168.219.1/19225   474     1      10      512     0      2009
 192.168.219.3/39120   192.168.219.1/19225   505     1      9       483     0      2022
 
 07:39:13
-LAddrPort            RAddrPort             Open_ms Dod_ms Rcov_ms Cwr_ms  Los_ms Chgs 
+LAddrPort            RAddrPort             Open_ms Dod_ms Rcov_ms Cwr_ms  Los_ms Chgs
 192.168.219.3/39070   192.168.219.1/19225   546     6      27      418     0      1659
 192.168.219.3/39098   192.168.219.1/19225   564     4      40      390     0      1937
 192.168.219.3/39112   192.168.219.1/19225   479     0      3       514     0      2008
 192.168.219.3/39120   192.168.219.1/19225   515     0      4       479     0      1982
 
 The (-u) option can be specified for recording the duration as miroseconds.
-Eg printing output every 1 second, and including timestamps (-T) and 
+Eg printing output every 1 second, and including timestamps (-T) and
 microseconds (-u) for local ports 30000-40000 and remote ports 19225-19227:
-./tcpcong -T -u -L 30000-40000 -R 19225-19227 1 3 
+./tcpcong -T -u -L 30000-40000 -R 19225-19227 1 3
 Tracing tcp congestion control status duration... Hit Ctrl-C to end.
 
 07:39:44
-LAddrPort            RAddrPort             Open_us Dod_us Rcov_us Cwr_us  Los_us Chgs 
+LAddrPort            RAddrPort             Open_us Dod_us Rcov_us Cwr_us  Los_us Chgs
 192.168.219.3/39070   192.168.219.1/19225   600971  3232   38601   509796  0      1843
 192.168.219.3/39098   192.168.219.1/19225   667184  5585   26285   453575  0      1969
 192.168.219.3/39112   192.168.219.1/19225   580982  22     1502    569479  0      2210
 192.168.219.3/39120   192.168.219.1/19225   600280  201    955     550752  0      2327
 
 07:39:45
-LAddrPort            RAddrPort             Open_us Dod_us Rcov_us Cwr_us  Los_us Chgs 
+LAddrPort            RAddrPort             Open_us Dod_us Rcov_us Cwr_us  Los_us Chgs
 192.168.219.3/39070   192.168.219.1/19225   567189  2029   25966   404698  0      1612
 192.168.219.3/39098   192.168.219.1/19225   597201  2263   24073   376454  0      1578
 192.168.219.3/39112   192.168.219.1/19225   500792  846    9297    489264  0      1850
 192.168.219.3/39120   192.168.219.1/19225   518700  94     749     480171  0      1967
 
 07:39:46
-LAddrPort            RAddrPort             Open_us Dod_us Rcov_us Cwr_us  Los_us Chgs 
+LAddrPort            RAddrPort             Open_us Dod_us Rcov_us Cwr_us  Los_us Chgs
 192.168.219.3/39070   192.168.219.1/19225   587340  5324   37035   370066  0      1602
 192.168.219.3/39098   192.168.219.1/19225   532986  5630   31624   345336  0      1319
 192.168.219.3/39112   192.168.219.1/19225   481936  1129   6244    510235  0      1909
@@ -262,8 +262,8 @@ fe80::bace:f6ff:fe14:d21c/32814  fe80::bace:f6ff:fe43:fe96/19226  841706  103   
 fe80::bace:f6ff:fe14:d21c/32816  fe80::bace:f6ff:fe43:fe96/19226  633320  0       0       286584 0      565
 
 
-The distribution of congestion status duration can be printed as a histogram 
-with the -d option and also optionally a count. Eg printing output every 
+The distribution of congestion status duration can be printed as a histogram
+with the -d option and also optionally a count. Eg printing output every
 1 second for microseconds, and including timestamps (-T):
 ./tcpcong.py -d -u -T 1 2
 Tracing tcp congestion control status duration... Hit Ctrl-C to end.

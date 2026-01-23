@@ -1,14 +1,7 @@
 # Copyright (c) PLUMgrid, Inc.
 # Licensed under the Apache License, Version 2.0 (the "License")
-cmake_minimum_required(VERSION 2.8.12)
-
-if(${CMAKE_VERSION} VERSION_EQUAL 3.12.0 OR ${CMAKE_VERSION} VERSION_GREATER 3.12.0)
-  cmake_policy(SET CMP0074 NEW)
-endif()
-
-if(${CMAKE_VERSION} VERSION_EQUAL 3.3.0 OR ${CMAKE_VERSION} VERSION_GREATER 3.3.0)
-  cmake_policy(SET CMP0057 NEW)
-endif()
+cmake_minimum_required(VERSION 3.12)
+cmake_policy(SET CMP0074 NEW)
 
 project(bcc)
 if(NOT CMAKE_BUILD_TYPE)
@@ -74,6 +67,7 @@ if(NOT CMAKE_USE_LIBBPF_PACKAGE)
     endif()
   else()
     execute_process(COMMAND git diff --shortstat ${CMAKE_CURRENT_SOURCE_DIR}/src/cc/libbpf/
+                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
                     OUTPUT_VARIABLE DIFF_STATUS)
     if("${DIFF_STATUS}" STREQUAL "")
       execute_process(COMMAND git submodule update --init --recursive
@@ -144,7 +138,7 @@ if(NOT PYTHON_ONLY)
 
     # clang is linked as a library, but the library path searching is
     # primitively supported, unlike libLLVM
-    set(CLANG_SEARCH "/opt/local/llvm/lib;/usr/lib/llvm-3.7/lib;${LLVM_LIBRARY_DIRS}")
+    set(CLANG_SEARCH "/opt/local/llvm/lib;${LLVM_LIBRARY_DIRS}")
     find_library(libclangAnalysis NAMES clangAnalysis clang-cpp HINTS ${CLANG_SEARCH})
     find_library(libclangAST NAMES clangAST clang-cpp HINTS ${CLANG_SEARCH})
     find_library(libclangBasic NAMES clangBasic clang-cpp HINTS ${CLANG_SEARCH})

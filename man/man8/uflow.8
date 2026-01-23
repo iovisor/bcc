@@ -77,7 +77,7 @@ The method name.
 .SH OVERHEAD
 This tool has extremely high overhead because it prints every method call. For
 some scenarios, you might see lost samples in the output as the tool is unable
-to keep up with the rate of data coming from the kernel. Filtering by class 
+to keep up with the rate of data coming from the kernel. Filtering by class
 or method prefix can help reduce the amount of data printed, but there is still
 a very high overhead in the collection mechanism. Do not use for performance-
 sensitive production scenarios, and always test first.

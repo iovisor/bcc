@@ -125,7 +125,7 @@ u64 __time = bpf_ktime_get_ns();
                         text += "if (%s == 0) { return 0 ; }\n" % val_name
                         self.param_val_names[pname] = val_name
                 return text
-        
+
         def _generate_comm_prefix(self):
                 text = """
 struct val_t {

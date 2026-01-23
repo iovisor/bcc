@@ -424,8 +424,6 @@ static char *type_id_to_str(struct btf *btf, __s32 type_id, char *str)
 				name = btf__str_by_offset(btf, type->name_off);
 				break;
 			case BTF_KIND_TYPEDEF:
-				name = btf__str_by_offset(btf, type->name_off);
-				break;
 			default:
 				name = btf__str_by_offset(btf, type->name_off);
 				break;
@@ -440,7 +438,6 @@ static char *type_id_to_str(struct btf *btf, __s32 type_id, char *str)
 
 static char *value_to_str(struct btf *btf, struct value *val, char *str)
 {
-
 	str = type_id_to_str(btf, val->type_id, str);
 	if (val->flags & KSNOOP_F_PTR)
 		strncat(str, "*", MAX_STR);

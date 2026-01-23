@@ -35,7 +35,7 @@ static struct env {
 	bool trace_all;
 	bool show_allocs;
 	bool combined_only;
-	int min_age_ns;
+	long min_age_ns;
 	uint64_t sample_rate;
 	int top_stacks;
 	size_t min_size;
@@ -82,11 +82,14 @@ struct allocation_node {
 };
 
 struct allocation {
-	uint64_t stack_id;
+	int64_t stack_id;
 	size_t size;
 	size_t count;
 	struct allocation_node* allocations;
 };
+
+#define OPT_PERF_MAX_STACK_DEPTH	1 /* --perf-max-stack-depth */
+#define OPT_STACK_STORAGE_SIZE		2 /* --stack-storage-size */
 
 #define __ATTACH_UPROBE(skel, sym_name, prog_name, is_retprobe) \
 	do { \
@@ -122,6 +125,17 @@ struct allocation {
 
 #define ATTACH_UPROBE_CHECKED(skel, sym_name, prog_name) __ATTACH_UPROBE_CHECKED(skel, sym_name, prog_name, false)
 #define ATTACH_URETPROBE_CHECKED(skel, sym_name, prog_name) __ATTACH_UPROBE_CHECKED(skel, sym_name, prog_name, true)
+
+/*
+ * -EFAULT in get_stackid normally means the stack-trace is not available,
+ * such as getting kernel stack trace in user mode
+ */
+#define STACK_ID_EFAULT(stack_id)	(stack_id == -EFAULT)
+
+#define STACK_ID_ERR(stack_id)		((stack_id < 0) && !STACK_ID_EFAULT(stack_id))
+
+/* hash collision (-EEXIST) suggests that stack map size may be too small */
+#define STACK_ID_COLLISION(stack_id)		(stack_id == -EEXIST)
 
 static void sig_handler(int signo);
 
@@ -186,7 +200,7 @@ const char argp_args_doc[] =
 "./memleak -s 5\n"
 "        Trace roughly every 5th allocation, to reduce overhead\n"
 "./memleak -p $(pidof allocs) -S je_\n"
-"        Trace task who sue jemalloc\n"
+"        Trace task who use jemalloc\n"
 "";
 
 static const struct argp_option argp_options[] = {
@@ -200,11 +214,15 @@ static const struct argp_option argp_options[] = {
 	{"wa-missing-free", 'F', 0, 0, "workaround to alleviate misjudgments when free is missing", 0 },
 	{"sample-rate", 's', "SAMPLE_RATE", 0, "sample every N-th allocation to decrease the overhead", 0 },
 	{"top", 'T', "TOP_STACKS", 0, "display only this many top allocating stacks (by size)", 0 },
-	{"min-size", 'z', "MIN_SIZE", 0, "capture only allocations larger than this size", 0 },
-	{"max-size", 'Z', "MAX_SIZE", 0, "capture only allocations smaller than this size", 0 },
+	{"min-size", 'z', "MIN_SIZE", 0, "capture only allocations larger than or equal to this size", 0 },
+	{"max-size", 'Z', "MAX_SIZE", 0, "capture only allocations smaller than or equal to this size", 0 },
 	{"obj", 'O', "OBJECT", 0, "attach to allocator functions in the specified object", 0 },
 	{"percpu", 'P', NULL, 0, "trace percpu allocations", 0 },
 	{"symbols-prefix", 'S', "SYMBOLS_PREFIX", 0, "memory allocator symbols prefix", 0 },
+	{"stack-storage-size", OPT_STACK_STORAGE_SIZE, "STACK-STORAGE-SIZE", 0,
+	 "the number of unique stack traces that can be stored and displayed (default 10240)", 0 },
+	{"perf-max-stack-depth", OPT_PERF_MAX_STACK_DEPTH,
+	 "PERF-MAX-STACK-DEPTH", 0, "the limit for both kernel and user stack traces (default 127)", 0 },
 	{"verbose", 'v', NULL, 0, "verbose debug output", 0 },
 	{},
 };
@@ -232,6 +250,16 @@ static uint64_t *stack;
 static struct allocation *allocs;
 
 static const char default_object[] = "libc.so.6";
+
+static void print_headers()
+{
+	if (env.kernel_trace)
+		printf("Attaching to kernel allocators");
+	else
+		printf("Attaching to pid %d", env.pid);
+
+	printf(", Ctrl+C to quit.\n");
+}
 
 int main(int argc, char *argv[])
 {
@@ -265,16 +293,11 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	if (!strlen(env.object)) {
-		printf("using default object: %s\n", default_object);
+	if (!strlen(env.object))
 		strncpy(env.object, default_object, sizeof(env.object) - 1);
-	}
 
 	env.page_size = sysconf(_SC_PAGE_SIZE);
-	printf("using page size: %ld\n", env.page_size);
-
 	env.kernel_trace = env.pid < 0 && !strlen(env.command);
-	printf("tracing kernel: %s\n", env.kernel_trace ? "true" : "false");
 
 	// if specific userspace program was specified,
 	// create the child process and use an eventfd to synchronize the call to exec()
@@ -358,6 +381,11 @@ int main(int argc, char *argv[])
 				env.perf_max_stack_depth * sizeof(unsigned long));
 	bpf_map__set_max_entries(skel->maps.stack_traces, env.stack_map_max_entries);
 
+	if (env.combined_only) {
+		bpf_map__set_max_entries(skel->maps.combined_allocs, COMBINED_ALLOCS_MAX_ENTRIES);
+		skel->rodata->combined_only = true;
+	}
+
 	// disable kernel tracepoints based on settings or availability
 	if (env.kernel_trace) {
 		if (!has_kernel_node_tracepoints())
@@ -380,7 +408,7 @@ int main(int argc, char *argv[])
 	const int combined_allocs_fd = bpf_map__fd(skel->maps.combined_allocs);
 	const int stack_traces_fd = bpf_map__fd(skel->maps.stack_traces);
 
-	// if userspace oriented, attach upbrobes
+	// if userspace oriented, attach uprobes
 	if (!env.kernel_trace) {
 		ret = attach_uprobes(skel);
 		if (ret) {
@@ -439,7 +467,7 @@ int main(int argc, char *argv[])
 	}
 #endif
 
-	printf("Tracing outstanding memory allocs...  Hit Ctrl-C to end\n");
+	print_headers();
 
 	// main loop
 	while (!exiting && env.nr_intervals) {
@@ -488,8 +516,6 @@ cleanup:
 	free(allocs);
 	free(stack);
 
-	printf("done\n");
-
 	return ret;
 }
 
@@ -508,10 +534,11 @@ long argp_parse_long(int key, const char *arg, struct argp_state *state)
 error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 {
 	static int pos_args = 0;
+	long age_ms;
 
 	switch (key) {
 	case 'p':
-		env.pid = atoi(arg);
+		env.pid = argp_parse_long(key, arg, state);
 		break;
 	case 't':
 		env.trace_all = true;
@@ -520,7 +547,12 @@ error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 		env.show_allocs = true;
 		break;
 	case 'o':
-		env.min_age_ns = 1e6 * atoi(arg);
+		age_ms = argp_parse_long(key, arg, state);
+		if (age_ms > (LONG_MAX / 1e6) || age_ms < (LONG_MIN / 1e6)) {
+			fprintf(stderr, "invalid AGE_MS: %s\n", arg);
+			argp_usage(state);
+		}
+		env.min_age_ns = age_ms * 1e6;
 		break;
 	case 'c':
 		strncpy(env.command, arg, sizeof(env.command) - 1);
@@ -538,7 +570,7 @@ error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 		strncpy(env.symbols_prefix, arg, sizeof(env.symbols_prefix) - 1);
 		break;
 	case 'T':
-		env.top_stacks = atoi(arg);
+		env.top_stacks = argp_parse_long(key, arg, state);
 		break;
 	case 'z':
 		env.min_size = argp_parse_long(key, arg, state);
@@ -554,6 +586,22 @@ error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'v':
 		env.verbose = true;
+		break;
+	case OPT_PERF_MAX_STACK_DEPTH:
+		errno = 0;
+		env.perf_max_stack_depth = strtol(arg, NULL, 10);
+		if (errno) {
+			fprintf(stderr, "invalid perf max stack depth: %s\n", arg);
+			argp_usage(state);
+		}
+		break;
+	case OPT_STACK_STORAGE_SIZE:
+		errno = 0;
+		env.stack_map_max_entries = strtol(arg, NULL, 10);
+		if (errno) {
+			fprintf(stderr, "invalid stack storage size: %s\n", arg);
+			argp_usage(state);
+		}
 		break;
 	case ARGP_KEY_ARG:
 		pos_args++;
@@ -685,7 +733,7 @@ pid_t fork_sync_exec(const char *command, int fd)
 	return pid;
 }
 
-#if USE_BLAZESYM
+#ifdef USE_BLAZESYM
 void print_stack_frame_by_blazesym(size_t frame, uint64_t addr, const blazesym_csym *sym)
 {
 	if (!sym)
@@ -832,6 +880,8 @@ int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 	struct tm *tm = localtime(&t);
 
 	size_t nr_allocs = 0;
+	size_t nr_missing_stacks = 0;
+	size_t nr_collision_stacks = 0;
 
 	// for each struct alloc_info "alloc_info" in the bpf map "allocs"
 	for (uint64_t prev_key = 0, curr_key = 0;; prev_key = curr_key) {
@@ -864,6 +914,10 @@ int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 
 		// filter invalid stacks
 		if (alloc_info.stack_id < 0) {
+			/* handle stack id errors */
+			nr_missing_stacks += STACK_ID_ERR(alloc_info.stack_id);
+			nr_collision_stacks += STACK_ID_COLLISION(alloc_info.stack_id);
+
 			continue;
 		}
 
@@ -948,6 +1002,13 @@ int print_outstanding_allocs(int allocs_fd, int stack_traces_fd)
 		}
 	}
 
+	if (nr_missing_stacks > 0) {
+		fprintf(stderr, "WARNING: %zu stack traces could not be displayed"
+			" due to memory shortage, including %zu caused by hash collisions."
+			" Consider increasing --stack-storage-size.\n",
+			nr_missing_stacks, nr_collision_stacks);
+	}
+
 	return 0;
 }
 
@@ -957,6 +1018,8 @@ int print_outstanding_combined_allocs(int combined_allocs_fd, int stack_traces_f
 	struct tm *tm = localtime(&t);
 
 	size_t nr_allocs = 0;
+	size_t nr_missing_stacks = 0;
+	size_t nr_collision_stacks = 0;
 
 	// for each stack_id "curr_key" and union combined_alloc_info "alloc"
 	// in bpf_map "combined_allocs"
@@ -990,6 +1053,16 @@ int print_outstanding_combined_allocs(int combined_allocs_fd, int stack_traces_f
 			.allocations = NULL
 		};
 
+		// filter invalid stacks
+		if (alloc.stack_id < 0) {
+			/* handle stack id errors */
+			if (STACK_ID_ERR(alloc.stack_id))
+				nr_missing_stacks += alloc.count;
+			if (STACK_ID_COLLISION(alloc.stack_id))
+				nr_collision_stacks += alloc.count;
+			continue;
+		}
+
 		memcpy(&allocs[nr_allocs], &alloc, sizeof(alloc));
 		nr_allocs++;
 	}
@@ -1003,6 +1076,13 @@ int print_outstanding_combined_allocs(int combined_allocs_fd, int stack_traces_f
 			tm->tm_hour, tm->tm_min, tm->tm_sec, nr_allocs);
 
 	print_stack_frames(allocs, nr_allocs, stack_traces_fd);
+
+	if (nr_missing_stacks > 0) {
+		fprintf(stderr, "WARNING: %zu stack traces could not be displayed"
+			" due to memory shortage, including %zu caused by hash collisions."
+			" Consider increasing --stack-storage-size.\n",
+			nr_missing_stacks, nr_collision_stacks);
+	}
 
 	return 0;
 }
@@ -1054,9 +1134,15 @@ int attach_uprobes(struct memleak_bpf *skel)
 	if (strlen(env.symbols_prefix)) {
 		ATTACH_UPROBE(skel, mmap, mmap_enter);
 		ATTACH_URETPROBE(skel, mmap, mmap_exit);
+
+		ATTACH_UPROBE(skel, mremap, mmap_enter);
+		ATTACH_URETPROBE(skel, mremap, mmap_exit);
 	} else {
 		ATTACH_UPROBE_CHECKED(skel, mmap, mmap_enter);
 		ATTACH_URETPROBE_CHECKED(skel, mmap, mmap_exit);
+
+		ATTACH_UPROBE_CHECKED(skel, mremap, mremap_enter);
+		ATTACH_URETPROBE_CHECKED(skel, mremap, mremap_exit);
 	}
 
 	ATTACH_UPROBE_CHECKED(skel, posix_memalign, posix_memalign_enter);

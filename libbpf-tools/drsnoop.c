@@ -42,7 +42,7 @@ const char argp_program_doc[] =
 "    drsnoop -p 123  # trace pid 123\n"
 "    drsnoop -t 123  # trace tid 123 (use for threads only)\n"
 "    drsnoop -d 10   # trace for 10 seconds only\n"
-"    drsnoop -e      # trace all direct reclaim events with extended faileds\n";
+"    drsnoop -e      # trace all direct reclaim events with extended fields\n";
 
 static const struct argp_option opts[] = {
 	{ "duration", 'd', "DURATION", 0, "Total duration of trace in seconds", 0 },
@@ -119,9 +119,7 @@ static void sig_int(int signo)
 void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	struct event e;
-	struct tm *tm;
 	char ts[32];
-	time_t t;
 
 	if (data_sz < sizeof(e)) {
 		printf("Error: packet too small\n");
@@ -130,9 +128,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	/* Copy data as alignment in the perf buffer isn't guaranteed. */
 	memcpy(&e, data, sizeof(e));
 
-	time(&t);
-	tm = localtime(&t);
-	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+	str_timestamp("%H:%M:%S", ts, sizeof(ts));
 	printf("%-8s %-16s %-6d %8.3f %5lld",
 	       ts, e.task, e.pid, e.delta_ns / 1000000.0,
 	       e.nr_reclaimed);

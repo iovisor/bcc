@@ -18,11 +18,11 @@ permissions:
 
 jobs:
   test_bcc:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
-        os: [{distro: "ubuntu", version: "20.04", nick: focal}]
-        llvm_version: [12, 15, 17]
+        os: [{distro: "ubuntu", version: "24.04", nick: noble}]
+        llvm_version: [15, 17, 19]
         env:
         - TYPE: Debug
           PYTHON_TEST_LOGFILE: critical.log
@@ -127,7 +127,7 @@ jobs:
         overwrite: true
 
   test_bcc_fedora:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         os: [{distro: "fedora", version: "38", nick: "f38"}]

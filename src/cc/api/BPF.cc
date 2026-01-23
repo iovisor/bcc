@@ -528,6 +528,35 @@ StatusTuple BPF::detach_uprobe(const std::string& binary_path,
   return StatusTuple::OK();
 }
 
+// Detach all uprobes associated with the given binary path.
+// This function cleans up all matching uprobes without checking if the binary file exists.
+// It simply matches the sanitized binary path in the event names and detaches them.
+
+StatusTuple BPF::detach_all_uprobes_for_binary(const std::string& binary_path) {
+  bool has_error = false;
+  std::string error_msg;
+  std::vector<std::string> to_detach;
+
+  // Sanitize the binary path as used in event names
+  std::string sanitized_path = sanitize_str(binary_path, &BPF::uprobe_path_validator);
+  // Find all uprobes for this binary
+  for (auto& it : uprobes_) {
+    if (it.first.find(sanitized_path) != std::string::npos) {
+      auto res = detach_uprobe_event(it.first, it.second);
+      if (!res.ok()) {
+        error_msg += "Failed to detach uprobe event " + it.first + ": ";
+        error_msg += res.msg() + "\n";
+        has_error = true;
+      }
+      uprobes_.erase(it.first);
+    }
+  }
+  if (has_error)
+    return StatusTuple(-1, error_msg);
+  else
+    return StatusTuple::OK();
+}
+
 StatusTuple BPF::detach_usdt_without_validation(const USDT& u, pid_t pid) {
   auto& probe = *static_cast<::USDT::Probe*>(u.probe_.get());
   bool failed = false;

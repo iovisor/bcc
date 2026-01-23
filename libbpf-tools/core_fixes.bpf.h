@@ -305,4 +305,23 @@ static __always_inline __u8 get_inet_sock_bind_address_no_port(void *inet_sock)
 	return (1 << INET_FLAGS_BIND_ADDRESS_NO_PORT___x) & inet_flags ? 1 : 0;
 }
 
+/**
+ * commit 736c55a02c47 ("sched/fair: Rename cfs_rq.nr_running into nr_queued")
+ * renamed cfs_rq::nr_running to cfs_rq::nr_queued.
+ *
+ * References:
+ *   [0]: https://github.com/torvalds/linux/commit/736c55a02c47
+ */
+struct cfs_rq___pre_v614 {
+	unsigned int		nr_running;
+};
+
+static __always_inline __u8 cfs_rq_get_nr_running_or_nr_queued(void *cfs_rq)
+{
+	if (bpf_core_field_exists(struct cfs_rq___pre_v614, nr_running))
+		return BPF_CORE_READ((struct cfs_rq___pre_v614 *)cfs_rq, nr_running);
+
+	return BPF_CORE_READ((struct cfs_rq *)cfs_rq, nr_queued);
+}
+
 #endif /* __CORE_FIXES_BPF_H */

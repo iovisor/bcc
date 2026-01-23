@@ -9,8 +9,9 @@ LIBBPF_SRC := $(abspath ../src/cc/libbpf/src)
 LIBBPF_OBJ := $(abspath $(OUTPUT)/libbpf.a)
 LIBBLAZESYM_SRC := $(abspath blazesym/target/release/libblazesym.a)
 INCLUDES := -I$(OUTPUT) -I../src/cc/libbpf/include/uapi
-CFLAGS := -g -O2 -Wall -Wmissing-field-initializers -Werror
-BPFCFLAGS := -g -O2 -Wall
+CFLAGS := -g -O2 -Wall -Wmissing-field-initializers -Werror -Werror=undef
+BPFCFLAGS := -g -O2 -Wall -Werror=undef
+BPFCFLAGS_softirqs := $(BPFCFLAGS) -mcpu=v3
 INSTALL ?= install
 prefix ?= /usr/local
 bindir := $(prefix)/bin
@@ -99,8 +100,8 @@ APPS = \
 # export variables that are used in Makefile.btfgen as well.
 export OUTPUT BPFTOOL ARCH BTFHUB_ARCHIVE APPS
 
-FSDIST_ALIASES = btrfsdist ext4dist nfsdist xfsdist f2fsdist bcachefsdist
-FSSLOWER_ALIASES = btrfsslower ext4slower nfsslower xfsslower f2fsslower bcachefsslower
+FSDIST_ALIASES = btrfsdist ext4dist fusedist nfsdist xfsdist f2fsdist bcachefsdist zfsdist
+FSSLOWER_ALIASES = btrfsslower ext4slower fuseslower nfsslower xfsslower f2fsslower bcachefsslower zfsslower
 SIGSNOOP_ALIAS = killsnoop
 APP_ALIASES = $(FSDIST_ALIASES) $(FSSLOWER_ALIASES) ${SIGSNOOP_ALIAS}
 
@@ -112,6 +113,7 @@ COMMON_OBJ = \
 	$(OUTPUT)/uprobe_helpers.o \
 	$(OUTPUT)/btf_helpers.o \
 	$(OUTPUT)/compat.o \
+	$(OUTPUT)/path_helpers.o \
 	$(if $(ENABLE_MIN_CORE_BTFS),$(OUTPUT)/min_core_btf_tar.o) \
 	#
 
@@ -198,6 +200,8 @@ $(OUTPUT)/%.o: %.c $(wildcard %.h) $(LIBBPF_OBJ) | $(OUTPUT)
 $(OUTPUT)/%.skel.h: $(OUTPUT)/%.bpf.o | $(OUTPUT) $(BPFTOOL)
 	$(call msg,GEN-SKEL,$@)
 	$(Q)$(BPFTOOL) gen skeleton $< > $@
+
+$(OUTPUT)/softirqs.bpf.o: BPFCFLAGS = $(BPFCFLAGS_softirqs)
 
 $(OUTPUT)/%.bpf.o: %.bpf.c $(LIBBPF_OBJ) $(wildcard %.h) $(ARCH)/vmlinux.h | $(OUTPUT)
 	$(call msg,BPF,$@)

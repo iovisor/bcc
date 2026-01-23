@@ -14,7 +14,7 @@ ip netns add netns22
 ip netns add netns3
 ip netns add netns4
 
-# set up veth devices in netns11 to netns21 with connection to netns3  
+# set up veth devices in netns11 to netns21 with connection to netns3
 ip link add veth11 type veth peer name veth13
 ip link add veth21 type veth peer name veth23
 ip link set veth11 netns netns11
@@ -22,15 +22,15 @@ ip link set veth21 netns netns21
 ip link set veth13 netns netns3
 ip link set veth23 netns netns3
 
-# set up veth devices in netns12 and netns22 with connection to netns4 
+# set up veth devices in netns12 and netns22 with connection to netns4
 ip link add veth12 type veth peer name veth14
 ip link add veth22 type veth peer name veth24
 ip link set veth12 netns netns12
 ip link set veth22 netns netns22
 ip link set veth14 netns netns4
 ip link set veth24 netns netns4
-  
-# assign IP addresses and set the devices up 
+
+# assign IP addresses and set the devices up
 ip netns exec netns11 ifconfig veth11 192.168.100.11/24 up
 ip netns exec netns11 ip link set lo up
 ip netns exec netns12 ifconfig veth12 192.168.100.12/24 up
@@ -40,16 +40,16 @@ ip netns exec netns21 ip link set lo up
 ip netns exec netns22 ifconfig veth22 192.168.200.22/24 up
 ip netns exec netns22 ip link set lo up
 
-# set up bridge brx and its ports 
-ip netns exec netns3 brctl addbr brx  
+# set up bridge brx and its ports
+ip netns exec netns3 brctl addbr brx
 ip netns exec netns3 ip link set brx up
 ip netns exec netns3 ip link set veth13 up
 ip netns exec netns3 ip link set veth23 up
 ip netns exec netns3 brctl addif brx veth13
 ip netns exec netns3 brctl addif brx veth23
 
-# set up bridge bry and its ports 
-ip netns exec netns4 brctl addbr bry  
+# set up bridge bry and its ports
+ip netns exec netns4 brctl addbr bry
 ip netns exec netns4 ip link set bry up
 ip netns exec netns4 ip link set veth14 up
 ip netns exec netns4 ip link set veth24 up
@@ -95,14 +95,14 @@ ip netns exec netns3 bridge vlan del vid 1 dev veth23
 ip netns exec netns4 bridge vlan del vid 1 dev veth14
 ip netns exec netns4 bridge vlan del vid 1 dev veth24
 
-# set up bridge brvx and its ports 
-ip netns exec netns3 brctl addbr brvx  
+# set up bridge brvx and its ports
+ip netns exec netns3 brctl addbr brvx
 ip netns exec netns3 ip link set brvx up
 ip netns exec netns3 ip link set vethx11 up
 ip netns exec netns3 brctl addif brvx vethx11
 
-# set up bridge brvy and its ports 
-ip netns exec netns4 brctl addbr brvy  
+# set up bridge brvy and its ports
+ip netns exec netns4 brctl addbr brvy
 ip netns exec netns4 ip link set brvy up
 ip netns exec netns4 ip link set vethy11 up
 ip netns exec netns4 brctl addif brvy vethy11
@@ -132,15 +132,15 @@ ip link add veth7 type veth peer name veth8
 ip link set veth7 up
 ip link set veth8 up
 
-# set up bridge brjx and its ports 
-brctl addbr brjx  
+# set up bridge brjx and its ports
+brctl addbr brjx
 ip link set brjx up
 ip link set veth4 up
 brctl addif brjx veth4
 brctl addif brjx veth7
 
-# set up bridge brjy and its ports 
-brctl addbr brjy  
+# set up bridge brjy and its ports
+brctl addbr brjy
 ip link set brjy up
 ip link set veth6 up
 brctl addif brjy veth6

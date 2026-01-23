@@ -22,6 +22,7 @@ import re
 import errno
 import sys
 import platform
+import subprocess
 
 from .libbcc import lib, bcc_symbol, bcc_symbol_option, bcc_stacktrace_build_id, _SYM_CB_TYPE
 from .table import Table, PerfEventArray, RingBuf, BPF_MAP_TYPE_QUEUE, BPF_MAP_TYPE_STACK
@@ -461,6 +462,7 @@ class BPF(object):
         self.raw_tracepoint_fds = {}
         self.kfunc_entry_fds = {}
         self.kfunc_exit_fds = {}
+        self.fmod_ret_fds = {}
         self.lsm_fds = {}
         self.perf_buffers = {}
         self.open_perf_events = {}
@@ -1157,6 +1159,12 @@ class BPF(object):
             return True
         return False
 
+    @staticmethod
+    def support_fmod_ret():
+        # Checking the existence of enum BPF_MODIFY_RETURN as the
+        # condition of support_fmod_ret.
+        return BPF.kernel_enum_has_val("bpf_attach_type", "BPF_MODIFY_RETURN") == 1
+
     def detach_kfunc(self, fn_name=b""):
         fn_name = _assert_is_bytes(fn_name)
         fn_name = BPF.add_prefix(b"kfunc__", fn_name)
@@ -1165,6 +1173,15 @@ class BPF(object):
             raise Exception("Kernel entry func %s is not attached" % fn_name)
         os.close(self.kfunc_entry_fds[fn_name])
         del self.kfunc_entry_fds[fn_name]
+
+    def detach_fmod_ret(self, fn_name=b""):
+        fn_name = _assert_is_bytes(fn_name)
+        fn_name = BPF.add_prefix(b"kmod_ret__", fn_name)
+
+        if fn_name not in self.fmod_ret_fds:
+            raise Exception("Fmod_ret func %s is not attached" % fn_name)
+        os.close(self.fmod_ret_fds[fn_name])
+        del self.fmod_ret_fds[fn_name]
 
     def detach_kretfunc(self, fn_name=b""):
         fn_name = _assert_is_bytes(fn_name)
@@ -1187,6 +1204,22 @@ class BPF(object):
         if fd < 0:
             raise Exception("Failed to attach BPF to entry kernel func")
         self.kfunc_entry_fds[fn_name] = fd
+        return self
+
+    def attach_fmod_ret(self, fn_name=b""):
+        fn_name = _assert_is_bytes(fn_name)
+        fn_name = BPF.add_prefix(b"kmod_ret__", fn_name)
+
+        if fn_name in self.fmod_ret_fds:
+            raise Exception("Fmod_ret func %s has been attached" % fn_name)
+
+        fn = self.load_func(fn_name, BPF.TRACING)
+        fd = lib.bpf_attach_kfunc(fn.fd)
+
+        if fd < 0:
+            raise Exception("Failed to attach BPF to fmod_ret kernel func")
+        self.fmod_ret_fds[fn_name] = fd
+
         return self
 
     def attach_kretfunc(self, fn_name=b""):
@@ -1251,6 +1284,12 @@ class BPF(object):
         struct_name = _assert_is_bytes(struct_name)
         field_name = _assert_is_bytes(field_name)
         return lib.kernel_struct_has_field(struct_name, field_name)
+
+    @staticmethod
+    def kernel_enum_has_val(enum_name, value_name):
+        enum_name = _assert_is_bytes(enum_name)
+        value_name = _assert_is_bytes(value_name)
+        return lib.kernel_enum_has_val(enum_name, value_name)
 
     def detach_tracepoint(self, tp=b""):
         """detach_tracepoint(tp="")
@@ -1365,11 +1404,11 @@ class BPF(object):
 
     def _get_uprobe_evname(self, prefix, path, addr, pid):
         if pid == -1:
-            return b"%s_%s_0x%x" % (prefix, self._probe_repl.sub(b"_", path), addr)
+            return b"%s_%s_0x%x" % (prefix, self._probe_repl.sub(b"_", os.path.basename(path)), addr)
         else:
             # if pid is valid, put pid in the name, so different pid
             # can have different event names
-            return b"%s_%s_0x%x_%d" % (prefix, self._probe_repl.sub(b"_", path), addr, pid)
+            return b"%s_%s_0x%x_%d" % (prefix, self._probe_repl.sub(b"_", os.path.basename(path)), addr, pid)
 
     def attach_uprobe(self, name=b"", sym=b"", sym_re=b"", addr=None,
             fn_name=b"", pid=-1, sym_off=0):
@@ -1824,6 +1863,8 @@ class BPF(object):
             self.detach_kretfunc(k)
         for k, v in list(self.lsm_fds.items()):
             self.detach_lsm(k)
+        for k, v in list(self.fmod_ret_fds.items()):
+            self.detach_fmod_ret(k)
 
         # Clean up opened perf ring buffer and perf events
         table_keys = list(self.tables.keys())

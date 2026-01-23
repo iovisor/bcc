@@ -75,7 +75,7 @@ else:
     print("ERROR: swap_readpage() and swap_read_folio() kernel function"
           " not found or traceable. "
           "The kernel might be too old or the the function has been inlined.")
-    exit()
+    exit(1)
 
 print("Counting swap ins. Ctrl-C to end.");
 

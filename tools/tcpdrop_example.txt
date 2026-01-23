@@ -5,54 +5,46 @@ tcpdrop prints details of TCP packets or segments that were dropped by the
 kernel, including the kernel stack trace that led to the drop:
 
 # ./tcpdrop.py
-TIME     PID    IP SADDR:SPORT          > DADDR:DPORT          STATE (FLAGS)
-20:49:06 0      4  10.32.119.56:443     > 10.66.65.252:22912   CLOSE (ACK)
-	tcp_drop+0x1
-	tcp_v4_do_rcv+0x135
-	tcp_v4_rcv+0x9c7
-	ip_local_deliver_finish+0x62
-	ip_local_deliver+0x6f
-	ip_rcv_finish+0x129
-	ip_rcv+0x28f
-	__netif_receive_skb_core+0x432
-	__netif_receive_skb+0x18
-	netif_receive_skb_internal+0x37
-	napi_gro_receive+0xc5
-	ena_clean_rx_irq+0x3c3
-	ena_io_poll+0x33f
-	net_rx_action+0x140
-	__softirqentry_text_start+0xdf
-	irq_exit+0xb6
-	do_IRQ+0x82
-	ret_from_intr+0x0
-	native_safe_halt+0x6
-	default_idle+0x20
-	arch_cpu_idle+0x15
-	default_idle_call+0x23
-	do_idle+0x17f
-	cpu_startup_entry+0x73
-	rest_init+0xae
-	start_kernel+0x4dc
-	x86_64_start_reservations+0x24
-	x86_64_start_kernel+0x74
-	secondary_startup_64+0xa5
-
-20:49:50 12431  4  127.0.0.1:8198       > 127.0.0.1:48280      CLOSE (RST|ACK)
-	tcp_drop+0x1
-	tcp_v4_do_rcv+0x135
-	__release_sock+0x88
-	release_sock+0x30
-	inet_stream_connect+0x47
-	SYSC_connect+0x9e
-	sys_connect+0xe
-	do_syscall_64+0x73
-	entry_SYSCALL_64_after_hwframe+0x3d
+TIME     PID     IP SADDR:SPORT          > DADDR:DPORT          STATE (FLAGS)        REASON (CODE)
+14:46:49 0       4  39.156.66.10:80      > 10.211.55.10:33280   SYN_SENT (SYN|ACK)   NETFILTER_DROP (12)
+	b'__traceiter_kfree_skb+0x90'
+	b'__traceiter_kfree_skb+0x90'
+	b'sk_skb_reason_drop+0x1e4'
+	b'nft_do_chain+0x93c'
+	b'nft_do_chain_ipv4+0x16c'
+	b'nf_hook_slow+0xb0'
+	b'ip_local_deliver+0x244'
+	b'ip_sublist_rcv_finish+0xec'
+	b'ip_sublist_rcv+0x32c'
+	b'ip_list_rcv+0x210'
+	b'__netif_receive_skb_list_core+0x348'
+	b'netif_receive_skb_list_internal+0x498'
+	b'napi_complete_done+0x190'
+	b'virtnet_poll+0x10a8'
+	b'__napi_poll+0xa4'
+	b'net_rx_action+0x460'
+	b'handle_softirqs+0x304'
+	b'__do_softirq+0x20'
+	b'____do_softirq+0x1c'
+	b'call_on_irq_stack+0x3c'
+	b'do_softirq_own_stack+0x28'
+	b'__irq_exit_rcu+0x384'
+	b'irq_exit_rcu+0x1c'
+	b'el1_interrupt+0x4c'
+	b'el1h_64_irq_handler+0x1c'
+	b'el1h_64_irq+0x84'
+	b'do_idle+0x31c'
+	b'cpu_startup_entry+0x6c'
+	b'rest_init+0x170'
+	b'start_kernel+0x314'
+	b'__primary_switched+0x94'
 
 [...]
 
-The last two columns show the state of the TCP session, and the TCP flags.
-These two examples show packets arriving for a session in the closed state,
-that were dropped by the kernel.
+The last four columns show the state of the TCP session, the TCP flags, the
+reason for the packet drop, and the corresponding reason code. In this
+example, a packet arriving for a session in the `SYN_SENT` state with
+`SYN|ACK` flags was dropped by the kernel due to the reason `NETFILTER_DROP`.
 
 This tool is useful for debugging high rates of drops, which can cause the
 remote end to do timer-based retransmits, hurting performance.

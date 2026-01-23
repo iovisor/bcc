@@ -65,17 +65,6 @@ struct val_t {
     char name[TASK_COMM_LEN];
 };
 
-struct tp_args {
-    u64 __unused__;
-    dev_t dev;
-    sector_t sector;
-    unsigned int nr_sector;
-    unsigned int bytes;
-    char rwbs[8];
-    char comm[16];
-    char cmd[];
-};
-
 struct hash_key {
     dev_t dev;
     u32 rwflag;
@@ -182,17 +171,6 @@ int trace_pid_start(struct pt_regs *ctx, struct request *req)
     return __trace_pid_start(key);
 }
 
-int trace_pid_start_tp(struct tp_args *args)
-{
-    struct hash_key key = {
-        .dev = args->dev,
-        .rwflag = get_rwflag_tp(args->rwbs),
-        .sector = args->sector
-    };
-
-    return __trace_pid_start(key);
-}
-
 // time block I/O
 int trace_req_start(struct pt_regs *ctx, struct request *req)
 {
@@ -218,7 +196,6 @@ static int __trace_req_completion(void *ctx, struct hash_key key)
     struct start_req_t *startp;
     struct val_t *valp;
     struct data_t data = {};
-    //struct gendisk *rq_disk;
     u64 ts;
 
     // fetch timestamp and calculate delta
@@ -228,7 +205,6 @@ static int __trace_req_completion(void *ctx, struct hash_key key)
         return 0;
     }
     ts = bpf_ktime_get_ns();
-    //rq_disk = req->__RQ_DISK__;
     data.delta = ts - startp->ts;
     data.ts = ts / 1000;
     data.qdelta = 0;
@@ -260,10 +236,10 @@ static int __trace_req_completion(void *ctx, struct hash_key key)
 
     sector = last_sectors.lookup(&sector_key);
     if (sector != 0) {
-        data.pattern = req->__sector == *sector ? SEQUENTIAL : RANDOM;
+        data.pattern = key.sector == *sector ? SEQUENTIAL : RANDOM;
     }
 
-    last_sector = req->__sector + data.len / 512;
+    last_sector = key.sector + data.len / 512;
     last_sectors.update(&sector_key, &last_sector);
 #endif
 
@@ -286,8 +262,23 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
 
     return __trace_req_completion(ctx, key);
 }
+"""
 
-int trace_req_completion_tp(struct tp_args *args)
+tp_start_text = """
+TRACEPOINT_PROBE(block, block_io_start)
+{
+    struct hash_key key = {
+        .dev = args->dev,
+        .rwflag = get_rwflag_tp(args->rwbs),
+        .sector = args->sector
+    };
+
+    return __trace_pid_start(key);
+}
+"""
+
+tp_done_text = """
+TRACEPOINT_PROBE(block, block_io_done)
 {
     struct hash_key key = {
         .dev = args->dev,
@@ -298,6 +289,7 @@ int trace_req_completion_tp(struct tp_args *args)
     return __trace_req_completion(args, key);
 }
 """
+
 if args.queue:
     bpf_text = bpf_text.replace('##QUEUE##', '1')
 else:
@@ -331,31 +323,41 @@ if debug or args.ebpf:
     if args.ebpf:
         exit()
 
+if BPF.tracepoint_exists("block", "block_io_start"):
+    bpf_text += tp_start_text
+    tp_start = True
+else:
+    tp_start = False
+
+if BPF.tracepoint_exists("block", "block_io_done"):
+    bpf_text += tp_done_text
+    tp_done = True
+else:
+    tp_done = False
+
 # initialize BPF
 b = BPF(text=bpf_text)
-if BPF.tracepoint_exists("block", "block_io_start"):
-    b.attach_tracepoint(tp="block:block_io_start", fn_name="trace_pid_start_tp")
-elif BPF.get_kprobe_functions(b'__blk_account_io_start'):
-    b.attach_kprobe(event="__blk_account_io_start", fn_name="trace_pid_start")
-elif BPF.get_kprobe_functions(b'blk_account_io_start'):
-    b.attach_kprobe(event="blk_account_io_start", fn_name="trace_pid_start")
-else:
-    print("ERROR: No found any block io start probe/tp.")
-    exit()
+if not tp_start:
+    if BPF.get_kprobe_functions(b'__blk_account_io_start'):
+        b.attach_kprobe(event="__blk_account_io_start", fn_name="trace_pid_start")
+    elif BPF.get_kprobe_functions(b'blk_account_io_start'):
+        b.attach_kprobe(event="blk_account_io_start", fn_name="trace_pid_start")
+    else:
+        print("ERROR: No found any block io start probe/tp.")
+        exit(1)
 
 if BPF.get_kprobe_functions(b'blk_start_request'):
     b.attach_kprobe(event="blk_start_request", fn_name="trace_req_start")
 b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_req_start")
 
-if BPF.tracepoint_exists("block", "block_io_done"):
-    b.attach_tracepoint(tp="block:block_io_done", fn_name="trace_req_completion_tp")
-elif BPF.get_kprobe_functions(b'__blk_account_io_done'):
-    b.attach_kprobe(event="__blk_account_io_done", fn_name="trace_req_completion")
-elif BPF.get_kprobe_functions(b'blk_account_io_done'):
-    b.attach_kprobe(event="blk_account_io_done", fn_name="trace_req_completion")
-else:
-    print("ERROR: No found any block io done probe/tp.")
-    exit()
+if not tp_done:
+    if BPF.get_kprobe_functions(b'__blk_account_io_done'):
+        b.attach_kprobe(event="__blk_account_io_done", fn_name="trace_req_completion")
+    elif BPF.get_kprobe_functions(b'blk_account_io_done'):
+        b.attach_kprobe(event="blk_account_io_done", fn_name="trace_req_completion")
+    else:
+        print("ERROR: No found any block io done probe/tp.")
+        exit(1)
 
 
 # header

@@ -100,7 +100,7 @@ BPF_PERF_OUTPUT(events);
 // The current ext4 (Linux 4.5) uses generic_file_read_iter(), instead of it's
 // own function, for reads. So we need to trace that and then filter on ext4,
 // which I do by checking file->f_op.
-// The new Linux version (since form 4.10) uses ext4_file_read_iter(), And if the 'CONFIG_FS_DAX' 
+// The new Linux version (since form 4.10) uses ext4_file_read_iter(), And if the 'CONFIG_FS_DAX'
 // is not set, then ext4_file_read_iter() will call generic_file_read_iter(), else it will call
 // ext4_dax_read_iter(), and trace generic_file_read_iter() will fail.
 int trace_read_entry(struct pt_regs *ctx, struct kiocb *iocb)
@@ -270,7 +270,7 @@ with open(kallsyms) as syms:
     if ops == '':
         print("ERROR: no ext4_file_operations in /proc/kallsyms. Exiting.")
         print("HINT: the kernel should be built with CONFIG_KALLSYMS_ALL.")
-        exit()
+        exit(1)
     bpf_text = bpf_text.replace('EXT4_FILE_OPERATIONS', ops)
 if min_ms == 0:
     bpf_text = bpf_text.replace('FILTER_US', '0')

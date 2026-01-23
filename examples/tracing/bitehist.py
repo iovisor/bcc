@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 #
 # bitehist.py	Block I/O size histogram.
 #		For Linux, uses BCC, eBPF. Embedded C.
@@ -12,6 +12,7 @@
 #
 # 15-Aug-2015	Brendan Gregg	Created this.
 # 03-Feb-2019   Xiaozhou Liu    added linear histogram.
+# 02-Mar-2025   Wei             Use blk_mq_end_request for newer kernel.
 
 from __future__ import print_function
 from bcc import BPF
@@ -34,9 +35,13 @@ int trace_req_done(struct pt_regs *ctx, struct request *req)
 """)
 
 if BPF.get_kprobe_functions(b'__blk_account_io_done'):
+    # __blk_account_io_done is available before kernel v6.4.
     b.attach_kprobe(event="__blk_account_io_done", fn_name="trace_req_done")
-else:
+elif BPF.get_kprobe_functions(b'blk_account_io_done'):
+    # blk_account_io_done is traceable (not inline) before v5.16.
     b.attach_kprobe(event="blk_account_io_done", fn_name="trace_req_done")
+else:
+    b.attach_kprobe(event="blk_mq_end_request", fn_name="trace_req_done")
 
 # header
 print("Tracing... Hit Ctrl-C to end.")

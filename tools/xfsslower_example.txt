@@ -108,7 +108,7 @@ offsets: a sequential workload.
 
 A -j option will print just the fields (parsable output, csv):
 
-# ./xfsslower -j 1 
+# ./xfsslower -j 1
 ENDTIME_us,TASK,PID,TYPE,BYTES,OFFSET_b,LATENCY_us,FILE
 125563830632,randread.pl,12155,R,8192,27824193536,1057,data1
 125565050578,randread.pl,12155,R,8192,16908525568,1969,data1

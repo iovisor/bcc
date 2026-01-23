@@ -1,0 +1,133 @@
+.TH SOFTIRQSLOWER 8 "2025-07-08" "BCC Tools" "Linux Performance Analysis"
+.SH NAME
+softirqslower \- Trace softirq handlers with latency exceeding a threshold
+.SH SYNOPSIS
+.B softirqslower.py
+.RI [min_us]
+.br
+.B softirqslower.py
+.RB [ \-c
+.IR CPU ]
+.RI [min_us]
+.SH DESCRIPTION
+The
+.B softirqslower
+tool traces softirq events that exceed a specified latency threshold. This tool helps diagnose
+interrupt handling bottlenecks by measuring two critical latency dimensions:
+
+.IP \(bu 2
+\fBirq(hard) to softirq\fR: Time delay between hardware interrupt completion and softirq execution start
+.IP \(bu 2
+\fBsoftirq runtime\fR: Actual execution duration of softirq handlers
+.PP
+Developed as part of the BCC (BPF Compiler Collection) tools, it's particularly useful for network
+stack optimization, scheduler tuning, and real-time systems analysis.
+
+.SH OPTIONS
+.TP
+.B min_us
+Minimum latency threshold to trace (in microseconds). Default: 10,000 μs (10 ms)
+.TP
+.BR \-c ", " \-\-cpu " " \fICPU
+Trace only events on the specified CPU core
+
+.SH OUTPUT FORMAT
+The tool outputs events in the following table format:
+.PP
+TIME     STAGE                SOFTIRQ  LAT(us)        CPU    COMM
+.PP
+With fields defined as:
+.TP
+.B TIME
+Event timestamp (HH:MM:SS format)
+.TP
+.B STAGE
+Latency measurement type:
+.RS
+.TP 12
+.B irq(hard) to softirq
+Time from hardware interrupt completion to softirq dispatch
+.TP
+.B softirq runtime
+SoftIRQ handler execution duration
+.RE
+.TP
+.B SOFTIRQ
+SoftIRQ category (case-sensitive). Common values:
+.RS
+.TP 12
+.B NET_RX
+Network reception processing
+.TP
+.B NET_TX
+Network transmission processing
+.TP
+.B TIMER
+Timer callbacks
+.TP
+.B SCHED
+Scheduler operations
+.TP
+.B RCU
+Read-Copy-Update synchronization
+.TP
+.B TASKLET
+Deferred task execution
+.TP
+.B HRTIMER
+High-resolution timers
+.TP
+.B BLOCK
+Block device operations
+.RE
+.TP
+.B LAT(us)
+Measured latency in microseconds
+.TP
+.B CPU
+CPU core where softirq was handled (0-based numbering)
+.TP
+.B COMM
+Process context handling the softirq:
+.RS
+.TP 12
+.B swapper/N
+Idle thread for CPU N
+.TP
+.B ksoftirqd/N
+Softirq daemon for CPU N
+.TP
+.B <process>
+User-space process
+.RE
+
+.SH EXAMPLES
+.TP
+Trace softirqs exceeding 10μs latency:
+.B softirqslower 10
+.TP
+Monitor only CPU core 1:
+.B softirqslower \-c 1
+.TP
+Trace network-related softirq delays (>50μs):
+.B softirqslower 50 | grep -E 'net_rx|net_tx'
+.TP
+Capture RCU delays longer than 100μs to file:
+.B softirqslower 100 | grep "rcu" > rcu_latency.log
+
+.SH SIGNALS
+.B Ctrl+C
+Stop tracing and exit gracefully
+
+.SH AUTHOR
+Chenyue Zhou
+
+.SH SEE ALSO
+.BR runqslower (8),
+.BR hardirqs (8),
+.BR softirqs (8),
+.BR trace (8),
+.BR funclatency (8),
+
+.SH REPORTING BUGS
+BCC Tools Issue Tracker: https://github.com/iovisor/bcc/issues

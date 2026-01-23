@@ -1,15 +1,15 @@
-ARG VERSION="20.04"
+ARG VERSION="24.04"
 FROM ubuntu:${VERSION}
 
-ARG LLVM_VERSION="12"
+ARG LLVM_VERSION="15"
 ENV LLVM_VERSION=$LLVM_VERSION
 
-ARG SHORTNAME="focal"
+ARG SHORTNAME="noble"
 
 ARG RUBY_INSTALL_VERSION="0.8.4"
 ENV RUBY_INSTALL_VERSION=$RUBY_INSTALL_VERSION
 
-ARG RUBY_VERSION="3.1.2"
+ARG RUBY_VERSION="3.3.6"
 ENV RUBY_VERSION=$RUBY_VERSION
 
 RUN /bin/bash -c 'apt-get update && apt-get install -y curl gnupg &&\
@@ -29,7 +29,7 @@ deb-src http://apt.llvm.org/${SHORTNAME}/ llvm-toolchain-${SHORTNAME}-${version}
 ARG DEBIAN_FRONTEND="noninteractive"
 ENV TZ="Etc/UTC"
 
-RUN /bin/bash -c 'apt-get update && apt-get install -y \
+RUN /bin/bash -c 'apt-get install -y \
       util-linux \
       bison \
       binutils-dev \
@@ -56,7 +56,7 @@ RUN /bin/bash -c 'apt-get update && apt-get install -y \
       iperf \
       iputils-ping \
       bridge-utils \
-      libtinfo5 \
+      libtinfo6 \
       libtinfo-dev \
       libzstd-dev \
       xz-utils \
@@ -77,11 +77,16 @@ do \
       then \
         apt-get install -y libpolly-${version}-dev; \
       fi; \
-done \ 
+done \
 && \
       apt-get -y clean'
 
-RUN pip3 install pyroute2==0.5.18 netaddr==0.8.0 dnslib==0.9.14 cachetools==3.1.1 pyelftools==0.30
+RUN apt-get install -y python3-setuptools \
+      python3-pyroute2 \
+      python3-netaddr \
+      python3-dnslib \
+      python3-cachetools \
+      python3-pyelftools
 
 # FIXME this is faster than building from source, but it seems there is a bug
 # in probing libruby.so rather than ruby binary

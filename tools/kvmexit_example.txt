@@ -224,27 +224,32 @@ USAGE message:
 ==============
 
 # ./kvmexit.py -h
-usage: kvmexit.py [-h] [-p PID [-v VCPU | -a] ] [-t TID | -T 'TID1,TID2'] [duration]
+usage: kvmexit.py [-h] [-p PID] [-t TID | -T TIDS | -v VCPU | -a] [-m MAX_PARALLELISM] [duration]
 
 Display kvm_exit_reason and its statistics at a timed interval
 
+positional arguments:
+  duration              show delta for next several seconds
+
 optional arguments:
   -h, --help            show this help message and exit
-  -p PID, --pid PID     display process with this PID only, collpase all tids with exit reasons sorted in descending order
-  -v VCPU, --v VCPU     display this VCPU only for this PID
-  -a, --alltids         display all TIDS for this PID
-  -t TID, --tid TID     display thread with this TID only with exit reasons sorted in descending order
-  -T 'TID1,TID2', --tids 'TID1,TID2'
-                        display threads for a union like {395490, 395491}
-  duration              duration of display, after sleeping several seconds
+  -p PID, --pid PID     trace this PID only
+  -t TID, --tid TID     trace this TID only
+  -T TIDS, --tids TIDS  trace a comma separated series of tids with no space in between
+  -v VCPU, --vcpu VCPU  trace this vcpu only
+  -a, --alltids         trace all tids for this pid
+  -m MAX_PARALLELISM, --max-parallelism MAX_PARALLELISM
+                        limit post processing parallelism to the given thread count
+  -d, --debug           enable debug facilities
 
 examples:
-    ./kvmexit                         # Display kvm_exit_reason and its statistics in real-time until Ctrl-C
-    ./kvmexit 5                       # Display in real-time after sleeping 5s
-    ./kvmexit -p 3195281              # Collpase all tids for pid 3195281 with exit reasons sorted in descending order
-    ./kvmexit -p 3195281 20           # Collpase all tids for pid 3195281 with exit reasons sorted in descending order, and display after sleeping 20s
-    ./kvmexit -p 3195281 -v 0         # Display only vcpu0 for pid 3195281, descending sort by default
-    ./kvmexit -p 3195281 -a           # Display all tids for pid 3195281
-    ./kvmexit -t 395490               # Display only for tid 395490 with exit reasons sorted in descending order
-    ./kvmexit -t 395490 20            # Display only for tid 395490 with exit reasons sorted in descending order after sleeping 20s
-    ./kvmexit -T '395490,395491'      # Display for a union like {395490, 395491}
+    ./kvmexit                              # Display kvm_exit_reason and its statistics in real-time until Ctrl-C
+    ./kvmexit 5                            # Display in real-time after sleeping 5s
+    ./kvmexit -p 3195281                   # Collpase all tids for pid 3195281 with exit reasons sorted in descending order
+    ./kvmexit -p 3195281 20                # Collpase all tids for pid 3195281 with exit reasons sorted in descending order, and display after sleeping 20s
+    ./kvmexit -p 3195281 -v 0              # Display only vcpu0 for pid 3195281, descending sort by default
+    ./kvmexit -p 3195281 -a                # Display all tids for pid 3195281
+    ./kvmexit -p 3195281 -a -m 2           # Display all tids for pid 3195281, limit post processing to two threads
+    ./kvmexit -t 395490                    # Display only for tid 395490 with exit reasons sorted in descending order
+    ./kvmexit -t 395490 20                 # Display only for tid 395490 with exit reasons sorted in descending order after sleeping 20s
+    ./kvmexit -T '395490,395491'           # Display for a union like {395490, 395491}

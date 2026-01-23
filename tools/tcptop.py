@@ -7,7 +7,8 @@
 # USAGE: tcptop [-h] [-C] [-S] [-p PID] [interval [count]] [-4 | -6]
 #
 # This uses dynamic tracing of kernel functions, and will need to be updated
-# to match kernel changes.
+# to match kernel changes. Only works on linux versions over 5.5. For older
+# versions, use tools/old/tcptop.py
 #
 # WARNING: This traces all send/receives at the TCP level, and while it
 # summarizes data in-kernel to reduce overhead, there may still be some
@@ -110,9 +111,10 @@ struct ipv6_key_t {
 };
 BPF_HASH(ipv6_send_bytes, struct ipv6_key_t);
 BPF_HASH(ipv6_recv_bytes, struct ipv6_key_t);
-BPF_HASH(sock_store, u32, struct sock *);
+BPF_HASH(sock_send, u32, struct sock *);
+BPF_HASH(sock_recv, u32, struct sock *);
 
-static int tcp_sendstat(int size)
+static int tcp_stat(int size, bool is_send)
 {
     if (container_should_be_filtered()) {
         return 0;
@@ -122,7 +124,7 @@ static int tcp_sendstat(int size)
     FILTER_PID
     u32 tid = bpf_get_current_pid_tgid();
     struct sock **sockpp;
-    sockpp = sock_store.lookup(&tid);
+    sockpp = is_send ? sock_send.lookup(&tid) : sock_recv.lookup(&tid);
     if (sockpp == 0) {
         return 0; //miss the entry
     }
@@ -131,7 +133,7 @@ static int tcp_sendstat(int size)
     bpf_probe_read_kernel(&family, sizeof(family),
         &sk->__sk_common.skc_family);
     FILTER_FAMILY
-    
+
     if (family == AF_INET) {
         struct ipv4_key_t ipv4_key = {.pid = pid};
         bpf_get_current_comm(&ipv4_key.name, sizeof(ipv4_key.name));
@@ -144,7 +146,11 @@ static int tcp_sendstat(int size)
         bpf_probe_read_kernel(&dport, sizeof(dport),
             &sk->__sk_common.skc_dport);
         ipv4_key.dport = ntohs(dport);
-        ipv4_send_bytes.increment(ipv4_key, size);
+        if (is_send) {
+            ipv4_send_bytes.increment(ipv4_key, size);
+        } else {
+            ipv4_recv_bytes.increment(ipv4_key, size);
+        }
 
     } else if (family == AF_INET6) {
         struct ipv6_key_t ipv6_key = {.pid = pid};
@@ -158,24 +164,32 @@ static int tcp_sendstat(int size)
         bpf_probe_read_kernel(&dport, sizeof(dport),
             &sk->__sk_common.skc_dport);
         ipv6_key.dport = ntohs(dport);
-        ipv6_send_bytes.increment(ipv6_key, size);
+        if (is_send) {
+            ipv6_send_bytes.increment(ipv6_key, size);
+        } else {
+            ipv6_recv_bytes.increment(ipv6_key, size);
+        }
     }
-    sock_store.delete(&tid);
+
+    if (is_send) {
+        sock_send.delete(&tid);
+    } else {
+        sock_recv.delete(&tid);
+    }
     // else drop
 
     return 0;
 }
 
-int tcp_send_ret(struct pt_regs *ctx)
+KRETFUNC_PROBE(tcp_sendmsg, struct sock *sk, struct msghdr *msg, size_t size, int ret)
 {
-    int size = PT_REGS_RC(ctx);
-    if (size > 0)
-        return tcp_sendstat(size);
+    if (ret > 0)
+        return tcp_stat(ret, true);
     else
         return 0;
 }
 
-int tcp_send_entry(struct pt_regs *ctx, struct sock *sk)
+KFUNC_PROBE(tcp_sendmsg, struct sock *sk, struct msghdr *msg, size_t size)
 {
     if (container_should_be_filtered()) {
         return 0;
@@ -185,7 +199,7 @@ int tcp_send_entry(struct pt_regs *ctx, struct sock *sk)
     u32 tid = bpf_get_current_pid_tgid();
     u16 family = sk->__sk_common.skc_family;
     FILTER_FAMILY
-    sock_store.update(&tid, &sk);
+    sock_send.update(&tid, &sk);
     return 0;
 }
 
@@ -195,47 +209,25 @@ int tcp_send_entry(struct pt_regs *ctx, struct sock *sk)
  * - misses tcp_read_sock() traffic
  * we'd much prefer tracepoints once they are available.
  */
-int kprobe__tcp_cleanup_rbuf(struct pt_regs *ctx, struct sock *sk, int copied)
+KRETFUNC_PROBE(tcp_recvmsg, struct sock *sk, struct msghdr *msg, size_t len, int flags, int *addr_len, int ret)
+{
+    if (ret > 0)
+        return tcp_stat(ret, false);
+    else
+        return 0;
+}
+
+KFUNC_PROBE(tcp_recvmsg, struct sock *sk, struct msghdr *msg, size_t len, int flags, int *addr_len)
 {
     if (container_should_be_filtered()) {
         return 0;
     }
-
     u32 pid = bpf_get_current_pid_tgid() >> 32;
     FILTER_PID
-
-    u16 dport = 0, family = sk->__sk_common.skc_family;
-    u64 *val, zero = 0;
-
-    if (copied <= 0)
-        return 0;
-
+    u32 tid = bpf_get_current_pid_tgid();
+    u16 family = sk->__sk_common.skc_family;
     FILTER_FAMILY
-    
-    if (family == AF_INET) {
-        struct ipv4_key_t ipv4_key = {.pid = pid};
-        bpf_get_current_comm(&ipv4_key.name, sizeof(ipv4_key.name));
-        ipv4_key.saddr = sk->__sk_common.skc_rcv_saddr;
-        ipv4_key.daddr = sk->__sk_common.skc_daddr;
-        ipv4_key.lport = sk->__sk_common.skc_num;
-        dport = sk->__sk_common.skc_dport;
-        ipv4_key.dport = ntohs(dport);
-        ipv4_recv_bytes.increment(ipv4_key, copied);
-
-    } else if (family == AF_INET6) {
-        struct ipv6_key_t ipv6_key = {.pid = pid};
-        bpf_get_current_comm(&ipv6_key.name, sizeof(ipv6_key.name));
-        bpf_probe_read_kernel(&ipv6_key.saddr, sizeof(ipv6_key.saddr),
-            &sk->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
-        bpf_probe_read_kernel(&ipv6_key.daddr, sizeof(ipv6_key.daddr),
-            &sk->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
-        ipv6_key.lport = sk->__sk_common.skc_num;
-        dport = sk->__sk_common.skc_dport;
-        ipv6_key.dport = ntohs(dport);
-        ipv6_recv_bytes.increment(ipv6_key, copied);
-    }
-    // else drop
-
+    sock_recv.update(&tid, &sk);
     return 0;
 }
 """
@@ -284,11 +276,7 @@ b = BPF(text=bpf_text)
 htab_batch_ops = True if BPF.kernel_struct_has_field(b'bpf_map_ops',
         b'map_lookup_and_delete_batch') == 1 else False
 
-b.attach_kprobe(event='tcp_sendmsg', fn_name='tcp_send_entry')
-b.attach_kretprobe(event='tcp_sendmsg', fn_name='tcp_send_ret')
-if BPF.get_kprobe_functions(b'tcp_sendpage'):
-    b.attach_kprobe(event='tcp_sendpage', fn_name='tcp_send_entry')
-    b.attach_kretprobe(event='tcp_sendpage', fn_name='tcp_send_ret')
+# attached with fentry/exit macros
 
 ipv4_send_bytes = b["ipv4_send_bytes"]
 ipv4_recv_bytes = b["ipv4_recv_bytes"]

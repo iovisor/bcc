@@ -1,0 +1,58 @@
+Demonstrations of softirqslower, the Linux eBPF/bcc version.
+
+The softirqslower tool traces two critical latency dimensions of softirq handling:
+
+1. Softirq execution duration - Measures the actual processing time consumed by
+softirq handlers (from entry to completion)
+2. Wakeup-to-execution latency - Tracks the delay between softirq wakeup
+triggers (via raise_softirq()) and handler execution start
+
+For example:
+
+# softirqslower
+
+Tracing softirq latency higher than 10000 us... Hit Ctrl-C to end.
+
+TIME     STAGE                SOFTIRQ  LAT(us)        CPU    COMM
+14:41:43 irq(hard) to softirq net_rx   50223          0      cat
+14:41:43 irq(hard) to softirq tasklet  50374          0      cat
+14:41:43 irq(hard) to softirq timer    15935          0      cat
+14:41:43 irq(hard) to softirq net_rx   15901          0      cat
+14:41:43 irq(hard) to softirq net_rx   10421          0      cat
+14:41:43 irq(hard) to softirq net_rx   21794          0      cat
+14:41:43 irq(hard) to softirq tasklet  21984          0      cat
+14:42:11 irq(hard) to softirq net_rx   95140          0      cat
+14:42:11 irq(hard) to softirq tasklet  95280          0      cat
+14:42:11 irq(hard) to softirq timer    50834          0      cat
+[...]
+
+The trace results reveal softirq events with measured latencies beyond the
+10,000μs threshold.
+
+The 'softirq runtime' metric indicates the actual execution duration of softirq
+handlers. This reveals which softirq types (NET_RX, TASKLET, etc.) are consuming
+excessive processing time.
+
+The 'hardirq-to-softirq latency' metric measures the delay between when a
+softirq is triggered (from hardware interrupt context) until its execution
+begins. Elevated values here suggest either: Preemption by higher-priority
+kernel tasks/threads or others
+
+USAGE message:
+
+# softirqslower -h
+usage: softirqslower.py [-h] [-c CPU] [min_us]
+
+Trace slow soft IRQ (interrupt).
+
+positional arguments:
+  min_us             minimum softirq latency to trace, in us (default 10000)
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -c CPU, --cpu CPU  trace this CPU only
+
+examples:
+    ./softirqslower        # trace softirq latency higher than 10000 us (default)
+    ./softirqslower 100000 # trace softirq latency higher than 100000 us
+    ./softirqslower -c 1   # trace softirq latency on CPU 1 only

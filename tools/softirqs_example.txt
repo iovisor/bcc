@@ -8,12 +8,12 @@ in-kernel for efficiency. For example:
 Tracing soft irq event time... Hit Ctrl-C to end.
 ^C
 SOFTIRQ                    TOTAL_usecs
-rcu_process_callbacks              974
-run_rebalance_domains             1809
-run_timer_softirq                 2615
-net_tx_action                    14605
-tasklet_action                   38692
 net_rx_action                    88188
+tasklet_action                   38692
+net_tx_action                    14605
+run_timer_softirq                 2615
+run_rebalance_domains             1809
+rcu_process_callbacks              974
 
 The SOFTIRQ column prints the interrupt action function name. While tracing,
 the net_rx_action() soft interrupt ran for 20199 microseconds (20 milliseconds)
@@ -32,30 +32,30 @@ Tracing soft irq event time... Hit Ctrl-C to end.
 
 22:29:16
 SOFTIRQ                    TOTAL_usecs
-rcu_process_callbacks              456
-run_rebalance_domains             1005
-run_timer_softirq                 1196
-net_tx_action                     2796
-tasklet_action                    5534
 net_rx_action                    15075
+tasklet_action                    5534
+net_tx_action                     2796
+run_timer_softirq                 1196
+run_rebalance_domains             1005
+rcu_process_callbacks              456
 
 22:29:17
 SOFTIRQ                    TOTAL_usecs
-rcu_process_callbacks              456
-run_rebalance_domains              839
-run_timer_softirq                 1142
-net_tx_action                     1912
-tasklet_action                    4428
 net_rx_action                    14652
+tasklet_action                    4428
+net_tx_action                     1912
+run_timer_softirq                 1142
+run_rebalance_domains              839
+rcu_process_callbacks              456
 
 22:29:18
 SOFTIRQ                    TOTAL_usecs
-rcu_process_callbacks              502
-run_rebalance_domains              840
-run_timer_softirq                 1192
-net_tx_action                     2341
-tasklet_action                    5496
 net_rx_action                    15656
+tasklet_action                    5496
+net_tx_action                     2341
+run_timer_softirq                 1192
+run_rebalance_domains              840
+rcu_process_callbacks              502
 
 This can be useful for quantifying where CPU cycles are spent among the soft
 interrupts (summarized as the %softirq column from mpstat(1), and shown as
@@ -186,12 +186,12 @@ of times. You can use the -C or --events option:
 Tracing soft irq events... Hit Ctrl-C to end.
 ^C
 SOFTIRQ          TOTAL_count
-block                      5
-tasklet                    6
-net_rx                   402
-sched                   5251
-rcu                     5748
 timer                   9530
+rcu                     5748
+sched                   5251
+net_rx                   402
+tasklet                    6
+block                      5
 
 
 USAGE message:

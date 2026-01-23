@@ -1,3 +1,63 @@
+bcc (0.35.0-1) unstable; urgency=low
+
+  * Support for kernel up to 6.14
+  * New bcc tools: mptcp: enable mptcp for tcp traffic
+  * tools/biosnoop: Fix biosnoop pattern option
+  * Allow cmake run out of the source tree
+  * Fix for test bpf_stack_id when running on custom image in yocto
+  * libbpf-tools/map_helpers: Add bpf_map_lookup_and_delete_batch to dump_hash
+  * libbpf-tools/biotop: Use dump_hash for map processing
+  * uninstall: use execute_process() instead of exec_program()
+  * clang: Fix pointer dereference on big-endian machines
+  * ci: Upgrade to ubuntu 24.04
+  * doc update, other bug fixes and example improvement.
+
+bcc (0.34.0-1) unstable; urgency=low
+
+  * Support for kernel up to 6.13
+  * Bump cmake minimum version to 3.12
+  * statsnoop: Display syscall name with -s
+  * readahead: Fix incorrect page accessed count since kernel 5.16
+  * libbpf-tools/opensnoop: Add new fields
+  * libbpf-tools: hardirqs/softirqs: Fix logarithmic calculation issue
+  * libbpf-tools/hardirqs: have better default display and add CPU column
+  * libbpf-tools/klockstat: Better stack dump and summary info
+  * libbpf-tools/sigsnoop: Support real-time signals and thread comm
+  * libbpf-tools/statsnoop: Support more syscalls
+  * libbpf-tools/memleak: Some fixes and better messages
+  * tools/opensnoop: Add new fields and fix bad mode value
+  * tools/profile: Prioritize using the cpu-cycles hardware event
+  * tools/tcpdrop: Add support for dumping TCP drop reasons
+  * Fix event name too long error in python source
+  * doc update, other bug fixes and example improvement.
+
+bcc (0.33.0-1) unstable; urgency=low
+
+  * Support for kernel up to 6.12
+  * Add new bcc tool numasched
+  * syms: Initialize ModulePath::fd_ to invalid FD
+  * libbpf-tools/memleak: Fix off-by-one error
+  * libbpf-tools/slabratetop: Fix failed to create kprobe error
+  * libbpf_tools/profile: Support PID namespace mapping
+  * libbpf-tools/mountsnoop: Support fsopen,fsconfig,fsmount,move_mount syscalls
+  * tools/oomkill: get application level stack trace
+  * tools/profile: Add additional information to backtrace
+  * tools/mountsnoop: Fix fsmount printing wrong flags
+  * tools/compactsnoop: Add aarch64 support
+  * doc update, other bug fixes and tools improvement.
+
+bcc (0.32.0-1) unstable; urgency=low
+
+  * Support for kernel up to 6.11.
+  * bcc tool update: wakeuptime, readahead, shmsnoop, offcputime, cachestat, cachetop, hardirqs
+  * libbpf tool update: futexctn, profile, readhead, softirqs, hardirqs
+  * Multiple enhancements for memleak, better error path checking, adding mremap uprobe
+  * Support get pid/tgid in pid namespaces (cpudist, profile)
+  * multiple pid filtering support: profile, offcputime
+  * detect whether elf binary is PIE even if the binary is marked as DYN
+  * Fix several compilation issues with llvm20
+  * doc update, other bug fixes and tools improvement.
+
 bcc (0.31.0-1) unstable; urgency=low
 
   * Support for kernel up to 6.9.

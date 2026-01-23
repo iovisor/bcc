@@ -363,6 +363,7 @@ ProbeVisitor::ProbeVisitor(ASTContext &C, Rewriter &rewriter,
   addrof_stmt_(nullptr), is_addrof_(false) {
   const char **calling_conv_regs = get_call_conv();
   cannot_fall_back_safely = (calling_conv_regs == calling_conv_regs_s390x || calling_conv_regs == calling_conv_regs_riscv64);
+  probe_read_func = cannot_fall_back_safely ? "bpf_probe_read_kernel" : "bpf_probe_read";
 }
 
 bool ProbeVisitor::assignsExtPtr(Expr *E, int *nbDerefs) {
@@ -758,11 +759,7 @@ bool ProbeVisitor::IsContextMemberExpr(Expr *E) {
 
 SourceRange
 ProbeVisitor::expansionRange(SourceRange range) {
-#if LLVM_VERSION_MAJOR >= 7
   return rewriter_.getSourceMgr().getExpansionRange(range).getAsRange();
-#else
-  return rewriter_.getSourceMgr().getExpansionRange(range);
-#endif
 }
 
 SourceLocation
@@ -780,6 +777,7 @@ BTypeVisitor::BTypeVisitor(ASTContext &C, BFrontendAction &fe)
     : C(C), diag_(C.getDiagnostics()), fe_(fe), rewriter_(fe.rewriter()), out_(llvm::errs()) {
   const char **calling_conv_regs = get_call_conv();
   cannot_fall_back_safely = (calling_conv_regs == calling_conv_regs_s390x || calling_conv_regs == calling_conv_regs_riscv64);
+  probe_read_func = cannot_fall_back_safely ? "bpf_probe_read_kernel" : "bpf_probe_read";
 }
 
 void BTypeVisitor::genParamDirectAssign(FunctionDecl *D, string& preamble,
@@ -820,13 +818,8 @@ void BTypeVisitor::genParamIndirectAssign(FunctionDecl *D, string& preamble,
       size_t d = idx - 1;
       const char *reg = calling_conv_regs[d];
       tmp_preamble += "\n " + text + ";";
-      if (cannot_fall_back_safely)
-        tmp_preamble += " bpf_probe_read_kernel";
-      else
-        tmp_preamble += " bpf_probe_read";
-      tmp_preamble += "(&" + arg->getName().str() + ", sizeof(" +
-                  arg->getName().str() + "), &" + new_ctx + "->" +
-                  string(reg) + ");";
+      tmp_preamble += " BCC_PROBE_READ";
+      tmp_preamble += "(&" + arg->getName().str() + ", &" + new_ctx + "->" + string(reg) + ", " + probe_read_func + ");";
     }
   }
 
@@ -1380,7 +1373,11 @@ bool BTypeVisitor::VisitBinaryOperator(BinaryOperator *E) {
             }
 
             uint64_t ofs = C.getFieldOffset(F);
+#if LLVM_VERSION_MAJOR >= 20
+            uint64_t sz = F->isBitField() ? F->getBitWidthValue() : C.getTypeSize(F->getType());
+#else
             uint64_t sz = F->isBitField() ? F->getBitWidthValue(C) : C.getTypeSize(F->getType());
+#endif
             string base = rewriter_.getRewrittenText(expansionRange(Base->getSourceRange()));
             string text = "bpf_dins_pkt(" + fn_args_[0]->getName().str() + ", (u64)" + base + "+" + to_string(ofs >> 3)
                 + ", " + to_string(ofs & 0x7) + ", " + to_string(sz) + ",";
@@ -1410,7 +1407,11 @@ bool BTypeVisitor::VisitImplicitCastExpr(ImplicitCastExpr *E) {
             return false;
           }
           uint64_t ofs = C.getFieldOffset(F);
+#if LLVM_VERSION_MAJOR >= 20
+          uint64_t sz = F->isBitField() ? F->getBitWidthValue() : C.getTypeSize(F->getType());
+#else
           uint64_t sz = F->isBitField() ? F->getBitWidthValue(C) : C.getTypeSize(F->getType());
+#endif
           string text = "bpf_dext_pkt(" + fn_args_[0]->getName().str() + ", (u64)" + Ref->getDecl()->getName().str() + "+"
               + to_string(ofs >> 3) + ", " + to_string(ofs & 0x7) + ", " + to_string(sz) + ")";
           rewriter_.ReplaceText(expansionRange(E->getSourceRange()), text);
@@ -1423,11 +1424,7 @@ bool BTypeVisitor::VisitImplicitCastExpr(ImplicitCastExpr *E) {
 
 SourceRange
 BTypeVisitor::expansionRange(SourceRange range) {
-#if LLVM_VERSION_MAJOR >= 7
   return rewriter_.getSourceMgr().getExpansionRange(range).getAsRange();
-#else
-  return rewriter_.getSourceMgr().getExpansionRange(range);
-#endif
 }
 
 template <unsigned N>
@@ -1446,17 +1443,10 @@ int64_t BTypeVisitor::getFieldValue(VarDecl *Decl, FieldDecl *FDecl, int64_t Ori
   unsigned idx = FDecl->getFieldIndex();
 
   if (auto I = dyn_cast_or_null<InitListExpr>(Decl->getInit())) {
-#if LLVM_VERSION_MAJOR >= 8
     Expr::EvalResult res;
     if (I->getInit(idx)->EvaluateAsInt(res, C)) {
       return res.Val.getInt().getExtValue();
     }
-#else
-    llvm::APSInt res;
-    if (I->getInit(idx)->EvaluateAsInt(res, C)) {
-      return res.getExtValue();
-    }
-#endif
   }
 
   return OrigFValue;
@@ -1833,6 +1823,18 @@ void BFrontendAction::DoMiscWorkAround() {
   else {
     probefunc = "";
   }
+  probefunc += "#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__\n"
+    "#define BCC_PROBE_READ(dst, src, probe_read_func) ({ \\\n"
+    "  probe_read_func(dst, sizeof(*(dst)), src); \\\n"
+    "})\n"
+    "#else\n"
+    "#define BCC_PROBE_READ(dst, src, probe_read_func) ({ \\\n"
+    "  int __sz = sizeof(*(dst)) < sizeof(*(src)) ? sizeof(*(dst)) : sizeof(*(src)); \\\n"
+    "  __builtin_memset((char *)(dst), 0, sizeof(*(dst)) - __sz); \\\n"
+    "  probe_read_func((char *)(dst) + sizeof(*(dst)) - __sz, __sz, \\\n"
+    "  (const char *)(src) + sizeof(*(src)) - __sz); \\\n"
+    "})\n"
+    "#endif\n";
   std::string prologue = "#if defined(BPF_LICENSE)\n"
     "#error BPF_LICENSE cannot be specified through cflags\n"
     "#endif\n"
@@ -1863,17 +1865,10 @@ void BFrontendAction::EndSourceFileAction() {
 
   if (flags_ & DEBUG_PREPROCESSOR)
     rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID()).write(llvm::errs());
-#if LLVM_VERSION_MAJOR >= 9
+
   llvm::raw_string_ostream tmp_os(mod_src_);
   rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID())
       .write(tmp_os);
-#else
-  if (flags_ & DEBUG_SOURCE) {
-    llvm::raw_string_ostream tmp_os(mod_src_);
-    rewriter_->getEditBuffer(rewriter_->getSourceMgr().getMainFileID())
-        .write(tmp_os);
-  }
-#endif
 
   for (auto func : func_range_) {
     auto f = func.first;

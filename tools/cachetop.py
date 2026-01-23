@@ -13,6 +13,7 @@
 # 13-Jul-2016   Emmanuel Bretelle first version
 # 17-Mar-2022   Rocky Xing        Added PID filter support.
 # 15-Feb-2023   Rong Tao          Add writeback_dirty_{folio,page} tracepoints
+# 17-Nov-2024   Rocky Xing        Added filemap_add_folio/folio_mark_accessed kprobes
 
 from __future__ import absolute_import
 from __future__ import division
@@ -206,8 +207,14 @@ def handle_loop(stdscr, args):
         bpf_text = bpf_text.replace('FILTER_PID', '0')
 
     b = BPF(text=bpf_text)
-    b.attach_kprobe(event="add_to_page_cache_lru", fn_name="do_count_apcl")
-    b.attach_kprobe(event="mark_page_accessed", fn_name="do_count_mpa")
+    if BPF.get_kprobe_functions(b'filemap_add_folio'):
+        b.attach_kprobe(event="filemap_add_folio", fn_name="do_count_apcl")
+    else:
+        b.attach_kprobe(event="add_to_page_cache_lru", fn_name="do_count_apcl")
+    if BPF.get_kprobe_functions(b'folio_mark_accessed'):
+        b.attach_kprobe(event="folio_mark_accessed", fn_name="do_count_mpa")
+    else:
+        b.attach_kprobe(event="mark_page_accessed", fn_name="do_count_mpa")
     b.attach_kprobe(event="mark_buffer_dirty", fn_name="do_count_mbd")
 
     # Function account_page_dirtied() is changed to folio_account_dirtied() in 5.15.

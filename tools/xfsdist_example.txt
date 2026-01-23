@@ -4,7 +4,7 @@ Demonstrations of xfsdist, the Linux eBPF/bcc version.
 xfsdist traces XFS reads, writes, opens, and fsyncs, and summarizes their
 latency as a power-of-2 histogram. For example:
 
-# ./xfsdist 
+# ./xfsdist
 Tracing XFS operation latency... Hit Ctrl-C to end.
 ^C
 

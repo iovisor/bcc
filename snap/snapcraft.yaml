@@ -274,6 +274,8 @@ apps:
         command: bcc-wrapper sofdsnoop
     softirqs:
         command: bcc-wrapper softirqs
+    softirqslower:
+        command: bcc-wrapper softirqslower
     solisten:
         command: bcc-wrapper solisten
     sslsniff:

@@ -10,13 +10,13 @@ For example, trace all Java thread creation events:
 
 # ./uthreads -l java 27420
 Tracing thread events in process 27420 (language: java)... Ctrl-C to quit.
-TIME     ID               TYPE     DESCRIPTION                   
-18.596   R=9/N=0          start    SIGINT handler                
-18.596   R=4/N=0          stop     Signal Dispatcher             
+TIME     ID               TYPE     DESCRIPTION
+18.596   R=9/N=0          start    SIGINT handler
+18.596   R=4/N=0          stop     Signal Dispatcher
 ^C
 
 The ID column in the preceding output shows the thread's runtime ID and native
-ID, when available. The accuracy of this information depends on the Java 
+ID, when available. The accuracy of this information depends on the Java
 runtime.
 
 
@@ -24,11 +24,11 @@ Next, trace only pthread creation events in some native application:
 
 # ./uthreads 27450
 Tracing thread events in process 27450 (language: c)... Ctrl-C to quit.
-TIME     ID               TYPE     DESCRIPTION                   
+TIME     ID               TYPE     DESCRIPTION
 0.924    27462            pthread  primes_thread [primes]
-0.927    27463            pthread  primes_thread [primes]     
-0.928    27464            pthread  primes_thread [primes]        
-0.928    27465            pthread  primes_thread [primes]        
+0.927    27463            pthread  primes_thread [primes]
+0.928    27464            pthread  primes_thread [primes]
+0.928    27465            pthread  primes_thread [primes]
 ^C
 
 The thread name ("primes_thread" in this example) is resolved from debuginfo.

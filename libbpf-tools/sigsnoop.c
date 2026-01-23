@@ -13,8 +13,10 @@
 #include <time.h>
 
 #include <bpf/bpf.h>
+#include <bpf/btf.h>
 #include "sigsnoop.h"
 #include "sigsnoop.skel.h"
+#include "trace_helpers.h"
 
 #define PERF_BUFFER_PAGES	16
 #define PERF_POLL_TIMEOUT_MS	100
@@ -63,6 +65,39 @@ static const char *sig_name[] = {
 	[29] = "SIGIO",
 	[30] = "SIGPWR",
 	[31] = "SIGSYS",
+	[32] = "SIGNAL-32", /* SIGRTMIN in kernel */
+	[33] = "SIGNAL-33",
+	[34] = "SIGNAL-34",
+	[35] = "SIGNAL-35",
+	[36] = "SIGNAL-36",
+	[37] = "SIGNAL-37",
+	[38] = "SIGNAL-38",
+	[39] = "SIGNAL-39",
+	[40] = "SIGNAL-40",
+	[41] = "SIGNAL-41",
+	[42] = "SIGNAL-42",
+	[43] = "SIGNAL-43",
+	[44] = "SIGNAL-44",
+	[45] = "SIGNAL-45",
+	[46] = "SIGNAL-46",
+	[47] = "SIGNAL-47",
+	[48] = "SIGNAL-48",
+	[49] = "SIGNAL-49",
+	[50] = "SIGNAL-50",
+	[51] = "SIGNAL-51",
+	[52] = "SIGNAL-52",
+	[53] = "SIGNAL-53",
+	[54] = "SIGNAL-54",
+	[55] = "SIGNAL-55",
+	[56] = "SIGNAL-56",
+	[57] = "SIGNAL-57",
+	[58] = "SIGNAL-58",
+	[59] = "SIGNAL-59",
+	[60] = "SIGNAL-60",
+	[61] = "SIGNAL-61",
+	[62] = "SIGNAL-62",
+	[63] = "SIGNAL-63",
+	[64] = "SIGNAL-64", /* SIGRTMAX */
 };
 
 const char *argp_program_version = "sigsnoop 0.1";
@@ -156,6 +191,23 @@ static void alias_parse(char *prog)
 	}
 }
 
+/**
+ * since linux commit 3f0e6f2b41d3 ("bpf: Add bpf_task_from_pid() kfunc")
+ * v6.1-rc4-1163-g3f0e6f2b41d3 support bpf_task_from_pid() helper.
+ */
+static bool support_bpf_task_from_pid(void)
+{
+	const struct btf *btf = btf__load_vmlinux_btf();
+	int type_id;
+
+	type_id = btf__find_by_name_kind(btf, "bpf_task_from_pid",
+					 BTF_KIND_FUNC);
+	if (type_id < 0)
+		return false;
+
+	return true;
+}
+
 static void sig_int(int signo)
 {
 	exiting = 1;
@@ -164,19 +216,15 @@ static void sig_int(int signo)
 static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	struct event *e = data;
-	struct tm *tm;
 	char ts[32];
-	time_t t;
 
-	time(&t);
-	tm = localtime(&t);
-	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+	str_timestamp("%H:%M:%S", ts, sizeof(ts));
 	if (signal_name && e->sig < ARRAY_SIZE(sig_name))
-		printf("%-8s %-7d %-16s %-9s %-7d %-6d\n",
-		       ts, e->pid, e->comm, sig_name[e->sig], e->tpid, e->ret);
+		printf("%-8s %-7d %-16s %-12s %-7d %-16s %-6d\n",
+		       ts, e->pid, e->comm, sig_name[e->sig], e->tpid, e->tcomm, e->ret);
 	else
-		printf("%-8s %-7d %-16s %-9d %-7d %-6d\n",
-		       ts, e->pid, e->comm, e->sig, e->tpid, e->ret);
+		printf("%-8s %-7d %-16s %-12d %-7d %-16s %-6d\n",
+		       ts, e->pid, e->comm, e->sig, e->tpid, e->tcomm, e->ret);
 }
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
@@ -248,8 +296,12 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	printf("%-8s %-7s %-16s %-9s %-7s %-6s\n",
-	       "TIME", "PID", "COMM", "SIG", "TPID", "RESULT");
+	if (!support_bpf_task_from_pid())
+		fprintf(stderr, "WARNING: Current kernel not support "\
+				"bpf_task_from_pid(), ignore TCOMM field\n");
+
+	printf("%-8s %-7s %-16s %-12s %-7s %-16s %-6s\n",
+	       "TIME", "PID", "COMM", "SIG", "TPID", "TCOMM", "RESULT");
 
 	while (!exiting) {
 		err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS);

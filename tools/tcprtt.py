@@ -209,7 +209,7 @@ if args.byladdr:
     print_header = "Local Address"
 elif args.byraddr:
     bpf_text = bpf_text.replace('STORE_HIST', 'key.addr = addr = daddr;')
-    print_header = "Remote Addres"
+    print_header = "Remote Address"
 else:
     bpf_text = bpf_text.replace('STORE_HIST', 'key.addr = addr = 0;')
     print_header = "All Addresses"

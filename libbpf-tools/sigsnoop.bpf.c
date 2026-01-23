@@ -23,14 +23,31 @@ struct {
 	__uint(value_size, sizeof(__u32));
 } events SEC(".maps");
 
-static __always_inline bool is_target_signal(int sig) {
-  if (target_signals == 0)
-    return true;
+static __always_inline bool is_target_signal(int sig)
+{
+	if (target_signals == 0)
+		return true;
 
-  if ((target_signals & (1 << (sig - 1))) == 0)
-    return false;
+	if ((target_signals & (1 << (sig - 1))) == 0)
+		return false;
 
-  return true;
+	return true;
+}
+
+static __always_inline void get_tcomm(pid_t tpid, char *tcomm, __u32 size)
+{
+	if (bpf_ksym_exists(bpf_task_from_pid)) {
+		struct task_struct *ttask = bpf_task_from_pid(tpid);
+		if (ttask) {
+			bpf_probe_read_kernel(tcomm, size, ttask->comm);
+			bpf_task_release(ttask);
+			return;
+		}
+	}
+	tcomm[0] = 'N';
+	tcomm[1] = '/';
+	tcomm[2] = 'A';
+	tcomm[3] = '\0';
 }
 
 static int probe_entry(pid_t tpid, int sig)
@@ -47,6 +64,8 @@ static int probe_entry(pid_t tpid, int sig)
 	tid = (__u32)pid_tgid;
 	if (filtered_pid && pid != filtered_pid)
 		return 0;
+
+	get_tcomm(tpid, event.tcomm, sizeof(event.tcomm));
 
 	event.pid = pid;
 	event.tpid = tpid;
@@ -141,6 +160,8 @@ int sig_trace(struct trace_event_raw_signal_generate *ctx)
 	pid = pid_tgid >> 32;
 	if (filtered_pid && pid != filtered_pid)
 		return 0;
+
+	get_tcomm(tpid, event.tcomm, sizeof(event.tcomm));
 
 	event.pid = pid;
 	event.tpid = tpid;

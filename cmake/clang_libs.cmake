@@ -2,7 +2,7 @@ if(ENABLE_LLVM_SHARED)
 set(llvm_libs "LLVM")
 else()
 set(llvm_raw_libs bitwriter bpfcodegen debuginfodwarf irreader linker
-  mcjit objcarcopts option passes lto)
+  mcjit objcarcopts option passes lto bpfasmparser bpfdisassembler)
 if(ENABLE_LLVM_NATIVECODEGEN)
 set(llvm_raw_libs ${llvm_raw_libs} nativecodegen)
 endif()
@@ -17,10 +17,6 @@ endif()
 list(FIND LLVM_AVAILABLE_LIBS "LLVMFrontendOpenMP" _llvm_frontendOpenMP)
 if (${_llvm_frontendOpenMP} GREATER -1)
   list(APPEND llvm_raw_libs frontendopenmp)
-endif()
-if (${LLVM_PACKAGE_VERSION} VERSION_EQUAL 6 OR ${LLVM_PACKAGE_VERSION} VERSION_GREATER 6)
-  list(APPEND llvm_raw_libs bpfasmparser)
-  list(APPEND llvm_raw_libs bpfdisassembler)
 endif()
 if (${LLVM_PACKAGE_VERSION} VERSION_EQUAL 15 OR ${LLVM_PACKAGE_VERSION} VERSION_GREATER 15)
   list(APPEND llvm_raw_libs windowsdriver)
@@ -43,11 +39,8 @@ else()
 set(clang_libs
   ${libclangFrontend}
   ${libclangSerialization}
-  ${libclangDriver})
-
-if (${LLVM_PACKAGE_VERSION} VERSION_EQUAL 8 OR ${LLVM_PACKAGE_VERSION} VERSION_GREATER 8)
-  list(APPEND clang_libs ${libclangASTMatchers})
-endif()
+  ${libclangDriver}
+  ${libclangASTMatchers})
 
 list(APPEND clang_libs
   ${libclangParse}

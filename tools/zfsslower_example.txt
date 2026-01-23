@@ -5,7 +5,7 @@ zfsslower shows ZFS reads, writes, opens, and fsyncs, slower than a threshold.
 It has been written to work on ZFS on Linux (http://zfsonlinux.org). For
 example:
 
-# ./zfsslower 
+# ./zfsslower
 Tracing ZFS operations slower than 10 ms
 TIME     COMM           PID    T BYTES   OFF_KB   LAT(ms) FILENAME
 06:31:28 dd             25570  W 131072  38784     303.92 data1

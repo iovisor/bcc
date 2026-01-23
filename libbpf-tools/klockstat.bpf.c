@@ -32,8 +32,15 @@ struct task_lock {
 	u64 lock_ptr;
 };
 
+struct task_state {
+	u16 nlmsg_type;
+	u16 ioctl;
+};
+
 struct lockholder_info {
 	s32 stack_id;
+	u16 nlmsg_type;
+	u16 ioctl;
 	u64 task_id;
 	u64 try_at;
 	u64 acq_at;
@@ -69,6 +76,13 @@ struct {
 	__type(value, void *);
 } locks SEC(".maps");
 
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, MAX_ENTRIES);
+	__type(key, u32);
+	__type(value, struct task_state);
+} task_states SEC(".maps");
+
 static bool tracing_task(u64 task_id)
 {
 	u32 tgid = task_id >> 32;
@@ -95,17 +109,7 @@ static void lock_contended(void *ctx, void *lock)
 
 	li->task_id = task_id;
 	li->lock_ptr = (u64)lock;
-	/*
-	 * Skip 4 frames, e.g.:
-	 *       __this_module+0x34ef
-	 *       __this_module+0x34ef
-	 *       __this_module+0x8c44
-	 *             mutex_lock+0x5
-	 *
-	 * Note: if you make major changes to this bpf program, double check
-	 * that you aren't skipping too many frames.
-	 */
-	li->stack_id = bpf_get_stackid(ctx, &stack_map, 4 | BPF_F_FAST_STACK_CMP);
+	li->stack_id = bpf_get_stackid(ctx, &stack_map, BPF_F_FAST_STACK_CMP);
 
 	/* Legit failures include EEXIST */
 	if (li->stack_id < 0)
@@ -135,6 +139,8 @@ static void lock_aborted(void *lock)
 static void lock_acquired(void *lock)
 {
 	u64 task_id;
+	u32 tid;
+	struct task_state *state;
 	struct lockholder_info *li;
 	struct task_lock tl = {};
 
@@ -151,6 +157,13 @@ static void lock_acquired(void *lock)
 		return;
 
 	li->acq_at = bpf_ktime_get_ns();
+
+	tid = (u32)task_id;
+	state = bpf_map_lookup_elem(&task_states, &tid);
+	if (state) {
+		li->nlmsg_type = state->nlmsg_type;
+		li->ioctl = state->ioctl;
+	}
 }
 
 static void account(struct lockholder_info *li)
@@ -191,6 +204,8 @@ static void account(struct lockholder_info *li)
 		WRITE_ONCE(ls->acq_max_time, delta);
 		WRITE_ONCE(ls->acq_max_id, li->task_id);
 		WRITE_ONCE(ls->acq_max_lock_ptr, li->lock_ptr);
+		WRITE_ONCE(ls->acq_max_nltype, li->nlmsg_type);
+		WRITE_ONCE(ls->acq_max_ioctl, li->ioctl);
 		/*
 		 * Potentially racy, if multiple threads think they are the max,
 		 * so you may get a clobbered write.
@@ -206,6 +221,8 @@ static void account(struct lockholder_info *li)
 		WRITE_ONCE(ls->hld_max_time, delta);
 		WRITE_ONCE(ls->hld_max_id, li->task_id);
 		WRITE_ONCE(ls->hld_max_lock_ptr, li->lock_ptr);
+		WRITE_ONCE(ls->hld_max_nltype, li->nlmsg_type);
+		WRITE_ONCE(ls->hld_max_ioctl, li->ioctl);
 		if (!per_thread)
 			bpf_get_current_comm(ls->hld_max_comm, TASK_COMM_LEN);
 	}
@@ -232,6 +249,82 @@ static void lock_released(void *lock)
 	account(li);
 
 	bpf_map_delete_elem(&lockholder_map, &tl);
+}
+
+static void record_nltype(const struct nlmsghdr *hdr)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+	struct task_state state = {};
+
+	/* nlmsg_type and ioctl will never be set at the same time */
+	state.nlmsg_type = BPF_CORE_READ(hdr, nlmsg_type);
+	bpf_map_update_elem(&task_states, &tid, &state, BPF_ANY);
+}
+
+static void record_ioctl(unsigned int cmd)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+	struct task_state state = {.ioctl = cmd};
+
+	/* nlmsg_type and ioctl will never be set at the same time */
+	bpf_map_update_elem(&task_states, &tid, &state, BPF_ANY);
+}
+
+static void release_task_state(void)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+
+	bpf_map_delete_elem(&task_states, &tid);
+}
+
+SEC("fentry/rtnetlink_rcv_msg")
+int BPF_PROG(rtnetlink_rcv_msg, struct sk_buff *skb, struct nlmsghdr *nlh,
+	     struct netlink_ext_ack *extack)
+{
+	record_nltype(nlh);
+	return 0;
+}
+
+SEC("fexit/rtnetlink_rcv_msg")
+int BPF_PROG(rtnetlink_rcv_msg_exit, struct sk_buff *skb, struct nlmsghdr *nlh,
+	     struct netlink_ext_ack *extack, long ret)
+{
+	release_task_state();
+	return 0;
+}
+
+SEC("fentry/netlink_dump")
+int BPF_PROG(netlink_dump, struct sock *sk, bool lock_taken)
+{
+	struct netlink_sock *nlk = container_of(sk, struct netlink_sock, sk);
+	const struct nlmsghdr *nlh;
+
+	nlh = BPF_CORE_READ(nlk, cb.nlh);
+	record_nltype(nlh);
+	return 0;
+}
+
+SEC("fexit/netlink_dump")
+int BPF_PROG(netlink_dump_exit, struct sk_buff *skb, struct nlmsghdr *nlh,
+	     struct netlink_ext_ack *extack)
+{
+	release_task_state();
+	return 0;
+}
+
+SEC("fentry/sock_do_ioctl")
+int BPF_PROG(sock_do_ioctl, struct net *net, struct socket *sock,
+	     unsigned int cmd, unsigned long arg)
+{
+	record_ioctl(cmd);
+	return 0;
+}
+
+SEC("fexit/sock_do_ioctl")
+int BPF_PROG(sock_do_ioctl_exit)
+{
+	release_task_state();
+	return 0;
 }
 
 SEC("fentry/mutex_lock")
@@ -738,5 +831,251 @@ int BPF_KPROBE(kprobe_up_write, struct rw_semaphore *lock)
 	lock_released(lock);
 	return 0;
 }
+
+/* CONFIG_DEBUG_LOCK_ALLOC is enabled */
+
+SEC("kprobe/mutex_lock_nested")
+int BPF_KPROBE(kprobe_mutex_lock_nested, struct mutex *lock)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+
+	bpf_map_update_elem(&locks, &tid, &lock, BPF_ANY);
+	lock_contended(ctx, lock);
+	return 0;
+}
+
+SEC("kretprobe/mutex_lock_nested")
+int BPF_KRETPROBE(kprobe_mutex_lock_exit_nested, long ret)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+	void **lock;
+
+	lock = bpf_map_lookup_elem(&locks, &tid);
+	if (!lock)
+		return 0;
+
+	bpf_map_delete_elem(&locks, &tid);
+	lock_acquired(*lock);
+	return 0;
+}
+
+SEC("kprobe/mutex_lock_interruptible_nested")
+int BPF_KPROBE(kprobe_mutex_lock_interruptible_nested, struct mutex *lock)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+
+	bpf_map_update_elem(&locks, &tid, &lock, BPF_ANY);
+	lock_contended(ctx, lock);
+	return 0;
+}
+
+SEC("kretprobe/mutex_lock_interruptible_nested")
+int BPF_KRETPROBE(kprobe_mutex_lock_interruptible_exit_nested, long ret)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+	void **lock;
+
+	lock = bpf_map_lookup_elem(&locks, &tid);
+	if (!lock)
+		return 0;
+
+	bpf_map_delete_elem(&locks, &tid);
+
+	if (ret)
+		lock_aborted(*lock);
+	else
+		lock_acquired(*lock);
+	return 0;
+}
+
+SEC("kprobe/mutex_lock_killable_nested")
+int BPF_KPROBE(kprobe_mutex_lock_killable_nested, struct mutex *lock)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+
+	bpf_map_update_elem(&locks, &tid, &lock, BPF_ANY);
+	lock_contended(ctx, lock);
+	return 0;
+}
+
+SEC("kretprobe/mutex_lock_killable_nested")
+int BPF_KRETPROBE(kprobe_mutex_lock_killable_exit_nested, long ret)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+	void **lock;
+
+	lock = bpf_map_lookup_elem(&locks, &tid);
+	if (!lock)
+		return 0;
+
+	bpf_map_delete_elem(&locks, &tid);
+
+	if (ret)
+		lock_aborted(*lock);
+	else
+		lock_acquired(*lock);
+	return 0;
+}
+
+SEC("kprobe/down_read_nested")
+int BPF_KPROBE(kprobe_down_read_nested, struct rw_semaphore *lock)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+
+	bpf_map_update_elem(&locks, &tid, &lock, BPF_ANY);
+	lock_contended(ctx, lock);
+	return 0;
+}
+
+SEC("kretprobe/down_read_nested")
+int BPF_KRETPROBE(kprobe_down_read_exit_nested, long ret)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+	void **lock;
+
+	lock = bpf_map_lookup_elem(&locks, &tid);
+	if (!lock)
+		return 0;
+
+	bpf_map_delete_elem(&locks, &tid);
+
+	lock_acquired(*lock);
+	return 0;
+}
+
+SEC("kprobe/down_read_killable_nested")
+int BPF_KPROBE(kprobe_down_read_killable_nested, struct rw_semaphore *lock)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+
+	bpf_map_update_elem(&locks, &tid, &lock, BPF_ANY);
+	lock_contended(ctx, lock);
+	return 0;
+}
+
+SEC("kretprobe/down_read_killable_nested")
+int BPF_KRETPROBE(kprobe_down_read_killable_exit_nested, long ret)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+	void **lock;
+
+	lock = bpf_map_lookup_elem(&locks, &tid);
+	if (!lock)
+		return 0;
+
+	bpf_map_delete_elem(&locks, &tid);
+
+	if (ret)
+		lock_aborted(*lock);
+	else
+		lock_acquired(*lock);
+	return 0;
+}
+
+SEC("kprobe/down_write_nested")
+int BPF_KPROBE(kprobe_down_write_nested, struct rw_semaphore *lock)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+
+	bpf_map_update_elem(&locks, &tid, &lock, BPF_ANY);
+	lock_contended(ctx, lock);
+	return 0;
+}
+
+SEC("kretprobe/down_write_nested")
+int BPF_KRETPROBE(kprobe_down_write_exit_nested, long ret)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+	void **lock;
+
+	lock = bpf_map_lookup_elem(&locks, &tid);
+	if (!lock)
+		return 0;
+
+	bpf_map_delete_elem(&locks, &tid);
+
+	lock_acquired(*lock);
+	return 0;
+}
+
+SEC("kprobe/down_write_killable_nested")
+int BPF_KPROBE(kprobe_down_write_killable_nested, struct rw_semaphore *lock)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+
+	bpf_map_update_elem(&locks, &tid, &lock, BPF_ANY);
+	lock_contended(ctx, lock);
+	return 0;
+}
+
+SEC("kretprobe/down_write_killable_nested")
+int BPF_KRETPROBE(kprobe_down_write_killable_exit_nested, long ret)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+	void **lock;
+
+	lock = bpf_map_lookup_elem(&locks, &tid);
+	if (!lock)
+		return 0;
+
+	bpf_map_delete_elem(&locks, &tid);
+
+	if (ret)
+		lock_aborted(*lock);
+	else
+		lock_acquired(*lock);
+	return 0;
+}
+
+SEC("kprobe/rtnetlink_rcv_msg")
+int BPF_KPROBE(kprobe_rtnetlink_rcv_msg, struct sk_buff *skb, struct nlmsghdr *nlh,
+	       struct netlink_ext_ack *ext)
+{
+	record_nltype(nlh);
+	return 0;
+}
+
+SEC("kretprobe/rtnetlink_rcv_msg")
+int BPF_KRETPROBE(kprobe_rtnetlink_rcv_msg_exit, long ret)
+{
+	release_task_state();
+	return 0;
+}
+
+SEC("kprobe/netlink_dump")
+int BPF_KPROBE(kprobe_netlink_dump, struct sock *sk, bool lock_taken)
+{
+	struct netlink_sock *nlk = container_of(sk, struct netlink_sock, sk);
+	const struct nlmsghdr *nlh;
+
+	nlh = BPF_CORE_READ(nlk, cb.nlh);
+	record_nltype(nlh);
+	return 0;
+}
+
+SEC("kretprobe/netlink_dump")
+int BPF_KRETPROBE(kprobe_netlink_dump_exit, long ret)
+{
+	release_task_state();
+	return 0;
+}
+
+SEC("kprobe/sock_do_ioctl")
+int BPF_PROG(kprobe_sock_do_ioctl, struct net *net, struct socket *sock,
+	     unsigned int cmd, unsigned long arg)
+{
+	record_ioctl(cmd);
+	return 0;
+}
+
+SEC("kretprobe/sock_do_ioctl")
+int BPF_PROG(kprobe_sock_do_ioctl_exit)
+{
+	release_task_state();
+	return 0;
+}
+
+
+
 
 char LICENSE[] SEC("license") = "GPL";

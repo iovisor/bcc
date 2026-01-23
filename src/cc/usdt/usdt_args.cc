@@ -58,7 +58,8 @@ bool Argument::get_global_address(uint64_t *address, const std::string &binpath,
         .resolve_name(binpath.c_str(), deref_ident_->c_str(), address);
   }
 
-  if (!bcc_elf_is_shared_obj(binpath.c_str())) {
+  if (!bcc_elf_is_shared_obj(binpath.c_str()) ||
+      bcc_elf_is_pie(binpath.c_str())) {
     struct bcc_symbol sym;
     if (bcc_resolve_symname(binpath.c_str(), deref_ident_->c_str(), 0x0, -1, nullptr, &sym) == 0) {
       *address = sym.offset;

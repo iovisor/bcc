@@ -2,7 +2,7 @@ Demonstrations of ugc.
 
 
 ugc traces garbage collection events in high-level languages, including Java,
-Python, Ruby, and Node. Each GC event is printed with some additional 
+Python, Ruby, and Node. Each GC event is printed with some additional
 information provided by that language's runtime, if available. The duration of
 the GC event is also provided.
 
@@ -10,7 +10,7 @@ For example, to trace all garbage collection events in a specific Node process:
 
 # ugc $(pidof node)
 Tracing garbage collections in node process 30012... Ctrl-C to quit.
-START    TIME (us) DESCRIPTION                             
+START    TIME (us) DESCRIPTION
 1.500    1181.00  GC scavenge
 1.505    1704.00  GC scavenge
 1.509    1534.00  GC scavenge
@@ -46,7 +46,7 @@ switches can be useful for this:
 
 # ugc -F Tenured $(pidof java)
 Tracing garbage collections in java process 29907... Ctrl-C to quit.
-START    TIME (us) DESCRIPTION                             
+START    TIME (us) DESCRIPTION
 0.360    4309.00  MarkSweepCompact Tenured Gen used=287528->287528 max=173408256->173408256
 2.459    4232.00  MarkSweepCompact Tenured Gen used=287528->287528 max=173408256->173408256
 4.648    4139.00  MarkSweepCompact Tenured Gen used=287528->287528 max=173408256->173408256
@@ -54,7 +54,7 @@ START    TIME (us) DESCRIPTION
 
 # ugc -M 1 $(pidof java)
 Tracing garbage collections in java process 29907... Ctrl-C to quit.
-START    TIME (us) DESCRIPTION                             
+START    TIME (us) DESCRIPTION
 0.160    3715.00  MarkSweepCompact Code Cache used=287528->3209472 max=173408256->251658240
 0.160    3975.00  MarkSweepCompact Metaspace used=287528->3092104 max=173408256->18446744073709551615
 0.160    4058.00  MarkSweepCompact Compressed Class Space used=287528->266840 max=173408256->1073741824

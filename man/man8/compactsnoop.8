@@ -12,7 +12,7 @@ caused by some critical processes or not.
 This works by tracing the compact zone events using raw_tracepoints and one
 kretprobe.
 
-For the Centos 7.6 (3.10.x kernel), see the version under tools/old, which 
+For the Centos 7.6 (3.10.x kernel), see the version under tools/old, which
 uses an older memory compaction mechanism.
 
 Since this uses BPF, only the root user can use this tool.
@@ -108,14 +108,14 @@ The compaction's result.
 For (CentOS 7.6's kernel), the status include:
 .PP
 .in +8n
-"skipped" (COMPACT_SKIPPED): compaction didn't start as it was not possible or 
+"skipped" (COMPACT_SKIPPED): compaction didn't start as it was not possible or
 direct reclaim was more suitable
 .PP
 .in +8n
 "continue" (COMPACT_CONTINUE): compaction should continue to another pageblock
 .PP
 .in +8n
-"partial" (COMPACT_PARTIAL): direct compaction partially compacted a zone and 
+"partial" (COMPACT_PARTIAL): direct compaction partially compacted a zone and
 there are suitable pages
 .PP
 .in +8n
@@ -125,19 +125,19 @@ there are suitable pages
 For (kernel 4.7 and above):
 .PP
 .in +8n
-"not_suitable_zone" (COMPACT_NOT_SUITABLE_ZONE): For more detailed tracepoint 
+"not_suitable_zone" (COMPACT_NOT_SUITABLE_ZONE): For more detailed tracepoint
 output - internal to compaction
 .PP
 .in +8n
-"skipped" (COMPACT_SKIPPED): compaction didn't start as it was not possible or 
+"skipped" (COMPACT_SKIPPED): compaction didn't start as it was not possible or
 direct reclaim was more suitable
 .PP
 .in +8n
-"deferred" (COMPACT_DEFERRED): compaction didn't start as it was deferred due 
+"deferred" (COMPACT_DEFERRED): compaction didn't start as it was deferred due
 to past failures
 .PP
 .in +8n
-"no_suitable_page" (COMPACT_NOT_SUITABLE_PAGE): For more detailed tracepoint 
+"no_suitable_page" (COMPACT_NOT_SUITABLE_PAGE): For more detailed tracepoint
 output - internal to compaction
 .PP
 .in +8n
@@ -156,7 +156,7 @@ of the zone but wasn't successful to compact suitable pages.
 contentions
 .PP
 .in +8n
-"success" (COMPACT_SUCCESS): direct compaction terminated after concluding that 
+"success" (COMPACT_SUCCESS): direct compaction terminated after concluding that
 the allocation should now succeed
 .PP
 .in +8n

@@ -57,7 +57,7 @@ able to run for 4-16ms before being descheduled (this is likely the quantum
 length). Occasionally, tasks had to be descheduled a lot earlier -- possibly
 because they competed for a shared lock.
 
-If necessary, you can restrict the output to include only threads from a 
+If necessary, you can restrict the output to include only threads from a
 particular process -- this helps reduce noise:
 
 # ./cpudist.py -p $(pidof parprimes)
