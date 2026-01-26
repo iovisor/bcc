@@ -39,10 +39,9 @@ if broken_links:
     for text, url, error in broken_links:
         report += f"| {text} | {url} | {error} |\n"
         
-    with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-        delimiter = "_REPORT_DELIMITER_"
-        f.write(f"broken_links=true\n")
-        f.write(f"report<<{delimiter}\n{report}\n{delimiter}\n")
+    print("broken_links=true")
+    escaped_report = report.replace("\n", "%0A").replace("\r", "%0D")
+    print(f"report={escaped_report}")
 else:
-    with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-        f.write("broken_links=false\n")
+    print("broken_links=false")
+    print("report=No broken links found.")
