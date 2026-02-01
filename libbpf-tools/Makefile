@@ -94,6 +94,7 @@ APPS = \
 	tcptop \
 	vfsstat \
 	wakeuptime \
+	xfsAG \
 	$(BZ_APPS) \
 	#
 
@@ -120,7 +121,6 @@ COMMON_OBJ = \
 ifeq ($(USE_BLAZESYM),1)
 COMMON_OBJ += \
 	$(OUTPUT)/libblazesym.a \
-	$(OUTPUT)/blazesym.h \
 	#
 endif
 
@@ -156,7 +156,7 @@ CFLAGS += -DUSE_BLAZESYM=1
 endif
 
 ifeq ($(USE_BLAZESYM),1)
-LDFLAGS += $(OUTPUT)/libblazesym.a -lrt -lpthread -ldl
+LDFLAGS += -lrt -lpthread -ldl
 endif
 
 .PHONY: clean
