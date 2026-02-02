@@ -36,7 +36,6 @@ static const char * const prog_type_strings[] = {
   [BPF_PROG_TYPE_SK_MSG] = "sk_msg",
   [BPF_PROG_TYPE_RAW_TRACEPOINT] = "raw_tracepoint",
   [BPF_PROG_TYPE_CGROUP_SOCK_ADDR] = "cgroup_sock_addr",
-  [BPF_PROG_TYPE_LWT_SEG6LOCAL] = "lwt_seg6local",
   [BPF_PROG_TYPE_LIRC_MODE2] = "lirc_mode2",
   [BPF_PROG_TYPE_SK_REUSEPORT] = "sk_reuseport",
   [BPF_PROG_TYPE_FLOW_DISSECTOR] = "flow_dissector",
@@ -70,7 +69,6 @@ static const char * const map_type_strings[] = {
   [BPF_MAP_TYPE_DEVMAP] = "devmap",
   [BPF_MAP_TYPE_SOCKMAP] = "sockmap",
   [BPF_MAP_TYPE_CPUMAP] = "cpumap",
-  [BPF_MAP_TYPE_XSKMAP] = "xskmap",
   [BPF_MAP_TYPE_SOCKHASH] = "sockhash",
   [BPF_MAP_TYPE_CGROUP_STORAGE] = "cgroup_storage",
   [BPF_MAP_TYPE_REUSEPORT_SOCKARRAY] = "reuseport_sockarray",
@@ -87,7 +85,6 @@ static const char * const map_type_strings[] = {
   [BPF_MAP_TYPE_USER_RINGBUF] = "user_ringbuf",
   [BPF_MAP_TYPE_CGRP_STORAGE] = "cgrp_storage",
   [BPF_MAP_TYPE_ARENA] = "arena",
-  [BPF_MAP_TYPE_INSN_ARRAY] = "insn_array",
 };
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
