@@ -1,3 +1,9 @@
+bcc (0.36.1-1) unstable; urgency=low
+
+  * Bug Fixes
+    Sync BCC with libbpf submodule update (afb8b17) (#5455, #5460)
+    libbpf-tools: Sync blazesym submodule and migrate tools to new C API (#5458)
+
 bcc (0.36.0-1) unstable; urgency=low
 
   * Support for kernel up to 6.18
