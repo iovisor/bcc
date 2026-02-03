@@ -103,7 +103,9 @@ static const char *lock_ksym_names[] = {
 	"mutex_lock_interruptible_nested",
 	"mutex_lock_killable",
 	"mutex_lock_killable_nested",
+	"_mutex_lock_killable",
 	"mutex_trylock",
+	"_mutex_trylock_nest_lock",
 	"down_read",
 	"down_read_nested",
 	"down_read_interruptible",
@@ -821,10 +823,6 @@ static void enable_fentry(struct klockstat_bpf *obj)
 				       "mutex_lock_interruptible_nested");
 	bpf_program__set_attach_target(obj->progs.mutex_lock_interruptible_exit, 0,
 				       "mutex_lock_interruptible_nested");
-	bpf_program__set_attach_target(obj->progs.mutex_lock_killable, 0,
-				       "mutex_lock_killable_nested");
-	bpf_program__set_attach_target(obj->progs.mutex_lock_killable_exit, 0,
-				       "mutex_lock_killable_nested");
 
 	bpf_program__set_attach_target(obj->progs.down_read, 0,
 				       "down_read_nested");
@@ -842,6 +840,24 @@ static void enable_fentry(struct klockstat_bpf *obj)
 				       "down_write_killable_nested");
 	bpf_program__set_attach_target(obj->progs.down_write_killable_exit, 0,
 				       "down_write_killable_nested");
+
+	/* Since v6.16 mutex_lock_killable nested variant is implemented differently */
+	if (fentry_can_attach("_mutex_lock_killable", NULL)) {
+		bpf_program__set_attach_target(obj->progs.mutex_lock_killable, 0,
+					       "_mutex_lock_killable");
+		bpf_program__set_attach_target(obj->progs.mutex_lock_killable_exit, 0,
+					       "_mutex_lock_killable");
+	} else {
+		bpf_program__set_attach_target(obj->progs.mutex_lock_killable, 0,
+					       "mutex_lock_killable_nested");
+		bpf_program__set_attach_target(obj->progs.mutex_lock_killable_exit, 0,
+					       "mutex_lock_killable_nested");
+	}
+
+	/* Since v6.16 mutex_trylock also have a nested variant */
+	if (fentry_can_attach("_mutex_trylock_nest_lock", NULL))
+		bpf_program__set_attach_target(obj->progs.mutex_trylock_exit, 0,
+					       "_mutex_trylock_nest_lock");
 }
 
 static void enable_kprobes(struct klockstat_bpf *obj)
@@ -889,10 +905,6 @@ static void enable_kprobes(struct klockstat_bpf *obj)
 				       "mutex_lock_interruptible_nested");
 	bpf_program__set_attach_target(obj->progs.kprobe_mutex_lock_interruptible_exit, 0,
 				       "mutex_lock_interruptible_nested");
-	bpf_program__set_attach_target(obj->progs.kprobe_mutex_lock_killable, 0,
-				       "mutex_lock_killable_nested");
-	bpf_program__set_attach_target(obj->progs.kprobe_mutex_lock_killable_exit, 0,
-				       "mutex_lock_killable_nested");
 
 	bpf_program__set_attach_target(obj->progs.kprobe_down_read, 0,
 				       "down_read_nested");
@@ -910,6 +922,27 @@ static void enable_kprobes(struct klockstat_bpf *obj)
 				       "down_write_killable_nested");
 	bpf_program__set_attach_target(obj->progs.kprobe_down_write_killable_exit, 0,
 				       "down_write_killable_nested");
+
+	/* Since v6.16 mutex_lock_killable nested variant is implemented differently */
+	if (kprobe_exists("_mutex_lock_killable")) {
+		bpf_program__set_attach_target(obj->progs.mutex_lock_killable, 0,
+					       "_mutex_lock_killable");
+		bpf_program__set_attach_target(obj->progs.mutex_lock_killable_exit, 0,
+					       "_mutex_lock_killable");
+	} else {
+		bpf_program__set_attach_target(obj->progs.kprobe_mutex_lock_killable, 0,
+					       "mutex_lock_killable_nested");
+		bpf_program__set_attach_target(obj->progs.kprobe_mutex_lock_killable_exit, 0,
+					       "mutex_lock_killable_nested");
+	}
+
+	/* Since v6.16 mutex_trylock also have a nested variant */
+	if (kprobe_exists("_mutex_trylock_nest_lock")) {
+		bpf_program__set_attach_target(obj->progs.kprobe_mutex_trylock, 0,
+					       "_mutex_trylock_nest_lock");
+		bpf_program__set_attach_target(obj->progs.kprobe_mutex_trylock_exit, 0,
+					       "_mutex_trylock_nest_lock");
+	}
 }
 
 static void disable_nldump_ioctl_probes(struct klockstat_bpf *obj)
