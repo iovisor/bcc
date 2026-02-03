@@ -33,7 +33,7 @@
 static volatile sig_atomic_t exiting = 0;
 
 #ifdef USE_BLAZESYM
-static blazesym *symbolizer;
+static struct blaze_symbolizer *symbolizer;
 #endif
 
 static struct env {
@@ -206,8 +206,8 @@ int handle_event(void *ctx, void *data, size_t data_sz)
 {
 	struct event e;
 #ifdef USE_BLAZESYM
-	const blazesym_result *result = NULL;
-	const blazesym_csym *sym;
+	const struct blaze_syms *syms = NULL;
+	const struct blaze_sym *sym;
 	int i, j;
 #endif
 	int sps_cnt;
@@ -238,11 +238,13 @@ int handle_event(void *ctx, void *data, size_t data_sz)
 	}
 
 #ifdef USE_BLAZESYM
-	sym_src_cfg cfgs[] = {
-		{ .src_type = SRC_T_PROCESS, .params = { .process = { .pid = e.pid }}},
+	struct blaze_symbolize_src_process src = {
+		.type_size = sizeof(src),
+		.pid = e.pid,
+		.debug_syms = true,
 	};
 	if (env.callers)
-		result = blazesym_symbolize(symbolizer, cfgs, 1, (const uint64_t *)&e.callers, 2);
+		syms = blaze_symbolize_process_abs_addrs(symbolizer, &src, (const uint64_t *)&e.callers, 2);
 #endif
 
 	/* print output */
@@ -272,20 +274,20 @@ int handle_event(void *ctx, void *data, size_t data_sz)
 		printf("%s\n", e.fname.pathes);
 
 #ifdef USE_BLAZESYM
-	for (i = 0; result && i < result->size; i++) {
-		if (result->entries[i].size == 0)
+	for (i = 0; syms && i < syms->cnt; i++) {
+		sym = &syms->syms[i];
+		if (!sym->name)
 			continue;
-		sym = &result->entries[i].syms[0];
 
 		for (j = 0; j < sps_cnt; j++)
 			printf(" ");
-		if (sym->line_no)
-			printf("%s:%ld\n", sym->symbol, sym->line_no);
+		if (sym->code_info.line)
+			printf("%s:%u\n", sym->name, sym->code_info.line);
 		else
-			printf("%s\n", sym->symbol);
+			printf("%s\n", sym->name);
 	}
 
-	blazesym_result_free(result);
+	blaze_syms_free(syms);
 #endif
 	return 0;
 }
@@ -368,8 +370,19 @@ int main(int argc, char **argv)
 	}
 
 #ifdef USE_BLAZESYM
-	if (env.callers)
-		symbolizer = blazesym_new();
+	if (env.callers) {
+		struct blaze_symbolizer_opts opts = {
+			.type_size = sizeof(opts),
+			.demangle = true,
+			.code_info = true,
+		};
+		symbolizer = blaze_symbolizer_new_opts(&opts);
+		if (!symbolizer) {
+			fprintf(stderr, "failed to create symbolizer\n");
+			err = -1;
+			goto cleanup;
+		}
+	}
 #endif
 
 	/* print headers */
@@ -423,7 +436,7 @@ cleanup:
 	opensnoop_bpf__destroy(obj);
 	cleanup_core_btf(&open_opts);
 #ifdef USE_BLAZESYM
-	blazesym_free(symbolizer);
+	blaze_symbolizer_free(symbolizer);
 #endif
 
 	return err != 0;
