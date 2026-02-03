@@ -1027,6 +1027,68 @@ int BPF_KRETPROBE(kprobe_down_write_killable_exit_nested, long ret)
 	return 0;
 }
 
+/* Since v6.16 mutex_trylock also have a nested variant */
+
+SEC("kprobe/_mutex_trylock_nest_lock")
+int BPF_KPROBE(kprobe_mutex_trylock_nest_lock, struct mutex *lock)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+
+	bpf_map_update_elem(&locks, &tid, &lock, BPF_ANY);
+	return 0;
+}
+
+SEC("kretprobe/_mutex_trylock_nest_lock")
+int BPF_KRETPROBE(kprobe_mutex_trylock_exit_nest_lock, long ret)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+	void **lock;
+
+	lock = bpf_map_lookup_elem(&locks, &tid);
+	if (!lock)
+		return 0;
+
+	bpf_map_delete_elem(&locks, &tid);
+
+	if (ret) {
+		lock_contended(ctx, *lock);
+		lock_acquired(*lock);
+	}
+	return 0;
+}
+
+/* Since v6.16 mutex_lock_killable nested variant is implemented differently */
+
+SEC("kprobe/_mutex_lock_killable")
+int BPF_KPROBE(kprobe_mutex_lock_killable_nest_lock, struct mutex *lock)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+
+	bpf_map_update_elem(&locks, &tid, &lock, BPF_ANY);
+	lock_contended(ctx, lock);
+	return 0;
+}
+
+SEC("kretprobe/_mutex_lock_killable")
+int BPF_KRETPROBE(kprobe_mutex_lock_killable_exit_nest_lock, long ret)
+{
+	u32 tid = (u32)bpf_get_current_pid_tgid();
+	void **lock;
+
+	lock = bpf_map_lookup_elem(&locks, &tid);
+	if (!lock)
+		return 0;
+
+	bpf_map_delete_elem(&locks, &tid);
+
+	if (ret)
+		lock_aborted(*lock);
+	else
+		lock_acquired(*lock);
+	return 0;
+}
+
+
 SEC("kprobe/rtnetlink_rcv_msg")
 int BPF_KPROBE(kprobe_rtnetlink_rcv_msg, struct sk_buff *skb, struct nlmsghdr *nlh,
 	       struct netlink_ext_ack *ext)
