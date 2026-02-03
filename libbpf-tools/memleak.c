@@ -25,7 +25,7 @@
 #include "trace_helpers.h"
 
 #ifdef USE_BLAZESYM
-#include "blazesym.h"
+#include <blazesym.h>
 #endif
 
 static struct env {
@@ -151,7 +151,7 @@ static int event_notify(int fd, uint64_t event);
 static pid_t fork_sync_exec(const char *command, int fd);
 
 #ifdef USE_BLAZESYM
-static void print_stack_frame_by_blazesym(size_t frame, uint64_t addr, const blazesym_csym *sym);
+static void print_stack_frame_by_blazesym(size_t frame, uint64_t addr, const struct blaze_sym *sym);
 static void print_stack_frames_by_blazesym();
 #else
 static void print_stack_frames_by_ksyms();
@@ -237,8 +237,10 @@ static struct sigaction sig_action = {
 static int child_exec_event_fd = -1;
 
 #ifdef USE_BLAZESYM
-static blazesym *symbolizer;
-static sym_src_cfg src_cfg;
+static struct blaze_symbolizer *symbolizer;
+static struct blaze_symbolize_src_kernel src_kernel;
+static struct blaze_symbolize_src_process src_process;
+static bool is_kernel;
 #else
 struct syms_cache *syms_cache;
 struct ksyms *ksyms;
@@ -337,12 +339,22 @@ int main(int argc, char *argv[])
 
 #ifdef USE_BLAZESYM
 	if (env.pid < 0) {
-		src_cfg.src_type = SRC_T_KERNEL;
-		src_cfg.params.kernel.kallsyms = NULL;
-		src_cfg.params.kernel.kernel_image = NULL;
+		src_kernel = (struct blaze_symbolize_src_kernel){
+			.type_size = sizeof(src_kernel),
+			.kallsyms = NULL,
+			.vmlinux = NULL,
+			.debug_syms = true,
+		};
+		is_kernel = true;
 	} else {
-		src_cfg.src_type = SRC_T_PROCESS;
-		src_cfg.params.process.pid = env.pid;
+		src_process = (struct blaze_symbolize_src_process){
+			.type_size = sizeof(src_process),
+			.pid = env.pid,
+			.debug_syms = true,
+			.perf_map = false,
+			.no_map_files = false,
+		};
+		is_kernel = false;
 	}
 #endif
 
@@ -437,9 +449,9 @@ int main(int argc, char *argv[])
 	}
 
 #ifdef USE_BLAZESYM
-	symbolizer = blazesym_new();
+	symbolizer = blaze_symbolizer_new();
 	if (!symbolizer) {
-		fprintf(stderr, "Failed to load blazesym\n");
+		fprintf(stderr, "Failed to create blaze symbolizer\n");
 		ret = -ENOMEM;
 
 		goto cleanup;
@@ -504,7 +516,7 @@ int main(int argc, char *argv[])
 
 cleanup:
 #ifdef USE_BLAZESYM
-	blazesym_free(symbolizer);
+	blaze_symbolizer_free(symbolizer);
 #else
 	if (syms_cache)
 		syms_cache__free(syms_cache);
@@ -734,54 +746,56 @@ pid_t fork_sync_exec(const char *command, int fd)
 }
 
 #ifdef USE_BLAZESYM
-void print_stack_frame_by_blazesym(size_t frame, uint64_t addr, const blazesym_csym *sym)
+void print_stack_frame_by_blazesym(size_t frame, uint64_t addr, const struct blaze_sym *sym)
 {
-	if (!sym)
+	if (!sym || !sym->name) {
 		printf("\t%zu [<%016lx>] <%s>\n", frame, addr, "null sym");
-	else if (sym->path && strlen(sym->path))
-		printf("\t%zu [<%016lx>] %s+0x%lx %s:%ld\n", frame, addr, sym->symbol, addr - sym->start_address, sym->path, sym->line_no);
+		return;
+	}
+
+	const char *loc = NULL;
+	if (sym->code_info.file && strlen(sym->code_info.file))
+		loc = sym->code_info.file;
+	else if (sym->module && strlen(sym->module))
+		loc = sym->module;
+
+	if (loc)
+		printf("\t%zu [<%016lx>] %s+0x%zx %s:%u\n", frame, addr, sym->name, sym->offset, loc, sym->code_info.line);
 	else
-		printf("\t%zu [<%016lx>] %s+0x%lx\n", frame, addr, sym->symbol, addr - sym->start_address);
+		printf("\t%zu [<%016lx>] %s+0x%zx\n", frame, addr, sym->name, sym->offset);
 }
 
 void print_stack_frames_by_blazesym()
 {
-	const blazesym_result *result = blazesym_symbolize(symbolizer, &src_cfg, 1, stack, env.perf_max_stack_depth);
+	const struct blaze_syms *syms;
 
-	for (size_t j = 0; j < result->size; ++j) {
+	if (is_kernel) {
+		syms = blaze_symbolize_kernel_abs_addrs(symbolizer, &src_kernel, stack, env.perf_max_stack_depth);
+	} else {
+		syms = blaze_symbolize_process_abs_addrs(symbolizer, &src_process, stack, env.perf_max_stack_depth);
+	}
+
+	if (!syms)
+		return;
+
+	for (size_t j = 0; j < syms->cnt && j < env.perf_max_stack_depth; ++j) {
 		const uint64_t addr = stack[j];
 
 		if (addr == 0)
 			break;
 
+		const struct blaze_sym *sym = &syms->syms[j];
+
 		// no symbol found
-		if (!result || j >= result->size || result->entries[j].size == 0) {
+		if (!sym->name) {
 			print_stack_frame_by_blazesym(j, addr, NULL);
-
 			continue;
 		}
 
-		// single symbol found
-		if (result->entries[j].size == 1) {
-			const blazesym_csym *sym = &result->entries[j].syms[0];
-			print_stack_frame_by_blazesym(j, addr, sym);
-
-			continue;
-		}
-
-		// multi symbol found
-		printf("\t%zu [<%016lx>] (%lu entries)\n", j, addr, result->entries[j].size);
-
-		for (size_t k = 0; k < result->entries[j].size; ++k) {
-			const blazesym_csym *sym = &result->entries[j].syms[k];
-			if (sym->path && strlen(sym->path))
-				printf("\t\t%s@0x%lx %s:%ld\n", sym->symbol, sym->start_address, sym->path, sym->line_no);
-			else
-				printf("\t\t%s@0x%lx\n", sym->symbol, sym->start_address);
-		}
+		print_stack_frame_by_blazesym(j, addr, sym);
 	}
 
-	blazesym_result_free(result);
+	blaze_syms_free(syms);
 }
 #else
 void print_stack_frames_by_ksyms()

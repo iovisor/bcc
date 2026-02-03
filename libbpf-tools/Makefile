@@ -7,7 +7,9 @@ BPFTOOL_OUTPUT ?= $(abspath $(OUTPUT)/bpftool)
 BPFTOOL ?= $(BPFTOOL_OUTPUT)/bootstrap/bpftool
 LIBBPF_SRC := $(abspath ../src/cc/libbpf/src)
 LIBBPF_OBJ := $(abspath $(OUTPUT)/libbpf.a)
-LIBBLAZESYM_SRC := $(abspath blazesym/target/release/libblazesym.a)
+LIBBLAZESYM_SRC := $(abspath blazesym/)
+LIBBLAZESYM_INC := $(abspath $(LIBBLAZESYM_SRC)/capi/include)
+LIBBLAZESYM_OBJ := $(abspath $(OUTPUT)/libblazesym_c.a)
 INCLUDES := -I$(OUTPUT) -I../src/cc/libbpf/include/uapi
 CFLAGS := -g -O2 -Wall -Wmissing-field-initializers -Werror -Werror=undef
 BPFCFLAGS := -g -O2 -Wall -Werror=undef
@@ -119,7 +121,7 @@ COMMON_OBJ = \
 
 ifeq ($(USE_BLAZESYM),1)
 COMMON_OBJ += \
-	$(OUTPUT)/libblazesym.a \
+	$(LIBBLAZESYM_OBJ) \
 	$(OUTPUT)/blazesym.h \
 	#
 endif
@@ -156,7 +158,7 @@ CFLAGS += -DUSE_BLAZESYM=1
 endif
 
 ifeq ($(USE_BLAZESYM),1)
-LDFLAGS += $(OUTPUT)/libblazesym.a -lrt -lpthread -ldl
+LDFLAGS += $(LIBBLAZESYM_OBJ) -lrt -lpthread -ldl
 endif
 
 .PHONY: clean
@@ -164,23 +166,16 @@ clean:
 	$(call msg,CLEAN)
 	$(Q)rm -rf $(OUTPUT) $(APPS) $(APP_ALIASES)
 
-$(LIBBLAZESYM_SRC)::
-	$(Q)cd blazesym && cargo build --release
+$(LIBBLAZESYM_SRC)/target/release/libblazesym_c.a::
+	$(Q)cd $(LIBBLAZESYM_SRC) && $(CARGO) build --release --package=blazesym-c
 
-$(OUTPUT)/libblazesym.a: $(LIBBLAZESYM_SRC) | $(OUTPUT)
+$(LIBBLAZESYM_OBJ): $(LIBBLAZESYM_SRC)/target/release/libblazesym_c.a | $(OUTPUT)
 	$(call msg,LIB,$@)
-	$(Q)cp $(LIBBLAZESYM_SRC) $@
+	$(Q)cp $(LIBBLAZESYM_SRC)/target/release/libblazesym_c.a $@
 
-$(OUTPUT)/blazesym.h: $(LIBBLAZESYM_SRC) | $(OUTPUT)
+$(OUTPUT)/blazesym.h: $(LIBBLAZESYM_SRC)/target/release/libblazesym_c.a | $(OUTPUT)
 	$(call msg,INC,$@)
-	$(Q)if [ -f blazesym/target/release/blazesym.h ]; then \
-		cp blazesym/target/release/blazesym.h $@; \
-	elif [ -f blazesym/include/blazesym.h ]; then \
-		cp blazesym/include/blazesym.h $@; \
-	else \
-		echo "Error: blazesym.h not found. Please check blazesym version."; \
-		exit 1; \
-	fi
+	$(Q)cp $(LIBBLAZESYM_INC)/blazesym.h $@
 
 $(OUTPUT) $(OUTPUT)/libbpf $(BPFTOOL_OUTPUT):
 	$(call msg,MKDIR,$@)

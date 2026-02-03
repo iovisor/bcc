@@ -22,7 +22,7 @@
 #endif
 
 #ifdef USE_BLAZESYM
-static blazesym *symbolizer;
+static struct blaze_symbolizer *symbolizer;
 #else
 static struct syms_cache *syms_cache;
 #endif
@@ -186,11 +186,13 @@ static void sig_handler(int sig)
 static int print_stack(struct futexctn_bpf *obj, struct hist_key *info)
 {
 #ifdef USE_BLAZESYM
-	sym_src_cfg cfgs[] = {
-		{ .src_type = SRC_T_PROCESS, .params = { .process = { .pid = info->pid_tgid >> 32 }}},
+	struct blaze_symbolize_src_process src = {
+		.type_size = sizeof(src),
+		.pid = info->pid_tgid >> 32,
+		.debug_syms = true,
 	};
-	const blazesym_result *result = NULL;
-	const blazesym_csym *sym;
+	const struct blaze_syms *syms = NULL;
+	const struct blaze_sym *sym;
 #else
 	const struct syms *syms;
 	const struct sym *sym;
@@ -214,16 +216,20 @@ static int print_stack(struct futexctn_bpf *obj, struct hist_key *info)
 	}
 
 #ifdef USE_BLAZESYM
-	result = blazesym_symbolize(symbolizer, cfgs, 1, ip, env.perf_max_stack_depth);
+	syms = blaze_symbolize_process_abs_addrs(symbolizer, &src, ip, env.perf_max_stack_depth);
 
-	for (i = 0; result && i < result->size; i++) {
-		if (result->entries[i].size == 0)
+	for (i = 0; syms && i < syms->cnt; i++) {
+		if (ip[i] == 0)
+			break;
+
+		sym = &syms->syms[i];
+		if (!sym->name)
 			continue;
-		sym = &result->entries[i].syms[0];
-		if (sym->line_no)
-			printf("    %s:%lu\n", sym->symbol, sym->line_no);
+
+		if (sym->code_info.line != 0)
+			printf("    %s:%u\n", sym->name, sym->code_info.line);
 		else
-			printf("    %s\n", sym->symbol);
+			printf("    %s\n", sym->name);
 	}
 #else
 	syms = syms_cache__get_syms(syms_cache, info->pid_tgid >> 32);
@@ -258,7 +264,7 @@ static int print_stack(struct futexctn_bpf *obj, struct hist_key *info)
 
 cleanup:
 #ifdef USE_BLAZESYM
-	blazesym_result_free(result);
+	blaze_syms_free(syms);
 #endif
 
 	free(ip);
@@ -354,7 +360,7 @@ int main(int argc, char **argv)
 	}
 
 #ifdef USE_BLAZESYM
-	symbolizer = blazesym_new();
+	symbolizer = blaze_symbolizer_new();
 #else
 	syms_cache = syms_cache__new(0);
 	if (!syms_cache) {
@@ -386,7 +392,7 @@ int main(int argc, char **argv)
 cleanup:
 	futexctn_bpf__destroy(obj);
 #ifdef USE_BLAZESYM
-	blazesym_free(symbolizer);
+	blaze_symbolizer_free(symbolizer);
 #else
 	syms_cache__free(syms_cache);
 #endif
