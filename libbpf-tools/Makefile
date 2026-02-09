@@ -55,6 +55,7 @@ APPS = \
 	drsnoop \
 	execsnoop \
 	exitsnoop \
+	ext4file \
 	filelife \
 	filetop \
 	fsdist \
