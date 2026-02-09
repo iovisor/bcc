@@ -27,7 +27,7 @@ dependencies. You will need nodejs+npm installed on the system to run this, but
 the setup script will only install packages in the local directory.
 
 ```
-[user@localhost tunnel_monitor]$ ./setup.sh 
+[user@localhost tunnel_monitor]$ ./setup.sh
 Cloning into 'chord-transitions'...
 remote: Counting objects: 294, done.
 ...
@@ -40,7 +40,7 @@ fastclick#1.0.6 bower_components/fastclick
 Then, start the simulation by running main.py:
 
 ```
-[root@bcc-dev tunnel_monitor]# python main.py 
+[root@bcc-dev tunnel_monitor]# python main.py
 Launching host 1 of 9
 Launching host 2 of 9
 ...

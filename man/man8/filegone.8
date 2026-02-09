@@ -5,7 +5,7 @@ filegone \- Trace why file gone (deleted or renamed). Uses Linux eBPF/bcc.
 .B filegone [\-h] [\-p PID]
 .SH DESCRIPTION
 This traces why file gone/vanished, providing information on who deleted or
-renamed the file. 
+renamed the file.
 
 This works by tracing the kernel vfs_unlink() , vfs_rmdir() , vfs_rename
 functions.

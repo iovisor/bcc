@@ -7,9 +7,9 @@ output (IP addresses changed to protect the innocent):
 
 # ./tcpv4connect.py
 PID    COMM         SADDR            DADDR            DPORT
-1479   telnet       127.0.0.1        127.0.0.1        23  
-1469   curl         10.201.219.236   54.245.105.25    80  
-1469   curl         10.201.219.236   54.67.101.145    80  
+1479   telnet       127.0.0.1        127.0.0.1        23
+1469   curl         10.201.219.236   54.245.105.25    80
+1469   curl         10.201.219.236   54.67.101.145    80
 
 This output shows three connections, one from a "telnet" process and two from
 "curl". The output details shows the source address, destination address,

@@ -21,7 +21,7 @@ the hit ration down to 55%.
 
 This shows a 1 Gbyte uncached file that is read twice:
 
-(root) ~ # ./cachestat.py 
+(root) ~ # ./cachestat.py
     HITS   MISSES  DIRTIES HITRATIO   BUFFERS_MB  CACHED_MB
        1        0        0  100.00%            5        191
      198    12136        0    1.61%            5        238
@@ -65,7 +65,7 @@ and the HITRATIO was around 99%.
 
 This output shows a 1 Gbyte file being created and added to the page cache:
 
-(root) ~ # ./cachestat.py 
+(root) ~ # ./cachestat.py
     HITS   MISSES  DIRTIES HITRATIO   BUFFERS_MB  CACHED_MB
        1        0        0  100.00%            8        209
        0        0   165584    0.00%            8        856

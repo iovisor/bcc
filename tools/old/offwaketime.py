@@ -55,7 +55,7 @@ maxwdepth = 10    # and MAXWDEPTH
 maxtdepth = 20    # and MAXTDEPTH
 if args.pid and args.useronly:
     print("ERROR: use either -p or -u.")
-    exit()
+    exit(1)
 
 # signal handler
 def signal_ignore(signal, frame):
@@ -212,7 +212,7 @@ b.attach_kprobe(event="try_to_wake_up", fn_name="waker")
 matched = b.num_open_kprobes()
 if matched == 0:
     print("0 functions traced. Exiting.")
-    exit()
+    exit(1)
 
 # header
 if not folded:

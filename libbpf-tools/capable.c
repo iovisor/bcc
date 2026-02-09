@@ -278,13 +278,9 @@ cleanup:
 static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	const struct cap_event *e = data;
-	struct tm *tm;
 	char ts[32];
-	time_t t;
 
-	time(&t);
-	tm = localtime(&t);
-	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+	str_timestamp("%H:%M:%S", ts, sizeof(ts));
 
 	char *verdict = "deny";
 	if (!e->ret)

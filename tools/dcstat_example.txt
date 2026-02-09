@@ -3,7 +3,7 @@ Demonstrations of dcstat, the Linux eBPF/bcc version.
 
 dcstat shows directory entry cache (dcache) statistics. For example:
 
-# ./dcstat 
+# ./dcstat
 TIME         REFS/s   SLOW/s   MISS/s     HIT%
 08:11:47:      2059      141       97    95.29
 08:11:48:     79974      151      106    99.87
@@ -30,7 +30,7 @@ ratio to 53%, and more importantly, a miss rate of over 10 thousand per second.
 
 Here's an interesting workload:
 
-# ./dcstat 
+# ./dcstat
 TIME         REFS/s   SLOW/s   MISS/s     HIT%
 08:15:53:    250683      141       97    99.96
 08:15:54:    266115      145      101    99.96
@@ -44,7 +44,7 @@ does not exist. Here's the C program that generated the workload:
      1	#include <sys/types.h>
      2	#include <sys/stat.h>
      3	#include <fcntl.h>
-     4	
+     4
      5	int
      6	main(int argc, char *argv[])
      7	{
@@ -67,13 +67,13 @@ each time (which is also a missing file), using the following C code:
      2	#include <sys/stat.h>
      3	#include <fcntl.h>
      4	#include <stdio.h>
-     5	
+     5
      6	int
      7	main(int argc, char *argv[])
      8	{
      9	    int fd, i = 0;
     10	    char buf[128] = {};
-    11	
+    11
     12	    while (1) {
     13	        sprintf(buf, "bad%d", i++);
     14	        fd = open(buf, O_RDONLY);
@@ -83,7 +83,7 @@ each time (which is also a missing file), using the following C code:
 
 Here's dcstat:
 
-# ./dcstat 
+# ./dcstat
 TIME         REFS/s   SLOW/s   MISS/s     HIT%
 08:18:52:    241131   237544   237505     1.51
 08:18:53:    238210   236323   236278     0.82

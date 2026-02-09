@@ -4,7 +4,7 @@ Demonstrations of filelife, the Linux eBPF/bcc version.
 filelife traces short-lived files: those that have been created and then
 deleted while tracing. For example:
 
-# ./filelife 
+# ./filelife
 TIME     PID    COMM             AGE(s)  FILE
 05:57:59 8556   gcc              0.04    ccCB5EDe.s
 05:57:59 8560   rm               0.02    .entry_64.o.d

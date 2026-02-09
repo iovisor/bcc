@@ -101,8 +101,8 @@ APPS = \
 # export variables that are used in Makefile.btfgen as well.
 export OUTPUT BPFTOOL ARCH BTFHUB_ARCHIVE APPS
 
-FSDIST_ALIASES = btrfsdist ext4dist nfsdist xfsdist f2fsdist bcachefsdist zfsdist
-FSSLOWER_ALIASES = btrfsslower ext4slower nfsslower xfsslower f2fsslower bcachefsslower zfsslower
+FSDIST_ALIASES = btrfsdist ext4dist fusedist nfsdist xfsdist f2fsdist bcachefsdist zfsdist
+FSSLOWER_ALIASES = btrfsslower ext4slower fuseslower nfsslower xfsslower f2fsslower bcachefsslower zfsslower
 SIGSNOOP_ALIAS = killsnoop
 APP_ALIASES = $(FSDIST_ALIASES) $(FSSLOWER_ALIASES) ${SIGSNOOP_ALIAS}
 
@@ -114,6 +114,7 @@ COMMON_OBJ = \
 	$(OUTPUT)/uprobe_helpers.o \
 	$(OUTPUT)/btf_helpers.o \
 	$(OUTPUT)/compat.o \
+	$(OUTPUT)/path_helpers.o \
 	$(if $(ENABLE_MIN_CORE_BTFS),$(OUTPUT)/min_core_btf_tar.o) \
 	#
 
@@ -165,7 +166,7 @@ clean:
 	$(Q)rm -rf $(OUTPUT) $(APPS) $(APP_ALIASES)
 
 $(LIBBLAZESYM_SRC)::
-	$(Q)cd blazesym && cargo build --release --features=cheader
+	$(Q)cd blazesym && cargo build --release
 
 $(OUTPUT)/libblazesym.a: $(LIBBLAZESYM_SRC) | $(OUTPUT)
 	$(call msg,LIB,$@)
@@ -173,7 +174,14 @@ $(OUTPUT)/libblazesym.a: $(LIBBLAZESYM_SRC) | $(OUTPUT)
 
 $(OUTPUT)/blazesym.h: $(LIBBLAZESYM_SRC) | $(OUTPUT)
 	$(call msg,INC,$@)
-	$(Q)cp blazesym/target/release/blazesym.h $@
+	$(Q)if [ -f blazesym/target/release/blazesym.h ]; then \
+		cp blazesym/target/release/blazesym.h $@; \
+	elif [ -f blazesym/include/blazesym.h ]; then \
+		cp blazesym/include/blazesym.h $@; \
+	else \
+		echo "Error: blazesym.h not found. Please check blazesym version."; \
+		exit 1; \
+	fi
 
 $(OUTPUT) $(OUTPUT)/libbpf $(BPFTOOL_OUTPUT):
 	$(call msg,MKDIR,$@)

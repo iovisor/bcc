@@ -16,7 +16,7 @@
 # 20-Mar-2018   Brendan Gregg   Created this.
 
 from __future__ import print_function
-from bcc import BPF
+from bcc import BPF, tcp
 import argparse
 from socket import inet_ntop, AF_INET, AF_INET6
 import sys
@@ -312,28 +312,6 @@ if args.journal:
         exit(1)
 
 
-def tcpstate2str(state):
-    # from include/net/tcp_states.h:
-    tcpstate = {
-        1: "ESTABLISHED",
-        2: "SYN_SENT",
-        3: "SYN_RECV",
-        4: "FIN_WAIT1",
-        5: "FIN_WAIT2",
-        6: "TIME_WAIT",
-        7: "CLOSE",
-        8: "CLOSE_WAIT",
-        9: "LAST_ACK",
-        10: "LISTEN",
-        11: "CLOSING",
-        12: "NEW_SYN_RECV",
-    }
-
-    if state in tcpstate:
-        return tcpstate[state]
-    else:
-        return str(state)
-
 def journal_fields(event, addr_family):
     addr_pfx = 'IPV4'
     if addr_family == AF_INET6:
@@ -354,8 +332,8 @@ def journal_fields(event, addr_family):
         'OBJECT_TCP_SOURCE_PORT': str(event.lport),
         'OBJECT_' + addr_pfx + '_DESTINATION_ADDRESS': inet_ntop(addr_family, event.daddr),
         'OBJECT_TCP_DESTINATION_PORT': str(event.dport),
-        'OBJECT_TCP_OLD_STATE': tcpstate2str(event.oldstate),
-        'OBJECT_TCP_NEW_STATE': tcpstate2str(event.newstate),
+        'OBJECT_TCP_OLD_STATE': tcp.state2str(event.oldstate),
+        'OBJECT_TCP_NEW_STATE': tcp.state2str(event.newstate),
         'OBJECT_TCP_SPAN_TIME': str(event.span_us)
         }
 
@@ -396,7 +374,7 @@ def print_event(event, addr_family):
         version if args.wide or args.csv else "",
         inet_ntop(addr_family, event.saddr), event.lport,
         inet_ntop(addr_family, event.daddr), event.dport,
-        tcpstate2str(event.oldstate), tcpstate2str(event.newstate),
+        tcp.state2str(event.oldstate), tcp.state2str(event.newstate),
         float(event.span_us) / 1000))
     if args.journal:
         journal.send(**journal_fields(event, addr_family))

@@ -141,7 +141,7 @@ PROBE_TTY_WRITE
     if (iocb->ki_filp->f_inode->i_ino != PTS)
         return 0;
 /**
- * commit 8cd54c1c8480 iov_iter: separate direction from flavour 
+ * commit 8cd54c1c8480 iov_iter: separate direction from flavour
  * `type` is represented by iter_type and data_source separately
  */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0)

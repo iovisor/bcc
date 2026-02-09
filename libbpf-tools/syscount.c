@@ -127,7 +127,8 @@ static const char *agg_col(struct data_ext_t *val, char *buf, size_t size)
 	if (env.process) {
 		snprintf(buf, size, "%-6u %-15s", val->key, val->comm);
 	} else {
-		syscall_name(val->key, buf, size);
+		if (syscall_name(val->key, buf, size) < 0)
+			snprintf(buf, size, "[unknown: %u]", val->key);
 	}
 	return buf;
 }

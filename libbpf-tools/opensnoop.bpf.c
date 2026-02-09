@@ -6,6 +6,7 @@
 #include <bpf/bpf_helpers.h>
 #include "compat.bpf.h"
 #include "opensnoop.h"
+#include "path_helpers.bpf.h"
 
 #ifndef O_CREAT
 #define O_CREAT		00000100
@@ -134,9 +135,9 @@ int trace_exit(struct syscall_trace_exit* ctx)
 	eventp->pid = bpf_get_current_pid_tgid() >> 32;
 	eventp->uid = bpf_get_current_uid_gid();
 	bpf_get_current_comm(&eventp->comm, sizeof(eventp->comm));
-	bpf_probe_read_user_str(&eventp->fname, sizeof(eventp->fname),
+	bpf_probe_read_user_str(&eventp->fname.pathes, sizeof(eventp->fname.pathes),
 			  ap->fname);
-	eventp->path_depth = 0;
+	eventp->fname.depth = 0;
 	eventp->flags = ap->flags;
 
 	if (ap->flags & O_CREAT || (ap->flags & O_TMPFILE) == O_TMPFILE)
@@ -152,40 +153,10 @@ int trace_exit(struct syscall_trace_exit* ctx)
 	eventp->callers[0] = stack[1];
 	eventp->callers[1] = stack[2];
 
-	if (full_path && eventp->fname[0] != '/') {
-		int depth;
-		struct task_struct *task;
-		struct dentry *dentry, *parent_dentry;
-		size_t filepart_length;
-		void *payload = eventp->fname;
-
-
-		task = (struct task_struct *)bpf_get_current_task_btf();
-		dentry = BPF_CORE_READ(task, fs, pwd.dentry);
-
-		for (depth = 1, payload += NAME_MAX; depth < MAX_PATH_DEPTH; depth++) {
-			filepart_length =
-				bpf_probe_read_kernel_str(payload, NAME_MAX,
-						BPF_CORE_READ(dentry, d_name.name));
-
-			if (filepart_length < 0) {
-				eventp->get_path_failed = 1;
-				break;
-			}
-
-			parent_dentry = BPF_CORE_READ(dentry, d_parent);
-			if (dentry == parent_dentry)
-				break;
-
-			if (filepart_length > NAME_MAX)
-				break;
-
-			payload += NAME_MAX;
-
-			dentry = parent_dentry;
-			eventp->path_depth++;
-		}
-	}
+	if (full_path && eventp->fname.pathes[0] != '/')
+		bpf_getcwd(eventp->fname.pathes + NAME_MAX, NAME_MAX,
+			   MAX_PATH_DEPTH - 1,
+			   &eventp->fname.failed, &eventp->fname.depth);
 
 	/* emit event */
 	submit_buf(ctx, eventp, sizeof(*eventp));

@@ -3,7 +3,7 @@ Demonstrations of disksnoop.py, the Linux eBPF/bcc version.
 
 This traces block I/O, a prints a line to summarize each I/O completed:
 
-# ./disksnoop.py 
+# ./disksnoop.py
 TIME(s)            T  BYTES    LAT(ms)
 16458043.435457    W  4096        2.73
 16458043.435981    W  4096        3.24

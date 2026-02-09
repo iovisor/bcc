@@ -185,7 +185,7 @@ And again with quiet:
 
 Here is an example of reset-trace detecting an unrelated tracing session:
 
-# ./reset-trace.sh 
+# ./reset-trace.sh
 Noticed unrelated tracing file /sys/kernel/debug/tracing/set_ftrace_filter isn't set as expected. Not resetting (-F to force, -v for verbose).
 
 And verbose:

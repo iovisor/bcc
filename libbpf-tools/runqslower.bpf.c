@@ -9,6 +9,8 @@
 
 #define TASK_RUNNING	0
 
+const volatile char targ_comm[TASK_COMM_LEN] = {};
+const volatile bool filter_comm = false;
 const volatile __u64 min_us = 0;
 const volatile pid_t targ_pid = 0;
 const volatile pid_t targ_tgid = 0;
@@ -26,8 +28,19 @@ struct {
 	__uint(value_size, sizeof(u32));
 } events SEC(".maps");
 
+static __always_inline bool comm_allowed(const char *comm)
+{
+	int i;
+
+	for (i = 0; i < TASK_COMM_LEN && targ_comm[i] != '\0'; i++) {
+		if (comm[i] != targ_comm[i])
+			return false;
+	}
+	return true;
+}
+
 /* record enqueue timestamp */
-static int trace_enqueue(u32 tgid, u32 pid)
+static int trace_enqueue(u32 tgid, u32 pid, const char *comm)
 {
 	u64 ts;
 
@@ -36,6 +49,8 @@ static int trace_enqueue(u32 tgid, u32 pid)
 	if (targ_tgid && targ_tgid != tgid)
 		return 0;
 	if (targ_pid && targ_pid != pid)
+		return 0;
+	if (filter_comm && !comm_allowed(comm))
 		return 0;
 
 	ts = bpf_ktime_get_ns();
@@ -48,10 +63,14 @@ static int handle_switch(void *ctx, struct task_struct *prev, struct task_struct
 	struct event event = {};
 	u64 *tsp, delta_us;
 	u32 pid;
+	char comm[TASK_COMM_LEN] = {};
 
 	/* ivcsw: treat like an enqueue event and store timestamp */
-	if (get_task_state(prev) == TASK_RUNNING)
-		trace_enqueue(BPF_CORE_READ(prev, tgid), BPF_CORE_READ(prev, pid));
+	if (get_task_state(prev) == TASK_RUNNING) {
+		if (filter_comm)
+			BPF_CORE_READ_STR_INTO(&comm, prev, comm);
+		trace_enqueue(BPF_CORE_READ(prev, tgid), BPF_CORE_READ(prev, pid), comm);
+	}
 
 	pid = BPF_CORE_READ(next, pid);
 
@@ -81,13 +100,13 @@ static int handle_switch(void *ctx, struct task_struct *prev, struct task_struct
 SEC("tp_btf/sched_wakeup")
 int BPF_PROG(sched_wakeup, struct task_struct *p)
 {
-	return trace_enqueue(p->tgid, p->pid);
+	return trace_enqueue(p->tgid, p->pid, p->comm);
 }
 
 SEC("tp_btf/sched_wakeup_new")
 int BPF_PROG(sched_wakeup_new, struct task_struct *p)
 {
-	return trace_enqueue(p->tgid, p->pid);
+	return trace_enqueue(p->tgid, p->pid, p->comm);
 }
 
 SEC("tp_btf/sched_switch")
@@ -99,13 +118,21 @@ int BPF_PROG(sched_switch, bool preempt, struct task_struct *prev, struct task_s
 SEC("raw_tp/sched_wakeup")
 int BPF_PROG(handle_sched_wakeup, struct task_struct *p)
 {
-	return trace_enqueue(BPF_CORE_READ(p, tgid), BPF_CORE_READ(p, pid));
+	char comm[TASK_COMM_LEN] = {};
+
+	if (filter_comm)
+		BPF_CORE_READ_STR_INTO(&comm, p, comm);
+	return trace_enqueue(BPF_CORE_READ(p, tgid), BPF_CORE_READ(p, pid), comm);
 }
 
 SEC("raw_tp/sched_wakeup_new")
 int BPF_PROG(handle_sched_wakeup_new, struct task_struct *p)
 {
-	return trace_enqueue(BPF_CORE_READ(p, tgid), BPF_CORE_READ(p, pid));
+	char comm[TASK_COMM_LEN] = {};
+
+	if (filter_comm)
+		BPF_CORE_READ_STR_INTO(&comm, p, comm);
+	return trace_enqueue(BPF_CORE_READ(p, tgid), BPF_CORE_READ(p, pid), comm);
 }
 
 SEC("raw_tp/sched_switch")

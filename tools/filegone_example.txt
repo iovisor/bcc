@@ -4,7 +4,7 @@ Demonstrations of filegone, the Linux eBPF/bcc version.
 filegone traces why file gone, either been deleted or renamed
 For example:
 
-# ./filegone 
+# ./filegone
 18:30:56 22905   vim               DELETE .fstab.swpx
 18:30:56 22905   vim               DELETE .fstab.swp
 18:31:00 22905   vim               DELETE .viminfo

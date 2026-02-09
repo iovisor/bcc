@@ -26,6 +26,7 @@
 #ifdef USE_BLAZESYM
 #include "blazesym.h"
 #endif
+#include "path_helpers.h"
 
 #define NSEC_PER_SEC		1000000000ULL
 
@@ -204,7 +205,6 @@ static void sig_int(int signo)
 int handle_event(void *ctx, void *data, size_t data_sz)
 {
 	struct event e;
-	struct tm *tm;
 #ifdef USE_BLAZESYM
 	const blazesym_result *result = NULL;
 	const blazesym_csym *sym;
@@ -212,7 +212,6 @@ int handle_event(void *ctx, void *data, size_t data_sz)
 #endif
 	int sps_cnt;
 	char ts[32];
-	time_t t;
 	int fd, err;
 
 	if (data_sz < sizeof(struct event)) {
@@ -228,9 +227,8 @@ int handle_event(void *ctx, void *data, size_t data_sz)
 		return -1;
 
 	/* prepare fields */
-	time(&t);
-	tm = localtime(&t);
-	strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+	str_timestamp("%H:%M:%S", ts, sizeof(ts));
+
 	if (e.ret >= 0) {
 		fd = e.ret;
 		err = 0;
@@ -268,23 +266,10 @@ int handle_event(void *ctx, void *data, size_t data_sz)
 		sps_cnt += 9;
 	}
 	if (env.full_path) {
-		for (int depth = e.path_depth; depth >= 0; depth--)
-			/**
-			 * 1. If the file/path name starts with '/', do not
-			 *    print the '/' prefix.
-			 * 2. If bpf_probe_read_kernel_str() fails, or the
-			 *    directory depth reaches the upper limit
-			 *    MAX_PATH_DEPTH, the top-level directory
-			 *    is printed without the prefix '/'.
-			 */
-			printf("%s%s",
-				"/\0" + (e.fname[NAME_MAX * depth] == '/' ||
-					 ((e.get_path_failed || e.path_depth == MAX_PATH_DEPTH - 1) &&
-					  depth == e.path_depth)),
-				(char *)&e.fname[NAME_MAX * depth]);
+		print_full_path(&e.fname);
 		printf("\n");
 	} else
-		printf("%s\n", e.fname);
+		printf("%s\n", e.fname.pathes);
 
 #ifdef USE_BLAZESYM
 	for (i = 0; result && i < result->size; i++) {

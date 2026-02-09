@@ -289,7 +289,7 @@ apt-get install flex bison libssl-dev libelf-dev dwarves bc
 
 First, you will need to checkout the WSL2 Linux kernel git repository:
 ```
-KERNEL_VERSION=$(uname -r | cut -d '-' -f 1)
+KERNEL_VERSION=$(uname -r | cut -d '.' -f 1-2 | xargs -I {} echo "{}.y")
 git clone --depth 1 https://github.com/microsoft/WSL2-Linux-Kernel.git -b linux-msft-wsl-$KERNEL_VERSION
 cd WSL2-Linux-Kernel
 ```
@@ -311,7 +311,7 @@ mv /lib/modules/$KERNEL_VERSION-microsoft-standard-WSL2+/ /lib/modules/$KERNEL_V
 
 Then you can install bcc tools package according your distribution.
 
-If you met some problems, try to 
+If you met some problems, try to
 ```
 sudo mount -t debugfs debugfs /sys/kernel/debug
 ```
@@ -387,7 +387,7 @@ sudo apt install -y zip bison build-essential cmake flex git libedit-dev \
 sudo apt install -y zip bison build-essential cmake flex git libedit-dev \
   libllvm14 llvm-14-dev libclang-14-dev python3 zlib1g-dev libelf-dev libfl-dev python3-setuptools \
   liblzma-dev libdebuginfod-dev arping netperf iperf
-  
+
 # For Lunar Lobster (23.04)
 sudo apt install -y zip bison build-essential cmake flex git libedit-dev \
   libllvm15 llvm-15-dev libclang-15-dev python3 zlib1g-dev libelf-dev libfl-dev python3-setuptools \
@@ -433,7 +433,7 @@ suppose you're running with root or add sudo first
 ### Install build dependencies
 ```
 dnf install -y bison cmake ethtool flex git iperf3 libstdc++-devel python3-netaddr python3-pip gcc gcc-c++ make zlib-devel elfutils-libelf-devel
-# dnf install -y luajit luajit-devel ## if use luajit, will report some lua function(which in lua5.3) undefined problem 
+# dnf install -y luajit luajit-devel ## if use luajit, will report some lua function(which in lua5.3) undefined problem
 dnf install -y clang clang-devel llvm llvm-devel llvm-static ncurses-devel
 dnf -y install netperf
 pip3 install pyroute2
@@ -449,7 +449,7 @@ cd bcc-build/
 ## here llvm should always link shared library
 cmake ../bcc -DCMAKE_INSTALL_PREFIX=/usr -DENABLE_LLVM_SHARED=1
 make -j10
-make install 
+make install
 
 ```
 after install, you may add bcc directory to your $PATH, which you can add to ~/.bashrc
@@ -460,20 +460,20 @@ export PATH=$bcctools:$bccexamples:$PATH
 ```
 ### let path take effect
 ```
-source ~/.bashrc 
+source ~/.bashrc
 ```
-then run 
+then run
 ```
 hello_world.py
 ```
-Or 
+Or
 ```
 cd /usr/share/bcc/examples
 ./hello_world.py
 ./tracing/bitehist.py
 
 cd /usr/share/bcc/tools
-./bitesize 
+./bitesize
 
 ```
 
@@ -532,7 +532,7 @@ sudo zypper in lua51-luajit-devel # for lua support in openSUSE Tumbleweed
 git clone https://github.com/iovisor/bcc.git
 mkdir bcc/build; cd bcc/build
 cmake -DLUAJIT_INCLUDE_DIR=`pkg-config --variable=includedir luajit` \ # for lua support
-      ..
+      -DENABLE_LLVM_SHARED=1 ..
 make
 sudo make install
 cmake -DPYTHON_CMD=python3 .. # build python3 binding

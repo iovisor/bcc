@@ -47,7 +47,7 @@ else:
     label = "usecs"
     if args.interval and int(args.interval) == 0:
         print("ERROR: interval 0. Exiting.")
-        exit()
+        exit(1)
 debug = 0
 
 # define BPF program

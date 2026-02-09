@@ -51,7 +51,7 @@ debug = 0
 maxdepth = 20    # and MAXDEPTH
 if args.pid and args.useronly:
     print("ERROR: use either -p or -u.")
-    exit()
+    exit(1)
 
 # signal handler
 def signal_ignore(signal, frame):
@@ -163,7 +163,7 @@ b.attach_kprobe(event="finish_task_switch", fn_name="oncpu")
 matched = b.num_open_kprobes()
 if matched == 0:
     print("0 functions traced. Exiting.")
-    exit()
+    exit(1)
 
 # header
 if not folded:

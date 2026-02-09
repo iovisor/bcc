@@ -120,27 +120,32 @@ void SourceDebugger::dump() {
   string TripleStr(mod_->getTargetTriple());
 #endif
   Triple TheTriple(TripleStr);
-  const Target *T = TargetRegistry::lookupTarget(TripleStr, Error);
+#if LLVM_VERSION_MAJOR >= 22
+  const Triple &TripleArg = TheTriple;
+#else
+  const string &TripleArg = TripleStr;
+#endif
+  const Target *T = TargetRegistry::lookupTarget(TripleArg, Error);
   if (!T) {
     errs() << "Debug Error: cannot get target\n";
     return;
   }
 
-  std::unique_ptr<MCRegisterInfo> MRI(T->createMCRegInfo(TripleStr));
+  std::unique_ptr<MCRegisterInfo> MRI(T->createMCRegInfo(TripleArg));
   if (!MRI) {
     errs() << "Debug Error: cannot get register info\n";
     return;
   }
 
   MCTargetOptions MCOptions;
-  std::unique_ptr<MCAsmInfo> MAI(T->createMCAsmInfo(*MRI, TripleStr, MCOptions));
+  std::unique_ptr<MCAsmInfo> MAI(T->createMCAsmInfo(*MRI, TripleArg, MCOptions));
   if (!MAI) {
     errs() << "Debug Error: cannot get assembly info\n";
     return;
   }
 
   std::unique_ptr<MCSubtargetInfo> STI(
-      T->createMCSubtargetInfo(TripleStr, "", ""));
+      T->createMCSubtargetInfo(TripleArg, "", ""));
   MCObjectFileInfo MOFI;
 #if LLVM_VERSION_MAJOR >= 13
   MCContext Ctx(TheTriple, MAI.get(), MRI.get(), STI.get(), nullptr);

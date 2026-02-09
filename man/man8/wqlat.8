@@ -5,14 +5,14 @@ wqlat \- Summarize kernel workqueue latency as a histogram.
 .B wqlat [\-h] [\-T] [\-N] [\-W] [\-w WQNAME] [interval [count]]
 .SH DESCRIPTION
 wqlat traces  work's waiting on workqueue, and records the distribution
-of work's queuing latency (time). This is printed as a histogram 
+of work's queuing latency (time). This is printed as a histogram
 either on Ctrl-C, or after a given interval in seconds.
 
 This tool uses in-kernel eBPF maps for storing timestamps and the histogram,
 for efficiency.
 
 This tool uses the workqueue:workqueue_queue_work and workqueue:workqueue_execute_start
-kernel tracepoints, which is a stable tracing mechanism. Please note BPF programs can 
+kernel tracepoints, which is a stable tracing mechanism. Please note BPF programs can
 attach to tracepoints from Linux 4.7 only, so this tools can only support kernel 4.7 or
 later version.
 
@@ -44,7 +44,7 @@ Number of outputs.
 .TP
 Summarize kernel workqueue latency as a histogram:
 #
-.B wqlat 
+.B wqlat
 .TP
 Print 1 second summaries, 10 times:
 #
@@ -61,7 +61,7 @@ Print 1 second summaries, 10 times per workqueue:
 .TP
 Print 1 second summaries for workqueue nvmet_tcp_wq:
 #
-.B wqlat \-w nvmet_tcp_wq 1 
+.B wqlat \-w nvmet_tcp_wq 1
 .SH FIELDS
 .TP
 usecs
@@ -78,8 +78,8 @@ An ASCII bar chart to visualize the distribution (count column)
 .SH OVERHEAD
 This traces kernel functions and maintains in-kernel timestamps and a histogram,
 which are asynchronously copied to user-space. This method is very efficient,
-and the overhead for most workqueue scheduling rates (< 100k) should be 
-negligible.If you have a higher workqueue scheduling, please test and quantify 
+and the overhead for most workqueue scheduling rates (< 100k) should be
+negligible.If you have a higher workqueue scheduling, please test and quantify
 the overhead before use.
 .SH SOURCE
 This is from bcc.

@@ -6,7 +6,7 @@ how long tasks spent waiting their turn to run on-CPU.
 
 Here is a heavily loaded system:
 
-# ./runqlat 
+# ./runqlat
 Tracing run queue latency... Hit Ctrl-C to end.
 ^C
      usecs               : count     distribution

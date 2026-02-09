@@ -209,7 +209,7 @@ else:
 if args.pid_netns != 0:
     if args.netns_id != 0:
         print("ERROR: --pid_netns and --netns-id not allowed together")
-        exit()
+        exit(1)
     args.netns_id = os.stat('/proc/{}/ns/net'.format(args.pid_netns)).st_ino
 
 if args.netns_id != 0:
@@ -342,7 +342,7 @@ drop_reasons = {
 def print_ipv4_event(cpu, data, size):
     event = b["ipv4_events"].event(data)
     reason_str = drop_reasons.get(event.drop_reason, "UNKNOWN")
-    state_flag_str = "%s (%s)" % (tcp.tcpstate[event.state], tcp.flags2str(event.tcpflags))
+    state_flag_str = "%s (%s)" % (tcp.state2str(event.state), tcp.flags2str(event.tcpflags))
     print("%-8s %-7d %-2d %-20s > %-20s %-20s %s (%d)" % (
         strftime("%H:%M:%S"), event.pid, event.ip,
         "%s:%d" % (inet_ntop(AF_INET, pack('I', event.saddr)), event.sport),
@@ -356,7 +356,7 @@ def print_ipv4_event(cpu, data, size):
 def print_ipv6_event(cpu, data, size):
     event = b["ipv6_events"].event(data)
     reason_str = drop_reasons.get(event.drop_reason, "UNKNOWN")
-    state_flag_str = "%s (%s)" % (tcp.tcpstate[event.state], tcp.flags2str(event.tcpflags))
+    state_flag_str = "%s (%s)" % (tcp.state2str(event.state), tcp.flags2str(event.tcpflags))
     print("%-8s %-7d %-2d %-20s > %-20s %-20s %s (%d)" % (
         strftime("%H:%M:%S"), event.pid, event.ip,
         "%s:%d" % (inet_ntop(AF_INET6, event.saddr), event.sport),
@@ -386,7 +386,7 @@ else:
     print("ERROR: tcp_drop() kernel function and tracepoint:skb:kfree_skb"
           " not found or traceable. "
           "The kernel might be too old or the the function has been inlined.")
-    exit()
+    exit(1)
 stack_traces = b.get_table("stack_traces")
 
 # header

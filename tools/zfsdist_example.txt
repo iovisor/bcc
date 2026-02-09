@@ -5,7 +5,7 @@ zfsdist traces ZFS reads, writes, opens, and fsyncs, and summarizes their
 latency as a power-of-2 histogram. It has been written to work on ZFS on Linux
 (http://zfsonlinux.org). For example:
 
-# ./zfsdist 
+# ./zfsdist
 Tracing ZFS operation latency... Hit Ctrl-C to end.
 ^C
 

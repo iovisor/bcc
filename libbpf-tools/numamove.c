@@ -74,9 +74,7 @@ int main(int argc, char **argv)
 		.doc = argp_program_doc,
 	};
 	struct numamove_bpf *obj;
-	struct tm *tm;
 	char ts[32];
-	time_t t;
 	int err;
 	bool use_folio, use_fentry;
 
@@ -142,9 +140,7 @@ int main(int argc, char **argv)
 	printf("%-10s %18s %18s\n", "TIME", "NUMA_migrations", "NUMA_migrations_ms");
 	while (!exiting) {
 		sleep(1);
-		time(&t);
-		tm = localtime(&t);
-		strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+		str_timestamp("%H:%M:%S", ts, sizeof(ts));
 		printf("%-10s %18lld %18lld\n", ts,
 			__atomic_exchange_n(&obj->bss->num, 0, __ATOMIC_RELAXED),
 			__atomic_exchange_n(&obj->bss->latency, 0, __ATOMIC_RELAXED));

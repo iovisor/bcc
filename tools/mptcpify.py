@@ -65,7 +65,7 @@ KMOD_RET(update_socket_protocol, int family, int type, int protocol, int ret)
     if ((family == AF_INET || family == AF_INET6) &&
         type == SOCK_STREAM &&
         (!protocol || protocol == IPPROTO_TCP) &&
-        (*mode == 0 || support_apps.lookup(&target)))
+        (mode && *mode == 0 || support_apps.lookup(&target)))
         return IPPROTO_MPTCP;
 
     return protocol;

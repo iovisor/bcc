@@ -29,7 +29,7 @@ inspect each allocation individually -- you get a nice summary of which stack
 is responsible for a large leak.
 
 Occasionally, you do want the individual allocation details. Perhaps the same
-stack is allocating various sizes and you want to confirm which sizes are 
+stack is allocating various sizes and you want to confirm which sizes are
 prevalent. Use the -a switch:
 
 # ./memleak -p $(pidof allocs) -a
@@ -109,18 +109,18 @@ to reduce the memory overhead.
 To avoid false positives, allocations younger than a certain age (500ms by
 default) are not printed. To change this threshold, use the -o switch.
 
-By default, memleak prints its output every 5 seconds. To change this 
-interval, pass the interval as a positional parameter to memleak. You can 
+By default, memleak prints its output every 5 seconds. To change this
+interval, pass the interval as a positional parameter to memleak. You can
 also control the number of times the output will be printed before exiting.
 For example:
 
 # ./memleak 1 10
 
 ... will print the outstanding allocation statistics every second, for ten
-times, and then exit. 
+times, and then exit.
 
 memleak may introduce considerable overhead if your application or kernel is
-allocating and freeing memory at a very high rate. In that case, you can 
+allocating and freeing memory at a very high rate. In that case, you can
 control the overhead by sampling every N-th allocation. For example, to sample
 roughly 10% of the allocations and print the outstanding allocations every 5
 seconds, 3 times before quitting:
@@ -142,9 +142,9 @@ Attaching to pid 2614, Ctrl+C to quit.
                  main+0x6d [allocs]
                  __libc_start_main+0xf0 [libc-2.21.so]
 
-Note that even though the application leaks 16 bytes of memory every second, 
+Note that even though the application leaks 16 bytes of memory every second,
 the report (printed every 5 seconds) doesn't "see" all the allocations because
-of the sampling rate applied. 
+of the sampling rate applied.
 
 Profiling in memory part is hard to be accurate because of BPF infrastructure.
 memleak keeps misjudging memory leak on the complicated environment which has
@@ -177,7 +177,7 @@ Attaching to pid 2623, Ctrl+C to quit.
 		0x0000559b478700b7	main+0x4a7 [redis-server]
 		0x00007fdf47029d90	__libc_start_call_main+0x80 [libc.so.6]
 
-When using the --symbols-prefix argument, memleak can trace the third-party memory 
+When using the --symbols-prefix argument, memleak can trace the third-party memory
 allocations, such as jemalloc whose symbols are usually identified by the "je_" prefix
 in redis project.
 

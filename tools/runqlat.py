@@ -268,14 +268,14 @@ if args.pids or args.tids:
         pid = "pid"
         section = "tid"
     bpf_text = bpf_text.replace('STORAGE',
-        'BPF_HISTOGRAM(dist, pid_key_t);')
+        'BPF_HISTOGRAM(dist, pid_key_t, MAX_PID);')
     bpf_text = bpf_text.replace('STORE',
         'pid_key_t key = {}; key.id = ' + pid + '; key.slot = bpf_log2l(delta); ' +
         'dist.increment(key);')
 elif args.pidnss:
     section = "pidns"
     bpf_text = bpf_text.replace('STORAGE',
-        'BPF_HISTOGRAM(dist, pidns_key_t);')
+        'BPF_HISTOGRAM(dist, pidns_key_t, MAX_PIDNS);')
     bpf_text = bpf_text.replace('STORE', 'pidns_key_t key = ' +
         '{.id = pid_namespace(prev), ' +
         '.slot = bpf_log2l(delta)}; dist.atomic_increment(key);')
@@ -289,8 +289,11 @@ if debug or args.ebpf:
     if args.ebpf:
         exit()
 
+max_pid = int(open("/proc/sys/kernel/pid_max").read())
+max_pidns = int(open("/proc/sys/user/max_pid_namespaces").read())
 # load BPF program
-b = BPF(text=bpf_text)
+b = BPF(text=bpf_text, cflags=["-DMAX_PID=%d" % max_pid,
+                               "-DMAX_PIDNS=%d" % max_pidns])
 if not is_support_raw_tp:
     b.attach_kprobe(event="ttwu_do_wakeup", fn_name="trace_ttwu_do_wakeup")
     b.attach_kprobe(event="wake_up_new_task", fn_name="trace_wake_up_new_task")

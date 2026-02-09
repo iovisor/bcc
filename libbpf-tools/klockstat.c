@@ -804,6 +804,22 @@ static void enable_fentry(struct klockstat_bpf *obj)
 	bpf_program__set_autoload(obj->progs.kprobe_down_write_killable_exit, false);
 	bpf_program__set_autoload(obj->progs.kprobe_up_write, false);
 
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_exit_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_interruptible_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_interruptible_exit_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_killable_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_killable_exit_nested, false);
+
+	bpf_program__set_autoload(obj->progs.kprobe_down_read_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_read_exit_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_read_killable_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_read_killable_exit_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_write_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_write_exit_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_write_killable_nested, false);
+	bpf_program__set_autoload(obj->progs.kprobe_down_write_killable_exit_nested, false);
+
 	bpf_program__set_autoload(obj->progs.kprobe_rtnetlink_rcv_msg, false);
 	bpf_program__set_autoload(obj->progs.kprobe_rtnetlink_rcv_msg_exit, false);
 	bpf_program__set_autoload(obj->progs.kprobe_netlink_dump, false);
@@ -879,6 +895,41 @@ static void enable_kprobes(struct klockstat_bpf *obj)
 	bpf_program__set_autoload(obj->progs.netlink_dump_exit, false);
 	bpf_program__set_autoload(obj->progs.sock_do_ioctl, false);
 	bpf_program__set_autoload(obj->progs.sock_do_ioctl_exit, false);
+
+        /* CONFIG_DEBUG_LOCK_ALLOC is on */
+	if (kprobe_exists("mutex_lock_nested")) {
+		bpf_program__set_autoload(obj->progs.kprobe_mutex_lock, false);
+		bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_exit, false);
+		bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_interruptible, false);
+		bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_interruptible_exit, false);
+		bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_killable, false);
+		bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_killable_exit, false);
+
+		bpf_program__set_autoload(obj->progs.kprobe_down_read, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_read_exit, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_read_killable, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_read_killable_exit, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_write, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_write_exit, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_write_killable, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_write_killable_exit, false);
+	} else {
+		bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_nested, false);
+		bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_exit_nested, false);
+		bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_interruptible_nested, false);
+		bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_interruptible_exit_nested, false);
+		bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_killable_nested, false);
+		bpf_program__set_autoload(obj->progs.kprobe_mutex_lock_killable_exit_nested, false);
+
+		bpf_program__set_autoload(obj->progs.kprobe_down_read_nested, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_read_exit_nested, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_read_killable_nested, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_read_killable_exit_nested, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_write_nested, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_write_exit_nested, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_write_killable_nested, false);
+		bpf_program__set_autoload(obj->progs.kprobe_down_write_killable_exit_nested, false);
+	}
 }
 
 static void disable_nldump_ioctl_probes(struct klockstat_bpf *obj)
@@ -909,9 +960,7 @@ int main(int argc, char **argv)
 	struct klockstat_bpf *obj = NULL;
 	struct ksyms *ksyms = NULL;
 	int i, err;
-	struct tm *tm;
 	char ts[32];
-	time_t t;
 	void *lock_addr = NULL;
 
 	err = argp_parse(&argp, argc, argv, 0, NULL, &env);
@@ -988,9 +1037,7 @@ int main(int argc, char **argv)
 
 		printf("\n");
 		if (env.timestamp) {
-			time(&t);
-			tm = localtime(&t);
-			strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+			str_timestamp("%H:%M:%S", ts, sizeof(ts));
 			printf("%-8s\n", ts);
 		}
 

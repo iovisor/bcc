@@ -1,12 +1,12 @@
 Demonstrations of wqlat, the Linux eBPF/bcc version.
 
 This tool traces  work's waiting on workqueue, and records the distribution
-of work's queuing latency (time), printing this as a histogram when Ctrl-C 
+of work's queuing latency (time), printing this as a histogram when Ctrl-C
 is hit.
 
 For example:
 
-./wqlat 
+./wqlat
 Tracing work queue request latency time... Hit Ctrl-C to end.
 ^C
      usecs               : count     distribution
@@ -30,7 +30,7 @@ waiting latency is between 1us and 32us.The highest latency seen while tracing
 is between 4 and 8 ms:the last row printed, for which there is 1 work
 
 We can also specify the per workqueue option (-W), along with interval
-and count parameters. Eg, printing out every 1 second, and including 
+and count parameters. Eg, printing out every 1 second, and including
 timestamps(-T):
 
 ./wqlat -T -W 1 2
@@ -61,7 +61,7 @@ An tracing one workqueue (-w) can be specified, along with interval
 and count. Eg, printing output every 1 second, and including Timestamps(-T)
 and workqueue nvmet_tcp_wq:
 
-./wqlat -T -w nvmet_tcp_wq 1 2 
+./wqlat -T -w nvmet_tcp_wq 1 2
 Tracing work queue request latency time... Hit Ctrl-C to end.
 
 06:18:03

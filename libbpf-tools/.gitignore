@@ -28,6 +28,8 @@
 /fsdist
 /fsslower
 /funclatency
+/fusedist
+/fuseslower
 /futexctn
 /gethostlatency
 /hardirqs

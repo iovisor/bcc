@@ -103,7 +103,7 @@ This caught the 'summond' command because it partially matches 'mond' that's pas
 to the '-n' option.
 
 
-The -v option can be used to show system memory state (now only free mem) at 
+The -v option can be used to show system memory state (now only free mem) at
 the beginning of direct reclaiming:
 
 # ./drsnoop.py -v
