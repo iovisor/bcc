@@ -14,7 +14,7 @@
 
 from __future__ import print_function
 from bcc import BPF
-from bcc.utils import ArgString, printb
+from bcc.utils import ArgString, printb, positive_int_list
 import argparse
 from time import strftime
 
@@ -33,11 +33,11 @@ parser = argparse.ArgumentParser(
     epilog=examples)
 parser.add_argument("-x", "--failed", action="store_true",
     help="only show failed kill syscalls")
-parser.add_argument("-p", "--pid",
+parser.add_argument("-p", "--pid", type=int,
     help="trace this PID only which is the sender of signal")
-parser.add_argument("-T", "--tpid",
+parser.add_argument("-T", "--tpid", type=int,
     help="trace this target PID only which is the receiver of signal")
-parser.add_argument("-s", "--signal",
+parser.add_argument("-s", "--signal", type=positive_int_list,
     help="trace a signal or a signal list")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
@@ -127,8 +127,7 @@ else:
     bpf_text = bpf_text.replace('PID_FILTER', '')
 
 if args.signal:
-    signals = args.signal.split(',')
-    signal_filter = ' && '.join(['sig != %s' % signal for signal in signals])
+    signal_filter = ' && '.join(['sig != %d' % signal for signal in args.signal])
     bpf_text = bpf_text.replace('SIGNAL_FILTER',
         'if (%s) { return 0; }' % signal_filter)
 else:

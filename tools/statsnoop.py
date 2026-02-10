@@ -35,7 +35,7 @@ parser.add_argument("-s", "--sysname", action="store_true",
     help="include syscall name on output")
 parser.add_argument("-x", "--failed", action="store_true",
     help="only show failed stats")
-parser.add_argument("-p", "--pid",
+parser.add_argument("-p", "--pid", type=int,
     help="trace this PID only")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
