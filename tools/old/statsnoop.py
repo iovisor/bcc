@@ -30,7 +30,7 @@ parser.add_argument("-t", "--timestamp", action="store_true",
     help="include timestamp on output")
 parser.add_argument("-x", "--failed", action="store_true",
     help="only show failed stats")
-parser.add_argument("-p", "--pid",
+parser.add_argument("-p", "--pid", type=int,
     help="trace this PID only")
 args = parser.parse_args()
 debug = 0
