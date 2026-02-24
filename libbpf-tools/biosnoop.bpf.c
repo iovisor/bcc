@@ -62,7 +62,7 @@ int trace_pid(struct request *rq)
 	struct piddata piddata = {};
 
 	piddata.pid = id >> 32;
-	bpf_get_current_comm(&piddata.comm, sizeof(&piddata.comm));
+	bpf_get_current_comm(&piddata.comm, sizeof(piddata.comm));
 	bpf_map_update_elem(&infobyreq, &rq, &piddata, 0);
 	return 0;
 }
