@@ -192,6 +192,33 @@ jobs:
                    /bin/bash -c \
                    'cd /bcc/libbpf-tools && make -j9'"
 
+    - name: Run libbpf-tools build with blazesym
+      env: ${{ matrix.env }}
+      run: |
+        /bin/bash -c \
+                   "docker run --privileged \
+                   --pid=host \
+                   -v $(pwd):/bcc \
+                   -v /sys/kernel/debug:/sys/kernel/debug:rw \
+                   -v /lib/modules:/lib/modules:ro \
+                   -v /usr/src:/usr/src:ro \
+                   -v /usr/include/linux:/usr/include/linux:ro \
+                   bcc-docker \
+                   /bin/bash -c \
+                   'curl --proto \"=https\" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
+                    source \$HOME/.cargo/env && \
+                    cd /bcc/libbpf-tools && make clean && \
+                    echo \"=== Checking blazesym build configuration ===\" && \
+                    USE_BLAZESYM_VALUE=\$(make --no-print-directory -f - <<< \"include Makefile\n\nprint_blazesym:\n\t@echo \\\$(USE_BLAZESYM)\" print_blazesym) && \
+                    echo \"USE_BLAZESYM=\$USE_BLAZESYM_VALUE\" && \
+                    if [ \"\$USE_BLAZESYM_VALUE\" != \"1\" ]; then \
+                        echo \"ERROR: USE_BLAZESYM is not set to 1. Expected 1 but got: \$USE_BLAZESYM_VALUE\" && \
+                        echo \"This build requires cargo and blazesym support.\" && \
+                        exit 1; \
+                    fi && \
+                    echo \"=== Blazesym enabled, proceeding with build ===\" && \
+                    make -j9'"
+
     - name: Run bcc's cc tests
       env: ${{ matrix.env }}
       # tests are wrapped with `script` as a hack to get a TTY as github actions doesn't provide this
