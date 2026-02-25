@@ -117,6 +117,10 @@ parser.add_argument("--sort", type=str, default="size",
         help="report sorted in given key; available key list: size, count")
 parser.add_argument("--symbols-prefix", type=str,
         help="memory allocator symbols prefix")
+parser.add_argument("--costom-malloc-uprobe", type=str,
+        help="costom memory allocator uprobe")
+parser.add_argument("--costom-free-uprobe", type=str,
+        help="costom memory free uprobe")
 
 args = parser.parse_args()
 
@@ -438,6 +442,26 @@ TRACEPOINT_PROBE(percpu, percpu_free_percpu) {
 }
 """
 
+costom_malloc_uprobe_source = '''
+
+int COSTOM_MALLOC_UPROBE_enter(struct pt_regs *ctx, size_t size) {
+        return gen_alloc_enter(ctx, size, MALLOC);
+}
+
+int COSTOM_MALLOC_UPROBE_exit(struct pt_regs *ctx) {
+        return gen_alloc_exit2(ctx, PT_REGS_RC(ctx), MALLOC);
+}
+
+'''
+
+costom_free_uprobe_source = '''
+
+int COSTOM_FREE_UPROBE_enter(struct pt_regs *ctx, void *address) {
+        return gen_free_enter(ctx, address);
+}
+
+'''
+
 if kernel_trace:
         if args.percpu:
                 bpf_source += bpf_source_percpu
@@ -468,6 +492,15 @@ stack_flags = "0"
 if not kernel_trace:
         stack_flags += "|BPF_F_USER_STACK"
 bpf_source = bpf_source.replace("STACK_FLAGS", stack_flags)
+
+
+if args.costom_malloc_uprobe is not None:
+        costom_malloc_uprobe_source = costom_malloc_uprobe_source.replace("COSTOM_MALLOC_UPROBE",args.costom_malloc_uprobe)
+        bpf_source = bpf_source + costom_malloc_uprobe_source
+
+if args.costom_free_uprobe is not None:
+        costom_free_uprobe_source = costom_free_uprobe_source.replace("COSTOM_FREE_UPROBE",args.costom_free_uprobe)
+        bpf_source = bpf_source + costom_free_uprobe_source
 
 if args.ebpf:
     print(bpf_source)
@@ -508,6 +541,10 @@ if not kernel_trace:
         attach_probes("aligned_alloc", can_fail=True)  # added in C11
         attach_probes("free", need_uretprobe=False)
         attach_probes("munmap", can_fail=True, need_uretprobe=False) # failed on jemalloc
+        if args.costom_malloc_uprobe is not None:
+                attach_probes(args.costom_malloc_uprobe)
+        if args.costom_free_uprobe is not None:
+                attach_probes(args.costom_free_uprobe, need_uretprobe=False)
 
 else:
         print("Attaching to kernel allocators, Ctrl+C to quit.")
