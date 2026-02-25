@@ -78,6 +78,7 @@ APPS = \
 	runqlat \
 	runqlen \
 	runqslower \
+	schedtimes \
 	sigsnoop \
 	slabratetop \
 	softirqs \
