@@ -14,6 +14,7 @@
 # 13-Jan-2016	Brendan Gregg	Created this.
 # 27-Mar-2023	Rocky Xing      Added option to show symbol offsets.
 # 04-Apr-2023   Rocky Xing      Updated default stack storage size.
+# 27-Mar-2025   Jirka Hladky    Gracefully stops upon receiving the SIGUSR1 signal, making it suitable for automated workflows.
 
 from __future__ import print_function
 from bcc import BPF
@@ -301,6 +302,17 @@ def print_warn_event(cpu, data, size):
           % (event.pid, event.tgid, event.t_start, event.t_end),
           file=stderr)
 
+# Custom exception to break the sleep
+class SleepInterruptException(Exception):
+    pass
+
+# Signal handler to raise the exception when SIGUSR1 is received
+def signal_handler(signum, frame):
+    raise SleepInterruptException
+
+# Trap SIGUSR1
+signal.signal(signal.SIGUSR1, signal_handler)
+
 b["warn_events"].open_perf_buffer(print_warn_event)
 try:
     duration_ms = duration * 1000
@@ -310,7 +322,7 @@ try:
         if elapsed_ms >= duration_ms:
             break
         b.perf_buffer_poll(timeout=duration_ms - elapsed_ms)
-except KeyboardInterrupt:
+except (KeyboardInterrupt, SleepInterruptException):
     # as cleanup can take many seconds, trap Ctrl-C:
     signal.signal(signal.SIGINT, signal_ignore)
 
