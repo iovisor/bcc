@@ -68,6 +68,7 @@
 /tcpstates
 /tcpsynbl
 /tcptop
+/vfscount
 /vfsstat
 /wakeuptime
 /xfsdist
