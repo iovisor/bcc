@@ -7,6 +7,7 @@
 // 23-Aug-2023   Rong Tao      Add vfs_* 'struct mnt_idmap' support.(CO-RE)
 // 08-Nov-2023   Rong Tao      Support unlink failed
 #include <argp.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -117,7 +118,7 @@ int handle_event(void *ctx, void *data, size_t data_sz)
 
 void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 {
-	fprintf(stderr, "lost %llu events on CPU #%d\n", lost_cnt, cpu);
+	fprintf(stderr, "lost %" PRIu64" events on CPU #%d\n", (uint64_t)lost_cnt, cpu);
 }
 
 int main(int argc, char **argv)
