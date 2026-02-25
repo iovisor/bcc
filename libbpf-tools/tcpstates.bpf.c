@@ -41,6 +41,25 @@ struct {
 	__uint(value_size, sizeof(__u32));
 } events SEC(".maps");
 
+static inline int tcp_sock_create(struct sock *sk)
+{
+	__u64 ts = bpf_ktime_get_ns();
+	bpf_map_update_elem(&timestamps, &sk, &ts, BPF_ANY);
+	return 0;
+}
+
+SEC("kprobe/tcp_v4_init_sock")
+int BPF_KPROBE(tcp_v4_init_sock, struct sock *sk)
+{
+	return tcp_sock_create(sk);
+}
+
+SEC("kprobe/tcp_v6_init_sock")
+int BPF_KPROBE(tcp_v6_init_sock, struct sock *sk)
+{
+	return tcp_sock_create(sk);
+}
+
 SEC("tracepoint/sock/inet_sock_set_state")
 int handle_set_state(struct trace_event_raw_inet_sock_set_state *ctx)
 {
@@ -48,7 +67,7 @@ int handle_set_state(struct trace_event_raw_inet_sock_set_state *ctx)
 	__u16 family = ctx->family;
 	__u16 sport = ctx->sport;
 	__u16 dport = ctx->dport;
-	__u64 *tsp, delta_us, ts;
+	__u64 *tsp, delta_ns, ts;
 	struct event event = {};
 
 	if (ctx->protocol != IPPROTO_TCP)
@@ -66,13 +85,13 @@ int handle_set_state(struct trace_event_raw_inet_sock_set_state *ctx)
 	tsp = bpf_map_lookup_elem(&timestamps, &sk);
 	ts = bpf_ktime_get_ns();
 	if (!tsp)
-		delta_us = 0;
+		delta_ns = 0;
 	else
-		delta_us = (ts - *tsp) / 1000;
+		delta_ns = (ts - *tsp);
 
 	event.skaddr = (__u64)sk;
 	event.ts_us = ts / 1000;
-	event.delta_us = delta_us;
+	event.delta_ns = delta_ns;
 	event.pid = bpf_get_current_pid_tgid() >> 32;
 	event.oldstate = ctx->oldstate;
 	event.newstate = ctx->newstate;
