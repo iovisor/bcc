@@ -136,7 +136,7 @@ $(call allow-override,CC,$(CROSS_COMPILE)cc)
 $(call allow-override,LD,$(CROSS_COMPILE)ld)
 
 .PHONY: all
-all: $(APPS) $(APP_ALIASES)
+all: $(APPS) $(APP_ALIASES) blkalgn
 
 ifeq ($(V),1)
 Q =
@@ -164,7 +164,7 @@ endif
 .PHONY: clean
 clean:
 	$(call msg,CLEAN)
-	$(Q)rm -rf $(OUTPUT) $(APPS) $(APP_ALIASES)
+	$(Q)rm -rf $(OUTPUT) $(APPS) $(APP_ALIASES) blkalgn
 
 $(LIBBLAZESYM_SRC)/target/release/libblazesym_c.a::
 	$(Q)cd $(LIBBLAZESYM_SRC) && $(CARGO) build --release --package=blazesym-c
@@ -189,17 +189,27 @@ $(APPS): %: $(OUTPUT)/%.o $(COMMON_OBJ) $(LIBBPF_OBJ) | $(OUTPUT)
 	$(call msg,BINARY,$@)
 	$(Q)$(CC) $(CFLAGS) $^ $(LDFLAGS) -lelf -lz -o $@
 
+blkalgn: %: $(OUTPUT)/%.o $(COMMON_OBJ) $(LIBBPF_OBJ) | $(OUTPUT)
+	$(call msg,BINARY,$@)
+	$(Q)$(CC) $(CFLAGS) $^ $(LDFLAGS) -lelf -lz -ljson-c -lm -o $@
+
 ifeq ($(USE_BLAZESYM),1)
 $(patsubst %,$(OUTPUT)/%.o,$(BZ_APPS)): $(OUTPUT)/blazesym.h
 endif
 
 $(patsubst %,$(OUTPUT)/%.o,$(APPS)): %.o: %.skel.h
 
+$(patsubst %,$(OUTPUT)/%.o,blkalgn): %.o: %.skel.h
+
 $(OUTPUT)/%.o: %.c $(wildcard %.h) $(LIBBPF_OBJ) | $(OUTPUT)
 	$(call msg,CC,$@)
 	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $(filter %.c,$^) -o $@
 
 $(OUTPUT)/%.skel.h: $(OUTPUT)/%.bpf.o | $(OUTPUT) $(BPFTOOL)
+	$(call msg,GEN-SKEL,$@)
+	$(Q)$(BPFTOOL) gen skeleton $< > $@
+
+$(OUTPUT)/blkalgn.skel.h: $(OUTPUT)/blkalgn.bpf.o | $(OUTPUT) $(BPFTOOL)
 	$(call msg,GEN-SKEL,$@)
 	$(Q)$(BPFTOOL) gen skeleton $< > $@
 
@@ -241,11 +251,13 @@ $(SIGSNOOP_ALIAS): sigsnoop
 	$(call msg,SYMLINK,$@)
 	$(Q)ln -f -s $(APP_PREFIX)$^ $@
 
-install: $(APPS) $(APP_ALIASES)
+install: $(APPS) $(APP_ALIASES) install-blkalgn
 	$(call msg, INSTALL libbpf-tools)
 	$(Q)$(INSTALL) -m 0755 -d $(DESTDIR)$(bindir)
 	$(Q)$(foreach app,$(APPS),$(INSTALL) $(app) $(DESTDIR)$(bindir)/$(APP_PREFIX)$(app);)
-	$(Q)$(foreach alias,$(APP_ALIASES),cp -a $(alias) $(DESTDIR)$(bindir)/$(APP_PREFIX)$(alias);)
+
+install-blkalgn: blkalgn
+	$(Q)$(INSTALL) blkalgn $(DESTDIR)$(bindir)/$(APP_PREFIX)blkalgn
 
 .PHONY: force
 force:
