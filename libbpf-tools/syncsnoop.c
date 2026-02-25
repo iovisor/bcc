@@ -10,6 +10,7 @@
 #include <bpf/libbpf.h>
 #include "syncsnoop.h"
 #include "syncsnoop.skel.h"
+#include "trace_helpers.h"
 
 #define PERF_BUFFER_PAGES       16
 #define PERF_POLL_TIMEOUT_MS    100
@@ -101,9 +102,22 @@ int main(int argc, char **argv)
 
 	libbpf_set_print(libbpf_print_fn);
 
-	obj = syncsnoop_bpf__open_and_load();
+	obj = syncsnoop_bpf__open();
 	if (!obj) {
-		fprintf(stderr, "failed to open and load BPF object\n");
+		fprintf(stderr, "failed to open BPF object\n");
+		return 1;
+	}
+
+	if (!tracepoint_exists("syscalls", "sys_enter_sync_file_range"))
+		bpf_program__set_autoload(obj->progs.tracepoint__syscalls__sys_enter_sync_file_range, false);
+	if (!tracepoint_exists("syscalls", "sys_enter_sync_file_range2"))
+		bpf_program__set_autoload(obj->progs.tracepoint__syscalls__sys_enter_sync_file_range2, false);
+	if (!tracepoint_exists("syscalls", "sys_enter_arm_sync_file_range"))
+		bpf_program__set_autoload(obj->progs.tracepoint__syscalls__sys_enter_arm_sync_file_range, false);
+
+	err = syncsnoop_bpf__load(obj);
+	if (err) {
+		fprintf(stderr, "failed to load BPF object\n");
 		return 1;
 	}
 

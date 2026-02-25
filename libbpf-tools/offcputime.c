@@ -363,8 +363,8 @@ int main(int argc, char **argv)
 	obj->rodata->user_threads_only = env.user_threads_only;
 	obj->rodata->kernel_threads_only = env.kernel_threads_only;
 	obj->rodata->state = env.state;
-	obj->rodata->min_block_ns = env.min_block_time;
-	obj->rodata->max_block_ns = env.max_block_time;
+	obj->rodata->min_block_us = env.min_block_time;
+	obj->rodata->max_block_us = env.max_block_time;
 
 	/* User space PID and TID correspond to TGID and PID in the kernel, respectively */
 	if (env.pids[0])

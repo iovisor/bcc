@@ -51,7 +51,7 @@ For example, run tcprtt on a storage node to show initiators' rtt histogram:
 Tracing TCP RTT... Hit Ctrl-C to end.
 
 
-Remote Addres = 10.194.87.206 [AVG 170]
+Remote Address = 10.194.87.206 [AVG 170]
      usecs               : count     distribution
          0 -> 1          : 0        |                                        |
          2 -> 3          : 0        |                                        |
@@ -67,7 +67,7 @@ Remote Addres = 10.194.87.206 [AVG 170]
       2048 -> 4095       : 14       |                                        |
       4096 -> 8191       : 10       |                                        |
 
-Remote Addres = 10.194.87.197 [AVG 4293]
+Remote Address = 10.194.87.197 [AVG 4293]
      usecs               : count     distribution
          0 -> 1          : 0        |                                        |
          2 -> 3          : 0        |                                        |
@@ -83,7 +83,7 @@ Remote Addres = 10.194.87.197 [AVG 4293]
       2048 -> 4095       : 12       |**********************************      |
       4096 -> 8191       : 14       |****************************************|
 
-Remote Addres = 10.194.88.148 [AVG 6215]
+Remote Address = 10.194.88.148 [AVG 6215]
      usecs               : count     distribution
          0 -> 1          : 0        |                                        |
          2 -> 3          : 0        |                                        |
@@ -99,7 +99,7 @@ Remote Addres = 10.194.88.148 [AVG 6215]
       2048 -> 4095       : 0        |                                        |
       4096 -> 8191       : 2        |****************************************|
 
-Remote Addres = 10.194.87.90 [AVG 2188]
+Remote Address = 10.194.87.90 [AVG 2188]
      usecs               : count     distribution
          0 -> 1          : 0        |                                        |
          2 -> 3          : 0        |                                        |
