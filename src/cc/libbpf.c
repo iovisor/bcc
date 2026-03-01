@@ -1081,6 +1081,27 @@ static int bpf_get_retprobe_bit(const char *event_type)
 }
 
 /*
+ * Returns the first online CPU by parsing /sys/devices/system/cpu/online.
+ * The file contains a sorted list of ranges (e.g. "0-3", "1,3-5").
+ * Reading the first integer with fscanf stops at the first non-digit
+ * (hyphen or comma), which always gives the lowest-numbered online CPU.
+ * Falls back to CPU 0 if the file cannot be read or parsed.
+ */
+static int get_first_online_cpu(void)
+{
+  FILE *fp;
+  int cpu = 0;
+
+  fp = fopen("/sys/devices/system/cpu/online", "r");
+  if (!fp)
+    return 0;
+  if (fscanf(fp, "%d", &cpu) != 1)
+    cpu = 0;
+  fclose(fp);
+  return cpu;
+}
+
+/*
  * Kernel API with e12f03d ("perf/core: Implement the 'perf_kprobe' PMU") allows
  * creating [k,u]probe with perf_event_open, which makes it easier to clean up
  * the [k,u]probe. This function tries to create pfd with the perf_kprobe PMU.
@@ -1092,7 +1113,7 @@ static int bpf_try_perf_event_open_with_probe(const char *name, uint64_t offs,
   struct perf_event_attr attr = {};
   int type = bpf_find_probe_type(event_type);
   int is_return_bit = bpf_get_retprobe_bit(event_type);
-  int cpu = 0;
+  int cpu = get_first_online_cpu();
 
   if (type < 0 || is_return_bit < 0)
     return -1;
@@ -1160,7 +1181,7 @@ static const char *get_tracefs_path()
 static int bpf_attach_tracing_event(int progfd, const char *event_path, int pid,
                                     int *pfd)
 {
-  int efd, cpu = 0;
+  int efd, cpu = get_first_online_cpu();
   ssize_t bytes;
   char buf[PATH_MAX];
   struct perf_event_attr attr = {};
