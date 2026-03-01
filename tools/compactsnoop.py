@@ -36,7 +36,7 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument("-T", "--timestamp", action="store_true",
         help="include timestamp on output")
-parser.add_argument("-p", "--pid", help="trace this PID only")
+parser.add_argument("-p", "--pid", type=int, help="trace this PID only")
 parser.add_argument("-d", "--duration",
         help="total duration of trace in seconds")
 parser.add_argument("-K", "--kernel-stack", action="store_true",
