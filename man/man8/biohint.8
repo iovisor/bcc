@@ -1,0 +1,81 @@
+.TH biohint 8  "2025-11-26" "USER COMMANDS"
+.SH NAME
+biohint \- Summarize write hint in block of FDP SSDs.
+.SH SYNOPSIS
+.B biohint [\-h] [\-t] [\-s] [\-d <dir>] [interval [count]]
+.SH DESCRIPTION
+biohint is used to monitor the bi_write_hint field in each block I/O, which
+is only relevant for FDP SSDs. It prints ratio of every hint usage for each 
+disk or the specified disk either on Ctrl-C, or after a given interval in 
+seconds.
+
+This works by tracing kernel tracepoint block:block_bio_queue.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.
+.SH OPTIONS
+\-h
+Print usage message.
+.TP
+\-t
+Include timestamps on output.
+.TP
+\-s
+Output histograms of every device separately
+.TP
+\-d
+Trace this disk only.
+.TP
+interval
+Output interval, in seconds.
+.TP
+count
+Number of outputs.
+.SH EXAMPLES
+.TP
+Summarize write hint in block of FDP SSDs
+#
+.B biohint
+.TP
+Print 1 second summaries, 10 times, and include timestamps on output:
+#
+.B biohint -T 1 5
+.TP
+Print histograms of every device separately:
+#
+.B biohint -s
+.TP
+Trace disk mounted on /mnt/fdp only:
+#
+.B biohint -d /mnt/fdp
+.SH FIELDS
+.TP
+hint
+hint can be choose to place data
+.TP
+count
+How many I/O fell into this range
+.TP
+distribution
+An ASCII bar chart to visualize the distribution (count column)
+.SH OVERHEAD
+This traces kernel functions and maintains in-kernel timestamps and a histgroam,
+which are asynchronously copied to user-space. This method is very efficient,
+and the overhead for most storage I/O rates (< 10k IOPS) should be negligible.
+If you have a higher IOPS storage environment, test and quantify the overhead
+before use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Samsung Electronics Co., Ltd.
+.SH SEE ALSO
