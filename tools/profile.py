@@ -27,6 +27,7 @@
 # 26-Jan-2019      "      "     Changed to exclude CPU idle by default.
 # 11-Apr-2023   Rocky Xing      Added option to increase hash storage size.
 # 14-Feb-2025   Rocky Xing      Prioritized using the cpu-cycles hardware event.
+# 27-Mar-2025   Jirka Hladky    Gracefully stops upon receiving the SIGUSR1 signal, making it suitable for automated workflows.
 
 from __future__ import print_function
 from bcc import BPF, PerfType, PerfSWConfig, PerfHWConfig
@@ -349,10 +350,21 @@ def signal_ignore(signal, frame):
 # Output Report
 #
 
+# Custom exception to break the sleep
+class SleepInterruptException(Exception):
+    pass
+
+# Signal handler to raise the exception when SIGUSR1 is received
+def signal_handler(signum, frame):
+    raise SleepInterruptException
+
+# Trap SIGUSR1
+signal.signal(signal.SIGUSR1, signal_handler)
+
 # collect samples
 try:
     sleep(duration)
-except KeyboardInterrupt:
+except (KeyboardInterrupt, SleepInterruptException):
     # as cleanup can take some time, trap Ctrl-C:
     signal.signal(signal.SIGINT, signal_ignore)
 
