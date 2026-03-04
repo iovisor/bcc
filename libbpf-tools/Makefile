@@ -90,6 +90,7 @@ APPS = \
 	tcpconnlat \
 	tcplife \
 	tcppktlat \
+	tcpretrans \
 	tcprtt \
 	tcpstates \
 	tcpsynbl \
