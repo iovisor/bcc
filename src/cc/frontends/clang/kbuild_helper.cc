@@ -137,6 +137,10 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
   cflags->push_back("-Wno-pointer-sign");
   cflags->push_back("-fno-stack-protector");
 
+  // Align with Linux kernel's -fms-extensions flags adopted since v6.19
+  cflags->push_back("-fms-extensions");
+  cflags->push_back("-Wno-microsoft-anon-tag");
+
   /*
    * kernel is usually build with gcc and the kernel devel header
    * reflects that fact. However we build with clang and this must be
