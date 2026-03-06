@@ -208,8 +208,12 @@ int BPFModule::free_bcc_memory() {
 
 // load an entire c file as a module
 int BPFModule::load_cfile(const string &file, bool in_memory, const char *cflags[], int ncflags) {
+  std::vector<const char *> new_cflags(cflags, cflags + ncflags);
+  new_cflags.push_back("-fms-extensions");
+  new_cflags.push_back("-Wno-microsoft-anon-tag");
+
   ClangLoader clang_loader(&*ctx_, flags_);
-  if (clang_loader.parse(&mod_, *ts_, file, in_memory, cflags, ncflags, id_,
+  if (clang_loader.parse(&mod_, *ts_, file, in_memory, new_cflags.data(), new_cflags.size(), id_,
                          *prog_func_info_, mod_src_, maps_ns_, fake_fd_map_,
                          perf_events_))
     return -1;
