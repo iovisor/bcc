@@ -780,6 +780,8 @@ std::string BPF::get_syscall_fnname(const std::string& name) {
       syscall_prefix_.reset(new std::string("sys_"));
     else if (ksym.resolve_name(nullptr, "__x64_sys_bpf", &addr))
       syscall_prefix_.reset(new std::string("__x64_sys_"));
+    else if (ksym.resolve_name(nullptr, "__riscv_sys_bpf", &addr))
+      syscall_prefix_.reset(new std::string("__riscv_sys_"));
     else
       syscall_prefix_.reset(new std::string());
   }
