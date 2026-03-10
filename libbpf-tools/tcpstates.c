@@ -33,6 +33,7 @@ static short target_family = 0;
 static char *target_sports = NULL;
 static char *target_dports = NULL;
 static bool wide_output = false;
+static bool nanoseconds = false;
 static bool verbose = false;
 static const char *tcp_states[] = {
 	[1] = "ESTABLISHED",
@@ -70,6 +71,7 @@ static const struct argp_option opts[] = {
 	{ "ipv4", '4', NULL, 0, "Trace IPv4 family only", 0 },
 	{ "ipv6", '6', NULL, 0, "Trace IPv6 family only", 0 },
 	{ "wide", 'w', NULL, 0, "Wide column output (fits IPv6 addresses)", 0 },
+	{ "nanoseconds", 'n', NULL, 0, "Display nanosecond delay", 0 },
 	{ "localport", 'L', "LPORT", 0, "Comma-separated list of local ports to trace.", 0 },
 	{ "remoteport", 'D', "DPORT", 0, "Comma-separated list of remote ports to trace.", 0 },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
@@ -96,6 +98,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'w':
 		wide_output = true;
+		break;
+	case 'n':
+		nanoseconds = true;
 		break;
 	case 'L':
 		if (!arg) {
@@ -175,11 +180,13 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		family = e.family == AF_INET ? 4 : 6;
 		printf("%-16llx %-7d %-16s %-2d %-39s %-5d %-39s %-5d %-11s -> %-11s %.3f\n",
 		       e.skaddr, e.pid, e.task, family, saddr, e.sport, daddr, e.dport,
-		       tcp_states[e.oldstate], tcp_states[e.newstate], (double)e.delta_us / 1000);
+		       tcp_states[e.oldstate], tcp_states[e.newstate],
+		       (double)e.delta_ns / (nanoseconds ? 1 : 1000000));
 	} else {
 		printf("%-16llx %-7d %-10.10s %-15s %-5d %-15s %-5d %-11s -> %-11s %.3f\n",
 		       e.skaddr, e.pid, e.task, saddr, e.sport, daddr, e.dport,
-		       tcp_states[e.oldstate], tcp_states[e.newstate], (double)e.delta_us / 1000);
+		       tcp_states[e.oldstate], tcp_states[e.newstate],
+		       (double)e.delta_ns / (nanoseconds ? 1 : 1000000));
 	}
 }
 
@@ -274,11 +281,13 @@ int main(int argc, char **argv)
 	if (wide_output)
 		printf("%-16s %-7s %-16s %-2s %-39s %-5s %-39s %-5s %-11s -> %-11s %s\n",
 		       "SKADDR", "PID", "COMM", "IP", "LADDR", "LPORT",
-		       "RADDR", "RPORT", "OLDSTATE", "NEWSTATE", "MS");
+		       "RADDR", "RPORT", "OLDSTATE", "NEWSTATE",
+		       nanoseconds ? "NS" : "MS");
 	else
 		printf("%-16s %-7s %-10s %-15s %-5s %-15s %-5s %-11s -> %-11s %s\n",
 		       "SKADDR", "PID", "COMM", "LADDR", "LPORT",
-		       "RADDR", "RPORT", "OLDSTATE", "NEWSTATE", "MS");
+		       "RADDR", "RPORT", "OLDSTATE", "NEWSTATE",
+		       nanoseconds ? "NS" : "MS");
 
 	while (!exiting) {
 		err = perf_buffer__poll(pb, PERF_POLL_TIMEOUT_MS);
