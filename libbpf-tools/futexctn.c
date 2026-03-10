@@ -232,6 +232,11 @@ static int print_stack(struct futexctn_bpf *obj, struct hist_key *info)
 			printf("    %s\n", sym->name);
 	}
 #else
+	/*
+	 * sym expected to be cached in preload stage
+	 * too late to cache here for short lived processes
+	 * proc/pid/maps not available to cache
+	 */
 	syms = syms_cache__get_syms(syms_cache, info->pid_tgid >> 32);
 	if (!syms) {
 		if (!env.verbose) {
@@ -375,7 +380,30 @@ int main(int argc, char **argv)
 
 	/* main: poll */
 	while (1) {
+
+#ifndef USE_BLAZESYM
+		for (int elapsed = 0; elapsed < env.interval; elapsed++) {
+			sleep(1);
+			if (!env.summary) {
+				/*
+				 * Populate symbol cache periodically during the interval
+				 * while processes are still alive and /proc/<pid>/maps
+				 * is readable. A single preload before or after
+				 * sleep(interval) misses very short-lived processes that
+				 * both start and exit within the sleep window of 1s.
+				 */
+				struct hist_key preload_key = { .pid_tgid = -1 }, next_key;
+				int preload_fd = bpf_map__fd(obj->maps.hists);
+
+				while (!bpf_map_get_next_key(preload_fd, &preload_key, &next_key)) {
+					syms_cache__get_syms(syms_cache, next_key.pid_tgid >> 32);
+					preload_key = next_key;
+				}
+			}
+		}
+#else
 		sleep(env.interval);
+#endif
 		printf("\n");
 
 		if (env.timestamp) {
