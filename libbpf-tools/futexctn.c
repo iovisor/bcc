@@ -232,6 +232,11 @@ static int print_stack(struct futexctn_bpf *obj, struct hist_key *info)
 			printf("    %s\n", sym->name);
 	}
 #else
+	/*
+	 * sym expected to be cached in preload stage
+	 * too late to cache here for short lived processes
+	 * proc/pid/maps not available to cache
+	 */
 	syms = syms_cache__get_syms(syms_cache, info->pid_tgid >> 32);
 	if (!syms) {
 		if (!env.verbose) {
@@ -375,6 +380,17 @@ int main(int argc, char **argv)
 
 	/* main: poll */
 	while (1) {
+		/*
+		 * preload sym cache with symbols from short lived processes
+		 * needed later for stack trace printing
+		 */
+		struct hist_key lookup_key = { .pid_tgid = -1 }, next_key;
+		int fd = bpf_map__fd(obj->maps.hists);
+		while (!bpf_map_get_next_key(fd, &lookup_key, &next_key)) {
+			syms_cache__get_syms(syms_cache, next_key.pid_tgid >> 32);
+			lookup_key = next_key;
+		}
+
 		sleep(env.interval);
 		printf("\n");
 
