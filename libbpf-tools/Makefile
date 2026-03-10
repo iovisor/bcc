@@ -73,6 +73,7 @@ APPS = \
 	numamove \
 	offcputime \
 	oomkill \
+	pidpersec \
 	profile \
 	readahead \
 	runqlat \
