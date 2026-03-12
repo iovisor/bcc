@@ -60,6 +60,15 @@ if (${LLVM_PACKAGE_VERSION} VERSION_EQUAL 18 OR ${LLVM_PACKAGE_VERSION} VERSION_
   list(APPEND clang_libs ${libclangAPINotes})
 endif()
 
+if (${LLVM_PACKAGE_VERSION} VERSION_EQUAL 22 OR ${LLVM_PACKAGE_VERSION} VERSION_GREATER 22)
+  list(APPEND clang_libs
+    ${libclangAnalysisLifetimeSafety}
+    ${libclangFormat}
+    ${libclangToolingCore}
+    ${libclangToolingInclusions}
+    ${libclangOptions})
+endif()
+
 list(APPEND clang_libs
   ${libclangBasic})
 endif()

@@ -161,6 +161,14 @@ if(NOT PYTHON_ONLY)
       find_library(libclangAPINotes NAMES clangAPINotes clang-cpp HINTS ${CLANG_SEARCH})
     endif()
 
+    if(${LLVM_PACKAGE_VERSION} VERSION_EQUAL 22 OR ${LLVM_PACKAGE_VERSION} VERSION_GREATER 22)
+      find_library(libclangAnalysisLifetimeSafety NAMES clangAnalysisLifetimeSafety clang-cpp HINTS ${CLANG_SEARCH})
+      find_library(libclangFormat NAMES clangFormat clang-cpp HINTS ${CLANG_SEARCH})
+      find_library(libclangToolingCore NAMES clangToolingCore clang-cpp HINTS ${CLANG_SEARCH})
+      find_library(libclangToolingInclusions NAMES clangToolingInclusions clang-cpp HINTS ${CLANG_SEARCH})
+      find_library(libclangOptions NAMES clangOptions clang-cpp HINTS ${CLANG_SEARCH})
+    endif()
+
     find_library(libclang-shared libclang-cpp.so HINTS ${CLANG_SEARCH})
 
     if(libclangBasic STREQUAL "libclangBasic-NOTFOUND")
