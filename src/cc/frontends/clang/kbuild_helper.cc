@@ -136,6 +136,8 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
   cflags->push_back("-Wno-unused-value");
   cflags->push_back("-Wno-pointer-sign");
   cflags->push_back("-fno-stack-protector");
+  cflags->push_back("-fms-extensions");
+  cflags->push_back("-Wno-microsoft-anon-tag");
 
   /*
    * kernel is usually build with gcc and the kernel devel header
