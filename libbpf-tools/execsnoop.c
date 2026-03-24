@@ -171,11 +171,15 @@ static void time_since_start()
 	printf("%-8.3f", time_diff);
 }
 
-static void inline quoted_symbol(char c) {
+static void inline escape_symbol(char c, bool quote) {
 	switch(c) {
 		case '"':
-			putchar('\\');
-			putchar('"');
+			if (quote) {
+				putchar('\\');
+				putchar('"');
+			} else {
+				putchar(c);
+			}
 			break;
 		case '\t':
 			putchar('\\');
@@ -210,14 +214,14 @@ static void print_args(const struct event *e, bool quote)
 					putchar('"');
 				}
 			} else {
-				quoted_symbol(c);
+				escape_symbol(c, true);
 			}
 		} else {
 			if (c == '\0') {
 				args_counter++;
 				putchar(' ');
 			} else {
-				putchar(c);
+				escape_symbol(c, false);
 			}
 		}
 	}
