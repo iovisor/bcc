@@ -319,10 +319,10 @@ static void print_headers()
 	if (!print_header_threads())
 		printf(" all threads");
 
-	if (env.duration < 99999999)
-		printf(" for %d secs.\n", env.duration);
-	else
-		printf("... Hit Ctrl-C to end.\n");
+	if (env.duration < 99999999) printf(" for %d secs.\n", env.duration);
+	else printf("... Hit Ctrl-C to end.\n");
+
+  fflush(stdout);
 }
 
 int main(int argc, char **argv)
