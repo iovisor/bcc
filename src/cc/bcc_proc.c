@@ -447,6 +447,8 @@ static int load_ld_cache(const char *cache_path) {
 #define ABI_S390_LIB64 0x0400
 #define ABI_POWERPC_LIB64 0x0500
 #define ABI_AARCH64_LIB64 0x0a00
+#define ABI_LARCH_FLOAT_ABI_SOFT 0x1100
+#define ABI_LARCH_FLOAT_ABI_DOUBLE 0x1200
 
 static bool match_so_flags(int flags) {
   if ((flags & FLAG_TYPE_MASK) != TYPE_ELF_LIBC6)
@@ -459,6 +461,8 @@ static bool match_so_flags(int flags) {
   case ABI_S390_LIB64:
   case ABI_POWERPC_LIB64:
   case ABI_AARCH64_LIB64:
+  case ABI_LARCH_FLOAT_ABI_SOFT:
+  case ABI_LARCH_FLOAT_ABI_DOUBLE:
     return (sizeof(void *) == 8);
   }
 
