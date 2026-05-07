@@ -800,10 +800,21 @@ struct syms *syms_cache__get_syms(struct syms_cache *syms_cache, int tgid)
 {
 	void *tmp;
 	int i;
+	struct syms *syms = NULL;
 
 	for (i = 0; i < syms_cache->nr; i++) {
-		if (syms_cache->data[i].tgid == tgid)
+		if (syms_cache->data[i].tgid == tgid) {
+			/*
+			 * for caching symbols appearing after last
+			 * pre-loading/caching cycle.
+			 */
+			if (!syms_cache->data[i].syms) {
+				syms = syms__load_pid(tgid);
+				if (syms)
+					syms_cache->data[i].syms = syms;
+			}
 			return syms_cache->data[i].syms;
+		}
 	}
 
 	tmp = realloc(syms_cache->data, (syms_cache->nr + 1) *
