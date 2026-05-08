@@ -116,6 +116,7 @@ COMMON_OBJ = \
 	$(OUTPUT)/btf_helpers.o \
 	$(OUTPUT)/compat.o \
 	$(OUTPUT)/path_helpers.o \
+	$(OUTPUT)/datastructure_helpers.o \
 	$(if $(ENABLE_MIN_CORE_BTFS),$(OUTPUT)/min_core_btf_tar.o) \
 	#
 
