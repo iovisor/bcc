@@ -289,6 +289,8 @@ int handle_event(void *ctx, void *data, size_t data_sz)
 
 	blaze_syms_free(syms);
 #endif
+	/* avoid compiler warnings on sps_cnt not being used */
+	(void) sps_cnt;
 	return 0;
 }
 
