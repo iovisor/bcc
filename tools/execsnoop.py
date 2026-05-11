@@ -104,7 +104,7 @@ parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
 
-def check_cpu_filed():
+def check_cpu_field():
     # Define the bpf program for checking purpose
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5,16,0)
     filed_in_task_struct = True
@@ -209,7 +209,7 @@ out:
 
 int do_ret_sys_execve(struct pt_regs *ctx)
 {
-    if (container_should_be_filtered()) {
+   if (container_should_be_filtered()) {
         return 0;
     }
 
@@ -258,7 +258,7 @@ else:
 # CPU field moved back into thread_info since commit bcf9033e5449(linux 5.16)
 # Use BTF for CPU field checks if available, otherwise use LINUX_VERSION_CODE checking.
 if BPF.kernel_struct_has_field(b'task_struct', b'cpu') == 1 \
-        or check_cpu_filed():
+        or check_cpu_field():
     bpf_text = bpf_text.replace('CPU_RUNNING_ON', 'task->cpu')
 else:
     bpf_text = bpf_text.replace('CPU_RUNNING_ON', 'task->thread_info.cpu')
