@@ -97,6 +97,16 @@ args = parser.parse_args()
 # define BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
+/* Compat for newer kernel internal headers with older BCC virtual UAPI. */
+#ifndef BPF_TRACE_FSESSION
+#define BPF_TRACE_FSESSION BPF_TRAMP_FSESSION
+#endif
+#ifndef BPF_F_CPU
+#define BPF_F_CPU BPF_F_CURRENT_CPU
+#endif
+#ifndef BPF_F_ALL_CPUS
+#define BPF_F_ALL_CPUS (1ULL << 12)
+#endif
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wtautological-compare"
 #include <net/sock.h>
