@@ -109,10 +109,14 @@ bpf_text = """
 #endif
 #endif
 #ifndef BPF_F_CPU
+#ifdef BPF_F_INDEX_MASK
+#define BPF_F_CPU BPF_F_INDEX_MASK
+#else
 #define BPF_F_CPU 0xffffffffULL
 #endif
+#endif
 #ifndef BPF_F_ALL_CPUS
-#define BPF_F_ALL_CPUS (1ULL << 12)
+#define BPF_F_ALL_CPUS 0
 #endif
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wtautological-compare"
