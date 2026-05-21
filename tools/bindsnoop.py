@@ -97,12 +97,19 @@ args = parser.parse_args()
 # define BPF program
 bpf_text = """
 #include <uapi/linux/ptrace.h>
-/* Compat for newer kernel internal headers with older BCC virtual UAPI. */
+/*
+ * Compat for newer kernel internal headers with older BCC virtual UAPI.
+ * These are only used while parsing included kernel headers in this tool.
+ */
 #ifndef BPF_TRACE_FSESSION
+#ifdef BPF_TRAMP_FSESSION
 #define BPF_TRACE_FSESSION BPF_TRAMP_FSESSION
+#else
+#define BPF_TRACE_FSESSION 0
+#endif
 #endif
 #ifndef BPF_F_CPU
-#define BPF_F_CPU BPF_F_CURRENT_CPU
+#define BPF_F_CPU 0xffffffffULL
 #endif
 #ifndef BPF_F_ALL_CPUS
 #define BPF_F_ALL_CPUS (1ULL << 12)
