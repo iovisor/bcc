@@ -111,7 +111,7 @@ struct ksyms *ksyms__load(void)
 		goto err_out;
 
 	while (true) {
-		ret = fscanf(f, "%lx %c %s%*[^\n]\n",
+		ret = fscanf(f, "%lx %c %255s%*[^\n]\n",
 			     &sym_addr, &sym_type, sym_name);
 		if (ret == EOF && feof(f))
 			break;
@@ -838,7 +838,7 @@ struct partitions *partitions__load(void)
 		/* skip heading */
 		if (buf[0] != ' ' || buf[0] == '\n')
 			continue;
-		if (sscanf(buf, "%u %u %llu %s", &devmaj, &devmin, &nop,
+		if (sscanf(buf, "%u %u %llu %31s", &devmaj, &devmin, &nop,
 				part_name) != 4)
 			goto err_out;
 		if (partitions__add_partition(partitions, part_name,
@@ -1012,34 +1012,6 @@ bool is_kernel_module(const char *name)
 	return found;
 }
 
-static bool fentry_try_attach(int id)
-{
-	int prog_fd, attach_fd;
-	char error[4096];
-	struct bpf_insn insns[] = {
-		{ .code = BPF_ALU64 | BPF_MOV | BPF_K, .dst_reg = BPF_REG_0, .imm = 0 },
-		{ .code = BPF_JMP | BPF_EXIT },
-	};
-	LIBBPF_OPTS(bpf_prog_load_opts, opts,
-			.expected_attach_type = BPF_TRACE_FENTRY,
-			.attach_btf_id = id,
-			.log_buf = error,
-			.log_size = sizeof(error),
-	);
-
-	prog_fd = bpf_prog_load(BPF_PROG_TYPE_TRACING, "test", "GPL", insns,
-			sizeof(insns) / sizeof(struct bpf_insn), &opts);
-	if (prog_fd < 0)
-		return false;
-
-	attach_fd = bpf_raw_tracepoint_open(NULL, prog_fd);
-	if (attach_fd >= 0)
-		close(attach_fd);
-
-	close(prog_fd);
-	return attach_fd >= 0;
-}
-
 bool fentry_can_attach(const char *name, const char *mod)
 {
 	const char sysfs_vmlinux[] = "/sys/kernel/btf/vmlinux";
@@ -1074,7 +1046,7 @@ bool fentry_can_attach(const char *name, const char *mod)
 err_out:
 	btf__free(btf);
 	btf__free(base);
-	return id > 0 && fentry_try_attach(id);
+	return id > 0;
 }
 
 bool kprobe_exists(const char *name)

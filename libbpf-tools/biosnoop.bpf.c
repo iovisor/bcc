@@ -66,15 +66,6 @@ int trace_pid(struct request *rq)
 	return 0;
 }
 
-SEC("fentry/blk_account_io_start")
-int BPF_PROG(blk_account_io_start, struct request *rq)
-{
-	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
-		return 0;
-
-	return trace_pid(rq);
-}
-
 SEC("kprobe/blk_account_io_merge_bio")
 int BPF_KPROBE(blk_account_io_merge_bio, struct request *rq)
 {
@@ -129,6 +120,8 @@ int BPF_PROG(block_rq_insert)
 SEC("tp_btf/block_rq_issue")
 int BPF_PROG(block_rq_issue)
 {
+	struct request *rq;
+
 	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
 		return 0;
 
@@ -138,9 +131,11 @@ int BPF_PROG(block_rq_issue)
 	 * to TP_PROTO(struct request *rq)
 	 */
 	if (LINUX_KERNEL_VERSION >= KERNEL_VERSION(5, 11, 0))
-		return trace_rq_start((void *)ctx[0], false);
+		rq = (void *)ctx[0];
 	else
-		return trace_rq_start((void *)ctx[1], false);
+		rq = (void *)ctx[1];
+	trace_pid(rq);
+	return trace_rq_start(rq, false);
 }
 
 SEC("tp_btf/block_rq_complete")

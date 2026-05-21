@@ -230,13 +230,6 @@ int main(int argc, char **argv)
 	obj->rodata->targ_queued = env.queued;
 	obj->rodata->filter_cg = env.cg;
 
-	if (fentry_can_attach("blk_account_io_start", NULL))
-		bpf_program__set_attach_target(obj->progs.blk_account_io_start, 0,
-					       "blk_account_io_start");
-	else
-		bpf_program__set_attach_target(obj->progs.blk_account_io_start, 0,
-					       "__blk_account_io_start");
-
 	err = biosnoop_bpf__load(obj);
 	if (err) {
 		fprintf(stderr, "failed to load BPF object: %d\n", err);
@@ -258,13 +251,6 @@ int main(int argc, char **argv)
 		}
 	}
 
-	obj->links.blk_account_io_start = bpf_program__attach(obj->progs.blk_account_io_start);
-	if (!obj->links.blk_account_io_start) {
-		err = -errno;
-		fprintf(stderr, "failed to attach blk_account_io_start: %s\n",
-			strerror(-err));
-		goto cleanup;
-	}
 	ksyms = ksyms__load();
 	if (!ksyms) {
 		err = -ENOMEM;
