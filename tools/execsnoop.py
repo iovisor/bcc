@@ -209,7 +209,7 @@ out:
 
 int do_ret_sys_execve(struct pt_regs *ctx)
 {
-   if (container_should_be_filtered()) {
+    if (container_should_be_filtered()) {
         return 0;
     }
 
