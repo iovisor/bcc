@@ -491,6 +491,16 @@ static void dso__free_fields(struct dso *dso)
 	free(dso->ranges);
 	free(dso->syms);
 	btf__free(dso->btf);
+
+	/* Clear relevant fields in dso to avoid dangling pointers*/
+	dso->name = NULL;
+	dso->ranges = NULL;
+	dso->syms = NULL;
+	dso->btf = NULL;
+
+	/* zero out size and capacity to prevent dso__add_sym from reallocating */
+	dso->syms_sz = 0;
+	dso->syms_cap = 0;
 }
 
 static int dso__load_sym_table_from_elf(struct dso *dso, int fd)
