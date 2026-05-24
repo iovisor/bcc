@@ -242,30 +242,9 @@ static int bindsnoop_return(struct pt_regs *ctx, short ipver)
     // SO_REUSEPORT (skp->reuseport)
     opts.fields.reuseport = bitfield >> 4 & 0x01;
 
-    // workaround for reading the sk_protocol bitfield (from tcpaccept.py):
-    u16 protocol;
-    int gso_max_segs_offset = offsetof(struct sock, sk_gso_max_segs);
-    int sk_lingertime_offset = offsetof(struct sock, sk_lingertime);
+    u16 protocol = 0;
 
-    // Since kernel v5.6 sk_protocol has its own u16 field
-    if (sk_lingertime_offset - gso_max_segs_offset == 2)
-        protocol = skp->sk_protocol;
-    else if (sk_lingertime_offset - gso_max_segs_offset == 4)
-        // 4.10+ with little endian
-#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-        protocol = *(u8 *)((u64)&skp->sk_gso_max_segs - 3);
-    else
-        // pre-4.10 with little endian
-        protocol = *(u8 *)((u64)&skp->sk_wmem_queued - 3);
-#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-        // 4.10+ with big endian
-        protocol = *(u8 *)((u64)&skp->sk_gso_max_segs - 1);
-    else
-        // pre-4.10 with big endian
-        protocol = *(u8 *)((u64)&skp->sk_wmem_queued - 1);
-#else
-# error "Fix your compiler's __BYTE_ORDER__?!"
-#endif
+    ##GET_SK_PROTOCOL##
 
     if (ipver == 4) {
         IPV4_CODE
@@ -287,6 +266,50 @@ int bindsnoop_v6_return(struct pt_regs *ctx)
 {
     return bindsnoop_return(ctx, 6);
 }
+"""
+
+get_sk_protocol_field = """
+    protocol = skp->sk_protocol;
+"""
+
+get_sk_protocol_bitfield = """
+    // workaround for reading the sk_protocol bitfield:
+
+    // Following comments add by Joe Yin:
+    // Unfortunately,it can not work since Linux 4.10,
+    // because the sk_wmem_queued is not following the bitfield of sk_protocol.
+    // And the following member is sk_gso_max_segs.
+    // So, we can use this:
+    // bpf_probe_read_kernel(&protocol, 1, (void *)((u64)&skp->sk_gso_max_segs) - 3);
+    // In order to  diff the pre-4.10 and 4.10+ ,introduce the variables gso_max_segs_offset,sk_lingertime,
+    // sk_lingertime is closed to the gso_max_segs_offset,and
+    // the offset between the two members is 4
+
+    int gso_max_segs_offset = offsetof(struct sock, sk_gso_max_segs);
+    int sk_lingertime_offset = offsetof(struct sock, sk_lingertime);
+
+
+    // Since kernel v5.6 sk_protocol is its own u16 field and gso_max_segs
+    // precedes sk_lingertime.
+    // We keep this workaround in case BTF is unavailable
+    if (sk_lingertime_offset - gso_max_segs_offset == 2)
+        protocol = skp->sk_protocol;
+    else if (sk_lingertime_offset - gso_max_segs_offset == 4)
+        // 4.10+ with little endian
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+        protocol = *(u8 *)((u64)&skp->sk_gso_max_segs - 3);
+    else
+        // pre-4.10 with little endian
+        protocol = *(u8 *)((u64)&skp->sk_wmem_queued - 3);
+#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+        // 4.10+ with big endian
+        protocol = *(u8 *)((u64)&skp->sk_gso_max_segs - 1);
+    else
+        // pre-4.10 with big endian
+        protocol = *(u8 *)((u64)&skp->sk_wmem_queued - 1);
+#else
+# error "Fix your compiler's __BYTE_ORDER__?!"
+#endif
 """
 
 struct_init = {
@@ -354,6 +377,12 @@ if args.uid:
         'if (uid != %s) { return 0; }' % args.uid)
 if args.errors:
     bpf_text = bpf_text.replace('FILTER_ERRORS', 'ignore_errors = 0;')
+
+if BPF.kernel_struct_has_field("sock", "sk_protocol") == 1:
+    bpf_text = bpf_text.replace('##GET_SK_PROTOCOL##', get_sk_protocol_field)
+else:
+    bpf_text = bpf_text.replace('##GET_SK_PROTOCOL##', get_sk_protocol_bitfield)
+
 bpf_text = filter_by_containers(args) + bpf_text
 bpf_text = bpf_text.replace('FILTER_PID', '')
 bpf_text = bpf_text.replace('FILTER_PORT', '')
