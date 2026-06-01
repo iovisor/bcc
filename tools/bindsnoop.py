@@ -275,7 +275,7 @@ get_sk_protocol_field = """
 get_sk_protocol_bitfield = """
     // workaround for reading the sk_protocol bitfield:
 
-    // Following comments add by Joe Yin:
+    // The following comments were added by Joe Yin:
     // Unfortunately,it can not work since Linux 4.10,
     // because the sk_wmem_queued is not following the bitfield of sk_protocol.
     // And the following member is sk_gso_max_segs.
