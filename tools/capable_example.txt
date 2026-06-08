@@ -88,6 +88,23 @@ TIME      UID    PID    COMM             CAP  NAME                 AUDIT
 Similarly, it is possible to include user-space stack with -U (or they can be
 used both at the same time to include user and kernel stack).
 
+DWARF CFI can be used for user-space stacks with --dwarf -U. This mode is
+opt-in, currently supports x86_64/amd64, requires bpf_task_pt_regs support and
+BCC built with libgunwinder, and does not currently support --unique.
+
+# ./capable.py --dwarf -U
+TIME      UID    PID    COMM             CAP  NAME                 AUDIT
+23:34:28  0      1142817 tmux            21   CAP_SYS_ADMIN        0
+        mmap
+        _dl_map_object_from_fd
+        _dl_map_object
+        openaux
+        _dl_catch_exception
+        _dl_map_object_deps
+        dl_main
+        _dl_sysdep_start
+        _dl_start
+
 Some processes can do a lot of security capability checks, generating a lot of
 ouput. In this case, the --unique option is useful to only print once the same
 set of capability, pid (or cgroup if --cgroupmap is used) and kernel/user
@@ -106,17 +123,18 @@ For more details, see docs/special_filtering.md
 USAGE:
 
 # ./capable.py -h
-usage: capable.py [-h] [-v] [-p PID] [-K] [-U] [-x] [--cgroupmap CGROUPMAP]
-                  [--mntnsmap MNTNSMAP] [--unique]
+usage: capable.py [-h] [-v] [-p PID] [-K] [-U] [--dwarf] [-x]
+                  [--cgroupmap CGROUPMAP] [--mntnsmap MNTNSMAP] [--unique]
 
 Trace security capability checks
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -v, --verbose         include non-audit checks
   -p PID, --pid PID     trace this PID only
   -K, --kernel-stack    output kernel stack trace
   -U, --user-stack      output user stack trace
+  --dwarf               use DWARF CFI for user stack traces
   -x, --extra           show extra fields in TID and INSETID columns
   --cgroupmap CGROUPMAP
                         trace cgroups in this BPF map only
@@ -129,6 +147,7 @@ examples:
     ./capable -p 181      # only trace PID 181
     ./capable -K          # add kernel stacks to trace
     ./capable -U          # add user-space stacks to trace
+    ./capable --dwarf -U  # add DWARF user-space stacks to trace
     ./capable -x          # extra fields: show TID and INSETID columns
     ./capable --unique    # don't repeat stacks for the same pid or cgroup
     ./capable --cgroupmap mappath  # only trace cgroups in this BPF map

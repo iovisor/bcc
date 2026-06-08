@@ -134,6 +134,37 @@ class SmokeTests(TestCase):
     def test_capable(self):
         self.run_with_int("capable.py")
 
+    def test_capable_dwarf_requires_user_stacks(self):
+        command = [TOOLS_DIR + "capable.py", "--dwarf", "--ebpf"]
+        proc = subprocess.Popen(command, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+        stdout, stderr = proc.communicate()
+        self.assertNotEqual(0, proc.returncode)
+        self.assertIn(b"--dwarf currently requires -U", stderr)
+
+    def test_capable_dwarf_rejects_unique(self):
+        command = [TOOLS_DIR + "capable.py", "--dwarf", "-U", "--unique",
+                   "--ebpf"]
+        proc = subprocess.Popen(command, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+        stdout, stderr = proc.communicate()
+        self.assertNotEqual(0, proc.returncode)
+        self.assertIn(b"--dwarf does not support --unique yet", stderr)
+
+    @skipUnless(platform.machine() in ("x86_64", "amd64"),
+                "DWARF stacks currently support x86_64 only")
+    def test_capable_dwarf_ebpf_uses_hook_helper(self):
+        command = [TOOLS_DIR + "capable.py", "--dwarf", "-U", "--ebpf"]
+        proc = subprocess.Popen(command, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+        stdout, stderr = proc.communicate()
+        self.assertEqual(0, proc.returncode, stderr)
+        self.assertIn(b"struct bcc_dwarf_sample", stdout)
+        self.assertIn(b"bcc_dwarf_fill_sample_from_regs", stdout)
+        self.assertIn(b"(struct bcc_dwarf_sample *)&data->stack_size",
+                      stdout)
+        self.assertNotIn(b"bcc_dwarf_raw_task_regs_fallback", stdout)
+
     def test_cpudist(self):
         self.run_with_duration("cpudist.py 1 1")
 
