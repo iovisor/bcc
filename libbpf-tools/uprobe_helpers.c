@@ -70,7 +70,8 @@ int get_pid_lib_path(pid_t pid, const char *lib, char *path, size_t path_sz)
 		return -1;
 	}
 	while (fgets(line_buf, sizeof(line_buf), maps)) {
-		if (sscanf(line_buf, "%*x-%*x %*s %*x %*s %*u %s", path_buf) != 1)
+		if (sscanf(line_buf, "%*x-%*x %*s %*x %*s %*u %1023s",
+			   path_buf) != 1)
 			continue;
 		/* e.g. /usr/lib/x86_64-linux-gnu/libc-2.31.so */
 		p = strrchr(path_buf, '/');
@@ -85,7 +86,7 @@ int get_pid_lib_path(pid_t pid, const char *lib, char *path, size_t path_sz)
 		/* libraries can have - or . after the name */
 		if (*p != '.' && *p != '-')
 			continue;
-		if (strnlen(path_buf, 1024) >= path_sz) {
+		if (strnlen(path_buf, sizeof(path_buf)) >= path_sz) {
 			warn("path size too small\n");
 			goto cleanup;
 		}
@@ -106,27 +107,50 @@ cleanup:
  */
 static int which_program(const char *prog, char *path, size_t path_sz)
 {
-	FILE *which;
-	char cmd[100];
+	char candidate[PATH_MAX];
+	const char *path_env, *dir, *next;
+	size_t prog_len;
 
-	if (snprintf(cmd, sizeof(cmd), "which %s", prog) >= sizeof(cmd)) {
-		warn("snprintf which prog failed");
+	if (!prog || !prog[0])
 		return -1;
+
+	prog_len = strlen(prog);
+	if (strchr(prog, '/')) {
+		if (access(prog, X_OK))
+			return -1;
+		if (snprintf(path, path_sz, "%s", prog) >= path_sz) {
+			warn("path size too small\n");
+			return -1;
+		}
+		return 0;
 	}
-	which = popen(cmd, "r");
-	if (!which) {
-		warn("which failed");
+
+	path_env = getenv("PATH");
+	if (!path_env)
 		return -1;
+
+	for (dir = path_env; dir; dir = next ? next + 1 : NULL) {
+		size_t dir_len;
+
+		next = strchr(dir, ':');
+		dir_len = next ? (size_t)(next - dir) : strlen(dir);
+		if (dir_len + 1 + prog_len >= sizeof(candidate))
+			continue;
+		if (dir_len)
+			snprintf(candidate, sizeof(candidate), "%.*s/%s",
+				 (int)dir_len, dir, prog);
+		else
+			snprintf(candidate, sizeof(candidate), "./%s", prog);
+		if (access(candidate, X_OK))
+			continue;
+		if (snprintf(path, path_sz, "%s", candidate) >= path_sz) {
+			warn("path size too small\n");
+			return -1;
+		}
+		return 0;
 	}
-	if (!fgets(path, path_sz, which)) {
-		warn("fgets which failed");
-		pclose(which);
-		return -1;
-	}
-	/* which has a \n at the end of the string */
-	path[strlen(path) - 1] = '\0';
-	pclose(which);
-	return 0;
+
+	return -1;
 }
 
 /*
