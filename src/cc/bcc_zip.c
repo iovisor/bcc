@@ -16,6 +16,7 @@
 
 #include "bcc_zip.h"
 
+#include <endian.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <stdint.h>
@@ -42,7 +43,7 @@ typedef struct {
 static uint16_t unaligned_uint16_read(unaligned_uint16_t value) {
   uint16_t return_value;
   memcpy(&return_value, value.raw, sizeof(return_value));
-  return return_value;
+  return le16toh(return_value);
 }
 
 typedef struct {
@@ -52,7 +53,7 @@ typedef struct {
 static uint32_t unaligned_uint32_read(unaligned_uint32_t value) {
   uint32_t return_value;
   memcpy(&return_value, value.raw, sizeof(return_value));
-  return return_value;
+  return le32toh(return_value);
 }
 
 #define END_OF_CD_RECORD_MAGIC 0x06054b50
