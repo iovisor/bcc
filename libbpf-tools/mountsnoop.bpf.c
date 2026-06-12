@@ -130,6 +130,8 @@ static int probe_exit(void *ctx, int ret)
 					sizeof(eventp->move_mount.to_pathname),
 					argp->sys.move_mount.to_pathname);
 		break;
+	default:
+		break;
 	}
 
 	submit_buf(ctx, eventp, sizeof(*eventp));
