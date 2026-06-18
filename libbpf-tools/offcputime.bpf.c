@@ -17,6 +17,9 @@ const volatile __u64 min_block_us = 1;
 const volatile bool filter_by_tgid = false;
 const volatile bool filter_by_pid = false;
 const volatile long state = -1;
+const volatile bool use_pidns = false;
+const volatile __u64 pidns_dev = 0;
+const volatile __u64 pidns_ino = 0;
 
 struct internal_key {
 	u64 start_ts;
@@ -56,14 +59,27 @@ struct {
 	__uint(max_entries, MAX_TID_NR);
 } pids SEC(".maps");
 
-static bool allow_record(struct task_struct *t)
+static bool allow_record(struct task_struct *t, u32* ns_pid, u32* ns_tgid)
 {
-	u32 tgid = BPF_CORE_READ(t, tgid);
-	u32 pid = BPF_CORE_READ(t, pid);
+	s64 id;
+	struct bpf_pidns_info ns = {};
 
-	if (filter_by_tgid && !bpf_map_lookup_elem(&tgids, &tgid))
+	if (use_pidns && BPF_CORE_READ(t, pid) != 0) {
+		if (!bpf_get_ns_current_pid_tgid(pidns_dev, pidns_ino, &ns, sizeof(ns))) {
+			*ns_pid = ns.pid;
+			*ns_tgid = ns.tgid;
+		} else {
+			return false;
+		}
+	} else {
+		id = bpf_get_current_pid_tgid();
+		*ns_pid = id;
+		*ns_tgid = id >> 32;
+	}
+
+	if (filter_by_tgid && !bpf_map_lookup_elem(&tgids, ns_tgid))
 		return false;
-	if (filter_by_pid && !bpf_map_lookup_elem(&pids, &pid))
+	if (filter_by_pid && !bpf_map_lookup_elem(&pids, ns_pid))
 		return false;
 	if (user_threads_only && (BPF_CORE_READ(t, flags) & PF_KTHREAD))
 		return false;
@@ -79,9 +95,9 @@ static int handle_sched_switch(void *ctx, bool preempt, struct task_struct *prev
 	struct internal_key *i_keyp, i_key;
 	struct val_t *valp, val;
 	s64 delta;
-	u32 pid;
+	u32 pid, ns_pid, ns_tgid;
 
-	if (allow_record(prev)) {
+	if (allow_record(prev, &ns_pid, &ns_tgid)) {
 		pid = BPF_CORE_READ(prev, pid);
 		/* To distinguish idle threads of different cores */
 		if (!pid)
@@ -97,6 +113,8 @@ static int handle_sched_switch(void *ctx, bool preempt, struct task_struct *prev
 		i_key.key.kern_stack_id = bpf_get_stackid(ctx, &stackmap, 0);
 		bpf_map_update_elem(&start, &pid, &i_key, 0);
 		bpf_probe_read_kernel_str(&val.comm, sizeof(prev->comm), BPF_CORE_READ(prev, comm));
+		val.ns_pid = ns_pid;
+		val.ns_tgid = ns_tgid;
 		val.delta = 0;
 		bpf_map_update_elem(&info, &i_key.key, &val, BPF_NOEXIST);
 	}
