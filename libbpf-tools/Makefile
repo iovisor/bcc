@@ -81,6 +81,7 @@ APPS = \
 	sigsnoop \
 	slabratetop \
 	softirqs \
+	softirqslower \
 	solisten \
 	statsnoop \
 	syncsnoop \
