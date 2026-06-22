@@ -72,7 +72,7 @@ parser.add_argument("-t", "--timestamp", action="store_true",
     help="include timestamp on output")
 parser.add_argument("-w", "--wide", action="store_true",
     help="wide column output (fits IPv6 addresses)")
-parser.add_argument("-p", "--pid",
+parser.add_argument("-p", "--pid", type=int,
     help="trace this PID only")
 parser.add_argument("-P", "--port",
     help="comma-separated list of ports to trace.")
@@ -80,7 +80,7 @@ parser.add_argument("-E", "--errors", action="store_true",
     help="include errors in the output.")
 parser.add_argument("-U", "--print-uid", action="store_true",
     help="include UID on output")
-parser.add_argument("-u", "--uid",
+parser.add_argument("-u", "--uid", type=int,
     help="trace this UID only")
 parser.add_argument("--count", action="store_true",
     help="count binds per src ip and port")

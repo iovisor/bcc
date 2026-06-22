@@ -34,7 +34,7 @@ parser.add_argument("-T", "--notimestamp", action="store_true",
     help="don't include timestamp on interval output")
 parser.add_argument("-m", "--milliseconds", action="store_true",
     help="output in milliseconds")
-parser.add_argument("-p", "--pid",
+parser.add_argument("-p", "--pid", type=int,
     help="trace this PID only")
 parser.add_argument("interval", nargs="?",
     help="output interval, in seconds")
