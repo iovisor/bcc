@@ -39,14 +39,16 @@ optimizations.
 USAGE message:
 
 # ./filelife -h
-usage: filelife [-h] [-p PID]
+usage: filelife.py [-h] [-p PID] [-P]
 
-Trace stat() syscalls
+Trace lifecycle of file
 
-optional arguments:
-  -h, --help         show this help message and exit
-  -p PID, --pid PID  trace this PID only
+options:
+  -h, --help     show this help message and exit
+  -p, --pid PID  trace this PID only
+  -P, --path     show file path
 
 examples:
-    ./filelife           # trace all stat() syscalls
+    ./filelife           # trace lifecycle of file(create->remove)
+    ./filelife -P        # show path of file
     ./filelife -p 181    # only trace PID 181
