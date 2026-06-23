@@ -42,6 +42,7 @@ BZ_APPS = \
 	#
 
 APPS = \
+	alsan \
 	bashreadline \
 	bindsnoop \
 	biolatency \
