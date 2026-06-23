@@ -5,24 +5,33 @@ This prints bash commands from all running bash shells on the system. For
 example:
 
 # ./bashreadline
-TIME      PID    COMMAND
-05:28:25  21176  ls -l
-05:28:28  21176  date
-05:28:35  21176  echo hello world
-05:28:43  21176  foo this command failed
-05:28:45  21176  df -h
-05:29:04  3059   echo another shell
-05:29:13  21176  echo first shell again
+TIME                 PID     UID    COMMAND
+02/25/2025-05:28:25  21176   56782  ls -l
+02/25/2025-05:28:28  21176   56783  date
+02/25/2025-05:28:35  21176   56782  echo hello world
+02/25/2025-05:28:43  21176   56784  foo this command failed
+02/25/2025-05:28:45  21176   56784  df -h
+02/25/2025-05:29:04  3059    56779  echo another shell
+02/25/2025-05:29:13  21176   56784  echo first shell again
 
 When running the script on Arch Linux, you may need to specify the location
 of libreadline.so library:
 
 # ./bashreadline -s /lib/libreadline.so
-TIME      PID    COMMAND
-11:17:34  28796  whoami
-11:17:41  28796  ps -ef
-11:17:51  28796  echo "Hello eBPF!"
+TIME                 PID     UID    COMMAND
+02/25/2025-11:17:34  28796   56782  whoami
+02/25/2025-11:17:41  28796   56782  ps -ef
+02/25/2025-11:17:51  28796   56782  echo "Hello eBPF!"
 
+There is a -j or --json argument that converts the output to json:
+# ./bashreadline -j
+{'TIME': '02/25/2025-11:14:21', 'PID': 818095, 'UID': 78912, 'COMMAND': 'whoami'}
+{'TIME': '02/25/2025-11:14:28', 'PID': 818095, 'UID': 43592, 'COMMAND': 'oranges'}
+
+There is also a -f or --file argument that logs all output to a file instead of to stdout:
+# ./bashreadline -f /var/log/test.log
+if the file logging is desired in json, combine the arguments to produce the desired result:
+# ./bashreadline -jf /var/log/test.log
 
 The entered command may fail. This is just showing what command lines were
 entered interactively for bash to process.
