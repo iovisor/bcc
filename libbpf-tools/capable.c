@@ -4,6 +4,7 @@
 // Copyright 2022 Sony Group Corporation
 
 #include <argp.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -296,7 +297,7 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 {
-	fprintf(stderr, "lost %llu events on CPU #%d\n", lost_cnt, cpu);
+	fprintf(stderr, "lost %" PRIu64" events on CPU #%d\n", (uint64_t)lost_cnt, cpu);
 }
 
 int main(int argc, char **argv)
