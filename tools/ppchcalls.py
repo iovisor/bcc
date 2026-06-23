@@ -104,6 +104,7 @@ hcall_table = {
     472: 'H_POLL_PENDING',
     484: 'H_QUERY_INT_STATE',
     580: 'H_ILLAN_ATTRIBUTES',
+    584: 'H_ADD_LOGICAL_LAN_BUFFERS',
     592: 'H_MODIFY_HEA_QP',
     596: 'H_QUERY_HEA_QP',
     600: 'H_QUERY_HEA',
@@ -182,6 +183,7 @@ hcall_table = {
     1100: 'H_SCM_FLUSH',
     1104: 'H_GET_ENERGY_SCALE_INFO',
     1108: 'H_PKS_SIGNED_UPDATE',
+    1112: 'H_HTM',
     1116: 'H_WATCHDOG',
     # Platform specific hcalls used by KVM on PowerVM
     1120: 'H_GUEST_GET_CAPABILITIES',
@@ -193,6 +195,9 @@ hcall_table = {
     1152: 'H_GUEST_RUN_VCPU',
     1156: 'H_GUEST_COPY_MEMORY',
     1160: 'H_GUEST_DELETE',
+    # Key wrapping hcalls
+    1168: 'H_PKS_WRAP_OBJECT',
+    1172: 'H_PKS_UNWRAP_OBJECT',
     # Platform-specific hcalls used by the Ultravisor
     61184: 'H_SVM_PAGE_IN',
     61188: 'H_SVM_PAGE_OUT',
