@@ -31,6 +31,12 @@ USE_BLAZESYM ?= 1
 endif
 endif
 
+ifeq ($(ARCH),x86)
+USE_DWARF_UNWIND = 1
+else
+USE_DWARF_UNWIND = 0
+endif
+
 ifeq ($(wildcard $(ARCH)/),)
 $(error Architecture $(ARCH) is not supported yet. Please open an issue)
 endif
@@ -39,6 +45,11 @@ BZ_APPS = \
 	futexctn \
 	memleak \
 	opensnoop \
+	#
+
+UNW_APPS = \
+	memleak \
+	offcputime \
 	#
 
 APPS = \
@@ -71,7 +82,6 @@ APPS = \
 	mdflush \
 	mountsnoop \
 	numamove \
-	offcputime \
 	oomkill \
 	profile \
 	readahead \
@@ -97,6 +107,7 @@ APPS = \
 	vfsstat \
 	wakeuptime \
 	$(BZ_APPS) \
+	$(UNW_APPS) \
 	#
 
 # export variables that are used in Makefile.btfgen as well.
@@ -123,6 +134,12 @@ ifeq ($(USE_BLAZESYM),1)
 COMMON_OBJ += \
 	$(LIBBLAZESYM_OBJ) \
 	$(OUTPUT)/blazesym.h \
+	#
+endif
+
+ifeq ($(USE_DWARF_UNWIND),1)
+COMMON_OBJ += \
+	$(OUTPUT)/unwind_helpers.o \
 	#
 endif
 
@@ -156,9 +173,16 @@ endif
 ifeq ($(USE_BLAZESYM),1)
 CFLAGS += -DUSE_BLAZESYM=1
 endif
+ifeq ($(USE_DWARF_UNWIND),1)
+CFLAGS += -DUSE_DWARF_UNWIND=1
+endif
 
 ifeq ($(USE_BLAZESYM),1)
 LDFLAGS += $(LIBBLAZESYM_OBJ) -lrt -lpthread -ldl
+endif
+
+ifeq ($(USE_DWARF_UNWIND),1)
+LIBUNWIND_LIBS := -lunwind-ptrace -lunwind-generic -lunwind -llzma
 endif
 
 .PHONY: clean
@@ -187,17 +211,22 @@ $(BPFTOOL): | $(BPFTOOL_OUTPUT)
 
 $(APPS): %: $(OUTPUT)/%.o $(COMMON_OBJ) $(LIBBPF_OBJ) | $(OUTPUT)
 	$(call msg,BINARY,$@)
-	$(Q)$(CC) $(CFLAGS) $^ $(LDFLAGS) -lelf -lz -o $@
+	$(Q)$(CC) $(CFLAGS) $^ $(LDFLAGS) -lelf -lz $(LIBUNWIND_LIBS) -o $@
 
 ifeq ($(USE_BLAZESYM),1)
 $(patsubst %,$(OUTPUT)/%.o,$(BZ_APPS)): $(OUTPUT)/blazesym.h
+endif
+
+ifeq ($(USE_DWARF_UNWIND),1)
+$(patsubst %,$(OUTPUT)/%.o,$(UNW_APPS)): unwind_helpers_types.h unwind_helpers.h
+$(patsubst %,$(OUTPUT)/%.bpf.o,$(UNW_APPS)): unwind_helpers.bpf.h
 endif
 
 $(patsubst %,$(OUTPUT)/%.o,$(APPS)): %.o: %.skel.h
 
 $(OUTPUT)/%.o: %.c $(wildcard %.h) $(LIBBPF_OBJ) | $(OUTPUT)
 	$(call msg,CC,$@)
-	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $(filter %.c,$^) -o $@
+	$(Q)$(CC) $(CFLAGS) -D__TARGET_ARCH_$(ARCH) $(INCLUDES) -c $(filter %.c,$^) -o $@
 
 $(OUTPUT)/%.skel.h: $(OUTPUT)/%.bpf.o | $(OUTPUT) $(BPFTOOL)
 	$(call msg,GEN-SKEL,$@)
