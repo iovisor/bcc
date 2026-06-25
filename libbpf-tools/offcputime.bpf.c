@@ -77,7 +77,7 @@ static bool allow_record(struct task_struct *t)
 static int handle_sched_switch(void *ctx, bool preempt, struct task_struct *prev, struct task_struct *next)
 {
 	struct internal_key *i_keyp, i_key;
-	struct val_t *valp, val;
+	struct val_t *valp, val = {};
 	s64 delta;
 	u32 pid;
 
