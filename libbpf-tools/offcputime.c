@@ -11,6 +11,7 @@
 #include <time.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
+#include <sys/stat.h>
 #include "offcputime.h"
 #include "offcputime.skel.h"
 #include "trace_helpers.h"
@@ -252,7 +253,7 @@ print_ustack:
 			goto skip_ustack;
 		}
 
-		syms = syms_cache__get_syms(syms_cache, next_key.tgid);
+		syms = syms_cache__get_syms(syms_cache, val.ns_tgid);
 		if (!syms) {
 			if (!env.verbose) {
 				fprintf(stderr, "failed to get syms\n");
@@ -282,7 +283,7 @@ print_ustack:
 		}
 
 skip_ustack:
-		printf("    %-16s %s (%d)\n", "-", val.comm, next_key.pid);
+		printf("    %-16s %s (%d)\n", "-", val.comm, val.ns_pid);
 		printf("        %lld\n\n", val.delta);
 	}
 
@@ -310,6 +311,23 @@ static bool print_header_threads()
 	}
 
 	return printed;
+}
+
+static int set_pidns(const struct offcputime_bpf *obj)
+{
+	struct stat statbuf;
+
+	if (!probe_bpf_ns_current_pid_tgid())
+		return -EPERM;
+
+	if (stat("/proc/self/ns/pid", &statbuf) == -1)
+		return -errno;
+
+	obj->rodata->use_pidns = true;
+	obj->rodata->pidns_dev = statbuf.st_dev;
+	obj->rodata->pidns_ino = statbuf.st_ino;
+
+	return 0;
 }
 
 static void print_headers()
@@ -380,6 +398,10 @@ int main(int argc, char **argv)
 		bpf_program__set_autoload(obj->progs.sched_switch, false);
 	else
 		bpf_program__set_autoload(obj->progs.sched_switch_raw, false);
+
+	err = set_pidns(obj);
+	if (err && env.verbose)
+		fprintf(stderr, "failed to translate pidns: %s\n", strerror(-err));
 
 	err = offcputime_bpf__load(obj);
 	if (err) {
