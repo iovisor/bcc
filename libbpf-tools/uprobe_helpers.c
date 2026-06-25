@@ -70,7 +70,7 @@ int get_pid_lib_path(pid_t pid, const char *lib, char *path, size_t path_sz)
 		return -1;
 	}
 	while (fgets(line_buf, sizeof(line_buf), maps)) {
-		if (sscanf(line_buf, "%*x-%*x %*s %*x %*s %*u %1023s",
+		if (sscanf(line_buf, "%*llx-%*llx %*s %*llx %*s %*u %1023s",
 			   path_buf) != 1)
 			continue;
 		/* e.g. /usr/lib/x86_64-linux-gnu/libc-2.31.so */
@@ -109,12 +109,10 @@ static int which_program(const char *prog, char *path, size_t path_sz)
 {
 	char candidate[PATH_MAX];
 	const char *path_env, *dir, *next;
-	size_t prog_len;
 
 	if (!prog || !prog[0])
 		return -1;
 
-	prog_len = strlen(prog);
 	if (strchr(prog, '/')) {
 		if (access(prog, X_OK))
 			return -1;
@@ -131,16 +129,17 @@ static int which_program(const char *prog, char *path, size_t path_sz)
 
 	for (dir = path_env; dir; dir = next ? next + 1 : NULL) {
 		size_t dir_len;
+		int ret;
 
 		next = strchr(dir, ':');
 		dir_len = next ? (size_t)(next - dir) : strlen(dir);
-		if (dir_len + 1 + prog_len >= sizeof(candidate))
-			continue;
 		if (dir_len)
-			snprintf(candidate, sizeof(candidate), "%.*s/%s",
-				 (int)dir_len, dir, prog);
+			ret = snprintf(candidate, sizeof(candidate), "%.*s/%s",
+				       (int)dir_len, dir, prog);
 		else
-			snprintf(candidate, sizeof(candidate), "./%s", prog);
+			ret = snprintf(candidate, sizeof(candidate), "./%s", prog);
+		if (ret < 0 || (size_t)ret >= sizeof(candidate))
+			continue;
 		if (access(candidate, X_OK))
 			continue;
 		if (snprintf(path, path_sz, "%s", candidate) >= path_sz) {
