@@ -32,11 +32,14 @@ from __future__ import print_function
 from bcc import BPF, PerfType, PerfSWConfig, PerfHWConfig
 from bcc.containers import filter_by_containers
 from sys import stderr
-from time import sleep
+from time import sleep, time
 from os import open, close, dup, stat, uname, devnull, O_WRONLY
 import argparse
 import signal
 import errno
+import platform
+
+DWARF_MAX_FRAMES = 128
 
 #
 # Process Arguments
@@ -82,6 +85,7 @@ examples = """examples:
     ./profile -L 185      # only profile thread with TID 185
     ./profile -U          # only show user space stacks (no kernel)
     ./profile -K          # only show kernel space stacks (no user)
+    ./profile --dwarf -U  # unwind user stacks with DWARF CFI
     ./profile --cgroupmap mappath  # only trace cgroups in this BPF map
     ./profile --mntnsmap mappath   # only trace mount namespaces in the map
 """
@@ -113,6 +117,9 @@ parser.add_argument("-I", "--include-idle", action="store_true",
     help="include CPU idle stacks")
 parser.add_argument("-f", "--folded", action="store_true",
     help="output folded format, one line per stack (for flame graphs)")
+parser.add_argument("--dwarf", action="store_true",
+    help="unwind user stacks with DWARF CFI (requires -U, "
+         "bpf_task_pt_regs, and x86_64)")
 parser.add_argument("--hash-storage-size", default=40960,
     type=positive_nonzero_int,
     help="the number of hash keys that can be stored and (default %(default)s)")
@@ -138,6 +145,11 @@ parser.add_argument("-A", "--address", action="store_true",
 args = parser.parse_args()
 duration = int(args.duration)
 debug = 0
+dwarf_mode = args.dwarf and args.user_stacks_only
+if args.dwarf and not args.user_stacks_only:
+    parser.error("--dwarf currently requires -U")
+if dwarf_mode and platform.machine() not in ("x86_64", "amd64"):
+    parser.error("--dwarf currently supports x86_64 only")
 need_delimiter = args.delimited and not (args.kernel_stacks_only or
     args.user_stacks_only)
 # TODO: add stack depth, and interval
@@ -233,6 +245,24 @@ int do_perf_event(struct bpf_perf_event_data *ctx) {
 }
 """
 
+if dwarf_mode:
+    from bcc.dwarf import (DWARF_REG_COUNT, DWARF_STACK_BYTES,
+                           bpf_task_pt_regs_probe_error,
+                           build_dwarf_profile_bpf_text,
+                           has_bpf_task_pt_regs)
+    if not args.ebpf and not has_bpf_task_pt_regs():
+        print("ERROR: --dwarf requires bpf_task_pt_regs support on this "
+            "kernel", file=stderr)
+        probe_error = bpf_task_pt_regs_probe_error()
+        if probe_error:
+            print("ERROR: bpf_task_pt_regs probe failed: %s" % probe_error,
+                file=stderr)
+        exit(1)
+    bpf_text = build_dwarf_profile_bpf_text(
+        stack_bytes=DWARF_STACK_BYTES,
+        reg_count=DWARF_REG_COUNT,
+        force_bpf_task_pt_regs=True)
+
 # pid-namespace translation
 try:
     devinfo = stat("/proc/self/ns/pid")
@@ -315,6 +345,18 @@ if debug or args.ebpf:
     if args.ebpf:
         exit()
 
+if dwarf_mode:
+    from bcc.dwarf import (
+        DwarfUnwinder,
+        dwarf_event_to_regs,
+        format_dwarf_frame,
+        dwarf_synthetic_stack_table,
+    )
+    if not DwarfUnwinder.supported():
+        print("ERROR: --dwarf requested but BCC was not built with "
+            "libgunwinder support", file=stderr)
+        exit(1)
+
 # initialize BPF & perf_events
 b = BPF(text=bpf_text)
 
@@ -345,19 +387,95 @@ finally:
 def signal_ignore(signal, frame):
     print()
 
+def dwarf_event_regs(event):
+    return dwarf_event_to_regs(event)
+
+def print_dwarf_counts(dwarf_counts):
+    for (name, pid, frames), count in sorted(dwarf_counts.items(),
+            key=lambda item: item[1]):
+        if args.folded:
+            line = [name]
+            line.extend(reversed(frames))
+            print("%s %d" % (";".join(line), count))
+        else:
+            for frame in frames:
+                if args.address:
+                    print("    %s" % frame)
+                else:
+                    print("    %s" % frame)
+            print("    %-16s %s (%d)" % ("-", name, pid))
+            print("        %d\n" % count)
+
 #
 # Output Report
 #
 
 # collect samples
-try:
-    sleep(duration)
-except KeyboardInterrupt:
-    # as cleanup can take some time, trap Ctrl-C:
-    signal.signal(signal.SIGINT, signal_ignore)
+dwarf_counts = {}
+dwarf_missing_stacks = 0
+dwarf_lost_events = 0
+
+if dwarf_mode:
+    unwinder = DwarfUnwinder()
+
+    def record_dwarf_event(cpu, data, size):
+        global dwarf_missing_stacks
+        event = b["dwarf_events"].event(data)
+        name = event.name.decode('utf-8', 'replace')
+        try:
+            regs = dwarf_event_regs(event)
+            stack_data = bytes(bytearray(event.stack[:event.stack_size]))
+            result = unwinder.sample(event.pid, regs, stack_data=stack_data,
+                unique_id=event.tid, max_frames=DWARF_MAX_FRAMES)
+        except Exception:
+            result = None
+
+        if result is None or not result.frames:
+            dwarf_missing_stacks += 1
+            frames = dwarf_synthetic_stack_table()
+        else:
+            frames = tuple(format_dwarf_frame(frame,
+                include_address=args.address and not args.folded)
+                for frame in result.frames)
+        key = (name, event.pid, frames)
+        dwarf_counts[key] = dwarf_counts.get(key, 0) + 1
+
+    def record_dwarf_lost(count):
+        global dwarf_lost_events
+        dwarf_lost_events += count
+
+    b["dwarf_events"].open_perf_buffer(record_dwarf_event,
+        lost_cb=record_dwarf_lost, page_cnt=64)
+    end = time() + duration
+    try:
+        while True:
+            remaining = end - time()
+            if remaining <= 0:
+                break
+            b.perf_buffer_poll(timeout=max(1, int(min(remaining, 0.1) * 1000)))
+    except KeyboardInterrupt:
+        signal.signal(signal.SIGINT, signal_ignore)
+    finally:
+        unwinder.close()
+else:
+    try:
+        sleep(duration)
+    except KeyboardInterrupt:
+        # as cleanup can take some time, trap Ctrl-C:
+        signal.signal(signal.SIGINT, signal_ignore)
 
 if not args.folded:
     print()
+
+if dwarf_mode:
+    print_dwarf_counts(dwarf_counts)
+    if dwarf_missing_stacks > 0:
+        print("WARNING: %d DWARF stack traces could not be displayed." %
+            dwarf_missing_stacks, file=stderr)
+    if dwarf_lost_events > 0:
+        print("WARNING: %d DWARF sample events were lost." %
+            dwarf_lost_events, file=stderr)
+    exit()
 
 def aksym(addr):
     if args.annotations:

@@ -18,6 +18,8 @@ from bcc import BPF
 from bcc.containers import filter_by_containers
 import errno
 import argparse
+import platform
+from sys import stderr
 from time import strftime
 
 # arguments
@@ -27,6 +29,7 @@ examples = """examples:
     ./capable -p 181      # only trace PID 181
     ./capable -K          # add kernel stacks to trace
     ./capable -U          # add user-space stacks to trace
+    ./capable --dwarf -U  # add DWARF user-space stacks to trace
     ./capable -x          # extra fields: show TID and INSETID columns
     ./capable --unique    # don't repeat stacks for the same pid or cgroup
     ./capable --cgroupmap mappath  # only trace cgroups in this BPF map
@@ -44,6 +47,8 @@ parser.add_argument("-K", "--kernel-stack", action="store_true",
     help="output kernel stack trace")
 parser.add_argument("-U", "--user-stack", action="store_true",
     help="output user stack trace")
+parser.add_argument("--dwarf", action="store_true",
+    help="use DWARF CFI for user stack traces")
 parser.add_argument("-x", "--extra", action="store_true",
     help="show extra fields in TID and INSETID columns")
 parser.add_argument("--cgroupmap",
@@ -52,8 +57,34 @@ parser.add_argument("--mntnsmap",
     help="trace mount namespaces in this BPF map only")
 parser.add_argument("--unique", action="store_true",
     help="don't repeat stacks for the same pid or cgroup")
+parser.add_argument("--ebpf", action="store_true",
+    help=argparse.SUPPRESS)
 args = parser.parse_args()
 debug = 0
+
+if args.dwarf and not args.user_stack:
+    parser.error("--dwarf currently requires -U")
+if args.dwarf and args.unique:
+    parser.error("--dwarf does not support --unique yet")
+if args.dwarf and platform.machine() not in ("x86_64", "amd64"):
+    parser.error("--dwarf currently supports x86_64 only")
+if args.dwarf:
+    from bcc.dwarf import (DwarfUnwinder, bpf_task_pt_regs_probe_error,
+                           build_dwarf_sample_bpf_text,
+                           decode_dwarf_sample, dwarf_synthetic_stack_table,
+                           format_dwarf_frame, has_bpf_task_pt_regs)
+    if not args.ebpf and not has_bpf_task_pt_regs():
+        print("ERROR: --dwarf requires bpf_task_pt_regs support on this "
+            "kernel", file=stderr)
+        probe_error = bpf_task_pt_regs_probe_error()
+        if probe_error:
+            print("ERROR: bpf_task_pt_regs probe failed: %s" % probe_error,
+                file=stderr)
+        exit(1)
+    if not args.ebpf and not DwarfUnwinder.supported():
+        print("ERROR: --dwarf requested but BCC was not built with "
+            "libgunwinder support", file=stderr)
+        exit(1)
 
 # capabilities to names, generated from (and will need updating):
 # awk '/^#define.CAP_.*[0-9]$/ { print "    " $3 ": \"" $2 "\"," }' \
@@ -131,9 +162,17 @@ struct data_t {
 #ifdef USER_STACKS
    int user_stack_id;
 #endif
+#ifdef DWARF_USER_STACKS
+   u32 stack_size;
+   u32 _pad;
+   u64 regs[DWARF_REG_COUNT];
+   u64 valid_mask;
+   u8 stack[DWARF_STACK_BYTES];
+#endif
 };
 
 BPF_PERF_OUTPUT(events);
+BPF_DWARF_EVENT_BUF
 
 #if UNIQUESET
 struct repeat_t {
@@ -183,19 +222,25 @@ int kprobe__cap_capable(struct pt_regs *ctx, const struct cred *cred,
 
     u32 uid = bpf_get_current_uid_gid();
 
-    struct data_t data = {};
+    BPF_DWARF_EVENT_LOOKUP
 
-    data.tgid = tgid;
-    data.pid = pid;
-    data.uid = uid;
-    data.cap = cap;
-    data.audit = audit;
-    data.insetid = insetid;
+    data->tgid = tgid;
+    data->pid = pid;
+    data->uid = uid;
+    data->cap = cap;
+    data->audit = audit;
+    data->insetid = insetid;
 #ifdef KERNEL_STACKS
-    data.kernel_stack_id = stacks.get_stackid(ctx, 0);
+    data->kernel_stack_id = stacks.get_stackid(ctx, 0);
 #endif
 #ifdef USER_STACKS
-    data.user_stack_id = stacks.get_stackid(ctx, BPF_F_USER_STACK);
+    data->user_stack_id = stacks.get_stackid(ctx, BPF_F_USER_STACK);
+#endif
+#ifdef DWARF_USER_STACKS
+    data->stack_size = 0;
+    data->valid_mask = 0;
+    bcc_dwarf_fill_sample_from_regs(ctx,
+        (struct bcc_dwarf_sample *)&data->stack_size);
 #endif
 
 #if UNIQUESET
@@ -207,10 +252,10 @@ int kprobe__cap_capable(struct pt_regs *ctx, const struct cred *cred,
     repeat.tgid = tgid;
 #endif
 #ifdef KERNEL_STACKS
-    repeat.kernel_stack_id = data.kernel_stack_id;
+    repeat.kernel_stack_id = data->kernel_stack_id;
 #endif
 #ifdef USER_STACKS
-    repeat.user_stack_id = data.user_stack_id;
+    repeat.user_stack_id = data->user_stack_id;
 #endif
     if (seen.lookup(&repeat) != NULL) {
         return 0;
@@ -219,8 +264,8 @@ int kprobe__cap_capable(struct pt_regs *ctx, const struct cred *cred,
     seen.update(&repeat, &zero);
 #endif
 
-    bpf_get_current_comm(&data.comm, sizeof(data.comm));
-    events.perf_submit(ctx, &data, sizeof(data));
+    bpf_get_current_comm(&data->comm, sizeof(data->comm));
+    events.perf_submit(ctx, data, sizeof(*data));
 
     return 0;
 };
@@ -232,8 +277,24 @@ if not args.verbose:
     bpf_text = bpf_text.replace('FILTER2', 'if (audit == 0) { return 0; }')
 if args.kernel_stack:
     bpf_text = "#define KERNEL_STACKS\n" + bpf_text
-if args.user_stack:
+if args.user_stack and not args.dwarf:
     bpf_text = "#define USER_STACKS\n" + bpf_text
+if args.dwarf:
+    bpf_text = "#define DWARF_USER_STACKS\n" + bpf_text
+    bpf_text = build_dwarf_sample_bpf_text(
+        force_bpf_task_pt_regs=True) + bpf_text
+    bpf_text = bpf_text.replace("BPF_DWARF_EVENT_BUF",
+        "BPF_PERCPU_ARRAY(event_buf, struct data_t, 1);")
+    bpf_text = bpf_text.replace("BPF_DWARF_EVENT_LOOKUP",
+        """u32 zero = 0;
+    struct data_t *data = event_buf.lookup(&zero);
+    if (data == 0)
+        return 0;""")
+else:
+    bpf_text = bpf_text.replace("BPF_DWARF_EVENT_BUF", "")
+    bpf_text = bpf_text.replace("BPF_DWARF_EVENT_LOOKUP",
+        """struct data_t data_store = {};
+    struct data_t *data = &data_store;""")
 bpf_text = bpf_text.replace('FILTER1', '')
 bpf_text = bpf_text.replace('FILTER2', '')
 bpf_text = bpf_text.replace('FILTER3',
@@ -243,11 +304,14 @@ if args.unique:
     bpf_text = bpf_text.replace('UNIQUESET', '1')
 else:
     bpf_text = bpf_text.replace('UNIQUESET', '0')
-if debug:
+if debug or args.ebpf:
     print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # initialize BPF
 b = BPF(text=bpf_text)
+dwarf_unwinder = DwarfUnwinder() if args.dwarf else None
 
 # header
 if args.extra:
@@ -271,6 +335,21 @@ def print_stack(bpf, stack_id, stack_type, tgid):
         print("        ", end="")
         print("%s" % (bpf.sym(addr, tgid, show_module=True, show_offset=True)))
 
+def print_dwarf_stack(unwinder, event):
+    try:
+        result = decode_dwarf_sample(unwinder, event.tgid, event,
+                                     unique_id=event.pid, max_frames=64)
+    except Exception:
+        result = None
+
+    if result is None or not result.frames:
+        frames = dwarf_synthetic_stack_table()
+    else:
+        frames = tuple(format_dwarf_frame(frame) for frame in result.frames)
+
+    for frame in frames:
+        print("        %s" % frame)
+
 # process event
 def print_event(bpf, cpu, data, size):
     event = b["events"].event(data)
@@ -290,7 +369,10 @@ def print_event(bpf, cpu, data, size):
     if args.kernel_stack:
         print_stack(bpf, event.kernel_stack_id, StackType.Kernel, -1)
     if args.user_stack:
-        print_stack(bpf, event.user_stack_id, StackType.User, event.tgid)
+        if args.dwarf:
+            print_dwarf_stack(dwarf_unwinder, event)
+        else:
+            print_stack(bpf, event.user_stack_id, StackType.User, event.tgid)
 
 # loop with callback to print_event
 callback = partial(print_event, b)
