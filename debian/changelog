@@ -1,3 +1,37 @@
+bcc (0.37.0-1) unstable; urgency=low
+
+  * Support for kernel up to 7.1
+
+  * Bug Fixes
+    libbpf-tools/trace_helpers.c: Fixed double-free in cleanup path (7b671951)
+    libbpf-tools/biostacks: Fixed sizeof pointer issue in bpf_get_current_comm() (45348eea)
+    libbpf-tools/biosnoop: Fixed incorrect sizeof in bpf_get_current_comm() (da296a9a)
+    libbpf-tools/filetop, offcputime: Fixed kernel memory disclosure (d3b8def9)
+    libbpf-tools/bashreadline: Fixed uninitialized stack data leak of kernel pointers (c2d8f9b4)
+    libbpf-tools/mountsnoop: Fixed compile error in probe_exit() (3fc265d6)
+    libbpf-tools/path_helpers: Fixed -Wstring-plus-int build error (3696ea0e)
+    libbpf-tools/runqlen: Fixed compile error on ppc64el (b11c1bdf)
+    syscall.py, syscall_helpers.c: Updated syscall tables (74572288)
+    tools/mptcpify: Masked socket type before matching SOCK_STREAM (25ca8b4d)
+    tools/ppchcalls: Updated hcall list for newer kernels (a14e204d)
+    tools/bindsnoop: Fixed PROT field showing UNKN (22aeb77b)
+    tools/execsnoop: Fixed typo in check_cpu_field function name (a3dcb9a5)
+    tools: Fixed available_filter_functions path handling (2cc6d1ad)
+    bcc-lua: Restored LuaJIT determinism (825de98f)
+
+  * Build & Test Fixes
+    doc/build: Added clang and llvm to libbpf-tools build dependencies (e1446ea4)
+    Build: Fixed deprecation warnings for LLVM PointerType::get/getUnqual (e75ce68d)
+    Build: Fixed build with LLVM 22 (4c7be1ec)
+    Build: Fixed C23 constness warnings (246c549e)
+    cc: Added ARM64 and riscv syscall prefix detection in C++ API (e48a177f, 88c4e546)
+    cc: Synced loongarch64 handling with glibc flags (#5500, ecb5e5d2)
+    clang: Added Microsoft extensions build flags (c3f35ecc)
+    tests/python: Added ARM and AArch64 support to static tracepoints (c8af3e7f)
+    tests/python: Removed x86-specific naming from tracing header (1afbe3cd)
+
+  * Doc update, other bug fixes and tools improvement
+
 bcc (0.36.1-1) unstable; urgency=low
 
   * Bug Fixes
