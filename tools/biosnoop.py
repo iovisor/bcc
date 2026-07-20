@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
 # @lint-avoid-python-3-compatibility-imports
 #
 # biosnoop  Trace block device I/O and print details including issuing PID.
@@ -9,6 +9,12 @@
 #
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
+#
+# 16-Sep-2015   Brendan Gregg   Created this.
+# 11-Feb-2016   Allan McAleavy  updated for BPF_PERF_OUTPUT
+# 21-Jun-2022   Rocky Xing      Added disk filter support.
+# 13-Oct-2022   Rocky Xing      Added support for displaying block I/O pattern.
+# 01-Aug-2023   Jerome Marchand Added support for block tracepoints
 
 from __future__ import print_function
 from bcc import BPF
@@ -23,6 +29,7 @@ examples = """examples:
     ./biosnoop -t        # include wall-clock timestamps
     ./biosnoop -Q        # include OS queued time
     ./biosnoop -d sdc    # trace sdc only
+    ./biosnoop -P        # display block I/O pattern
 """
 parser = argparse.ArgumentParser(
     description="Trace block I/O",
@@ -61,17 +68,6 @@ struct val_t {
     u64 ts;
     u32 pid;
     char name[TASK_COMM_LEN];
-};
-
-struct tp_args {
-    u32 __unused__[3];
-    dev_t dev;
-    sector_t sector;
-    unsigned int nr_sector;
-    unsigned int bytes;
-    char rwbs[8];
-    char comm[16];
-    char cmd[];
 };
 
 struct hash_key {
@@ -180,17 +176,6 @@ int trace_pid_start(struct pt_regs *ctx, struct request *req)
     return __trace_pid_start(key);
 }
 
-int trace_pid_start_tp(struct tp_args *args)
-{
-    struct hash_key key = {
-        .dev = args->dev,
-        .rwflag = get_rwflag_tp(args->rwbs),
-        .sector = args->sector
-    };
-
-    return __trace_pid_start(key);
-}
-
 // time block I/O
 int trace_req_start(struct pt_regs *ctx, struct request *req)
 {
@@ -282,17 +267,6 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
 
     return __trace_req_completion(ctx, key);
 }
-
-int trace_req_completion_tp(struct tp_args *args)
-{
-    struct hash_key key = {
-        .dev = args->dev,
-        .rwflag = get_rwflag_tp(args->rwbs),
-        .sector = args->sector
-    };
-
-    return __trace_req_completion(args, key);
-}
 """
 if args.queue:
     bpf_text = bpf_text.replace('##QUEUE##', '1')
@@ -322,6 +296,61 @@ if args.disk is not None:
 else:
     bpf_text = bpf_text.replace('DISK_FILTER', '')
 
+# Pre-determine tracepoint vs kprobe routing pathways
+is_tp_start = False
+is_tp_done = False
+kprobe_start = None
+kprobe_done = None
+
+if BPF.tracepoint_exists("block", "block_io_start"):
+    is_tp_start = True
+elif BPF.get_kprobe_functions(b'__blk_account_io_start'):
+    kprobe_start = "__blk_account_io_start"
+elif BPF.get_kprobe_functions(b'blk_account_io_start'):
+    kprobe_start = "blk_account_io_start"
+else:
+    print("ERROR: No found any block io start probe/tp.")
+    exit(1)
+
+if BPF.tracepoint_exists("block", "block_io_done"):
+    is_tp_done = True
+elif BPF.get_kprobe_functions(b'__blk_account_io_done'):
+    kprobe_done = "__blk_account_io_done"
+elif BPF.get_kprobe_functions(b'blk_account_io_done'):
+    kprobe_done = "blk_account_io_done"
+else:
+    print("ERROR: No found any block io done probe/tp.")
+    exit(1)
+
+# Dynamically append stable tracepoint hooks if target system supports them
+if is_tp_start:
+    bpf_text += """
+TRACEPOINT_PROBE(block, block_io_start)
+{
+    struct hash_key key = {
+        .dev = args->dev,
+        .rwflag = get_rwflag_tp(args->rwbs),
+        .sector = args->sector
+    };
+
+    return __trace_pid_start(key);
+}
+"""
+
+if is_tp_done:
+    bpf_text += """
+TRACEPOINT_PROBE(block, block_io_done)
+{
+    struct hash_key key = {
+        .dev = args->dev,
+        .rwflag = get_rwflag_tp(args->rwbs),
+        .sector = args->sector
+    };
+
+    return __trace_req_completion(args, key);
+}
+"""
+
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
@@ -329,32 +358,21 @@ if debug or args.ebpf:
 
 # initialize BPF
 b = BPF(text=bpf_text)
-if BPF.tracepoint_exists("block", "block_io_start"):
-    b.attach_tracepoint(tp="block:block_io_start", fn_name="trace_pid_start_tp")
-elif BPF.get_kprobe_functions(b'__blk_account_io_start'):
-    b.attach_kprobe(event="__blk_account_io_start", fn_name="trace_pid_start")
-elif BPF.get_kprobe_functions(b'blk_account_io_start'):
-    b.attach_kprobe(event="blk_account_io_start", fn_name="trace_pid_start")
-else:
-    print("ERROR: No found any block io start probe/tp.")
-    exit()
+
+# Explicitly register kprobes only when tracepoints are unavailable
+if not is_tp_start:
+    b.attach_kprobe(event=kprobe_start, fn_name="trace_pid_start")
 
 if BPF.get_kprobe_functions(b'blk_start_request'):
     b.attach_kprobe(event="blk_start_request", fn_name="trace_req_start")
 b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_req_start")
 
-if BPF.tracepoint_exists("block", "block_io_done"):
-    b.attach_tracepoint(tp="block:block_io_done", fn_name="trace_req_completion_tp")
-elif BPF.get_kprobe_functions(b'__blk_account_io_done'):
-    b.attach_kprobe(event="__blk_account_io_done", fn_name="trace_req_completion")
-elif BPF.get_kprobe_functions(b'blk_account_io_done'):
-    b.attach_kprobe(event="blk_account_io_done", fn_name="trace_req_completion")
-else:
-    print("ERROR: No found any block io done probe/tp.")
-    exit()
+if not is_tp_done:
+    b.attach_kprobe(event=kprobe_done, fn_name="trace_req_completion")
 
-# Calculate the offset between CLOCK_MONOTONIC and CLOCK_REALTIME
-mono_to_wall_offset = time.time() - time.clock_gettime(time.CLOCK_MONOTONIC)
+# Safely isolate high-precision wall clock calculations
+if args.timestamps:
+    mono_to_wall_offset = time.clock_gettime(time.CLOCK_REALTIME) - time.clock_gettime(time.CLOCK_MONOTONIC)
 
 # header
 if args.timestamps:
