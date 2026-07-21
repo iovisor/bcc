@@ -50,14 +50,19 @@ debug = 0
 
 # define BPF program
 bpf_text = """
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-declarations"
+
+#undef static_assert
+#define static_assert(...)
+#undef __static_assert
+#define __static_assert(...)
+#undef _Static_assert
+#define _Static_assert(...)
+
 #include <uapi/linux/ptrace.h>
 #include <linux/blk-mq.h>
-"""
 
-if args.pattern:
-    bpf_text += "#define INCLUDE_PATTERN\n"
-
-bpf_text += """
 // for saving the timestamp and __data_len of each request
 struct start_req_t {
     u64 ts;
@@ -140,7 +145,7 @@ static int get_rwflag_tp(char *rwbs) {
     for (int i = 0; i < RWBS_LEN; i++) {
         if (rwbs[i] == 'W')
             return 1;
-        if (rwbs[i] == '\\0')
+        if (rwbs[i] == 0)
             return 0;
     }
     return 0;
