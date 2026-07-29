@@ -94,6 +94,33 @@ process_request                             8.55ms
   └─ compute                                5.10ms
 
 
+The -F otel option switches output to OTLP-compatible span JSONL, one
+JSON object per line, suitable for piping into an OTLP collector
+(e.g. otlp-forwarder) instead of a human-readable diagram:
+
+# ./functrace -b ./demo_app -R process_request -f process_request \
+    -f parse_input -f validate -f compute -F otel -d 2
+
+Tracing... Hit Ctrl-C to stop.
+{"traceId":"0000000000000000000000005c2e3a91","spanId":"3f1a9c7d2b8e4f10","parentSpanId":"0000000000000000","name":"process_request","kind":1,"startTimeUnixNano":"1753776123045000000","endTimeUnixNano":"1753776123053640000","status":{"code":1},"attributes":[{"key":"pid","value":{"intValue":"48213"}},{"key":"tid","value":{"intValue":"48213"}}]}
+{"traceId":"0000000000000000000000005c2e3a91","spanId":"9a4b2e6f10c83d5a","parentSpanId":"3f1a9c7d2b8e4f10","name":"parse_input","kind":1,"startTimeUnixNano":"1753776123045200000","endTimeUnixNano":"1753776123047650000","status":{"code":1},"attributes":[{"key":"pid","value":{"intValue":"48213"}},{"key":"tid","value":{"intValue":"48213"}}]}
+{"traceId":"0000000000000000000000005c2e3a91","spanId":"7d3c1b9e2f6a4c85","parentSpanId":"3f1a9c7d2b8e4f10","name":"validate","kind":1,"startTimeUnixNano":"1753776123047700000","endTimeUnixNano":"1753776123048790000","status":{"code":1},"attributes":[{"key":"pid","value":{"intValue":"48213"}},{"key":"tid","value":{"intValue":"48213"}}]}
+{"traceId":"0000000000000000000000005c2e3a91","spanId":"1e6a8c4f2d9b3057","parentSpanId":"3f1a9c7d2b8e4f10","name":"compute","kind":1,"startTimeUnixNano":"1753776123048850000","endTimeUnixNano":"1753776123053640000","status":{"code":1},"attributes":[{"key":"pid","value":{"intValue":"48213"}},{"key":"tid","value":{"intValue":"48213"}}]}
+#
+
+parentSpanId of all-zero identifies the root span. The 128-bit traceId
+is shared by every span belonging to the same root-function invocation,
+letting a downstream OTLP backend (e.g. Grafana Tempo) reassemble the
+full call tree.
+
+The OTLP spans can be forwarded to Grafana Tempo and visualised in
+Grafana's trace viewer. The following screenshot shows the root span
+and its children as a waterfall, including their durations and
+parent-child relationships:
+
+See: bcc/libbpf-tools/images/functrace_traceview.png
+
+
 The -D option caps the maximum call depth recorded per thread (default
 64); the -B option sets the BPF ring buffer size in bytes (default
 1048576 = 1 MiB) for workloads that emit events faster than userspace
@@ -128,6 +155,7 @@ USAGE: functrace [OPTIONS] -b BINARY -f FUNC [-f FUNC2 ...]
   -B, --ringbuf-size=BYTES   Ring buffer size (default: 1048576)
   -d, --duration=SECONDS     Trace duration (0 = until Ctrl-C)
   -D, --max-depth=N          Max call depth (default: 64)
+  -F, --format=FMT           Output format: otel (OTLP JSONL)
   -o, --output=FILE          Output file (default: stdout)
   -p, --pid=PID              Trace only this PID (0 = all)
   -v, --verbose              Verbose debug output
@@ -142,6 +170,7 @@ for any corresponding short options.
 Examples:
     functrace -b ./app -f my_func                      # text diagram
     functrace -b ./app -R main -f main -f foo          # call tree
+    functrace -b ./app -f f1 -f f2 -p 1234 -F otel     # OTLP JSON
     functrace -b ./app -R main -f main -d 10           # trace for 10s
 
 Report bugs to https://github.com/iovisor/bcc/tree/master/libbpf-tools.
