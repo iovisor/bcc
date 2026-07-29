@@ -1,0 +1,147 @@
+Demonstrations of functrace, the Linux BPF CO-RE version.
+
+
+functrace traces userspace function calls via uprobes/uretprobes and
+reconstructs the call tree for a chosen "root" function, printing a
+per-invocation trace block. It is useful for visualising the internal
+call structure and per-function latency of a single transaction inside
+an application, without needing to recompile it with tracing hooks.
+
+By default, functrace prints a top-down text diagram to stdout. For
+example, tracing a demo application that handles one "request" per
+call to process_request():
+
+# ./functrace -b ./demo_app -R process_request \
+    -f process_request -f parse_input -f parse_stage1 \
+    -f parse_stage2 -f validate -f compute
+
+Tracing... Hit Ctrl-C to stop.
+[trace a1b2 | pid=48213 tid=48213 | start=+0.104s | total=8.64ms]
+process_request                             8.64ms
+  └─ parse_input                            2.45ms
+    └─ parse_stage1                         1.02ms
+      └─ parse_stage2                       0.61ms
+  └─ validate                               1.14ms
+  └─ compute                                5.03ms
+
+[trace 7f3c | pid=48213 tid=48213 | start=+0.213s | total=9.11ms]
+process_request                             9.11ms
+  └─ parse_input                            2.71ms
+    └─ parse_stage1                         0.95ms
+      └─ parse_stage2                       0.58ms
+  └─ validate                               0.87ms
+  └─ compute                                5.31ms
+^C
+
+Each block corresponds to one call of the root function (here,
+process_request). The header line shows a short (16-bit) trace ID
+fragment for quick visual grouping, the pid/tid of the traced thread,
+the offset in seconds since functrace started, and the total wall-clock
+latency of the whole call tree. Each function line is indented with
+"└─ " according to its call depth, and shows its own latency.
+
+-R/--root-func (the "transaction boundary") is mandatory: functrace
+needs to know when a trace starts and ends in order to issue trace IDs
+and flush a block. All traced functions, including the root, must also
+be listed with -f.
+
+
+The -p option filters on a single PID (filtered in-kernel), useful when
+multiple instances of the traced binary are running:
+
+# ./functrace -b ./demo_app -p 48213 -R process_request -f process_request \
+    -f parse_input -f validate -f compute
+
+Tracing... Hit Ctrl-C to stop.
+[trace 55aa | pid=48213 tid=48213 | start=+0.052s | total=8.02ms]
+process_request                             8.02ms
+  └─ parse_input                            2.20ms
+  └─ validate                               0.95ms
+  └─ compute                                4.87ms
+^C
+
+
+A maximum tracing duration can be set with -d. For example, to trace
+for 5 seconds and then exit automatically:
+
+# ./functrace -b ./demo_app -R process_request -f process_request \
+    -f parse_input -f validate -f compute -d 5
+
+Tracing... Hit Ctrl-C to stop.
+[trace 91de | pid=48213 tid=48213 | start=+0.031s | total=8.41ms]
+process_request                             8.41ms
+  └─ parse_input                            2.38ms
+  └─ validate                               1.09ms
+  └─ compute                                4.94ms
+[trace c02f | pid=48213 tid=48213 | start=+1.140s | total=8.77ms]
+process_request                             8.77ms
+  └─ parse_input                            2.51ms
+  └─ validate                               1.02ms
+  └─ compute                                5.24ms
+#
+
+
+The -o option redirects the trace output to a file instead of stdout,
+useful when functrace is run under sudo in the background:
+
+# ./functrace -b ./demo_app -R process_request -f process_request \
+    -f parse_input -f validate -f compute -o /tmp/functrace.out -d 5
+# cat /tmp/functrace.out
+[trace 3b7e | pid=48213 tid=48213 | start=+0.047s | total=8.55ms]
+process_request                             8.55ms
+  └─ parse_input                            2.44ms
+  └─ validate                               1.01ms
+  └─ compute                                5.10ms
+
+
+The -D option caps the maximum call depth recorded per thread (default
+64); the -B option sets the BPF ring buffer size in bytes (default
+1048576 = 1 MiB) for workloads that emit events faster than userspace
+can drain them:
+
+# ./functrace -b ./demo_app -R process_request -f process_request \
+    -f parse_input -f validate -f compute -D 8 -B 4194304 -v
+
+Binary     : ./demo_app
+Format     : text
+Root func  : process_request
+Max depth  : 8
+Ringbuf    : 4194304 bytes
+Functions  : process_request parse_input validate compute
+PID        : all
+Tracing... Hit Ctrl-C to stop.
+^C
+Lost 0 events total
+
+
+USAGE message:
+
+# ./functrace --help
+Usage: functrace [OPTION...] -b BINARY -f FUNC [-f FUNC2 ...]
+Trace userspace function calls with call tree visualisation.
+
+USAGE: functrace [OPTIONS] -b BINARY -f FUNC [-f FUNC2 ...]
+
+  -b, --binary=PATH          Path to binary with uprobes
+  -f, --function=FUNC        Function to trace (repeatable)
+  -R, --root-func=FUNC       Root function for trace boundary (required)
+  -B, --ringbuf-size=BYTES   Ring buffer size (default: 1048576)
+  -d, --duration=SECONDS     Trace duration (0 = until Ctrl-C)
+  -D, --max-depth=N          Max call depth (default: 64)
+  -o, --output=FILE          Output file (default: stdout)
+  -p, --pid=PID              Trace only this PID (0 = all)
+  -v, --verbose              Verbose debug output
+
+  -?, --help                 Give this help list
+      --usage                Give a short usage message
+  -V, --version              Print program version
+
+Mandatory or optional arguments to long options are also mandatory or optional
+for any corresponding short options.
+
+Examples:
+    functrace -b ./app -f my_func                      # text diagram
+    functrace -b ./app -R main -f main -f foo          # call tree
+    functrace -b ./app -R main -f main -d 10           # trace for 10s
+
+Report bugs to https://github.com/iovisor/bcc/tree/master/libbpf-tools.

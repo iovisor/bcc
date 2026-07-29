@@ -62,6 +62,7 @@ APPS = \
 	fsdist \
 	fsslower \
 	funclatency \
+	functrace \
 	gethostlatency \
 	hardirqs \
 	javagc \
@@ -186,6 +187,17 @@ $(BPFTOOL): | $(BPFTOOL_OUTPUT)
 	$(Q)$(MAKE) ARCH= CROSS_COMPILE=  OUTPUT=$(BPFTOOL_OUTPUT)/ -C $(BPFTOOL_SRC) bootstrap
 
 $(APPS): %: $(OUTPUT)/%.o $(COMMON_OBJ) $(LIBBPF_OBJ) | $(OUTPUT)
+	$(call msg,BINARY,$@)
+	$(Q)$(CC) $(CFLAGS) $^ $(LDFLAGS) -lelf -lz -o $@
+
+# functrace links an extra compilation unit (text output, no BPF deps)
+$(OUTPUT)/functrace_text.o: functrace_text.c functrace_text.h functrace.h \
+			    | $(OUTPUT)
+	$(call msg,CC,$@)
+	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+functrace: $(OUTPUT)/functrace.o $(OUTPUT)/functrace_text.o \
+	   $(COMMON_OBJ) $(LIBBPF_OBJ) | $(OUTPUT)
 	$(call msg,BINARY,$@)
 	$(Q)$(CC) $(CFLAGS) $^ $(LDFLAGS) -lelf -lz -o $@
 
