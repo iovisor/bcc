@@ -63,9 +63,14 @@ partitions__get_by_dev(const struct partitions *partitions, unsigned int dev);
 const struct partition *
 partitions__get_by_name(const struct partitions *partitions, const char *name);
 
+typedef unsigned long long (*bin_edge_function)(size_t, void *);
+typedef void (*integer_formatter)(char *, size_t, unsigned long long);
+void print_hist(unsigned int *vals, int vals_size, const char *val_type,
+		bin_edge_function left_bin_edge, void *ctx,
+		integer_formatter formatter, bool skip_empty_bins);
 void print_log2_hist(unsigned int *vals, int vals_size, const char *val_type);
 void print_linear_hist(unsigned int *vals, int vals_size, unsigned int base,
-		unsigned int step, const char *val_type);
+		       unsigned int step, const char *val_type);
 
 unsigned long long get_ktime_ns(void);
 
