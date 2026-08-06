@@ -948,12 +948,38 @@ static void print_stars(unsigned int val, unsigned int val_max, int width)
 		printf("+");
 }
 
-void print_log2_hist(unsigned int *vals, int vals_size, const char *val_type)
+static unsigned long long log2_bin_edge(size_t bin, void *ctx)
 {
-	int stars_max = 40, idx_min = -1, idx_max = -1;
+	return bin < 1 ? 0 : 1ULL << bin;
+}
+
+struct linear_hist_config {
+	unsigned int base;
+	unsigned int step;
+};
+
+static unsigned long long linear_bin_edge(size_t bin, void *ctx)
+{
+	struct linear_hist_config *cfg = ctx;
+
+	return cfg->base + bin * cfg->step;
+}
+
+static void format_integer_default(char *buf, size_t size,
+				   unsigned long long val)
+{
+	snprintf(buf, size, "%llu", val);
+}
+
+void print_hist(unsigned int *vals, int vals_size, const char *val_type,
+		bin_edge_function left_bin_edge, void *ctx,
+		integer_formatter formatter, bool skip_empty_bins)
+{
+	int stars_max = 40, width_max = 20, idx_min = -1, idx_max = -1;
+	char low_str[width_max + 1], high_str[width_max + 1];
+	int width = 10, width_growth = 0, i;
 	unsigned int val, val_max = 0;
 	unsigned long long low, high;
-	int stars, width, i;
 
 	for (i = 0; i < vals_size; i++) {
 		val = vals[i];
@@ -969,64 +995,63 @@ void print_log2_hist(unsigned int *vals, int vals_size, const char *val_type)
 	if (idx_max < 0)
 		return;
 
-	printf("%*s%-*s : count    distribution\n", idx_max <= 32 ? 5 : 15, "",
-		idx_max <= 32 ? 19 : 29, val_type);
+	left_bin_edge = left_bin_edge ?: log2_bin_edge;
+	formatter = formatter ?: format_integer_default;
 
-	if (idx_max <= 32)
-		stars = stars_max;
-	else
-		stars = stars_max / 2;
+	/* figure out required width for bin labels */
+	for (i = idx_min; i <= idx_max; i++) {
+		low = left_bin_edge(i, ctx);
+		high = left_bin_edge(i + 1, ctx) - 1;
+		formatter(low_str, width_max + 1, low);
+		formatter(high_str, width_max + 1, high);
+
+		if (strlen(low_str) > width || strlen(high_str) > width) {
+			width_growth = width_max - width;
+			stars_max -= width_growth * 2;
+			width = width_max;
+			break;
+		}
+	}
+
+	printf("%*s%-*s : count    distribution\n", 5 + width_growth, "",
+	       19 + width_growth, val_type);
 
 	for (i = idx_min; i <= idx_max; i++) {
-		low = (1ULL << (i + 1)) >> 1;
-		high = (1ULL << (i + 1)) - 1;
-		if (low == high)
-			low -= 1;
 		val = vals[i];
-		width = idx_max <= 32 ? 10 : 20;
-		printf("%*lld -> %-*lld : %-8d |", width, low, width, high, val);
-		print_stars(val, val_max, stars);
+		if (!val && skip_empty_bins)
+			continue;
+
+		low = left_bin_edge(i, ctx);
+		high = left_bin_edge(i + 1, ctx) - 1;
+		formatter(low_str, width + 1, low);
+		formatter(high_str, width + 1, high);
+		if (high > low)
+			printf("%*s -> %-*s : %-8d |", width, low_str, width,
+			       high_str, val);
+		else
+			printf("%*s    %-*s : %-8d |", width, "", width,
+			       low_str, val);
+
+		print_stars(val, val_max, stars_max);
 		printf("|\n");
 	}
+}
+
+void print_log2_hist(unsigned int *vals, int vals_size, const char *val_type)
+{
+	print_hist(vals, vals_size, val_type, log2_bin_edge, NULL, NULL, false);
 }
 
 void print_linear_hist(unsigned int *vals, int vals_size, unsigned int base,
 		       unsigned int step, const char *val_type)
 {
-	int i, stars_max = 40, idx_min = -1, idx_max = -1;
-	unsigned int val, val_max = 0;
-	unsigned int low, high;
+	struct linear_hist_config cfg = {
+		.base = base,
+		.step = step,
+	};
 
-	for (i = 0; i < vals_size; i++) {
-		val = vals[i];
-		if (val > 0) {
-			idx_max = i;
-			if (idx_min < 0)
-				idx_min = i;
-		}
-		if (val > val_max)
-			val_max = val;
-	}
-
-	if (idx_max < 0)
-		return;
-
-	printf("     %-19s : count    distribution\n", val_type);
-	for (i = idx_min; i <= idx_max; i++) {
-		val = vals[i];
-		if (!val)
-			continue;
-
-		low = base + i * step;
-		high = low + step - 1;
-		if (high > low)
-			printf("%10d -> %-10d : %-8d |", low, high, val);
-		else
-			printf("              %-10d : %-8d |", low, val);
-
-		print_stars(val, val_max, stars_max);
-		printf("|\n");
-	}
+	print_hist(vals, vals_size, val_type, linear_bin_edge, &cfg, NULL,
+		   true);
 }
 
 unsigned long long get_ktime_ns(void)
