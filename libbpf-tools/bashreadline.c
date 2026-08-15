@@ -7,6 +7,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <inttypes.h>
 
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
@@ -83,7 +84,7 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_size)
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 {
-	warn("lost %llu events on CPU #%d\n", lost_cnt, cpu);
+	warn("lost %" PRIu64" events on CPU #%d\n", (uint64_t)lost_cnt, cpu);
 }
 
 static char *find_readline_function_name(const char *bash_path)
