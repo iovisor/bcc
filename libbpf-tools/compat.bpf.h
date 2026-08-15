@@ -42,4 +42,16 @@ static __always_inline long submit_buf(void *ctx, void *buf, __u64 size)
 	return bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, buf, size);
 }
 
+/* Zero a buffer returned by reserve_buf so callers don't have to write every
+ * field of the event struct, and so cross-record stack/ringbuf residue is
+ * not emitted to userspace.  __noinline lands as a single BPF-to-BPF
+ * subprogram shared across call sites; volatile defeats LLVM's loop-idiom
+ * recognition, which would otherwise re-lower this back to __builtin_memset
+ * (which the BPF backend cannot inline for buffers larger than ~256 bytes). */
+static __noinline void zero_buf(void *p, __u64 sz)
+{
+	for (__u64 i = 0; i < sz; i++)
+		*(volatile char *)((char *)p + i) = 0;
+}
+
 #endif /* __COMPAT_BPF_H */

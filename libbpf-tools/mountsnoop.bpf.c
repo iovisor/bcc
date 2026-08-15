@@ -66,6 +66,7 @@ static int probe_exit(void *ctx, int ret)
 	eventp = reserve_buf(sizeof(*eventp));
 	if (!eventp)
 		goto cleanup;
+	zero_buf(eventp, sizeof(*eventp));
 
 	task = (struct task_struct *)bpf_get_current_task();
 	eventp->delta = bpf_ktime_get_ns() - argp->ts;
