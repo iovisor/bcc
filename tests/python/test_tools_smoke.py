@@ -463,5 +463,9 @@ class SmokeTests(TestCase):
         # Fails to attach the probe if zfs is not installed.
         pass
 
+    @skipUnless(kernel_version_ge(4,19), "requires kernel >= 4.19")
+    def test_filewriteback(self):
+        self.run_with_int("filewriteback.py")
+
 if __name__ == "__main__":
     main()
