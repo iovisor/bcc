@@ -4,6 +4,11 @@ Demonstrations of ext4dist, the Linux eBPF/bcc version.
 ext4dist traces ext4 reads, writes, opens, and fsyncs, and summarizes their
 latency as a power-of-2 histogram. For example:
 
+Note: only direct (O_DIRECT) writes are measured. Buffered/asynchronous
+writes (eg, via libaio) complete after this tool's return probe fires, so
+their real completion time isn't captured; including them would show
+misleadingly low latency.
+
 # ./ext4dist
 Tracing ext4 operation latency... Hit Ctrl-C to end.
 ^C
