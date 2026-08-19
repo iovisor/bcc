@@ -226,34 +226,57 @@ static void print_args(const struct event *e, bool quote)
 	}
 }
 
-static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
-{
-	const struct event *e = data;
-	char ts[32];
+/* Match the joined argument line, mirroring the Python tool's behavior
+ * (b' '.join(argv)): arguments are NUL-separated in the event, so replace
+ * the separators with spaces to allow strstr() to match across argument
+ * boundaries (e.g. -l "a b" matching "echo a b").
+ */
+static bool args_contains_line(const struct event *e, const char *line) {
+  char buf[FULL_MAX_ARGS_ARR];
+  int i, n = 0;
 
-	/* TODO: use pcre lib */
-	if (env.name && strstr(e->comm, env.name) == NULL)
-		return;
+  for (i = 0; i < e->args_size && n < (int)sizeof(buf) - 1; i++) {
+    char c = e->args[i];
 
-	/* TODO: use pcre lib */
-	if (env.line && strstr(e->comm, env.line) == NULL)
-		return;
+    /* args_size includes the final NUL terminator.  Preserve it as the
+     * end of the line rather than appending a spurious trailing space.
+     */
+    if (c == '\0' && i + 1 == e->args_size)
+      break;
+    buf[n++] = (c == '\0') ? ' ' : c;
+  }
+  buf[n] = '\0';
 
-	str_timestamp("%H:%M:%S", ts, sizeof(ts));
+  return strstr(buf, line) != NULL;
+}
 
-	if (env.time) {
-		printf("%-8s ", ts);
-	}
-	if (env.timestamp) {
-		time_since_start();
-	}
+static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz) {
+  const struct event *e = data;
+  char ts[32];
 
-	if (env.print_uid)
-		printf("%-6d", e->uid);
+  /* TODO: use pcre lib */
+  if (env.name && strstr(e->comm, env.name) == NULL)
+    return;
 
-	printf("%-16s %-6d %-6d %3d ", e->comm, e->pid, e->ppid, e->retval);
-	print_args(e, env.quote);
-	putchar('\n');
+  /* TODO: use pcre lib */
+  if (env.line && !args_contains_line(e, env.line))
+    return;
+
+  str_timestamp("%H:%M:%S", ts, sizeof(ts));
+
+  if (env.time) {
+    printf("%-8s ", ts);
+  }
+  if (env.timestamp) {
+    time_since_start();
+  }
+
+  if (env.print_uid)
+    printf("%-6d", e->uid);
+
+  printf("%-16s %-6d %-6d %3d ", e->comm, e->pid, e->ppid, e->retval);
+  print_args(e, env.quote);
+  putchar('\n');
 }
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
