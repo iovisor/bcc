@@ -226,6 +226,25 @@ static void print_args(const struct event *e, bool quote)
 	}
 }
 
+/* Match the joined argument line, mirroring the Python tool's behavior
+ * (b' '.join(argv)): arguments are NUL-separated in the event, so replace
+ * the separators with spaces to allow strstr() to match across argument
+ * boundaries (e.g. -l "a b" matching "echo a b").
+ */
+static bool args_contains_line(const struct event *e, const char *line)
+{
+	char buf[FULL_MAX_ARGS_ARR];
+	int i, n = 0;
+
+	for (i = 0; i < e->args_size && n < (int)sizeof(buf) - 1; i++) {
+		char c = e->args[i];
+		buf[n++] = (c == '\0') ? ' ' : c;
+	}
+	buf[n] = '\0';
+
+	return strstr(buf, line) != NULL;
+}
+
 static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	const struct event *e = data;
@@ -238,7 +257,7 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		return;
 
 	/* TODO: use pcre lib */
-	if (env.line && strstr(e->comm, env.line) == NULL)
+	if (env.line && !args_contains_line(e, env.line))
 		return;
 
 	time(&t);
