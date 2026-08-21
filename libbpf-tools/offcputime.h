@@ -14,6 +14,8 @@ struct key_t {
 };
 
 struct val_t {
+	__u32 ns_pid;
+	__u32 ns_tgid;
 	__u64 delta;
 	char comm[TASK_COMM_LEN];
 };
