@@ -30,6 +30,14 @@ struct {
 	__type(value, struct traffic_t);
 } ip_map SEC(".maps");
 
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 10240);
+	__type(key, u32);
+	__type(value, struct sock *);
+} sockets SEC(".maps");
+
+
 static int probe_ip(bool receiving, struct sock *sk, size_t size)
 {
 	struct ip_key_t ip_key = {};
@@ -109,19 +117,31 @@ int BPF_KPROBE(tcp_sendmsg, struct sock *sk, struct msghdr *msg, size_t size)
 	return probe_ip(false, sk, size);
 }
 
-/*
- * tcp_recvmsg() would be obvious to trace, but is less suitable because:
- * - we'd need to trace both entry and return, to have both sock and size
- * - misses tcp_read_sock() traffic
- * we'd much prefer tracepoints once they are available.
- */
-SEC("kprobe/tcp_cleanup_rbuf")
-int BPF_KPROBE(tcp_cleanup_rbuf, struct sock *sk, int copied)
+
+SEC("kprobe/tcp_recvmsg")
+int BPF_KPROBE(tcp_recvmsg, struct sock *sk, struct msghdr *msg, size_t len)
 {
-	if (copied <= 0)
+	u32 tid = bpf_get_current_pid_tgid();
+	bpf_map_update_elem(&sockets, &tid, &sk, BPF_ANY);
+	return 0;
+}
+
+SEC("kretprobe/tcp_recvmsg")
+int BPF_KRETPROBE(tcp_recvmsg_ret, int ret)
+{
+	u32 tid = bpf_get_current_pid_tgid();
+	struct sock **skp;
+
+	skp = bpf_map_lookup_elem(&sockets, &tid);
+	if (!skp)
 		return 0;
 
-	return probe_ip(true, sk, copied);
+	if (ret > 0)
+		probe_ip(true, *skp, ret);
+
+	bpf_map_delete_elem(&sockets, &tid);
+	return 0;
 }
+
 
 char LICENSE[] SEC("license") = "GPL";
