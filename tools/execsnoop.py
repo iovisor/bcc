@@ -96,9 +96,9 @@ parser.add_argument("-C", "--print-cpu", action="store_true",
     help="print CPU column")
 parser.add_argument("-M", "--print-pcomm", action="store_true",
     help="print parent command")
-parser.add_argument("--max-args", default="20",
+parser.add_argument("--max-args", default=20, type=int,
     help="maximum number of arguments parsed and displayed, defaults to 20")
-parser.add_argument("-P", "--ppid",
+parser.add_argument("-P", "--ppid", type=int,
     help="trace this parent PID only")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
@@ -241,7 +241,7 @@ int do_ret_sys_execve(struct pt_regs *ctx)
 }
 """
 
-bpf_text = bpf_text.replace("MAXARG", args.max_args)
+bpf_text = bpf_text.replace("MAXARG", str(args.max_args))
 
 if args.uid:
     bpf_text = bpf_text.replace('UID_FILTER',

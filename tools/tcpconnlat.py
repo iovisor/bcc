@@ -49,7 +49,7 @@ parser = argparse.ArgumentParser(
     epilog=examples)
 parser.add_argument("-t", "--timestamp", action="store_true",
     help="include timestamp on output")
-parser.add_argument("-p", "--pid",
+parser.add_argument("-p", "--pid", type=int,
     help="trace this PID only")
 parser.add_argument("-L", "--lport", action="store_true",
     help="include LPORT on output")

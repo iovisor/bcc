@@ -54,7 +54,7 @@ parser.add_argument("-w", "--wide", action="store_true",
     help="wide column output (fits IPv6 addresses)")
 parser.add_argument("-s", "--csv", action="store_true",
     help="comma separated values output")
-parser.add_argument("-p", "--pid",
+parser.add_argument("-p", "--pid", type=int,
     help="trace this PID only")
 parser.add_argument("-L", "--localport",
     help="comma-separated list of local ports to trace.")
