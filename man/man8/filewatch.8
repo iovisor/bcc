@@ -1,0 +1,142 @@
+.TH filewatch 8 "2026-08-26" "USER COMMANDS"
+.SH NAME
+filewatch \- Watch a file or directory tree for VFS access and dump process
+ancestry. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B filewatch [\-h] [\-r] [\-w] [\-m] [\-c] [\-u] [\-a] [\-k] [\-d SEC] [\-\-ebpf] path
+.SH DESCRIPTION
+filewatch traces VFS reads, writes, metadata changes, file/directory
+creation, and file/directory deletion on a single file or an entire
+directory tree.  For every event it prints the operation type, the
+affected filename with its full path, the triggering user, and the
+complete process ancestry with command lines.
+
+It is filesystem\-agnostic: because it hooks the VFS layer (vfs_read,
+vfs_write, notify_change, security_inode_create, security_inode_unlink,
+security_inode_mkdir, security_inode_rmdir), it works on ext4, btrfs,
+ZFS (OpenZFS), VxFS, XFS, tmpfs, NFS, and any other filesystem that
+goes through VFS.
+
+Target matching uses inode + device number, making it immune to bind
+mounts, hardlinks, and relative\-path tricks.  When pointed at a
+directory, the BPF probe walks the dentry parent chain in\-kernel so
+files at any depth are caught.
+
+The caller's command line is captured inside the BPF probe via
+mm\->arg_start, so even a short\-lived "bash \-c '...'" that exits
+right after the I/O is fully recorded.  Parent process command lines
+are enriched from /proc in userspace (they are long\-lived: sshd,
+systemd, crond, ansible, ...).
+
+If the target is a file and it is unlinked, filewatch prints the
+UNLINK event and exits cleanly.  If the target path does not exist,
+filewatch watches the parent directory for creation of that name.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+CONFIG_BPF and bcc.  Kernel >= 5.12 recommended (for mnt_idmap
+notify_change signature).
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-r, \-\-reads
+Trace reads (vfs_read / vfs_readv).
+.TP
+\-w, \-\-writes
+Trace writes (vfs_write / vfs_writev).  This is the default if no
+mode flags are specified.
+.TP
+\-m, \-\-meta
+Trace metadata changes: touch, chmod, chown, truncate (notify_change).
+.TP
+\-c, \-\-create
+Trace file and directory creation (directory mode only).
+.TP
+\-u, \-\-unlink
+Trace file deletion (unlink) and directory removal (rmdir).
+.TP
+\-a, \-\-all
+Enable all trace modes: reads + writes + metadata + create + unlink.
+.TP
+\-d SEC, \-\-debounce SEC
+Minimum seconds between reports for the same PID + operation type.
+Default is 0 (report every event).  Useful for suppressing bursts
+from programs that write in tight loops.
+.TP
+\-k, \-\-kstack
+Capture and display kernel stack traces for each event.
+.TP
+\-\-ebpf
+Print the BPF C source and exit (for debugging).
+.SH EXAMPLES
+.TP
+Watch a single file for writes (default):
+#
+.B filewatch /etc/fstab
+.TP
+Watch an entire directory tree for reads and writes:
+#
+.B filewatch \-rw /etc/
+.TP
+Watch for metadata changes on a file:
+#
+.B filewatch \-m /etc/passwd
+.TP
+Watch for file creation in a directory:
+#
+.B filewatch \-c /tmp/
+.TP
+Watch for file deletion:
+#
+.B filewatch \-u /etc/hosts
+.TP
+Trace everything with kernel stacks:
+#
+.B filewatch \-ak /etc/
+.TP
+Wait for a non\-existent file to be created:
+#
+.B filewatch \-a /tmp/file_not_yet_created.txt
+.TP
+Debounce writes at 1 second per PID:
+#
+.B filewatch \-w /var/log/messages \-d 1.0
+.SH OUTPUT
+Each event prints a separator line followed by a header showing the
+operation type (READ, WRITE, META, CREATE, UNLINK), a timestamp, the
+filename, and the user.  For reads and writes, the byte count is shown.
+For metadata changes, the changed attributes are decoded (MODE, UID,
+MTIME, etc.).
+
+Below the header, the full path from the filesystem root is displayed,
+followed by the process tree from the caller up to init (PID 1).  The
+caller (first entry, marked with >>>) includes its full command line
+captured in\-kernel.  Parent processes show command lines and executable
+paths read from /proc.
+
+If \-k is given, the kernel stack trace is appended after the process
+tree.
+.SH OVERHEAD
+This traces VFS read/write entry points, notify_change, and LSM hooks.
+On a quiet system the overhead is negligible.  On a system with heavy
+I/O to the watched path, the per\-event perf_submit and userspace
+/proc reads may become measurable.  Use \-d (debounce) to reduce
+output volume in high\-throughput scenarios, or narrow the scope to a
+single file rather than a large directory tree.
+.PP
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _examples.txt file
+containing example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable \- in development.
+.SH AUTHOR
+Vincent S. Cojot
+.SH SEE ALSO
+filelife(8), fileslower(8), filetop(8), opensnoop(8)
