@@ -549,6 +549,22 @@ def uid_to_name(uid):
         return str(uid)
 
 
+def _resolve_comm(comm, cmdline):
+    """Expand a truncated comm using cmdline when available.
+
+    The kernel's task->comm is limited to TASK_COMM_LEN (16 bytes,
+    15 usable chars).  When it looks truncated, scan the cmdline for
+    the full name.
+    """
+    if len(comm) < 15 or not cmdline:
+        return comm
+    for arg in cmdline.split():
+        name = os.path.basename(arg)
+        if name.startswith(comm):
+            return name
+    return comm
+
+
 def build_bpf(target_ino, target_dev, dir_mode, want_stacks):
     """Substitute placeholders in the BPF C source."""
     src = bpf_text
@@ -885,8 +901,9 @@ def print_event(cpu, data, size):
         indent = "  " * i
         tag = ">>>" if i == 0 else "   "
 
-        line = "%s %s[%d] %s" % (tag, indent, pid, comm)
-        if cmdline and cmdline != comm:
+        display_comm = _resolve_comm(comm, cmdline)
+        line = "%s %s[%d] %s" % (tag, indent, pid, display_comm)
+        if cmdline and cmdline != display_comm:
             line += "\n    %scmdline: %s" % (indent, cmdline)
         if exe:
             line += "\n    %sexe:     %s" % (indent, exe)
