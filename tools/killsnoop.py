@@ -143,8 +143,6 @@ TRACEPOINT_PROBE(syscalls, sys_exit_tgkill)
 {
     return probe_exit(args, args->ret);
 }
-;
-
 
 """
 
