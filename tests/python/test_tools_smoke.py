@@ -364,6 +364,54 @@ class SmokeTests(TestCase):
         self.run_with_int("tcpconnect.py")
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
+    def test_tcpconnect_ipv4(self):
+        self.run_with_int("tcpconnect.py -4")
+
+    @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
+    def test_tcpconnect_ipv4_count(self):
+        self.run_with_int("tcpconnect.py -4 -c")
+
+    @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
+    def test_tcpconnect_ipv4_ebpf(self):
+        output = subprocess.check_output(
+            TOOLS_DIR + "tcpconnect.py -4 --ebpf", shell=True,
+            universal_newlines=True)
+        self.assertIn("struct ipv4_data_t", output)
+        for ipv6_fragment in ("struct ipv6_data_t", "struct ipv6_flow_key_t",
+                              "ipv6_events", "trace_connect_v6_return"):
+            self.assertNotIn(ipv6_fragment, output)
+        dns_output = subprocess.check_output(
+            TOOLS_DIR + "tcpconnect.py -4 --dns --ebpf", shell=True,
+            universal_newlines=True)
+        self.assertIn("trace_udp_recvmsg", dns_output)
+        self.assertNotIn("trace_udpv6_recvmsg", dns_output)
+
+    @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
+    def test_tcpconnect_ipv6(self):
+        self.run_with_int("tcpconnect.py -6")
+
+    @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
+    def test_tcpconnect_ipv6_count(self):
+        self.run_with_int("tcpconnect.py -6 -c")
+
+    @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
+    def test_tcpconnect_ipv6_ebpf(self):
+        output = subprocess.check_output(
+            TOOLS_DIR + "tcpconnect.py -6 --ebpf", shell=True,
+            universal_newlines=True)
+        self.assertIn("struct ipv6_data_t", output)
+        for ipv4_fragment in ("struct ipv4_data_t", "struct ipv4_flow_key_t",
+                              "ipv4_events", "trace_connect_v4_return"):
+            self.assertNotIn(ipv4_fragment, output)
+        dns_output = subprocess.check_output(
+            TOOLS_DIR + "tcpconnect.py -6 --dns --ebpf", shell=True,
+            universal_newlines=True)
+        self.assertIn("trace_udpv6_recvmsg", dns_output)
+        for ipv4_dns_fragment in ("trace_udp_recvmsg",
+                                  "trace_udp_ret_recvmsg", "tbl_udp_msg_hdr"):
+            self.assertNotIn(ipv4_dns_fragment, dns_output)
+
+    @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_tcpconnlat(self):
         self.run_with_int("tcpconnlat.py")
 
