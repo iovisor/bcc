@@ -478,12 +478,16 @@ def _kernel_version():
 
 
 def _resolve_sb_dev(path):
-    """Return (major, minor) of the superblock device for *path*.
+    """Return (major, minor, mount_point) for the superblock of *path*.
 
     Filesystems like btrfs and ZFS override stat()->st_dev to a
     per-subvolume anonymous device, which differs from the kernel's
     i_sb->s_dev.  /proc/self/mountinfo always reports s_dev, so we
     parse that to get the value the BPF probe will see.
+
+    mount_point is returned so that dentry-based paths (which are
+    relative to the filesystem root) can be prefixed to form the
+    real absolute path.
     """
     abs_path = os.path.realpath(path)
     best_mount = ""
@@ -509,7 +513,7 @@ def _resolve_sb_dev(path):
         st = os.stat(path)
         best_major = os.major(st.st_dev)
         best_minor = os.minor(st.st_dev)
-    return best_major, best_minor
+    return best_major, best_minor, best_mount
 
 
 def decode_ia_valid(val):
@@ -684,7 +688,7 @@ if args.create and not dir_mode:
     args.create = False
 
 target_ino = st.st_ino
-st_major, st_minor = _resolve_sb_dev(args.path)
+st_major, st_minor, mount_point = _resolve_sb_dev(args.path)
 target_dev = (st_major << 20) | st_minor
 abs_path = os.path.abspath(args.path)
 
@@ -833,7 +837,11 @@ def print_event(cpu, data, size):
             if comp and comp != "/":
                 parts.append(comp)
         parts.reverse()
-        full_path = "/" + "/".join(parts)
+        dentry_path = "/" + "/".join(parts)
+        if mount_point and mount_point != "/":
+            full_path = mount_point + dentry_path
+        else:
+            full_path = dentry_path
     elif not dir_mode:
         full_path = abs_path
 
