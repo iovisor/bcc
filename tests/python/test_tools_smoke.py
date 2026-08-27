@@ -222,7 +222,7 @@ class SmokeTests(TestCase):
     def test_hardirqs(self):
         self.run_with_duration("hardirqs.py 1 1")
 
-    @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
+    @skipUnless(kernel_version_ge(4,7), "requires kernel >= 4.7")
     def test_killsnoop(self):
         # Because killsnoop intercepts signals, if we send it a SIGINT we we
         # we likely catch it while it is handling the data packet from the
