@@ -995,6 +995,7 @@ void print_linear_hist(unsigned int *vals, int vals_size, unsigned int base,
 {
 	int i, stars_max = 40, idx_min = -1, idx_max = -1;
 	unsigned int val, val_max = 0;
+	unsigned int low, high;
 
 	for (i = 0; i < vals_size; i++) {
 		val = vals[i];
@@ -1010,12 +1011,19 @@ void print_linear_hist(unsigned int *vals, int vals_size, unsigned int base,
 	if (idx_max < 0)
 		return;
 
-	printf("     %-13s : count     distribution\n", val_type);
+	printf("     %-19s : count    distribution\n", val_type);
 	for (i = idx_min; i <= idx_max; i++) {
 		val = vals[i];
 		if (!val)
 			continue;
-		printf("        %-10d : %-8d |", base + i * step, val);
+
+		low = base + i * step;
+		high = low + step - 1;
+		if (high > low)
+			printf("%10d -> %-10d : %-8d |", low, high, val);
+		else
+			printf("              %-10d : %-8d |", low, val);
+
 		print_stars(val, val_max, stars_max);
 		printf("|\n");
 	}
