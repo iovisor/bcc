@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <time.h>
 #include <bpf/libbpf.h>
 #include <sys/resource.h>
@@ -287,8 +288,9 @@ static int print_map(struct futexctn_bpf *obj)
 		}
 		printf("\n\n");
 		printf(
-		    "%s[%u] lock 0x%llx contended %llu times, %llu avg %s "
-		    "[max: %llu %s, min %llu %s]\n",
+		    "%s[%u] lock 0x%" PRIx64 " contended %" PRIu64
+		    " times, %" PRIu64 " avg %s [max: %" PRIu64
+		    " %s, min %" PRIu64 " %s]\n",
 		    hist.comm, (__u32)next_key.pid_tgid, next_key.uaddr,
 		    hist.contended, hist.total_elapsed / hist.contended, units,
 		    hist.max, units, hist.min, units);

@@ -7,6 +7,7 @@
 // 17-Oct-2022   Krisztian Fekete Edited this.
 #include <argp.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -67,10 +68,10 @@ static int handle_event(void *ctx, void *data, size_t len)
 	str_timestamp("%H:%M:%S", ts, sizeof(ts));
 
 	if (str_loadavg(loadavg, sizeof(loadavg)) > 0)
-		printf("%s Triggered by PID %d (\"%s\"), OOM kill of PID %d (\"%s\"), %lld pages, loadavg: %s",
+		printf("%s Triggered by PID %d (\"%s\"), OOM kill of PID %d (\"%s\"), %" PRIu64 " pages, loadavg: %s",
 			ts, e->fpid, e->fcomm, e->tpid, e->tcomm, e->pages, loadavg);
 	else
-		printf("%s Triggered by PID %d (\"%s\"), OOM kill of PID %d (\"%s\"), %lld pages\n",
+		printf("%s Triggered by PID %d (\"%s\"), OOM kill of PID %d (\"%s\"), %" PRIu64 " pages\n",
 			ts, e->fpid, e->fcomm, e->tpid, e->tcomm, e->pages);
 
 	return 0;
@@ -78,7 +79,7 @@ static int handle_event(void *ctx, void *data, size_t len)
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 {
-	printf("Lost %llu events on CPU #%d!\n", lost_cnt, cpu);
+	printf("Lost %llu events on CPU #%d!\n", (unsigned long long)lost_cnt, cpu);
 }
 
 static void sig_int(int signo)
