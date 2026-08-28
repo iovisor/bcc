@@ -10,5 +10,7 @@ Name: libbcc
 Version: @REVISION@
 Description: BCC Program library
 Requires:
+Requires.private: @LIBBCC_REQUIRES_PRIVATE@
 Libs: -L${libdir} -lbcc
+Libs.private: @LIBBCC_LIBS_PRIVATE@
 Cflags: -I${includedir} -I${compatdir}
