@@ -5,6 +5,7 @@
 // 29-Sep-2020   Wenbo Zhang   Created this.
 // 20-Jun-2022   YeZhengMao    Added tid info.
 #include <argp.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -165,7 +166,7 @@ static void print_map(struct bpf_map *map)
 		lookup_key = next_key;
 	}
 	total_hit = total_ref > total_miss ? total_ref - total_miss : 0;
-	printf("Total References: %llu Total Misses: %llu Hit Rate: %.2f%%\n",
+	printf("Total References: %" PRIu64 " Total Misses: %" PRIu64 " Hit Rate: %.2f%%\n",
 		total_ref, total_miss, total_ref > 0 ?
 		total_hit * 1.0 / total_ref * 100 : 0);
 

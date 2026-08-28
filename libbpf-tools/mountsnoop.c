@@ -15,6 +15,7 @@
 #include <argp.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <string.h>
 #include <time.h>
@@ -404,7 +405,7 @@ static int handle_event(void *ctx, void *data, size_t len)
 	printf("%sCOMM:   %s\n", indent, e->comm);
 	printf("%sOP:     %s\n", indent, op_name[e->op]);
 	printf("%sRET:    %s\n", indent, strerrno(e->ret));
-	printf("%sLAT:    %lldus\n", indent, e->delta / 1000);
+	printf("%sLAT:    %" PRIu64 "us\n", indent, e->delta / 1000);
 	printf("%sMNT_NS: %u\n", indent, e->mnt_ns);
 	switch (e->op) {
 	case MOUNT:
@@ -450,7 +451,7 @@ static int handle_event(void *ctx, void *data, size_t len)
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 {
-	warn("lost %llu events on CPU #%d\n", lost_cnt, cpu);
+	warn("lost %llu events on CPU #%d\n", (unsigned long long)lost_cnt, cpu);
 }
 
 int main(int argc, char **argv)
