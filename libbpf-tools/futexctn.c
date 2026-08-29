@@ -232,6 +232,11 @@ static int print_stack(struct futexctn_bpf *obj, struct hist_key *info)
 			printf("    %s\n", sym->name);
 	}
 #else
+	/*
+	 * sym expected to be cached in preload stage
+	 * too late to cache here for short lived processes
+	 * proc/pid/maps not available to cache
+	 */
 	syms = syms_cache__get_syms(syms_cache, info->pid_tgid >> 32);
 	if (!syms) {
 		if (!env.verbose) {
@@ -278,6 +283,9 @@ static int print_map(struct futexctn_bpf *obj)
 	const char *units = env.milliseconds ? "msecs" : "usecs";
 	int err,fd = bpf_map__fd(obj->maps.hists);
 	struct hist hist;
+	struct hist_key *ss_keys = NULL;
+	int ss_key_cnt = 0;
+	int max_entries = 0;
 
 	while (!bpf_map_get_next_key(fd, &lookup_key, &next_key)) {
 		err = bpf_map_lookup_elem(fd, &next_key, &hist);
@@ -301,16 +309,33 @@ static int print_map(struct futexctn_bpf *obj)
 		lookup_key = next_key;
 	}
 
+	/* snapshot all existing keys */
+	max_entries = bpf_map__max_entries(obj->maps.hists);
+	ss_keys = malloc(max_entries * sizeof(*ss_keys));
+
+	if (!ss_keys) {
+		fprintf(stderr, "failed to alloc memory for hist cleanup\n");
+		return -1;
+	}
+
 	lookup_key.pid_tgid = -1;
-	while (!bpf_map_get_next_key(fd, &lookup_key, &next_key)) {
-		err = bpf_map_delete_elem(fd, &next_key);
-		if (err < 0) {
-			fprintf(stderr, "failed to cleanup hist : %d\n", err);
-			return -1;
-		}
+	while (!bpf_map_get_next_key(fd, &lookup_key, &next_key) &&
+		ss_key_cnt < max_entries) {
+		ss_keys[ss_key_cnt++] = next_key;
 		lookup_key = next_key;
 	}
 
+	/* delete snapshotted keys explicitly */
+	for (int i = 0; i < ss_key_cnt; i++) {
+		err = bpf_map_delete_elem(fd, &ss_keys[i]);
+		if (err < 0) {
+			fprintf(stderr, "failed to cleanup hist : %d\n", err);
+			free(ss_keys);
+			return -1;
+		}
+	}
+
+	free(ss_keys);
 	return 0;
 }
 
@@ -375,7 +400,30 @@ int main(int argc, char **argv)
 
 	/* main: poll */
 	while (1) {
+
+#ifndef USE_BLAZESYM
+		for (int elapsed = 0; elapsed < env.interval; elapsed++) {
+			sleep(1);
+			if (!env.summary) {
+				/*
+				 * Populate symbol cache periodically during the interval
+				 * while processes are still alive and /proc/<pid>/maps
+				 * is readable. A single preload before or after
+				 * sleep(interval) misses very short-lived processes that
+				 * both start and exit within the sleep window of 1s.
+				 */
+				struct hist_key preload_key = { .pid_tgid = -1 }, next_key;
+				int preload_fd = bpf_map__fd(obj->maps.hists);
+
+				while (!bpf_map_get_next_key(preload_fd, &preload_key, &next_key)) {
+					syms_cache__get_syms(syms_cache, next_key.pid_tgid >> 32);
+					preload_key = next_key;
+				}
+			}
+		}
+#else
 		sleep(env.interval);
+#endif
 		printf("\n");
 
 		if (env.timestamp) {
