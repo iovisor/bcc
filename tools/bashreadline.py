@@ -21,6 +21,7 @@ from elftools.elf.elffile import ELFFile
 from bcc import BPF
 from time import strftime
 import argparse
+import subprocess
 
 parser = argparse.ArgumentParser(
         description="Print entered bash commands from all running shells",
@@ -44,7 +45,45 @@ def get_sym(filename):
     return "readline"
 
 
+def is_sym_defined(filename, symname):
+    """Check if symbol is defined (not just imported) in an ELF binary."""
+    try:
+        with open(filename, 'rb') as f:
+            elf = ELFFile(f)
+            dynsym = elf.get_section_by_name(".dynsym")
+            if dynsym:
+                for s in dynsym.iter_symbols():
+                    if s.name == symname:
+                        return s.entry['st_shndx'] != 'SHN_UNDEF'
+    except Exception:
+        pass
+    return False
+
+
+def find_readline_so():
+    """Find libreadline.so that bash dynamically links against."""
+    try:
+        out = subprocess.check_output(["ldd", "/bin/bash"],
+                                      stderr=subprocess.DEVNULL, text=True)
+        for line in out.splitlines():
+            if "libreadline" in line and "=>" in line:
+                path = line.split("=>")[1].strip().split()[0]
+                if path.startswith("/"):
+                    return path
+    except Exception:
+        pass
+    return None
+
+
 sym = get_sym(name)
+
+# When readline is undefined in /bin/bash (dynamically linked),
+# auto-detect and use libreadline.so instead.
+if not args.shared and not is_sym_defined(name, sym):
+    lib = find_readline_so()
+    if lib:
+        name = lib
+        sym = get_sym(name)
 
 # load BPF program
 bpf_text = """
