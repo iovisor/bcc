@@ -44,9 +44,9 @@ parser.add_argument("-T", "--timestamp", action="store_true",
                     help="include timestamp on output")
 parser.add_argument("-U", "--print-uid", action="store_true",
                     help="print UID column")
-parser.add_argument("-p", "--pid",
+parser.add_argument("-p", "--pid", type=int,
                     help="trace this PID only")
-parser.add_argument("-t", "--tid",
+parser.add_argument("-t", "--tid", type=int,
                     help="trace this TID only")
 parser.add_argument("-u", "--uid",
                     help="trace this UID only")
