@@ -4,6 +4,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <getopt.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -769,7 +770,7 @@ static void trace_handler(void *ctx, int cpu, void *data, __u32 size)
 
 static void lost_handler(void *ctx, int cpu, __u64 cnt)
 {
-	p_err("\t/* lost %llu events */", cnt);
+	p_err("\t/* lost %" PRIu64" events */", cnt);
 }
 
 static void sig_int(int signo)
