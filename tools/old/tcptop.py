@@ -115,12 +115,7 @@ BPF_HASH(sock_recv, u32, struct sock *);
 
 static int tcp_sendstat(int size)
 {
-    if (container_should_be_filtered()) {
-        return 0;
-    }
-
     u32 pid = bpf_get_current_pid_tgid() >> 32;
-    FILTER_PID
     u32 tid = bpf_get_current_pid_tgid();
     struct sock **sockpp;
     sockpp = sock_store.lookup(&tid);
@@ -131,7 +126,6 @@ static int tcp_sendstat(int size)
     u16 dport = 0, family;
     bpf_probe_read_kernel(&family, sizeof(family),
         &sk->__sk_common.skc_family);
-    FILTER_FAMILY
 
     if (family == AF_INET) {
         struct ipv4_key_t ipv4_key = {.pid = pid};
@@ -193,12 +187,7 @@ int tcp_send_entry(struct pt_regs *ctx, struct sock *sk)
 
 static int tcp_recvstat(int size)
 {
-    if (container_should_be_filtered()) {
-        return 0;
-    }
-
     u32 pid = bpf_get_current_pid_tgid() >> 32;
-    FILTER_PID
     u32 tid = bpf_get_current_pid_tgid();
     struct sock **sockpp;
     sockpp = sock_recv.lookup(&tid);
@@ -209,7 +198,6 @@ static int tcp_recvstat(int size)
     u16 dport = 0, family;
     bpf_probe_read_kernel(&family, sizeof(family),
         &sk->__sk_common.skc_family);
-    FILTER_FAMILY
 
     if (family == AF_INET) {
         struct ipv4_key_t ipv4_key = {.pid = pid};
@@ -318,6 +306,9 @@ b.attach_kprobe(event='tcp_sendmsg', fn_name='tcp_send_entry')
 b.attach_kretprobe(event='tcp_sendmsg', fn_name='tcp_send_ret')
 b.attach_kprobe(event='tcp_recvmsg', fn_name='tcp_recv_entry')
 b.attach_kretprobe(event='tcp_recvmsg', fn_name='tcp_recv_ret')
+if BPF.get_kprobe_functions(b'tcp_read_sock'):
+    b.attach_kprobe(event='tcp_read_sock', fn_name='tcp_recv_entry')
+    b.attach_kretprobe(event='tcp_read_sock', fn_name='tcp_recv_ret')
 
 if BPF.get_kprobe_functions(b'tcp_sendpage'):
     b.attach_kprobe(event='tcp_sendpage', fn_name='tcp_send_entry')

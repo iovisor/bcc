@@ -38,6 +38,30 @@ struct {
 } sockets SEC(".maps");
 
 
+
+static __always_inline bool filter_socket(struct sock *sk)
+{
+	u16 family;
+	u32 pid;
+
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return false;
+
+	pid = bpf_get_current_pid_tgid() >> 32;
+	if (target_pid != -1 && target_pid != pid)
+		return false;
+
+	family = BPF_CORE_READ(sk, __sk_common.skc_family);
+	if (target_family != -1 && target_family != family)
+		return false;
+
+	/* drop */
+	if (family != AF_INET && family != AF_INET6)
+		return false;
+
+	return true;
+}
+
 static int probe_ip(bool receiving, struct sock *sk, size_t size)
 {
 	struct ip_key_t ip_key = {};
@@ -45,22 +69,11 @@ static int probe_ip(bool receiving, struct sock *sk, size_t size)
 	u16 family;
 	u32 pid;
 
-	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
-		return 0;
-
 	pid = bpf_get_current_pid_tgid() >> 32;
-	if (target_pid != -1 && target_pid != pid)
-		return 0;
-
 	family = BPF_CORE_READ(sk, __sk_common.skc_family);
-	if (target_family != -1 && target_family != family)
-		return 0;
-
-	/* drop */
-	if (family != AF_INET && family != AF_INET6)
-		return 0;
 
 	ip_key.pid = pid;
+
 	bpf_get_current_comm(&ip_key.name, sizeof(ip_key.name));
 	ip_key.lport = BPF_CORE_READ(sk, __sk_common.skc_num);
 	ip_key.dport = bpf_ntohs(BPF_CORE_READ(sk, __sk_common.skc_dport));
@@ -114,6 +127,8 @@ static int probe_ip(bool receiving, struct sock *sk, size_t size)
 SEC("kprobe/tcp_sendmsg")
 int BPF_KPROBE(tcp_sendmsg, struct sock *sk, struct msghdr *msg, size_t size)
 {
+	if (!filter_socket(sk))
+		return 0;
 	return probe_ip(false, sk, size);
 }
 
@@ -121,6 +136,8 @@ int BPF_KPROBE(tcp_sendmsg, struct sock *sk, struct msghdr *msg, size_t size)
 SEC("kprobe/tcp_recvmsg")
 int BPF_KPROBE(tcp_recvmsg, struct sock *sk, struct msghdr *msg, size_t len)
 {
+	if (!filter_socket(sk))
+		return 0;
 	u32 tid = bpf_get_current_pid_tgid();
 	bpf_map_update_elem(&sockets, &tid, &sk, BPF_ANY);
 	return 0;
@@ -143,5 +160,33 @@ int BPF_KRETPROBE(tcp_recvmsg_ret, int ret)
 	return 0;
 }
 
+
+
+SEC("kprobe/tcp_read_sock")
+int BPF_KPROBE(tcp_read_sock, struct sock *sk)
+{
+	if (!filter_socket(sk))
+		return 0;
+	u32 tid = bpf_get_current_pid_tgid();
+	bpf_map_update_elem(&sockets, &tid, &sk, BPF_ANY);
+	return 0;
+}
+
+SEC("kretprobe/tcp_read_sock")
+int BPF_KRETPROBE(tcp_read_sock_ret, int ret)
+{
+	u32 tid = bpf_get_current_pid_tgid();
+	struct sock **skp;
+
+	skp = bpf_map_lookup_elem(&sockets, &tid);
+	if (!skp)
+		return 0;
+
+	if (ret > 0)
+		probe_ip(true, *skp, ret);
+
+	bpf_map_delete_elem(&sockets, &tid);
+	return 0;
+}
 
 char LICENSE[] SEC("license") = "GPL";
