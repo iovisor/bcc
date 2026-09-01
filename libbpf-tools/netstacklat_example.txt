@@ -1,0 +1,364 @@
+Demonstrations of netstacklat, the Linux BPF CO-RE version.
+
+netstacklat monitors how long network packets (SKBs) have spent within
+the Linux kernel's ingress network stack at various points in the
+stack and reports the overall latency distribution in histograms.
+
+Example output:
+
+$ sudo ./netstacklat
+ip-start:
+     delay               : count    distribution
+      65ns -> 128ns      : 380229   |****************************************|
+     129ns -> 256ns      : 118137   |************                            |
+     257ns -> 512ns      : 110608   |***********                             |
+     513ns -> 1.02us     : 157638   |****************                        |
+    1.02us -> 2.05us     : 274199   |****************************            |
+    2.05us -> 4.1us      : 109964   |***********                             |
+     4.1us -> 8.19us     : 189      |                                        |
+count: 1150964, average: 796.40ns
+
+tcp-start:
+     delay               : count    distribution
+     257ns -> 512ns      : 430325   |****************************************|
+     513ns -> 1.02us     : 96715    |********                                |
+    1.02us -> 2.05us     : 388659   |************************************    |
+    2.05us -> 4.1us      : 176817   |****************                        |
+     4.1us -> 8.19us     : 7489     |                                        |
+    8.19us -> 16.4us     : 8378     |                                        |
+    16.4us -> 32.8us     : 5        |                                        |
+count: 1108388, average: 1.24us
+
+udp-start:
+     delay               : count    distribution
+     257ns -> 512ns      : 14219    |*************************************** |
+     513ns -> 1.02us     : 14402    |****************************************|
+    1.02us -> 2.05us     : 13437    |*************************************   |
+    2.05us -> 4.1us      : 416      |*                                       |
+     4.1us -> 8.19us     : 25       |                                        |
+    8.19us -> 16.4us     : 1        |                                        |
+count: 42500, average: 901.06ns
+
+tcp-socket-enqueued:
+     delay               : count    distribution
+     513ns -> 1.02us     : 228145   |**************************************  |
+    1.02us -> 2.05us     : 193729   |********************************        |
+    2.05us -> 4.1us      : 238656   |****************************************|
+     4.1us -> 8.19us     : 109701   |******************                      |
+    8.19us -> 16.4us     : 29587    |****                                    |
+    16.4us -> 32.8us     : 8981     |*                                       |
+    32.8us -> 65.5us     : 6742     |*                                       |
+    65.5us -> 131us      : 3        |                                        |
+count: 815544, average: 3.21us
+
+udp-socket-enqueued:
+     delay               : count    distribution
+    1.02us -> 2.05us     : 2552     |**                                      |
+    2.05us -> 4.1us      : 39347    |****************************************|
+     4.1us -> 8.19us     : 594      |                                        |
+    8.19us -> 16.4us     : 4        |                                        |
+count: 42497, average: 3.16us
+
+tcp-socket-read:
+     delay               : count    distribution
+     4.1us -> 8.19us     : 22421    |****                                    |
+    8.19us -> 16.4us     : 139592   |****************************            |
+    16.4us -> 32.8us     : 32562    |******                                  |
+    32.8us -> 65.5us     : 44650    |*********                               |
+    65.5us -> 131us      : 6557     |*                                       |
+     131us -> 262us      : 27       |                                        |
+     262us -> 524us      : 282      |                                        |
+     524us -> 1.05ms     : 195294   |****************************************|
+    1.05ms -> 2.1ms      : 48       |                                        |
+     2.1ms -> 4.19ms     : 63       |                                        |
+    4.19ms -> 8.39ms     : 125      |                                        |
+    8.39ms -> 16.8ms     : 616      |                                        |
+    16.8ms -> 33.6ms     : 596      |                                        |
+    33.6ms -> 67.1ms     : 85824    |*****************                       |
+    67.1ms -> 134ms      : 10       |                                        |
+     134ms -> 268ms      : 19       |                                        |
+     268ms -> 537ms      : 36       |                                        |
+     537ms -> 1.07s      : 71       |                                        |
+     1.07s -> 2.15s      : 127      |                                        |
+     2.15s -> 4.29s      : 219      |                                        |
+count: 529139, average: 8.75ms
+
+udp-socket-read:
+     delay               : count    distribution
+    2.05us -> 4.1us      : 5        |                                        |
+     4.1us -> 8.19us     : 33732    |****************************************|
+    8.19us -> 16.4us     : 8732     |**********                              |
+    16.4us -> 32.8us     : 8        |                                        |
+    32.8us -> 65.5us     : 2        |                                        |
+    65.5us -> 131us      : 15       |                                        |
+count: 42494, average: 7.31us
+
+
+The above output shows how the latency varies at each of netstacklat's
+probe points. Here we can note that the latency distribution at
+ip-start (which is netstacklat's earliest probe, running at the start
+of IP-layer processing before e.g. netfilter) has a bimodal
+distribution with peaks in the 65-128ns and 1.02-2.05us bins. This
+bimodal distribution remains at later TCP probe points.
+
+We can also see that the tcp-socket-read latency (which shows the
+total time until the SKB payload is actually read by a user space
+application) has a trimodal distribution and a small number of reads
+that even exceed one second. In contrast, all UDP probe points have
+relatively narrow distributions, only reaching a handful of
+microseconds.
+
+
+We can use -e/--enable-probes to limit the monitoring to the probe
+points we're interested in. Furthermore, with -I/--groupby-interface
+and -C/--groupby-cgroup we can group the data per interface and cgroup
+(note that all cgroup options only apply to {tcp,udp}-socket-read as
+netstacklat is unable to determine the cgroup at earlier probes).
+
+# netstacklat -IC -e ip-start,tcp-socket-read
+Thu Aug 27 17:13:36 2026
+ip-start, interface=ens3f0:
+     delay               : count    distribution
+      65ns -> 128ns      : 178937   |****************************************|
+     129ns -> 256ns      : 70538    |***************                         |
+     257ns -> 512ns      : 39394    |********                                |
+     513ns -> 1.02us     : 1408     |                                        |
+    1.02us -> 2.05us     : 181      |                                        |
+    2.05us -> 4.1us      : 5        |                                        |
+     4.1us -> 8.19us     : 5        |                                        |
+count: 290468, average: 166.72ns
+
+ip-start, interface=ens3f1:
+     delay               : count    distribution
+     513ns -> 1.02us     : 73506    |******************                      |
+    1.02us -> 2.05us     : 161419   |****************************************|
+    2.05us -> 4.1us      : 33096    |********                                |
+     4.1us -> 8.19us     : 63       |                                        |
+count: 268084, average: 1.40us
+
+tcp-socket-read, interface=ens3f0, cgroup=/sys/fs/cgroup/system.slice/nginx.service:
+     delay               : count    distribution
+     4.1us -> 8.19us     : 2        |                                        |
+    8.19us -> 16.4us     : 2        |                                        |
+    16.4us -> 32.8us     : 0        |                                        |
+    32.8us -> 65.5us     : 0        |                                        |
+    65.5us -> 131us      : 7        |                                        |
+     131us -> 262us      : 12       |                                        |
+     262us -> 524us      : 359      |                                        |
+     524us -> 1.05ms     : 97159    |****************************************|
+    1.05ms -> 2.1ms      : 13       |                                        |
+     2.1ms -> 4.19ms     : 27       |                                        |
+    4.19ms -> 8.39ms     : 53       |                                        |
+    8.39ms -> 16.8ms     : 341      |                                        |
+    16.8ms -> 33.6ms     : 208      |                                        |
+    33.6ms -> 67.1ms     : 35856    |**************                          |
+    67.1ms -> 134ms      : 4        |                                        |
+     134ms -> 268ms      : 8        |                                        |
+     268ms -> 537ms      : 16       |                                        |
+     537ms -> 1.07s      : 28       |                                        |
+     1.07s -> 2.15s      : 53       |                                        |
+     2.15s -> 4.29s      : 79       |                                        |
+count: 134227, average: 13.82ms
+
+tcp-socket-read, interface=ens3f1, cgroup=/sys/fs/cgroup/system.slice/iperf3.service:
+     delay               : count    distribution
+    2.05us -> 4.1us      : 265      |                                        |
+     4.1us -> 8.19us     : 30607    |***********                             |
+    8.19us -> 16.4us     : 106040   |****************************************|
+    16.4us -> 32.8us     : 14476    |*****                                   |
+    32.8us -> 65.5us     : 5935     |**                                      |
+    65.5us -> 131us      : 170      |                                        |
+     131us -> 262us      : 1        |                                        |
+count: 157494, average: 12.53us
+
+Now we can see that the two peaks in the previous bimodal distribution
+at ip-start come from different interfaces, nanosecond delays on
+ens3f0 and microsecond delays on ens3f1. In this case, the higher
+delays on ens3f1 are caused by tc-BPF programs attached to the ens3f1,
+processing and delaying all packets on that interface.
+
+The tcp-socket-read latency has a different split. We can now see that
+the first peak in the previous trimodal distribution come from an
+iperf3 cgroup (systemd service). The two higher peaks as well as the
+multi-second delays are instead related to the nginx service. Note
+that all nginx traffic comes from the ens3f0 interface, so the delays
+here are not caused by the tc-BPF processing seen at the ip-start
+probe.
+
+To further limit our monitoring, we can use -i/--interfaces and
+-c/--cgroups to apply in-kernel filtering on the interfaces and
+cgroups of interest. By using -r/--report-interval we can get periodic
+reports.
+
+# netstacklat -e tcp-socket-read -i ens3f0 -c system.slice/nginx.service -r 2
+Thu Aug 27 17:35:14 2026
+tcp-socket-read:
+     delay               : count    distribution
+    33.6ms -> 67.1ms     : 12017    |****************************************|
+    67.1ms -> 134ms      : 0        |                                        |
+     134ms -> 268ms      : 0        |                                        |
+     268ms -> 537ms      : 0        |                                        |
+     537ms -> 1.07s      : 10       |                                        |
+     1.07s -> 2.15s      : 26       |                                        |
+     2.15s -> 4.29s      : 13       |                                        |
+count: 12066, average: 48.10ms
+
+Thu Aug 27 17:35:16 2026
+tcp-socket-read:
+     delay               : count    distribution
+     4.1us -> 8.19us     : 1        |                                        |
+    8.19us -> 16.4us     : 0        |                                        |
+    16.4us -> 32.8us     : 0        |                                        |
+    32.8us -> 65.5us     : 0        |                                        |
+    65.5us -> 131us      : 0        |                                        |
+     131us -> 262us      : 2        |                                        |
+     262us -> 524us      : 20       |                                        |
+     524us -> 1.05ms     : 10160    |****************************************|
+    1.05ms -> 2.1ms      : 0        |                                        |
+     2.1ms -> 4.19ms     : 0        |                                        |
+    4.19ms -> 8.39ms     : 0        |                                        |
+    8.39ms -> 16.8ms     : 0        |                                        |
+    16.8ms -> 33.6ms     : 0        |                                        |
+    33.6ms -> 67.1ms     : 1914     |*******                                 |
+    67.1ms -> 134ms      : 0        |                                        |
+     134ms -> 268ms      : 0        |                                        |
+     268ms -> 537ms      : 0        |                                        |
+     537ms -> 1.07s      : 0        |                                        |
+     1.07s -> 2.15s      : 0        |                                        |
+     2.15s -> 4.29s      : 25       |                                        |
+count: 12122, average: 13.91ms
+
+Thu Aug 27 17:35:18 2026
+tcp-socket-read:
+     delay               : count    distribution
+     262us -> 524us      : 16       |                                        |
+     524us -> 1.05ms     : 12226    |****************************************|
+count: 12242, average: 616.39us
+
+Thu Aug 27 17:35:20 2026
+tcp-socket-read:
+     delay               : count    distribution
+     262us -> 524us      : 16       |                                        |
+     524us -> 1.05ms     : 12117    |****************************************|
+count: 12133, average: 621.39us
+
+Thu Aug 27 17:35:22 2026
+tcp-socket-read:
+     delay               : count    distribution
+    8.19us -> 16.4us     : 1        |                                        |
+    16.4us -> 32.8us     : 0        |                                        |
+    32.8us -> 65.5us     : 1        |                                        |
+    65.5us -> 131us      : 1        |                                        |
+     131us -> 262us      : 7        |                                        |
+     262us -> 524us      : 25       |                                        |
+     524us -> 1.05ms     : 7985     |****************************************|
+    1.05ms -> 2.1ms      : 7        |                                        |
+     2.1ms -> 4.19ms     : 12       |                                        |
+    4.19ms -> 8.39ms     : 26       |                                        |
+    8.39ms -> 16.8ms     : 144      |                                        |
+    16.8ms -> 33.6ms     : 107      |                                        |
+    33.6ms -> 67.1ms     : 3427     |*****************                       |
+    67.1ms -> 134ms      : 2        |                                        |
+     134ms -> 268ms      : 4        |                                        |
+     268ms -> 537ms      : 8        |                                        |
+     537ms -> 1.07s      : 1        |                                        |
+count: 11758, average: 11.58ms
+
+In the output above, we can see that the slower reads (above 33ms)
+only occur during certain periods. In this case it is caused by
+periodic traffic spikes that temporarily overloads the nginx server.
+
+
+One aspect that can cause high SKB latency for tcp-socket-read
+specifically, is TCP head of line (HoL) blocking, where the TCP stack
+holds on to segments that arrived out of order until all preceding
+segments have arrived. As delays due to HoL blocking is primarily
+related to factors outside of the local host (the loss and latency on
+the network path the traffic is sent over), netstacklat by default
+filters out measurements from any SKBs that may potentially be HoL
+blocked. However, in some cases it may also be interesting to include
+delays from HoL blocked segments, so the HoL filtering can be disabled
+with -y/--include-hol-delay option.
+
+# netstacklat -e tcp-socket-read --include-hol-delay
+Thu Aug 27 15:45:24 2026
+tcp-socket-read:
+     delay               : count    distribution
+    2.05us -> 4.1us      : 1        |                                        |
+     4.1us -> 8.19us     : 189      |                                        |
+    8.19us -> 16.4us     : 2334     |******                                  |
+    16.4us -> 32.8us     : 3759     |*********                               |
+    32.8us -> 65.5us     : 10425    |***************************             |
+    65.5us -> 131us      : 15428    |****************************************|
+     131us -> 262us      : 4619     |***********                             |
+     262us -> 524us      : 189      |                                        |
+     524us -> 1.05ms     : 51       |                                        |
+    1.05ms -> 2.1ms      : 25       |                                        |
+     2.1ms -> 4.19ms     : 10       |                                        |
+    4.19ms -> 8.39ms     : 17       |                                        |
+    8.39ms -> 16.8ms     : 80       |                                        |
+    16.8ms -> 33.6ms     : 255      |                                        |
+    33.6ms -> 67.1ms     : 7        |                                        |
+    67.1ms -> 134ms      : 3        |                                        |
+     134ms -> 268ms      : 2        |                                        |
+count: 37394, average: 333.29us
+
+The output above comes from a different scenario where iperf3 traffic
+is received over a link with 1% packet loss and a 30ms RTT. As can be
+seen, a few SKBs sit around in the local network stack for 10s of
+milliseconds (with a small peak around the 30ms RTT) before they are
+read due to the TCP stack having to wait on lost segments to be
+retransmitted (in a couple of instances multiple times, causing delays
+greater than the RTT). Without --include-hol-delay (i.e. excluding
+measurements from HoL delayed SKBs), the latency stays below 1ms here.
+
+# netstacklat --help
+Usage: netstacklat [OPTION...]
+Monitor latency at various points in the ingress network stack
+
+USAGE: netstacklat [--help] [-l] [-I] [-C] [-r SEC] [-e PROBES | -d PROBES]
+                   [-i IFACES] [-c CGROUPS] [-p PIDS] [-n NETNS] [-q NUM]
+                   [-m PATH] [-y]
+
+EXAMPLES:
+    netstacklat            # trace ingress host network latency system-wide
+    netstacklat -l         # list all available netstacklat probe points
+    netstacklat -e PROBES  # only trace latency at PROBES
+    netstacklat -d PROBES  # trace latency for all points expect PROBES
+    netstacklat -r N       # print N second summeries
+    netstacklat -I -C      # separate summeries for each interface and cgroup
+    netstacklat -i IFACES  # filter for interface(s) IFACES
+    netstacklat -c CGROUPS # filter for cgroup(s) CGROUPS
+
+  -m, --cgroup-mount=PATH    set the path to the cgroup mount (default
+                             /sys/fs/cgroup)
+  -r, --report-interval=SEC  reporting interval in seconds
+  -y, --include-hol-delay    include delays from reads that are head-of-line
+                             blocked (only for tcp-socket-read)
+  Probe points:
+  -d, --disable-probes=PROBES   comma-separated list of probes to exclude
+  -e, --enable-probes=PROBES comma-separated list of probes to include
+  -l, --list-probes          list all probe points
+  Filtering:
+  -c, --cgroups=CGROUPS      comma-separated list of cgroups to include (only
+                             affects socket-read probes)
+  -i, --interfaces=IFACES    comma-separated list of interfaces to include
+  -n, --netns=NETNS-ID       network namespace identifier to monitor (-1 for
+                             all, 0 for current (default))
+  -p, --pids=PIDS            comma-separated list of pids to include (only
+                             affects socket-read probes)
+  -q, --min-queuelength=NUM  Only report socket reads when the socket receive
+                             queue is at least NUM SKBs
+  Grouping:
+  -C, --groupby-cgroup       group the results per cgroup (only affects
+                             socket-read probes)
+  -I, --groupby-interface    group the results per interface
+  Info:
+  -?, --help                 Give this help list
+      --usage                Give a short usage message
+  -V, --version              Print program version
+
+Mandatory or optional arguments to long options are also mandatory or optional
+for any corresponding short options.
+
+Report bugs to https://github.com/iovisor/bcc/tree/master/libbpf-tools.

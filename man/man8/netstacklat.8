@@ -1,0 +1,343 @@
+.TH netstacklat 8  "2026-08-07" "USER COMMANDS"
+.SH NAME
+netstacklat \- Summarize ingress network stack latency in histograms.
+.SH SYNOPSIS
+.B netstacklat [\-?] [\-l] [\-I] [\-C] [\-r SEC] [\-e PROBES | \-d PROBES] [\-i IFACES] [\-c CGROUPS] [\-p PIDS] [\-n NETNS] [\-q NUM] [\-m PATH] [\-y]
+
+.SH DESCRIPTION
+netstacklat monitors the time that network packets (SKBs) have spent
+in the ingress network stack at various points. This latency is
+recorded in log2 histograms, which are reported on shutdown or at
+fixed intervals (--report-interval). Alternatively, netstacklat can be
+used with ebpf-exporter to allow Prometheus to ingest the data.
+
+The network stack latency is measured against the SKB timestamp
+(sk_buff\->tstamp), which the kernel sets (through
+SOF_TIMESTAMPING_RX_SOFTWARE) at the start of the network stack
+processing (in e.g. netif_receive_skb_internal()). This allows eBPF
+programs at any time to efficiently check the how long an SKB have
+spent in the stack without having to keep any separate per-SKB state.
+
+.SS Probe points
+netstacklat can probe network stack latency at the following points:
+.TP
+.B ip\-start
+The point at which the SKB has reached the start of IP layer
+processing. Latency at this point comes from early parts of the
+network stack processing, such as VLAN and traffic control (tc)
+handling.
+.TP
+.B tcp\-start, udp\-start
+The SKB has reached the start of UDP or TCP processing. Latency at
+this point includes IP\-layer processing, such as routing and the
+Netfilter firewall subsystem, in addition to the latency from
+ip-start.
+.TP
+.B tcp\-socket\-enqueued, udp\-socket\-enqueued
+The SKB has now been enqueued to the application UDP or TCP
+socket. This is the end of network stack processing, and the SKB
+payload is now ready to be read by the application. Latency here
+includes the UDP or TCP layer processing in addition to the latency
+from udp-start and tcp-start.
+.TP
+.B tcp\-socket\-read, udp\-socket\-read
+In addition to the network stack latency from the socket-enqueued
+probes, the latency here also includes any additional delays before
+the application reads the data from the socket. This may include
+delays from the application being scheduled to run on a CPU, or the
+application performing or waiting on other tasks before attempting to
+read from the socket.
+
+.SH OPTIONS
+netstacklat includes a number of options to control how the network
+stack latency is recorded and reported.
+
+.SS General options
+.TP
+\-r SEC, \-\-report\-interval SEC
+Set reporting interval (in seconds). If not provided, only report on shutdown (CTRL-C).
+.TP
+\-m PATH, \-\-cgroup-mount PATH
+Set the cgroup mount path (default /sys/fs/cgroup). Used for the \-\-cgroups and \-\-groupby-cgroup options.
+.TP
+-y, --include-hol-delay
+Include delays from reads that may be head-of-line blocked (only for tcp-socket-read).
+.TP
+\-?, \-\-help
+Print help message.
+
+.SS Probe points
+.TP
+\-l, \-\-list\-probes
+List all available probe points.
+.TP
+\-e PROBES, \-\-enable\-probes PROBES
+Comma-separated list of probe points to enable (by default all probes), all other probes are disabled. Mutually exclusive with \-\-disable\-probes.
+.TP
+\-d PROBES, \-\-disable\-probes PROBES
+Comma-separated list of probe points to disable, all other probes are enabled. Mutually exclusive with \-\-enable\-probes.
+
+.SS Filtering
+.TP
+\-n NETNS\-ID, \-\-netns NETNS\-ID
+Only monitor traffic for the specified network namespace identifier (see e.g.
+.B lsns \-t net
+). 0 (the default value) is interpreted as the namespace that netstacklat is started in (e.g. the root namespace). -1 disables filtering (include traffic from all namespaces).
+.TP
+\-i IFACES, \-\-interfaces IFACES
+Only monitor traffic from the comma-separated list of interfaces. Interfaces can be specified by name or index. Can be specified multiple times.
+.TP
+\-c CGROUPS, \-\-cgroups CGROUPS
+Only monitor traffic for processes in the comma-separated list of cgroups. Cgroups can specified by cgroup path (relative to the \-\-cgroup\-mount path) or cgroup identifier. Can be specified multiple times.
+.TP
+\-p PIDS, \-\-pids PIDS
+Only monitor traffic to the comma-separated list of PIDs. Can be specified multiple times.
+.TP
+\-q NUM, \-\-min\-queuelength NUM
+Only report socket read measurements ({tcp,udp}-socket-read) when the socket receive queue has at least NUM SKBs. This can be useful to focus the monitoring on applications that are unable read received data right away.
+
+.SS Grouping
+.TP
+\-I, \-\-groupby\-interface
+Track latency separately for each interface.
+.TP
+\-C, \-\-groupby\-cgroup
+Track latency separately for each cgroup.
+
+.SH EXAMPLES
+.TP
+Summarize network stack latency in histograms for each probe point
+#
+.B netstacklat
+.TP
+Print 1 second summaries
+#
+.B netstacklat \-r 1
+.TP
+Summarize latency for all probe points except ip-start and limit monitoring to interfaces ens1f0 and ens1f1
+#
+.B netstacklat \-d ip\-start \-i ens1f0,ens1f1
+.TP
+Summarize tcp-socket-read latency for nginx and prometheus services per network interface and service
+#
+.B netstacklat \-IC \-e tcp\-socket\-read \-c system.slice/nginx.service,system.slice/prometheus.service
+.TP
+Run netstacklat with ebpf-exporter to export the data to Prometheus
+#
+.B ebpf_exporter \-\-config.dir=path\-to\-libbpf\-tools \-\-config.name=netstacklat
+
+.SH OVERHEAD
+netstacklat traces kernel functions in the ingress network stack that
+are triggered for each processed SKB (and a single SKB may be
+processed by multiple traced functions). The overhead is therefore
+highly dependent on the amount of received network traffic on the
+system. For most hosts that do not process heavy network loads, the
+overhead should be low (<1% CPU utilization). This includes many
+server workloads, where processing the requests greatly outweighs the
+kernel packet processing. E.g. for an nginx server serving static 10kB
+pages the overhead from netstacklat is <1% when the system is
+saturated, and in a Cloudflare deployment (limited to only monitoring
+tcp-socket-read for the nginx services), overhead was typically <0.04%
+CPU. However, for systems under heavy packet processing loads,
+e.g. iperf, the overhead can be substantial (>5% CPU).
+
+Limiting the amount of enabled probes to only monitor the points of
+interest can greatly reduce the overhead by reducing the number of
+traced functions (and thereby the frequency that the eBPF programs are
+invoked).
+
+Using filtering to limit the monitoring to a subset of the received
+traffic can help to reduce overhead to a limited extent. However, the
+filtering options only cause the eBPF programs to abort early when
+processing SKBs that should be excluded, but does not prevent the eBPF
+programs from running in the first place. Hence, there will still be a
+small amount of overhead even for excluded SKBs. Furthermore, the
+filtering logic adds some additional overhead for the included SKBs,
+so filtering can potentially
+.I increase
+overhead if the filtered set includes a majority of the
+traffic. Filtering should therefore primarily be seen as a way to
+limit the output to the traffic of interest, rather than a way to
+greatly reduce overhead.
+
+.SH LIMITATIONS
+The current implementation of netstacklat has some limitations to be
+aware of.
+
+.SS PID/cgroup filtering/group only applies to probes in process context
+The \-\-pids, \-\-cgroups, and \-\-groupby\-cgroup options only apply
+to probe points running process context (tcp-socket-read and
+udp-socket-read). Earlier probe points are not affected by these
+options, and it is not possible to filter or group the data at these
+earlier probe points based on cgroup or PID.
+
+The reason for this limitation is that the eBPF programs get the PID
+and cgroup-ID used for filtering and grouping from the current task
+(using bpf_get_current_pid_tgid() and
+bpf_get_current_cgroup_id()). When not running in process context, the
+current task may not correspond to the user space process that will
+receive the processed SKB. Most of the ingress network stack runs in
+softirq context, before we know which user space process an SKB will
+be delivered to, and it is therefore not possible to filter data at
+these early points based on the receiving process.
+
+.SS Cgroup filtering only applies exact matching, NOT hierarchical
+The \-\-cgroups option will only include measurements for the exact
+cgroups specified. Children of the specified cgroups will
+.B NOT
+automatically get included. All cgroup children that should be
+included have to be explicitly provided.
+
+.SS Cgroup filtering is based on initial cgroup-ID
+netstacklat operates on cgroup-IDs rather than cgroup paths. If
+netstacklat receives \-\-cgroups options as paths, it will translate
+those paths to the corresponding cgroup-IDs at startup. If a cgroup
+path is later recreated (e.g. a systemd unit that is restarted) it will
+receive a different cgroup-ID (cgroup-IDs are in practice not
+recycled) and will no longer be included by netstacklat.
+
+Likewise, data from a recreated cgroup path will be grouped separately
+from data from the prior cgroup with the same path, as the recreated
+cgroup will have a different cgroup-ID.
+
+.SS Grouping by cgroup may exhaust map entries
+When using the \-\-groupby\-cgroup, the (re)creation of cgroups may
+cause new entries to be added to the maps netstacklat uses (both for
+eBPF programs and within the user space agent). As netstacklat does
+not evict any map entries, cgroup churn may eventually exhaust all of
+netstacklat's map entries, at which point it may silently fail to
+report data for new cgroups or fail to translate cgroup-IDs to the
+corresponding cgroup paths.
+
+.SS Monitoring multiple network namespaces may mix up interfaces
+If monitoring multiple network namespaces (\-\-netns \-1), filtering
+or grouping by interface (\-\-interfaces or \-\-groupby\-interface)
+may not work as expected. netstacklat operates on interface indices
+(ifindex) rather than interface names. As each network namespace has
+its own ifindex range, netstacklat will be unable to distinguish
+between interfaces in different network namespaces that share the same
+of ifindex. Thus, if monitoring traffic from multiple namespaces,
+netstacklat will include traffic from all interfaces with a matching
+ifindex and group all traffic with the same ifindex in the same
+interface group.
+
+.SH USE WITH EBPF_EXPORTER
+netstacklat is compatible with ebpf_exporter (i.e. its BPF maps store
+the data in a format ebpf_exporter can parse). By using ebpf_exporter,
+the netstacklat latency data can be exported to Prometheus
+collectors. However, to successfully run netstacklat with
+ebpf-exporter, some precautions must be taken.
+
+.SS File locations and ebpf_exporter config
+ebpf_exporter needs two things to export data from an eBPF program:
+the compiled eBPF program ELF file (netstacklat.bpf.o) and a YAML
+config file (netstacklat.yaml) describing the data format of the BPF
+maps it should parse. netstacklat includes a ebpf_exporter config in
+the libbpf-tools directory. However, the libbpf-tools build process
+does not include the ELF file among the normal artifacts (instead
+embedding the ELF file within the stand-alone user space
+application). The ELF-file is still built, and can be found in
+the .output subfolder, so just ensure that both the config file and
+the ELF-file reside inside a common folder (e.g. by copying
+netstacklat.bpf.o from libbpf-tools/.output/ to libbpf-tools/). You
+can then run netstacklat with ebpf_exporter by providing it with the
+path to where the ELF and config files reside (e.g. libbpf-tools/).
+
+.IP
+#
+.B cp libbpf\-tools/.output/netstacklat.bpf.o libbpf\-tools/
+.br
+#
+.B ebpf_exporter \-\-config.dir=libbpf\-tools \-\-config.name=netstacklat
+
+.SS Configuring netstacklat options
+ebpf_exporter replaces netstacklat's custom user space agent
+(netstacklat.c), loading the netstacklat eBPF programs and exporting
+the data stored in BPF maps to Prometheus collectors. As ebpf-exporter
+is a generic eBPF program loader, it cannot directly deal with the
+different command-line options that the ordinary netstacklat agent
+supports.
+
+The netstacklat options are internally handled as constants stored in
+the rodata section, which the user space agent normally sets before
+loading the eBPF programs. As ebpf_exporter does not modify the
+rodata, these option constants have to be initialized to the desired
+values in the compiled ELF-file (by default initialized as netstacklat
+without any options). If you want to use any of the netstacklat
+options with ebpf_exporter you will have to modify the corresponding
+initialized values in the user_config struct at the start of the
+netstacklat.bpf.c source file and recompile the ELF file. For
+instance, the \-\-groupby\-cgroup option can be enabled by changing
+the groupby_cgroup member of the user_config struct from false to
+true.
+
+.SS TAI-clock offset
+A special case of the rodata constants discussed above is the
+TAI_OFFSET. The kernel timestamps ingress packets using the REALTIME
+clock. However, as the REALTIME clock is not easily accessible in eBPF
+programs, netstacklat instead uses the TAI clock
+(bpf_ktime_get_tai_ns()) and translates it to REALTIME to calculate
+the SKB latency. To do this, it needs to know the system's TAI offset,
+which the ordinary netstacklat user agent checks before loading the
+eBPF programs (see get_tai_offset() in netstacklat.c).
+
+When running netstacklat with ebpf_exporter, the user must ensure that
+the TAI_OFFSET constant is initialized to same value as the system's
+TAI offset. Just like the other constants, this can be achieved by
+modifying the TAI_OFFSET constant in the netstacklat.bpf.c source and
+recompiling.  While the TAI_OFFSET by default is initialized to the
+current actual TAI offset (37 seconds, since 2016), this may not be
+the TAI offset used on your system. Notably, some systems
+(e.g. default Ubuntu) will not set the TAI offset at all, in which
+cause the TAI_OFFSET should be 0.
+
+.SS Updating filtering maps
+In addition to requiring the corresponding rodata constants being set,
+the netstacklat options \-\-interfaces, \-\-pids, and \-\-cgroups also
+rely on BPF maps where entries are set to 1 to indicate which
+interfaces/pids/cgroups to include. These are normally filled by the
+netstacklat user space agent, but when used ebpf_exporter they must be
+filled by other means.
+
+For cgroups, ebpf_exporter will automatically manage the cgroup filter
+map based on the YAML config file. Ensure the regexps in the
+cgroup_id_map section of netstacklat.yaml match the cgroup path(s) you
+wish to filter on.
+
+The interface and pids filter maps are not managed by
+ebpf_exporter. They must instead be set externally, e.g. through
+bpftool. For instance, to add the interface with ifindex 3 to the set
+of interfaces to include, use the following command:
+.IP
+#
+.B bpftool map update name netstack_ifinde key 0x03 0x00 0x00 0x00 value 1 0 0 0 0 0 0 0
+
+.P
+Note that the above example assume a little-endian system. On a
+big-endian system the key and value bytes should instead be given in
+big-endian order (e.g. key 0x00 0x00 0x00 0x03).
+
+.SS Enabling kernel RX timestamping
+To be able to calculate the SKB latency, netstacklat requires the
+kernel to timestamp received packets
+(SOF_TIMESTAMPING_RX_SOFTWARE). The ebpf_exporter loader does not
+enable this timestamping on its own. It is therefore up to the user to
+ensure that some program on the system holds a socket with the
+SOF_TIMESTAMPING_RX_SOFTWARE to enable system-wide timestamping (see
+enable_sw_rx_tstamps() in netstacklat.c for how this can be
+accomplished).
+
+.SH REFERENCES
+An extensive description and evaluation of netstacklat is available in
+the conference paper at <https://doi.org/10.48550/arXiv.2606.02057>. A
+summary of the same content is also available at
+<https://research.redhat.com/blog/article/monitoring-latency-within-the-end-host-network-stack/>. A
+demo of how netstacklat can be used is available at
+<https://developers.redhat.com/articles/2026/04/29/boosting-speed-use-ebpf-and-netstacklat-troubleshoot-latency>.
+
+.SH AUTHOR
+Simon Sundberg, Jesper Dangaard Brouer
+
+.SH SEE ALSO
+\"tcppktlat and ebpf_exporter currently lack a manpages
+tcppktlat, softirq(8), ebpf_exporter
