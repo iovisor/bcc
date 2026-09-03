@@ -728,11 +728,9 @@ pid_t fork_sync_exec(const char *command, int fd)
 
 		printf("received go event. executing child command\n");
 
-		const int err = execl(command, command, NULL);
-		if (err) {
-			perror("failed to execute child command");
-			return -1;
-		}
+		execl(command, command, NULL);
+		perror("failed to execute child command");
+		exit(EXIT_FAILURE);
 
 		break;
 	}
