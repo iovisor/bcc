@@ -12,6 +12,10 @@ Since this works by tracing the ext4_file_operations interface functions, it
 will need updating to match any changes to these functions.
 
 Since this uses BPF, only the root user can use this tool.
+
+Write latency is only measured for synchronous O_DIRECT requests. Buffered
+and asynchronous writes complete after this tool's return probe fires, so
+their true completion latency isn't captured and they are excluded.
 .SH REQUIREMENTS
 CONFIG_BPF and bcc.
 .SH OPTIONS

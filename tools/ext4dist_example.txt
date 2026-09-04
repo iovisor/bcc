@@ -4,6 +4,11 @@ Demonstrations of ext4dist, the Linux eBPF/bcc version.
 ext4dist traces ext4 reads, writes, opens, and fsyncs, and summarizes their
 latency as a power-of-2 histogram. For example:
 
+Note: only synchronous O_DIRECT writes are measured. Buffered/asynchronous
+writes (eg, via libaio) complete after this tool's return probe fires, so
+their real completion time isn't captured; including them would show
+misleadingly low latency.
+
 # ./ext4dist
 Tracing ext4 operation latency... Hit Ctrl-C to end.
 ^C
@@ -52,7 +57,8 @@ interface to the file system, to when it completed. This spans everything:
 block device I/O (disk I/O), file system CPU cycles, file system locks, run
 queue latency, etc. This is a better measure of the latency suffered by
 applications reading from the file system than measuring this down at the
-block device interface.
+block device interface. For writes, this only holds for synchronous O_DIRECT
+requests, per the note above.
 
 Note that this only traces the common file system operations previously
 listed: other file system operations (eg, inode operations including
