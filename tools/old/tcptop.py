@@ -164,10 +164,13 @@ static int tcp_sendstat(int size)
 int tcp_send_ret(struct pt_regs *ctx)
 {
     int size = PT_REGS_RC(ctx);
-    if (size > 0)
+    if (size > 0) {
         return tcp_sendstat(size);
-    else
+    } else {
+        u32 tid = bpf_get_current_pid_tgid();
+        sock_store.delete(&tid);
         return 0;
+    }
 }
 
 int tcp_send_entry(struct pt_regs *ctx, struct sock *sk)
@@ -236,10 +239,13 @@ static int tcp_recvstat(int size)
 int tcp_recv_ret(struct pt_regs *ctx)
 {
     int size = PT_REGS_RC(ctx);
-    if (size > 0)
+    if (size > 0) {
         return tcp_recvstat(size);
-    else
+    } else {
+        u32 tid = bpf_get_current_pid_tgid();
+        sock_recv.delete(&tid);
         return 0;
+    }
 }
 
 int tcp_recv_entry(struct pt_regs *ctx, struct sock *sk)
