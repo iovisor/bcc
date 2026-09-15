@@ -4,7 +4,7 @@
 # killsnoop Trace signals issued by the kill() syscall.
 #           For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: killsnoop [-h] [-x] [-p PID] [-T PID] [-s SIGNAL]
+# USAGE: killsnoop [-h] [-x] [-p PID] [-T PID] [-s SIGNAL] [-e SIGNAL]
 #
 # Copyright (c) 2015 Brendan Gregg.
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -26,6 +26,8 @@ examples = """examples:
     ./killsnoop -T 189    # only trace target PID 189
     ./killsnoop -s 9      # only trace signal 9
     ./killsnoop -s 9,15   # trace signal 9 and 15
+    ./killsnoop -e 9      # trace all signals except signal 9
+    ./killsnoop -e 9,15   # trace all signals except signal 9 and 15
 """
 parser = argparse.ArgumentParser(
     description="Trace signals issued by the kill() syscall",
@@ -37,8 +39,11 @@ parser.add_argument("-p", "--pid",
     help="trace this PID only which is the sender of signal")
 parser.add_argument("-T", "--tpid",
     help="trace this target PID only which is the receiver of signal")
-parser.add_argument("-s", "--signal",
+signal_group = parser.add_mutually_exclusive_group()
+signal_group.add_argument("-s", "--signal",
     help="trace a signal or a signal list")
+signal_group.add_argument("-e", "--exclude-signal",
+    help="trace all signals except the given signal or signal list")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
@@ -161,6 +166,12 @@ else:
 if args.signal:
     signals = args.signal.split(',')
     signal_filter = ' && '.join(['sig != %s' % signal for signal in signals])
+    bpf_text = bpf_text.replace('SIGNAL_FILTER',
+        'if (%s) { return 0; }' % signal_filter)
+elif args.exclude_signal:
+    exclude_signals = args.exclude_signal.split(',')
+    signal_filter = ' || '.join(
+        ['sig == %s' % signal for signal in exclude_signals])
     bpf_text = bpf_text.replace('SIGNAL_FILTER',
         'if (%s) { return 0; }' % signal_filter)
 else:
