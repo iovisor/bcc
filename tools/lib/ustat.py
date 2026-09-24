@@ -25,6 +25,7 @@ import os
 import sys
 from subprocess import call
 from time import sleep, strftime
+import signal
 
 class Category(object):
     THREAD = "THREAD"
@@ -242,10 +243,17 @@ class Tool(object):
         self.bpf.cleanup()      # Cleans up all attached probes
         self.bpf = None
 
+    def _sigint_handler(self, signum, frame):
+        self.exiting = True;
+        if self.in_sleep:
+            raise KeyboardInterrupt
+
     def _loop_iter(self):
         self._attach_probes()
         try:
+            self.in_sleep = True
             sleep(self.args.interval)
+            self.in_sleep = False
         except KeyboardInterrupt:
             self.exiting = True
 
@@ -293,6 +301,7 @@ class Tool(object):
               self.args.interval)
         countdown = self.args.count
         self.exiting = False
+        signal.signal(signal.SIGINT, self._sigint_handler)
         while True:
             self._loop_iter()
             countdown -= 1
