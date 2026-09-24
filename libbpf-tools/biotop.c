@@ -27,6 +27,7 @@
 #include "compat.h"
 #include "trace_helpers.h"
 #include "map_helpers.h"
+#include "datastructure_helpers.h"
 
 #define warn(...) fprintf(stderr, __VA_ARGS__)
 #define OUTPUT_ROWS_LIMIT 10240
@@ -44,39 +45,13 @@ struct disk {
 	char name[256];
 };
 
-struct vector {
-	size_t nr;
-	size_t capacity;
-	void **elems;
+struct disk_key {
+	int major;
+	int minor;
 };
 
-int grow_vector(struct vector *vector) {
-	if (vector->nr >= vector->capacity) {
-		void **reallocated;
-
-		if (!vector->capacity)
-			vector->capacity = 1;
-		else
-			vector->capacity *= 2;
-
-		reallocated = libbpf_reallocarray(vector->elems, vector->capacity, sizeof(*vector->elems));
-		if (!reallocated)
-			return -1;
-
-		vector->elems = reallocated;
-	}
-
-	return 0;
-}
-
-void free_vector(struct vector vector) {
-	for (size_t i = 0; i < vector.nr; i++)
-		if (vector.elems[i] != NULL)
-			free(vector.elems[i]);
-	free(vector.elems);
-}
-
-struct vector disks = {};
+static struct ds_vec disks = {};
+static struct ds_hashmap disk_map = {};
 
 static volatile sig_atomic_t exiting = 0;
 
@@ -232,48 +207,50 @@ static void parse_disk_stat(void)
 	if (!fp)
 		return;
 
+	ds_vec_init(&disks, sizeof(struct disk));
+	if (ds_hashmap_init(&disk_map, sizeof(struct disk_key),
+			 sizeof(((struct disk *)0)->name), 0)) {
+		fclose(fp);
+		return;
+	}
+
 	zero = 0;
 	while (getline(&line, &zero, fp) != -1) {
 		struct disk disk;
+		struct disk_key key;
 
 		if (sscanf(line, "%d %d %s", &disk.major, &disk.minor, disk.name) != 3)
 			continue;
 
-		if (grow_vector(&disks) == -1)
+		if (ds_vec_push_back(&disks, &disk))
 			goto err;
 
-		disks.elems[disks.nr] = malloc(sizeof(disk));
-		if (!disks.elems[disks.nr])
+		key.major = disk.major;
+		key.minor = disk.minor;
+		if (ds_hashmap_insert(&disk_map, &key, disk.name))
 			goto err;
-
-		memcpy(disks.elems[disks.nr], &disk, sizeof(disk));
-
-		disks.nr++;
 	}
 
 	free(line);
 	fclose(fp);
-
 	return;
-err:
-	fprintf(stderr, "realloc or malloc failed\n");
 
-	free_vector(disks);
+err:
+	fprintf(stderr, "allocation failed while parsing disk stats\n");
+	free(line);
+	fclose(fp);
+	ds_vec_free(&disks);
+	ds_hashmap_free(&disk_map);
 }
 
 static char *search_disk_name(int major, int minor)
 {
-	for (size_t i = 0; i < disks.nr; i++) {
-		struct disk *diskp;
+	struct disk_key key = { .major = major, .minor = minor };
+	char *name;
 
-		if (!disks.elems[i])
-			continue;
-
-		diskp = (struct disk *) disks.elems[i];
-		if (diskp->major == major && diskp->minor == minor)
-			return diskp->name;
-	}
-
+	name = ds_hashmap_find(&disk_map, &key);
+	if (name)
+		return name;
 	return "";
 }
 
@@ -456,7 +433,8 @@ int main(int argc, char **argv)
 
 cleanup:
 	ksyms__free(ksyms);
-	free_vector(disks);
+	ds_vec_free(&disks);
+	ds_hashmap_free(&disk_map);
 	biotop_bpf__destroy(obj);
 
 	return err != 0;
