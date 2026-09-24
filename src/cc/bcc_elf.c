@@ -929,37 +929,59 @@ int bcc_elf_foreach_sym_lazy(const char *path, bcc_elf_symcb_lazy callback,
   return foreach_sym_core(path, NULL, callback, o, payload);
 }
 
-int bcc_elf_get_text_scn_info(const char *path, uint64_t *addr,
-                              uint64_t *offset) {
-  int err;
-  Elf_Scn *section = NULL;
-  GElf_Shdr header;
-  size_t stridx;
-  char *name;
+int bcc_elf_get_scn_info(const char *path, uint64_t segment_offset,
+                              uint64_t *addr, uint64_t *offset) {
+  int ret;
   struct bcc_elf_file elf_file;
+  Elf_Scn *section = NULL;
+  GElf_Shdr shdr;
+  uint64_t segment_vaddr = 0, segment_memsz = 0;
+  int found_segment = 0;                              
+
   bcc_elf_file_init(&elf_file);
 
-  if ((err = bcc_elf_file_open(path, &elf_file)) < 0 ||
-      (err = elf_getshdrstrndx(elf_file.elf, &stridx)) < 0)
+  if ((ret = bcc_elf_file_open(path, &elf_file)) < 0)
     goto exit;
 
-  err = -1;
-  while ((section = elf_nextscn(elf_file.elf, section)) != 0) {
-    if (!gelf_getshdr(section, &header))
+  ret = -1;
+
+  size_t phdr_num, i;
+  if (elf_getphdrnum(elf_file.elf, &phdr_num) != 0)
+    goto exit;
+
+  GElf_Phdr phdr;
+  for (i = 0; i < phdr_num; ++i) {
+    if (!gelf_getphdr(elf_file.elf, i, &phdr))
+      continue;
+    if (phdr.p_type != PT_LOAD || !(phdr.p_flags & PF_X))
       continue;
 
-    name = elf_strptr(elf_file.elf, stridx, header.sh_name);
-    if (name && !strcmp(name, ".text")) {
-      *addr = (uint64_t)header.sh_addr;
-      *offset = (uint64_t)header.sh_offset;
-      err = 0;
+    if (phdr.p_offset == segment_offset) {
+      segment_vaddr = phdr.p_vaddr;
+      segment_memsz = phdr.p_memsz;
+      found_segment = 1;
+      break;
+    }
+  }
+  if (!found_segment)
+    goto exit;
+
+  while ((section = elf_nextscn(elf_file.elf, section)) != 0) {
+    if (!gelf_getshdr(section, &shdr))
+      continue;
+
+    if (shdr.sh_addr >= segment_vaddr &&
+        shdr.sh_addr < segment_vaddr + segment_memsz) {
+      *addr = (uint64_t)shdr.sh_addr;
+      *offset = (uint64_t)shdr.sh_offset;
+      ret = 0;
       break;
     }
   }
 
 exit:
   bcc_elf_file_close(&elf_file);
-  return err;
+  return ret;
 }
 
 int bcc_elf_foreach_load_section(const char *path,
