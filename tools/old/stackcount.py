@@ -40,7 +40,7 @@ parser = argparse.ArgumentParser(
     description="Count kernel function calls and their stack traces",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
-parser.add_argument("-p", "--pid",
+parser.add_argument("-p", "--pid", type=int,
     help="trace this PID only")
 parser.add_argument("-i", "--interval", default=99999999,
     help="summary interval, seconds")

@@ -43,7 +43,7 @@ parser.add_argument("-T", "--time", action="store_true",
     help="include time column on output (HH:MM:SS)")
 parser.add_argument("-t", "--timestamp", action="store_true",
     help="include timestamp on output")
-parser.add_argument("-p", "--pid",
+parser.add_argument("-p", "--pid", type=int,
     help="trace this PID only")
 parser.add_argument("-P", "--port",
     help="comma-separated list of local ports to trace")

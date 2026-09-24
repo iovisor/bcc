@@ -69,9 +69,9 @@ parser.add_argument("-c", "--caller",
     help="print locks taken by given caller")
 parser.add_argument("-S", "--sort",
     help="sort data on <aq_field,hd_field>, fields: acq_[max|total|count] hld_[max|total|count]")
-parser.add_argument("-p", "--pid",
+parser.add_argument("-p", "--pid", type=int,
     help="trace this PID only")
-parser.add_argument("-t", "--tid",
+parser.add_argument("-t", "--tid", type=int,
     help="trace this TID only")
 parser.add_argument("--stack-storage-size", default=16384,
     type=positive_nonzero_int,

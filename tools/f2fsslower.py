@@ -48,7 +48,7 @@ parser = argparse.ArgumentParser(
     epilog=examples)
 parser.add_argument("-s", "--csv", action="store_true",
                     help="just print fields: comma-separated values")
-parser.add_argument("-p", "--pid",
+parser.add_argument("-p", "--pid", type=int,
                     help="trace this PID only")
 parser.add_argument("min_ms", nargs="?", default='10',
                     help="minimum I/O duration to trace, in ms (default 10)")

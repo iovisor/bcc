@@ -54,7 +54,7 @@ parser = argparse.ArgumentParser(
     epilog=examples)
 parser.add_argument("-t", "--timestamp", action="store_true",
     help="include timestamp on output")
-parser.add_argument("-p", "--pid",
+parser.add_argument("-p", "--pid", type=int,
     help="trace this PID only")
 parser.add_argument("-P", "--port",
     help="comma-separated list of destination ports to trace.")
@@ -67,7 +67,7 @@ parser.add_argument("-L", "--lport", action="store_true",
     help="include LPORT on output")
 parser.add_argument("-U", "--print-uid", action="store_true",
     help="include UID on output")
-parser.add_argument("-u", "--uid",
+parser.add_argument("-u", "--uid", type=int,
     help="trace this UID only")
 parser.add_argument("-c", "--count", action="store_true",
     help="count connects per src ip and dest ip/port")
