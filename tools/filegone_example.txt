@@ -13,14 +13,17 @@ For example:
 
 USAGE message:
 
-usage: filegone.py [-h] [-p PID]
+# ./filegone -h
+usage: filegone.py [-h] [-p PID] [-P]
 
 Trace why file gone (deleted or renamed)
 
-optional arguments:
-  -h, --help         show this help message and exit
-  -p PID, --pid PID  trace this PID only
+options:
+  -h, --help     show this help message and exit
+  -p, --pid PID  trace this PID only
+  -P, --path     show file path
 
 examples:
     ./filegone           # trace all file gone events
+    ./filegone -P        # show file path
     ./filegone -p 181    # only trace PID 181
