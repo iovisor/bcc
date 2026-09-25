@@ -2,7 +2,7 @@
 .SH NAME
 profile \- Profile CPU usage by sampling stack traces. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B profile [\-adfh] [\-p PID | \-L TID] [\-U | \-K] [\-F FREQUENCY | \-c COUNT]
+.B profile [\-adfh] [\-\-dwarf] [\-p PID | \-L TID] [\-U | \-K] [\-F FREQUENCY | \-c COUNT]
 .B [\-\-stack\-storage\-size COUNT] [\-C CPU] [\-\-cgroupmap CGROUPMAP] [\-\-mntnsmap MAPPATH] [duration]
 .SH DESCRIPTION
 This is a CPU profiler. It works by taking samples of stack traces at timed
@@ -48,6 +48,11 @@ in folded mode, "-").
 .TP
 \-U
 Show stacks from user space only (no kernel space stacks).
+.TP
+\-\-dwarf
+Unwind user stacks with DWARF CFI. This currently requires \-U and
+x86_64/amd64 with bpf_task_pt_regs support, and uses per-sample user stack
+snapshots instead of the default kernel stack ID aggregation path.
 .TP
 \-K
 Show stacks from kernel space only (no user space stacks).
@@ -101,6 +106,10 @@ Profile kernel stacks only:
 #
 .B profile -K
 .TP
+Profile user stacks with DWARF CFI on x86_64/amd64:
+#
+.B profile \-\-dwarf -U
+.TP
 Profile a set of cgroups only (see special_filtering.md from bcc sources for more details):
 #
 .B profile \-\-cgroupmap /sys/fs/bpf/test01
@@ -139,6 +148,11 @@ redundant perf samples are not collected.
 It's expected that the overhead while sampling at 49 Hertz (the default),
 across all CPUs, should be negligible. If you increase the sample rate, the
 overhead might begin to be measurable.
+
+The DWARF user stack mode is opt-in. It requires bpf_task_pt_regs support and
+passes bounded per-sample user stack snapshots to user space for DWARF
+unwinding, so it does not use the default kernel-side stack ID aggregation
+path.
 .SH SOURCE
 This is from bcc.
 .IP

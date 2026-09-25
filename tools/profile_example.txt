@@ -728,6 +728,20 @@ Sampling at 49 Hertz of all threads by user stack... Hit Ctrl-C to end.
     -                dd (2931)
         14
 
+DWARF CFI unwinding can be enabled for user stacks on x86_64/amd64:
+
+# ./profile --dwarf -U
+Sampling at 49 Hertz of all threads by user stack... Hit Ctrl-C to end.
+^C
+    func_a
+    main
+    __libc_start_main
+    -                func_ab (2930)
+        9
+
+DWARF mode is opt-in and currently requires -U, x86_64/amd64, and
+bpf_task_pt_regs support. It sends bounded user stack snapshots to user space
+for unwinding; the default stack ID path is unchanged.
 
 If there are too many unique stack traces for the kernel to save, a warning
 will be printed. Eg:
@@ -750,7 +764,8 @@ USAGE message:
 
 # ./profile -h
 usage: profile.py [-h] [-p PID | -L TID] [-U | -K] [-F FREQUENCY | -c COUNT]
-                  [-d] [-a] [-I] [-f] [--hash-storage-size HASH_STORAGE_SIZE]
+                  [-d] [-a] [-I] [-f] [--dwarf]
+                  [--hash-storage-size HASH_STORAGE_SIZE]
                   [--stack-storage-size STACK_STORAGE_SIZE] [-C CPU]
                   [--cgroupmap CGROUPMAP] [--mntnsmap MNTNSMAP]
                   [duration]
@@ -781,6 +796,8 @@ optional arguments:
   -I, --include-idle    include CPU idle stacks
   -f, --folded          output folded format, one line per stack (for flame
                         graphs)
+  --dwarf               unwind user stacks with DWARF CFI (requires -U,
+                        bpf_task_pt_regs, and x86_64)
   --hash-storage-size HASH_STORAGE_SIZE
                         the number of hash keys that can be stored and
                         (default 40960)
@@ -802,5 +819,6 @@ examples:
     ./profile -L 185      # only profile thread with TID 185
     ./profile -U          # only show user space stacks (no kernel)
     ./profile -K          # only show kernel space stacks (no user)
+    ./profile --dwarf -U  # unwind user stacks with DWARF CFI
     ./profile --cgroupmap mappath  # only trace cgroups in this BPF map
     ./profile --mntnsmap mappath   # only trace mount namespaces in the map

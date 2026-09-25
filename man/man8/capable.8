@@ -2,8 +2,8 @@
 .SH NAME
 capable \- Trace security capability checks (cap_capable()).
 .SH SYNOPSIS
-.B capable [\-h] [\-v] [\-p PID] [\-K] [\-U] [\-x] [\-\-cgroupmap MAPPATH]
-           [\-\-mntnsmap MAPPATH] [--unique]
+.B capable [\-h] [\-v] [\-p PID] [\-K] [\-U] [\-\-dwarf] [\-x]
+           [\-\-cgroupmap MAPPATH] [\-\-mntnsmap MAPPATH] [--unique]
 .SH DESCRIPTION
 This traces security capability checks in the kernel, and prints details for
 each call. This can be useful for general debugging, and also security
@@ -27,6 +27,11 @@ Include kernel stack traces to the output.
 \-U
 Include user-space stack traces to the output.
 .TP
+\-\-dwarf
+Use DWARF CFI to unwind user-space stack traces. This currently requires \-U,
+x86_64 or amd64, bpf_task_pt_regs support, and BCC built with libgunwinder.
+It does not currently support \-\-unique.
+.TP
 \-x
 Show extra fields in TID and INSETID columns.
 .TP
@@ -47,6 +52,10 @@ Trace all capability checks system-wide:
 Trace capability checks for PID 181:
 #
 .B capable \-p 181
+.TP
+Trace capability checks with DWARF user-space stacks:
+#
+.B capable \-\-dwarf \-U
 .TP
 Trace capability checks in a set of cgroups only (see special_filtering.md
 from bcc sources for more details):
