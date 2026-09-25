@@ -1369,3 +1369,77 @@ int str_timestamp(const char *format, char *buf, size_t buf_len)
 		return -errno;
 	return strftime(buf, buf_len, format, tm);
 }
+
+/* ── time_sync implementation ── */
+
+void sync_time(struct time_sync *sync)
+{
+	struct timespec mono, real;
+
+	clock_gettime(CLOCK_MONOTONIC, &mono);
+	clock_gettime(CLOCK_REALTIME, &real);
+	sync->monotonic_ns = (uint64_t)mono.tv_sec * 1000000000ULL
+			   + (uint64_t)mono.tv_nsec;
+	sync->realtime_ns  = (uint64_t)real.tv_sec * 1000000000ULL
+			   + (uint64_t)real.tv_nsec;
+}
+
+uint64_t convert_to_realtime_ns(uint64_t kernel_ns,
+				const struct time_sync *sync)
+{
+	return sync->realtime_ns + (kernel_ns - sync->monotonic_ns);
+}
+
+/* ── OTLP span output implementation ── */
+
+int print_span(const struct span *s, enum trace_output_format fmt, FILE *fp)
+{
+	if (!s || fmt < 0 || fmt >= TRACE_FORMAT_MAX)
+		return -EINVAL;
+	if (!fp)
+		fp = stdout;
+
+	if (fmt == TRACE_FORMAT_OTEL_SPAN_JSON) {
+		/* Convert numeric IDs to hex strings at output time */
+		char trace_id_str[33];
+		char span_id_str[17];
+		char parent_span_id_str[17];
+
+		snprintf(trace_id_str, sizeof(trace_id_str),
+			 "%016llx%016llx",
+			 (unsigned long long)s->trace_id_hi,
+			 (unsigned long long)s->trace_id_lo);
+		snprintf(span_id_str, sizeof(span_id_str),
+			 "%016llx",
+			 (unsigned long long)s->span_id);
+		snprintf(parent_span_id_str, sizeof(parent_span_id_str),
+			 "%016llx",
+			 (unsigned long long)s->parent_span_id);
+
+		fprintf(fp,
+			"{\"traceId\":\"%s\","
+			"\"spanId\":\"%s\","
+			"\"parentSpanId\":\"%s\","
+			"\"name\":\"%s\","
+			"\"kind\":%d,"
+			"\"startTimeUnixNano\":\"%llu\","
+			"\"endTimeUnixNano\":\"%llu\","
+			"\"status\":{\"code\":%d},"
+			"\"attributes\":["
+			"{\"key\":\"pid\",\"value\":{\"intValue\":\"%u\"}},"
+			"{\"key\":\"tid\",\"value\":{\"intValue\":\"%u\"}}"
+			"]}\n",
+			trace_id_str,
+			span_id_str,
+			parent_span_id_str,
+			s->name,
+			s->kind,
+			(unsigned long long)s->start_time_unix_nano,
+			(unsigned long long)s->end_time_unix_nano,
+			s->status_code,
+			s->pid, s->tid);
+	}
+
+	fflush(fp);
+	return 0;
+}
