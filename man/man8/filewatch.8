@@ -111,8 +111,10 @@ For metadata changes, the changed attributes are decoded (MODE, UID,
 MTIME, etc.).
 
 Below the header, the full path from the filesystem root is displayed,
-followed by the process tree from the caller up to init (PID 1).  The
-caller (first entry, marked with >>>) includes its full command line
+followed by the process tree from the caller up to init (PID 1).  Each
+process in the tree shows its owner (uid); when the effective user id
+differs from the real uid (e.g. setuid programs), both are shown.
+The caller (first entry, marked with >>>) includes its full command line
 captured in\-kernel.  Parent processes show command lines and executable
 paths read from /proc.
 

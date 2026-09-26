@@ -54,6 +54,7 @@ bpf_text = r"""
 
 #include <linux/fs.h>
 #include <linux/sched.h>
+#include <linux/cred.h>
 #include <linux/mm_types.h>
 
 struct iovec;  /* forward-decl avoids -Wvisibility in readv/writev */
@@ -71,6 +72,8 @@ struct iovec;  /* forward-decl avoids -Wvisibility in readv/writev */
 
 struct ancestor_t {
     u32 tgid;
+    u32 uid;
+    u32 euid;
     char comm[TASK_COMM_LEN];
 };
 
@@ -153,6 +156,21 @@ fill_event(struct event_t *event, struct dentry *de, u8 op)
                 &event->chain[i].comm,
                 sizeof(event->chain[i].comm),
                 task->comm);
+            {
+                const struct cred *_cred = NULL;
+                bpf_probe_read_kernel(&_cred, sizeof(_cred),
+                                      &task->cred);
+                if (_cred) {
+                    bpf_probe_read_kernel(
+                        &event->chain[i].uid,
+                        sizeof(event->chain[i].uid),
+                        &_cred->uid.val);
+                    bpf_probe_read_kernel(
+                        &event->chain[i].euid,
+                        sizeof(event->chain[i].euid),
+                        &_cred->euid.val);
+                }
+            }
             event->depth = i + 1;
             if (task->tgid <= 1) {
                 done = 1;
@@ -446,6 +464,8 @@ ATTR_FLAGS = [
 class AncestorT(ct.Structure):
     _fields_ = [
         ("tgid", ct.c_uint32),
+        ("uid",  ct.c_uint32),
+        ("euid", ct.c_uint32),
         ("comm", ct.c_char * TASK_COMM_LEN),
     ]
 
@@ -902,7 +922,15 @@ def print_event(cpu, data, size):
         tag = ">>>" if i == 0 else "   "
 
         display_comm = _resolve_comm(comm, cmdline)
-        line = "%s %s[%d] %s" % (tag, indent, pid, display_comm)
+        owner_uid = uid_to_name(a.uid)
+        owner_euid = uid_to_name(a.euid)
+        if a.uid == a.euid:
+            owner_info = "(uid: %s)" % owner_uid
+        else:
+            owner_info = "(uid: %s, euid: %s)" % (
+                owner_uid, owner_euid)
+        line = "%s %s[%d] %s  %s" % (
+            tag, indent, pid, display_comm, owner_info)
         if cmdline and cmdline != display_comm:
             line += "\n    %scmdline: %s" % (indent, cmdline)
         if exe:
