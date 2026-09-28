@@ -65,6 +65,7 @@
 /tcplife
 /tcppktlat
 /tcptracer
+/tcpretrans
 /tcprtt
 /tcpstates
 /tcpsynbl
