@@ -361,6 +361,11 @@ int main(int argc, char **argv)
 	obj->rodata->target_family = family;
 	obj->rodata->filter_cg = cgroup_filtering;
 
+	if (!kprobe_exists("tcp_read_sock")) {
+		bpf_program__set_autoload(obj->progs.tcp_read_sock, false);
+		bpf_program__set_autoload(obj->progs.tcp_read_sock_ret, false);
+	}
+
 	err = tcptop_bpf__load(obj);
 	if (err) {
 		warn("failed to load BPF object: %d\n", err);
