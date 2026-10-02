@@ -416,6 +416,12 @@ class SmokeTests(TestCase):
         pass
 
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
+    @mayFail("Depends on a glibc built with USDT (mutex) probes and on root")
+    def test_ulockstat(self):
+        # Traces this python process itself; needs glibc USDT mutex probes.
+        self.run_with_duration("ulockstat.py -p %d -d 1" % os.getpid())
+
+    @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_uobjnew(self):
         self.run_with_int("cobjnew.sh %d" % os.getpid())
 
