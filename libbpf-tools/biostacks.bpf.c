@@ -116,13 +116,58 @@ int BPF_PROG(blk_account_io_done, struct request *rq)
 	return trace_done(ctx, rq);
 }
 
+/*
+ * kprobe fallback for kernels without fentry support (no BTF, e.g. v4.19 and
+ * v5.4 LTS kernels). The traced functions were renamed over time, so a
+ * dedicated program is needed for each name.
+ */
+SEC("kprobe/__blk_account_io_start")
+int BPF_KPROBE(kprobe___blk_account_io_start, struct request *rq)
+{
+	return trace_start(ctx, rq, false);
+}
+
+SEC("kprobe/blk_account_io_start")
+int BPF_KPROBE(kprobe_blk_account_io_start, struct request *rq)
+{
+	return trace_start(ctx, rq, false);
+}
+
+SEC("kprobe/__blk_account_io_done")
+int BPF_KPROBE(kprobe___blk_account_io_done, struct request *rq)
+{
+	return trace_done(ctx, rq);
+}
+
+SEC("kprobe/blk_account_io_done")
+int BPF_KPROBE(kprobe_blk_account_io_done, struct request *rq)
+{
+	return trace_done(ctx, rq);
+}
+
 SEC("tp_btf/block_io_start")
-int BPF_PROG(block_io_start, struct request *rq)
+int BPF_PROG(block_io_start_btf, struct request *rq)
 {
 	return trace_start(ctx, rq, false);
 }
 
 SEC("tp_btf/block_io_done")
+int BPF_PROG(block_io_done_btf, struct request *rq)
+{
+	return trace_done(ctx, rq);
+}
+
+/*
+ * raw_tp fallback for kernels without BTF-enabled tracepoints (tp_btf needs
+ * v5.5+ with BTF), the block tracepoints themselves are much older.
+ */
+SEC("raw_tp/block_io_start")
+int BPF_PROG(block_io_start, struct request *rq)
+{
+	return trace_start(ctx, rq, false);
+}
+
+SEC("raw_tp/block_io_done")
 int BPF_PROG(block_io_done, struct request *rq)
 {
 	return trace_done(ctx, rq);

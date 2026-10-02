@@ -275,11 +275,65 @@ int main(int argc, char **argv)
 	obj->rodata->filter_cg = env.cg;
 	obj->rodata->min_ns = env.min_lat_ms * 1000000;
 
-	if (tracepoint_exists("block", "block_io_start"))
+	/*
+	 * The block_io_start tracepoint was added in v5.11. Prefer it when
+	 * available. On older kernels fall back to the blk_account_io_start
+	 * function, using fentry when BTF is available (v5.5+) and a kprobe
+	 * otherwise, so the tool also runs on v4.19/v5.4 LTS kernels.
+	 */
+	if (tracepoint_exists("block", "block_io_start")) {
 		bpf_program__set_autoload(obj->progs.blk_account_io_start, false);
-	else {
+		bpf_program__set_autoload(obj->progs.kprobe___blk_account_io_start, false);
+		bpf_program__set_autoload(obj->progs.kprobe_blk_account_io_start, false);
+		if (probe_tp_btf("block_io_start"))
+			bpf_program__set_autoload(obj->progs.block_io_start, false);
+		else
+			bpf_program__set_autoload(obj->progs.block_io_start_btf, false);
+	} else {
+		bool use_fentry;
+
 		bpf_program__set_autoload(obj->progs.block_io_start, false);
-		blk_account_io_set_attach_target(obj);
+		bpf_program__set_autoload(obj->progs.block_io_start_btf, false);
+
+		use_fentry = fentry_can_attach("blk_account_io_start", NULL);
+		if (use_fentry) {
+			bpf_program__set_autoload(obj->progs.kprobe___blk_account_io_start, false);
+			bpf_program__set_autoload(obj->progs.kprobe_blk_account_io_start, false);
+			blk_account_io_set_attach_target(obj);
+		} else {
+			bool has_underscore = kprobe_exists("__blk_account_io_start");
+			bool has_plain = kprobe_exists("blk_account_io_start");
+
+			/* Prefer the internal __-prefixed symbol, like the Python tool. */
+			bpf_program__set_autoload(obj->progs.blk_account_io_start, false);
+			bpf_program__set_autoload(obj->progs.kprobe___blk_account_io_start,
+						  has_underscore);
+			bpf_program__set_autoload(obj->progs.kprobe_blk_account_io_start,
+						  !has_underscore && has_plain);
+			if (!has_underscore && !has_plain) {
+				fprintf(stderr, "failed to find blk_account_io_start\n");
+				err = -1;
+				goto cleanup;
+			}
+		}
+	}
+
+	/*
+	 * The block_rq_* tracepoints carry BTF-typed arguments starting with
+	 * v5.5 (tp_btf); use raw_tp on kernels without BTF support.
+	 */
+	if (probe_tp_btf("block_rq_issue")) {
+		bpf_program__set_autoload(obj->progs.block_rq_insert, false);
+		bpf_program__set_autoload(obj->progs.block_rq_issue, false);
+		bpf_program__set_autoload(obj->progs.block_rq_complete, false);
+		if (!env.queued)
+			bpf_program__set_autoload(obj->progs.block_rq_insert_btf, false);
+	} else {
+		bpf_program__set_autoload(obj->progs.block_rq_insert_btf, false);
+		bpf_program__set_autoload(obj->progs.block_rq_issue_btf, false);
+		bpf_program__set_autoload(obj->progs.block_rq_complete_btf, false);
+		if (!env.queued)
+			bpf_program__set_autoload(obj->progs.block_rq_insert, false);
 	}
 
 	ksyms = ksyms__load();
@@ -289,9 +343,6 @@ int main(int argc, char **argv)
 	}
 	if (!ksyms__get_symbol(ksyms, "blk_account_io_merge_bio"))
 		bpf_program__set_autoload(obj->progs.blk_account_io_merge_bio, false);
-
-	if (!env.queued)
-		bpf_program__set_autoload(obj->progs.block_rq_insert, false);
 
 	err = biosnoop_bpf__load(obj);
 	if (err) {
