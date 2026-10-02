@@ -1,0 +1,282 @@
+Demonstrations of filewatch, the Linux eBPF/bcc version.
+
+
+filewatch traces VFS access to a single file or an entire directory tree
+and dumps the full process ancestry for every event.  It is useful for
+answering "who or what just touched this file?" -- a common question
+when debugging configuration drift, unexpected writes, or short-lived
+temporary files.
+
+It works on any filesystem (ext4, btrfs, ZFS, VxFS, XFS, tmpfs, NFS)
+because it hooks the VFS layer, not individual filesystem drivers.
+
+
+Watching a single file for writes (the default):
+
+# ./filewatch /etc/fstab
+filewatch - VFS file access tracer
+  file  : /etc/fstab
+  inode : 131073
+  dev   : major=8, minor=1 (kernel_dev=8388609)
+  mode  : writes
+Hit Ctrl-C to end.
+
+Loading probes...
+Attached probes: vfs_write, vfs_writev
+
+========================================================================
+WRITE  10:23:45  file=fstab  bytes=42  user=root
+       path: /etc/fstab
+Process tree (caller first):
+
+>>> [51234] bash
+    cmdline: bash -c echo '# test' >> /etc/fstab
+    exe:     /usr/bin/bash
+    cwd:     /root
+      [51200] sshd
+      cmdline: sshd: root@pts/0
+      exe:     /usr/libexec/openssh/sshd-session
+        [4562] sshd
+        cmdline: sshd: /usr/sbin/sshd -D [listener] 0 of 10-100 startups
+        exe:     /usr/sbin/sshd
+          [1] systemd
+          cmdline: /usr/lib/systemd/systemd --switched-root --system
+          exe:     /usr/lib/systemd/systemd  (init)
+
+The process tree shows the full ancestry from the process that performed
+the write (bash -c) all the way up to systemd.  The caller's command line
+is captured inside the BPF probe, so even short-lived processes that exit
+immediately after the I/O are recorded.
+
+
+Watching a directory tree for reads and writes:
+
+# ./filewatch -rw /etc/
+filewatch - VFS file access tracer
+  dir   : /etc  (recursive)
+  inode : 2
+  dev   : major=8, minor=1 (kernel_dev=8388609)
+  mode  : reads + writes
+  depth : up to 24 levels
+Hit Ctrl-C to end.
+
+Loading probes...
+Attached probes: vfs_read, vfs_readv, vfs_write, vfs_writev
+
+========================================================================
+READ   10:25:12  file=resolv.conf  bytes=4096  user=root
+       path: /etc/resolv.conf
+Process tree (caller first):
+
+>>> [2847] NetworkManager
+    cmdline: /usr/sbin/NetworkManager --no-daemon
+    exe:     /usr/sbin/NetworkManager
+      [1] systemd  (init)
+
+In directory mode, files at any depth under the watched directory are
+caught.  The matching is done in-kernel by walking the dentry parent
+chain, so there is no userspace filtering overhead.
+
+
+Tracing metadata changes (touch, chmod, chown):
+
+# ./filewatch -m /etc/passwd
+filewatch - VFS file access tracer
+  file  : /etc/passwd
+  inode : 131088
+  dev   : major=8, minor=1 (kernel_dev=8388609)
+  mode  : metadata
+Hit Ctrl-C to end.
+
+Loading probes...
+Attached probes: notify_change
+
+========================================================================
+META   10:30:01  file=passwd  attrs=MTIME|MTIME_SET  user=root
+       path: /etc/passwd
+Process tree (caller first):
+
+>>> [62001] touch
+      [61900] bash
+      cmdline: -bash
+      exe:     /usr/bin/bash
+        [1] systemd  (init)
+
+The attrs field decodes the iattr flags to show exactly what metadata
+was changed.  Common values: MODE (chmod), UID (chown), GID (chgrp),
+SIZE (truncate), MTIME|MTIME_SET (touch).
+
+
+Tracing file creation and deletion in a directory:
+
+# ./filewatch -cu /tmp/
+filewatch - VFS file access tracer
+  dir   : /tmp  (recursive)
+  inode : 1
+  dev   : major=0, minor=38 (kernel_dev=38)
+  mode  : create + unlink
+  depth : up to 24 levels
+Hit Ctrl-C to end.
+
+Loading probes...
+Attached probes: security_inode_create, security_inode_mkdir,
+  security_inode_unlink, security_inode_rmdir
+
+========================================================================
+CREATE 10:35:10  file=myfile.txt  user=alice
+       path: /tmp/myfile.txt
+Process tree (caller first):
+
+>>> [71234] touch
+      [71200] bash
+      cmdline: -bash
+      exe:     /usr/bin/bash
+        [1] systemd  (init)
+
+========================================================================
+UNLINK 10:35:15  file=myfile.txt  user=alice
+       path: /tmp/myfile.txt
+Process tree (caller first):
+
+>>> [71240] rm
+      [71200] bash
+      cmdline: -bash
+      exe:     /usr/bin/bash
+        [1] systemd  (init)
+
+Both file and directory creation/deletion are traced.  The CREATE
+operation hooks security_inode_create (files) and security_inode_mkdir
+(directories).  The UNLINK operation hooks security_inode_unlink (files)
+and security_inode_rmdir (directories).
+
+
+Watching for a non-existent file to be created:
+
+# ./filewatch -a /tmp/config_not_yet_created.yml
+filewatch - VFS file access tracer
+  dir   : /tmp  (recursive)
+  inode : 1
+  dev   : major=0, minor=38 (kernel_dev=38)
+  mode  : reads + writes + metadata + create + unlink
+  depth : up to 24 levels
+  filter: config_not_yet_created.yml (waiting for creation)
+Hit Ctrl-C to end.
+
+Loading probes...
+Attached probes: vfs_read, vfs_readv, vfs_write, vfs_writev,
+  notify_change, security_inode_create, security_inode_mkdir,
+  security_inode_unlink, security_inode_rmdir
+
+When the target path does not exist, filewatch automatically watches
+the parent directory and filters for the expected filename.  Events
+for other files in the directory are silently ignored.  The tool stays
+resident through create/delete cycles, acting as a sentry on that name.
+
+
+Single file unlink causes clean exit:
+
+# ./filewatch -a /etc/hosts
+[...]
+========================================================================
+UNLINK 10:40:00  file=hosts  user=root
+       path: /etc/hosts
+Process tree (caller first):
+
+>>> [81234] rm
+      [81200] bash
+      cmdline: -bash
+      exe:     /usr/bin/bash
+        [1] systemd  (init)
+
+  *** target was unlinked -- exiting ***
+
+When watching a single file (not a directory), filewatch exits cleanly
+after the file is unlinked.  The UNLINK event is printed with the full
+process tree before exiting.
+
+
+Including kernel stack traces:
+
+# ./filewatch -wk /etc/fstab
+
+Adding -k captures the kernel stack at the point of the VFS call.  This
+is useful for understanding the kernel code path that led to the access,
+for example distinguishing a direct write from a writeback or a page
+fault.
+
+========================================================================
+WRITE  10:45:00  file=fstab  bytes=42  user=root
+       path: /etc/fstab
+Process tree (caller first):
+
+>>> [91234] bash
+    [...]
+
+    Kernel stack:
+      vfs_write
+      ksys_write
+      do_syscall_64
+      entry_SYSCALL_64_after_hwframe
+
+
+Debouncing high-frequency events:
+
+# ./filewatch -w /var/log/messages -d 1.0
+
+The -d flag suppresses repeated events from the same PID and operation
+type within the specified window.  This is useful for log files or
+databases where a single process may write hundreds of times per second.
+With -d 1.0, you see at most one WRITE event per second per PID.
+
+
+Using -a (all) to trace everything:
+
+# ./filewatch -a /etc/
+
+This enables all five modes at once: reads, writes, metadata changes,
+file creation, and file deletion.  On a quiet directory this gives a
+complete picture of all access.  On a busy directory, combine with -d
+to keep the output manageable.
+
+
+USAGE message:
+
+# ./filewatch -h
+usage: filewatch [-h] [-r] [-w] [-m] [-c] [-u] [-a] [-d SEC] [-k]
+                 [--ebpf] path
+
+Watch a file or directory tree for VFS access and dump the full process
+ancestry with command lines.  Works on any filesystem (ext4, btrfs,
+ZFS, VxFS, XFS, NFS, ...).
+
+positional arguments:
+  path                  file or directory to watch (directories are
+                        recursive)
+
+options:
+  -h, --help            show this help message and exit
+  -r, --reads           trace reads (vfs_read / vfs_readv)
+  -w, --writes          trace writes (vfs_write / vfs_writev)
+  -m, --meta            trace metadata changes: touch, chmod, chown,
+                        truncate
+  -c, --create          trace file/directory creation (directory mode
+                        only)
+  -u, --unlink          trace file/directory deletion (unlink/rmdir)
+  -a, --all             trace everything: reads + writes + metadata +
+                        create + unlink
+  -d SEC, --debounce SEC
+                        minimum seconds between reports for same PID+op
+                        (default: 0 = every event)
+  -k, --kstack          capture and display kernel stack traces
+
+examples:
+    ./filewatch /etc/fstab            # watch one file (writes)
+    ./filewatch /etc/                 # watch entire /etc/ tree
+    ./filewatch -rw /etc/             # reads + writes, tree
+    ./filewatch -r  /etc/shadow       # reads only, one file
+    ./filewatch -m  /etc/passwd       # metadata (touch/chmod/...)
+    ./filewatch -c  /tmp/             # creation only (dir mode)
+    ./filewatch -u  /etc/hosts        # unlink only
+    ./filewatch -a  /etc/             # all: r+w+m+create+unlink
+    ./filewatch -w  /path -d 1.0      # writes, debounce 1s
+    ./filewatch -rwk /etc/hosts       # include kernel stacks
