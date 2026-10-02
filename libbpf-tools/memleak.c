@@ -723,16 +723,14 @@ pid_t fork_sync_exec(const char *command, int fd)
 		const uint64_t event = 1;
 		if (event_wait(fd, event)) {
 			fprintf(stderr, "failed to wait on event");
-			exit(EXIT_FAILURE);
+			_exit(EXIT_FAILURE);
 		}
 
 		printf("received go event. executing child command\n");
 
-		const int err = execl(command, command, NULL);
-		if (err) {
-			perror("failed to execute child command");
-			return -1;
-		}
+		execl(command, command, NULL);
+		perror("failed to execute child command");
+		_exit(EXIT_FAILURE);
 
 		break;
 	}
