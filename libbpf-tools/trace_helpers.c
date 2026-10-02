@@ -15,6 +15,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/resource.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <bpf/bpf.h>
 #include <bpf/btf.h>
@@ -196,6 +197,14 @@ enum elf_type {
 	UNKNOWN,
 };
 
+/* How the ELF backing a mapping was located; used for diagnostics only. */
+enum dso_open_method {
+	DSO_OPEN_FAILED = 0,
+	DSO_OPEN_MAP_FILES,	/* /proc/<tgid>/map_files/<start>-<end> */
+	DSO_OPEN_PROC_ROOT,	/* /proc/<tgid>/root/<path> */
+	DSO_OPEN_RAW_PATH,	/* <path>, as seen from our own mount ns */
+};
+
 struct dso {
 	char *name;
 	struct load_range *ranges;
@@ -205,6 +214,21 @@ struct dso {
 	/* Dyn's first text section file offset */
 	uint64_t sh_offset;
 	enum elf_type type;
+
+	/* Backing ELF fd, kept open until the symbol table has been read. */
+	int fd;
+	enum dso_open_method open_method;
+	/* locator, to re-open the backing ELF if fd was given up */
+	pid_t tgid;
+	uint64_t loc_start;
+	uint64_t loc_end;
+	/* file identity from maps, used to merge the VMAs of one ELF */
+	uint64_t dev;
+	uint64_t inode;
+	/* set once the backing file has been looked up, successfully or not */
+	bool open_tried;
+	/* set once loading failed (or yielded nothing) to avoid retrying */
+	bool syms_load_failed;
 
 	struct sym *syms;
 	int syms_sz;
@@ -263,72 +287,225 @@ static bool is_uprobes(const char *path)
 	return !strcmp(path, "[uprobes]");
 }
 
-static int get_elf_type(const char *path)
+/* BCC_SYM_DEBUG=1 prints why symbol resolution failed for a mapping. */
+static bool sym_debug(void)
 {
-	GElf_Ehdr hdr;
-	void *res;
-	Elf *e;
-	int fd;
+	static int cached = -1;
 
-	if (is_vdso(path))
-		return -1;
-	if (is_uprobes(path))
-		return -1;
-	e = open_elf(path, &fd);
-	if (!e)
-		return -1;
-	res = gelf_getehdr(e, &hdr);
-	close_elf(e, fd);
-	if (!res)
-		return -1;
-	return hdr.e_type;
+	if (cached < 0) {
+		const char *s = getenv("BCC_SYM_DEBUG");
+
+		cached = (s && s[0] && s[0] != '0') ? 1 : 0;
+	}
+	return cached == 1;
 }
 
-static int get_elf_text_scn_info(const char *path, uint64_t *addr,
-				 uint64_t *offset)
+static const char *open_method_str(enum dso_open_method method)
+{
+	switch (method) {
+	case DSO_OPEN_MAP_FILES:	return "map_files";
+	case DSO_OPEN_PROC_ROOT:	return "proc-root";
+	case DSO_OPEN_RAW_PATH:		return "raw-path";
+	default:			return "failed";
+	}
+}
+
+/* Needs CONFIG_CHECKPOINT_RESTORE + CAP_SYS_ADMIN; probe once. */
+static bool map_files_available(void)
+{
+	static int cached = -1;
+
+	if (cached < 0) {
+		cached = access("/proc/self/map_files", X_OK) == 0 ? 1 : 0;
+		if (!cached && sym_debug())
+			fprintf(stderr,
+				"sym: /proc/self/map_files unusable (%s), falling back to path based lookup\n",
+				strerror(errno));
+	}
+	return cached == 1;
+}
+
+/* Only ever return a regular file; open() on a FIFO would block forever. */
+static int open_regular_ro(const char *path)
+{
+	struct stat st;
+	int fd;
+
+	fd = open(path, O_RDONLY | O_CLOEXEC | O_NONBLOCK);
+	if (fd < 0)
+		return -1;
+	if (fstat(fd, &st) < 0 || !S_ISREG(st.st_mode)) {
+		close(fd);
+		return -1;
+	}
+	return fd;
+}
+
+/*
+ * Open the ELF that the target mapping was actually created from, in
+ * order of decreasing trust:
+ *  1. /proc/<tgid>/map_files/<start>-<end>: resolved by the kernel straight
+ *     to vma->vm_file, immune to mount namespaces and unlink().
+ *  2. /proc/<tgid>/root/<path>: looked up under the target's fs root, so at
+ *     least the namespace is correct.
+ *  3. the raw path: only correct for a non-containerised target.
+ */
+static int open_dso_fd(pid_t tgid, uint64_t start, uint64_t end,
+		       const char *path, enum dso_open_method *method)
+{
+	char buf[PATH_MAX];
+	int fd, n;
+
+	*method = DSO_OPEN_FAILED;
+
+	if (tgid > 0 && map_files_available()) {
+		/*
+		 * dname_to_vma_addr() rejects any zero padding, so the range
+		 * must be printed in minimal form: "%x", never "%016lx".
+		 */
+		n = snprintf(buf, sizeof(buf),
+			     "/proc/%d/map_files/%llx-%llx",
+			     tgid, (unsigned long long)start,
+			     (unsigned long long)end);
+		if (n > 0 && n < (int)sizeof(buf)) {
+			fd = open_regular_ro(buf);
+			if (fd >= 0) {
+				*method = DSO_OPEN_MAP_FILES;
+				return fd;
+			}
+			if (sym_debug())
+				fprintf(stderr, "sym: open %s failed: %s\n",
+					buf, strerror(errno));
+		}
+	}
+
+	if (tgid > 0 && path[0] == '/') {
+		n = snprintf(buf, sizeof(buf), "/proc/%d/root%s", tgid, path);
+		if (n > 0 && n < (int)sizeof(buf)) {
+			fd = open_regular_ro(buf);
+			if (fd >= 0) {
+				*method = DSO_OPEN_PROC_ROOT;
+				return fd;
+			}
+		}
+	}
+
+	fd = open_regular_ro(path);
+	if (fd >= 0) {
+		*method = DSO_OPEN_RAW_PATH;
+		return fd;
+	}
+	return -1;
+}
+
+/* Upper bound on ELF fds held across all cached processes. */
+#define DSO_FD_BUDGET	256
+
+static int dso_fd_in_use;
+
+static void dso__put_fd(struct dso *dso)
+{
+	if (dso->fd >= 0) {
+		close(dso->fd);
+		dso->fd = -1;
+		dso_fd_in_use--;
+	}
+}
+
+/* elf_begin() on a caller owned fd, without closing it on failure. */
+static Elf *dso_elf_begin(int fd)
+{
+	Elf *e;
+
+	if (elf_version(EV_CURRENT) == EV_NONE)
+		return NULL;
+	e = elf_begin(fd, ELF_C_READ, NULL);
+	if (!e)
+		return NULL;
+	if (elf_kind(e) != ELF_K_ELF) {
+		elf_end(e);
+		return NULL;
+	}
+	return e;
+}
+
+/*
+ * Determine the ELF type and, for shared objects, the .text section
+ * address/offset, reading everything from the already resolved fd.
+ */
+static int dso__read_elf_info(struct dso *dso, int fd)
 {
 	Elf_Scn *section = NULL;
-	int fd = -1, err = -1;
-	GElf_Shdr header;
+	GElf_Shdr shdr;
+	GElf_Ehdr ehdr;
+	int err = -1;
 	size_t stridx;
-	Elf *e = NULL;
 	char *name;
+	Elf *e;
 
-	e = open_elf(path, &fd);
+	e = dso_elf_begin(fd);
 	if (!e)
-		goto err_out;
-	err = elf_getshdrstrndx(e, &stridx);
-	if (err < 0)
-		goto err_out;
+		return -1;
 
-	err = -1;
+	if (!gelf_getehdr(e, &ehdr))
+		goto out;
+
+	if (ehdr.e_type == ET_EXEC) {
+		dso->type = EXEC;
+		err = 0;
+		goto out;
+	}
+	if (ehdr.e_type != ET_DYN)
+		goto out;
+
+	if (elf_getshdrstrndx(e, &stridx) < 0)
+		goto out;
+
 	while ((section = elf_nextscn(e, section)) != 0) {
-		if (!gelf_getshdr(section, &header))
+		if (!gelf_getshdr(section, &shdr))
 			continue;
-
-		name = elf_strptr(e, stridx, header.sh_name);
+		name = elf_strptr(e, stridx, shdr.sh_name);
 		if (name && !strcmp(name, ".text")) {
-			*addr = (uint64_t)header.sh_addr;
-			*offset = (uint64_t)header.sh_offset;
+			dso->sh_addr = (uint64_t)shdr.sh_addr;
+			dso->sh_offset = (uint64_t)shdr.sh_offset;
+			dso->type = DYN;
 			err = 0;
 			break;
 		}
 	}
 
-err_out:
-	close_elf(e, fd);
+out:
+	elf_end(e);
 	return err;
 }
 
-static int syms__add_dso(struct syms *syms, struct map *map, const char *name)
+/* Register one executable mapping; only allocation failures are fatal. */
+static int syms__add_dso(struct syms *syms, struct map *map, const char *name,
+			 pid_t tgid)
 {
+	enum dso_open_method method;
+	uint64_t dev, inode;
 	struct dso *dso = NULL;
-	int i, type;
+	int i, fd;
 	void *tmp;
 
+	dev = MKDEV(map->dev_major, map->dev_minor);
+	inode = map->inode;
+
+	/*
+	 * dev+inode identifies the file itself even where the pathname
+	 * does not; mappings without an inode ([vdso] etc.) key off name.
+	 */
 	for (i = 0; i < syms->dso_sz; i++) {
-		if (!strcmp(syms->dsos[i].name, name)) {
-			dso = &syms->dsos[i];
+		struct dso *cand = &syms->dsos[i];
+
+		if (inode) {
+			if (cand->inode == inode && cand->dev == dev) {
+				dso = cand;
+				break;
+			}
+		} else if (!cand->inode && !strcmp(cand->name, name)) {
+			dso = cand;
 			break;
 		}
 	}
@@ -341,8 +518,18 @@ static int syms__add_dso(struct syms *syms, struct map *map, const char *name)
 		syms->dsos = tmp;
 		dso = &syms->dsos[syms->dso_sz++];
 		memset(dso, 0, sizeof(*dso));
+		/* fd must be -1 before any early return can reach syms__free(). */
+		dso->fd = -1;
+		dso->type = UNKNOWN;
 		dso->name = strdup(name);
 		dso->btf = btf__new_empty();
+		if (!dso->name || !dso->btf)
+			return -1;
+		dso->tgid = tgid;
+		dso->loc_start = map->start_addr;
+		dso->loc_end = map->end_addr;
+		dso->dev = dev;
+		dso->inode = inode;
 	}
 
 	tmp = realloc(dso->ranges, (dso->range_sz + 1) * sizeof(*dso->ranges));
@@ -353,19 +540,60 @@ static int syms__add_dso(struct syms *syms, struct map *map, const char *name)
 	dso->ranges[dso->range_sz].end = map->end_addr;
 	dso->ranges[dso->range_sz].file_off = map->file_off;
 	dso->range_sz++;
-	type = get_elf_type(name);
-	if (type == ET_EXEC) {
-		dso->type = EXEC;
-	} else if (type == ET_DYN) {
-		dso->type = DYN;
-		if (get_elf_text_scn_info(name, &dso->sh_addr, &dso->sh_offset) < 0)
-			return -1;
-	} else if (is_perf_map(name)) {
-		dso->type = PERF_MAP;
-	} else if (is_vdso(name)) {
+
+	/* Already handled through one of its other mappings. */
+	if (dso->open_tried || dso->type != UNKNOWN)
+		return 0;
+
+	if (is_vdso(name)) {
 		dso->type = VDSO;
-	} else {
+		return 0;
+	}
+	if (is_perf_map(name)) {
+		dso->type = PERF_MAP;
+		return 0;
+	}
+
+	/*
+	 * The backing file is looked up at most once per dso; skip if
+	 * already tried via another VMA of the same ELF.
+	 */
+	dso->open_tried = true;
+
+	if (is_uprobes(name))
+		return 0;
+
+	fd = open_dso_fd(tgid, dso->loc_start, dso->loc_end, name, &method);
+	if (fd < 0) {
+		if (sym_debug())
+			fprintf(stderr, "sym: %s: no backing file found\n",
+				name);
+		return 0;
+	}
+	dso->open_method = method;
+
+	if (dso__read_elf_info(dso, fd) < 0) {
 		dso->type = UNKNOWN;
+		if (sym_debug())
+			fprintf(stderr, "sym: %s: unusable ELF (via %s)\n",
+				name, open_method_str(method));
+		close(fd);
+		return 0;
+	}
+
+	if (sym_debug())
+		fprintf(stderr, "sym: %s: %s via %s (dev %" PRIx64 ":%" PRIx64
+			" ino %" PRIu64 ")\n", name,
+			dso->type == EXEC ? "ET_EXEC" : "ET_DYN",
+			open_method_str(method), map->dev_major,
+			map->dev_minor, inode);
+
+	/* Hold the fd: the symbol table is read lazily, possibly after exit. */
+	if (dso_fd_in_use < DSO_FD_BUDGET) {
+		dso->fd = fd;
+		dso_fd_in_use++;
+	} else {
+		close(fd);
 	}
 	return 0;
 }
@@ -451,11 +679,16 @@ static int dso__add_syms(struct dso *dso, Elf *e, Elf_Scn *section,
 {
 	Elf_Data *data = NULL;
 
+	/* A zero sh_entsize (attacker controlled) would cause SIGFPE below. */
+	if (symsize == 0)
+		return 0;
+
 	while ((data = elf_getdata(section, data)) != 0) {
 		size_t i, symcount = data->d_size / symsize;
 
+		/* Truncated/inconsistent table; keep symbols parsed so far. */
 		if (data->d_size % symsize)
-			return -1;
+			break;
 
 		for (i = 0; i < symcount; ++i) {
 			const char *name;
@@ -482,11 +715,20 @@ err_out:
 	return -1;
 }
 
+static void dso__drop_syms(struct dso *dso)
+{
+	free(dso->syms);
+	dso->syms = NULL;
+	dso->syms_sz = 0;
+	dso->syms_cap = 0;
+}
+
 static void dso__free_fields(struct dso *dso)
 {
 	if (!dso)
 		return;
 
+	dso__put_fd(dso);
 	free(dso->name);
 	free(dso->ranges);
 	free(dso->syms);
@@ -507,13 +749,14 @@ static void dso__free_fields(struct dso *dso)
 	dso->sh_offset = 0;
 }
 
+/* Reads from a caller owned fd; the fd is left open. */
 static int dso__load_sym_table_from_elf(struct dso *dso, int fd)
 {
 	Elf_Scn *section = NULL;
 	Elf *e;
 	int i;
 
-	e = fd > 0 ? open_elf_by_fd(fd) : open_elf(dso->name, &fd);
+	e = dso_elf_begin(fd);
 	if (!e)
 		return -1;
 
@@ -540,21 +783,24 @@ static int dso__load_sym_table_from_elf(struct dso *dso, int fd)
 
 	qsort(dso->syms, dso->syms_sz, sizeof(*dso->syms), sym_cmp);
 
-	close_elf(e, fd);
+	elf_end(e);
 	return 0;
 
 err_out:
-	dso__free_fields(dso);
-	close_elf(e, fd);
+	/* Keep the dso itself intact; only the half built symbol table goes away. */
+	dso__drop_syms(dso);
+	elf_end(e);
 	return -1;
 }
 
 static int create_tmp_vdso_image(struct dso *dso)
 {
-	uint64_t start_addr, end_addr;
+	uint64_t start_addr = 0, end_addr = 0;
+	char line[PATH_MAX + 128];
 	long pid = getpid();
 	char buf[PATH_MAX];
 	void *image = NULL;
+	bool found = false;
 	char tmpfile[128];
 	int ret, fd = -1;
 	uint64_t sz;
@@ -566,23 +812,26 @@ static int create_tmp_vdso_image(struct dso *dso)
 	if (!f)
 		return -1;
 
-	while (true) {
-		ret = fscanf(f, "%llx-%llx %*s %*x %*x:%*x %*u%[^\n]",
+	/* Width limited like syms__load_maps(); see there for why. */
+	while (fgets(line, sizeof(line), f)) {
+		ret = sscanf(line, "%llx-%llx %*s %*x %*x:%*x %*u%4095[^\n]",
 			     (long long*)&start_addr, (long long*)&end_addr,
 			     buf);
-		if (ret == EOF && feof(f))
-			break;
 		if (ret != 3)
-			goto err_out;
+			continue;
 
 		name = buf;
 		while (isspace(*name))
 			name++;
-		if (!is_file_backed(name))
-			continue;
-		if (is_vdso(name))
+		if (is_vdso(name)) {
+			found = true;
 			break;
+		}
 	}
+
+	/* Bail out if [vdso] was never found, instead of using stale start/end. */
+	if (!found)
+		goto err_out;
 
 	sz = end_addr - start_addr;
 	image = malloc(sz);
@@ -619,32 +868,68 @@ err_out:
 static int dso__load_sym_table_from_vdso_image(struct dso *dso)
 {
 	int fd = create_tmp_vdso_image(dso);
+	int err;
 
 	if (fd < 0)
 		return -1;
-	return dso__load_sym_table_from_elf(dso, fd);
+	err = dso__load_sym_table_from_elf(dso, fd);
+	close(fd);
+	return err;
 }
 
 static int dso__load_sym_table(struct dso *dso)
 {
+	enum dso_open_method method;
+	int fd, err;
+
 	if (dso->type == UNKNOWN)
 		return -1;
 	if (dso->type == PERF_MAP)
 		return dso__load_sym_table_from_perf_map(dso);
-	if (dso->type == EXEC || dso->type == DYN)
-		return dso__load_sym_table_from_elf(dso, 0);
 	if (dso->type == VDSO)
 		return dso__load_sym_table_from_vdso_image(dso);
-	return -1;
+	if (dso->type != EXEC && dso->type != DYN)
+		return -1;
+
+	if (dso->fd >= 0) {
+		err = dso__load_sym_table_from_elf(dso, dso->fd);
+		/* symbols are in memory now, the file is no longer needed */
+		dso__put_fd(dso);
+		return err;
+	}
+
+	/* fd budget was exhausted earlier; re-locate (may fail if exited). */
+	fd = open_dso_fd(dso->tgid, dso->loc_start, dso->loc_end, dso->name,
+			 &method);
+	if (fd < 0) {
+		if (sym_debug())
+			fprintf(stderr, "sym: %s: re-open failed: %s\n",
+				dso->name, strerror(errno));
+		return -1;
+	}
+	err = dso__load_sym_table_from_elf(dso, fd);
+	close(fd);
+	return err;
 }
 
+/*
+ * The returned sym points into the dso's shared symbol table; valid only
+ * until the next lookup on the same dso.
+ */
 static struct sym *dso__find_sym(struct dso *dso, uint64_t offset)
 {
 	unsigned long sym_addr;
 	int start, end, mid;
 
-	if (!dso->syms && dso__load_sym_table(dso))
-		return NULL;
+	if (!dso->syms) {
+		/* Don't retry per event for a stripped/unreadable dso. */
+		if (dso->syms_load_failed)
+			return NULL;
+		if (dso__load_sym_table(dso) || !dso->syms_sz) {
+			dso->syms_load_failed = true;
+			return NULL;
+		}
+	}
 
 	start = 0;
 	end = dso->syms_sz - 1;
@@ -668,9 +953,13 @@ static struct sym *dso__find_sym(struct dso *dso, uint64_t offset)
 	return NULL;
 }
 
-struct syms *syms__load_file(const char *fname)
+/*
+ * tgid > 0 resolves mappings through /proc/<tgid>/; -1 (an external maps
+ * dump) restricts us to plain path lookups.
+ */
+static struct syms *syms__load_maps(const char *fname, pid_t tgid)
 {
-	char buf[PATH_MAX], perm[5];
+	char line[PATH_MAX + 128], buf[PATH_MAX], perm[5];
 	struct syms *syms;
 	struct map map;
 	char *name;
@@ -685,18 +974,23 @@ struct syms *syms__load_file(const char *fname)
 	if (!syms)
 		goto err_out;
 
-	while (true) {
-		ret = fscanf(f, "%llx-%llx %4s %llx %llx:%llx %llu%[^\n]",
+	/*
+	 * Read line by line with width limited sscanf(): the pathname from
+	 * d_path() is not bounded by PATH_MAX, so an unbounded conversion
+	 * could overflow buf.
+	 */
+	while (fgets(line, sizeof(line), f)) {
+		ret = sscanf(line,
+			     "%llx-%llx %4s %llx %llx:%llx %llu%4095[^\n]",
 			     (long long*)&map.start_addr,
 			     (long long*)&map.end_addr, perm,
 			     (long long*)&map.file_off,
 			     (long long*)&map.dev_major,
 			     (long long*)&map.dev_minor,
 			     (long long*)&map.inode, buf);
-		if (ret == EOF && feof(f))
-			break;
-		if (ret != 8)	/* perf-<PID>.map */
-			goto err_out;
+		/* Anonymous mappings and malformed lines fall short of 8 fields. */
+		if (ret != 8)
+			continue;
 
 		if (perm[2] != 'x')
 			continue;
@@ -707,7 +1001,7 @@ struct syms *syms__load_file(const char *fname)
 		if (!is_file_backed(name))
 			continue;
 
-		if (syms__add_dso(syms, &map, name))
+		if (syms__add_dso(syms, &map, name, tgid))
 			goto err_out;
 	}
 
@@ -720,12 +1014,17 @@ err_out:
 	return NULL;
 }
 
+struct syms *syms__load_file(const char *fname)
+{
+	return syms__load_maps(fname, -1);
+}
+
 struct syms *syms__load_pid(pid_t tgid)
 {
 	char fname[128];
 
 	snprintf(fname, sizeof(fname), "/proc/%ld/maps", (long)tgid);
-	return syms__load_file(fname);
+	return syms__load_maps(fname, tgid);
 }
 
 void syms__free(struct syms *syms)
