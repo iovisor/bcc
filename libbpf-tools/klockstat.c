@@ -15,6 +15,7 @@
 #endif
 #include <argp.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -593,7 +594,7 @@ static void print_acq_stat(struct ksyms *ksyms, struct stack_stat *ss,
 		printf("%37s\n", symname(ksyms, ss->bt[i], buf, sizeof(buf)));
 	}
 	if (nr_stack_entries > 1 && !env.per_thread)
-		printf("                              Max PID %llu, COMM %s, Lock %s (0x%llx)%s\n",
+		printf("                              Max PID %" PRIu64 ", COMM %s, Lock %s (0x%" PRIx64 ")%s\n",
 		       ss->ls.acq_max_id >> 32,
 		       ss->ls.acq_max_comm,
 		       get_lock_name(ksyms, ss->ls.acq_max_lock_ptr),
@@ -648,7 +649,7 @@ static void print_hld_stat(struct ksyms *ksyms, struct stack_stat *ss,
 		printf("%37s\n", symname(ksyms, ss->bt[i], buf, sizeof(buf)));
 	}
 	if (nr_stack_entries > 1 && !env.per_thread)
-		printf("                              Max PID %llu, COMM %s, Lock %s (0x%llx)%s\n",
+		printf("                              Max PID %" PRIu64 ", COMM %s, Lock %s (0x%" PRIx64 ")%s\n",
 		       ss->ls.hld_max_id >> 32,
 		       ss->ls.hld_max_comm,
 		       get_lock_name(ksyms, ss->ls.hld_max_lock_ptr),

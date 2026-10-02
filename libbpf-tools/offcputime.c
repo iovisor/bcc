@@ -6,6 +6,7 @@
 #include <argp.h>
 #include <signal.h>
 #include <stdio.h>
+#include <inttypes.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
@@ -283,7 +284,7 @@ print_ustack:
 
 skip_ustack:
 		printf("    %-16s %s (%d)\n", "-", val.comm, next_key.pid);
-		printf("        %lld\n\n", val.delta);
+		printf("        %" PRIu64 "\n\n", val.delta);
 	}
 
 cleanup:

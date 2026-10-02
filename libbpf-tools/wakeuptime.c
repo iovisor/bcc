@@ -6,6 +6,7 @@
 #include <argp.h>
 #include <signal.h>
 #include <stdio.h>
+#include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -194,7 +195,7 @@ static void print_map(struct ksyms *ksyms, struct wakeuptime_bpf *obj)
 		printf("	%16s %s\n","waker:", next_key.waker);
 		/*to convert val in microseconds*/
 		val /= 1000;
-		printf("	%lld\n", val);
+		printf("	%" PRIu64 "\n", val);
 	}
 
 	free(ip);

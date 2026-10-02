@@ -185,7 +185,7 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 {
-	warn("lost %llu events on CPU #%d\n", lost_cnt, cpu);
+	warn("lost %llu events on CPU #%d\n", (unsigned long long)lost_cnt, cpu);
 }
 
 int main(int argc, char **argv)

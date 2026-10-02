@@ -4,6 +4,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <getopt.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -485,7 +486,7 @@ static int get_func_ip_mod(struct func *func)
 				goto out;
 			}
 		}
-		p_debug("%s =  <ip %llx, mod %s>", func->name, func->ip,
+		p_debug("%s =  <ip %" PRIx64 ", mod %s>", func->name, func->ip,
 			strlen(func->mod) > 0 ? func->mod : "vmlinux");
 		break;
 	}
@@ -705,7 +706,7 @@ static void trace_handler(void *ctx, int cpu, void *data, __u32 size)
 			size, sizeof(trace) - MAX_TRACE_BUF);
 		return;
 	}
-	printf("%16lld %4d %8u %s(\n", trace->time, trace->cpu, trace->pid,
+	printf("%16" PRIu64 " %4d %8u %s(\n", trace->time, trace->cpu, trace->pid,
 	       trace->func.name);
 
 	for (i = 0, shown = 0; i < trace->nr_traces; i++) {
@@ -735,7 +736,7 @@ static void trace_handler(void *ctx, int cpu, void *data, __u32 size)
 			printf(",\n");
 		printf("%34s %s = ", "", val->name);
 		if (val->flags & KSNOOP_F_PTR)
-			printf("*(0x%llx)", data->raw_value);
+			printf("*(0x%" PRIx64 ")", data->raw_value);
 		printf("\n");
 
 		if (data->err_type_id != 0) {
@@ -769,7 +770,7 @@ static void trace_handler(void *ctx, int cpu, void *data, __u32 size)
 
 static void lost_handler(void *ctx, int cpu, __u64 cnt)
 {
-	p_err("\t/* lost %llu events */", cnt);
+	p_err("\t/* lost %" PRIu64 " events */", cnt);
 }
 
 static void sig_int(int signo)

@@ -7,6 +7,7 @@
 //                             use fentry/kprobe
 // 15-Feb-2023   Rong Tao      Add tracepoint writeback_dirty_{page,folio}
 #include <argp.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -112,8 +113,8 @@ static int get_meminfo(__u64 *buffers, __u64 *cached)
 		   "MemTotal: %*u kB\n"
 		   "MemFree: %*u kB\n"
 		   "MemAvailable: %*u kB\n"
-		   "Buffers: %llu kB\n"
-		   "Cached: %llu kB\n",
+		   "Buffers: %" SCNu64 " kB\n"
+		   "Cached: %" SCNu64 " kB\n",
 		   buffers, cached) != 2) {
 		fclose(f);
 		return -1;

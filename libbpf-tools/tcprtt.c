@@ -6,6 +6,7 @@
 #define _DEFAULT_SOURCE
 #include <arpa/inet.h>
 #include <argp.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <signal.h>
 #include <unistd.h>
@@ -220,7 +221,7 @@ static int print_map(struct bpf_map *map)
 		}
 
 		if (env.extended)
-			printf("[AVG %llu]", hist.latency / hist.cnt);
+			printf("[AVG %" PRIu64 "]", hist.latency / hist.cnt);
 		printf("\n");
 		print_log2_hist(hist.slots, MAX_SLOTS, units);
 		lookup_key = &next_key;

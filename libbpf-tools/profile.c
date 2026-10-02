@@ -448,13 +448,13 @@ static int print_count(struct key_t *event, __u64 count, int stack_map, bool fol
 		ret = print_kern_stacktrace(event, stack_map, ip, fmt, false);
 		print_user_stacktrace(event, stack_map, ip, fmt, ret && env.delimiter);
 		printf("    %-16s %s (%d)\n", "-", event->name, event->pid);
-		printf("        %lld\n\n", count);
+		printf("        %" PRIu64 "\n\n", count);
 	} else {
 		/* folded stack output */
 		printf("%s", event->name);
 		ret = print_user_stacktrace(event, stack_map, ip, fmt, false);
 		print_kern_stacktrace(event, stack_map, ip, fmt, ret && env.delimiter);
-		printf(" %lld\n", count);
+		printf(" %" PRIu64 "\n", count);
 	}
 
 	free(ip);
