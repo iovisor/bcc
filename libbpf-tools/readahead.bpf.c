@@ -68,6 +68,29 @@ SEC("fexit/filemap_alloc_folio_noprof")
 int BPF_PROG(filemap_alloc_folio_noprof_ret, gfp_t gfp, unsigned int order,
 	struct folio *ret)
 {
+	if (!ret)
+		return 0;
+	return alloc_done(&ret->page);
+}
+
+/*
+ * 7f3779a3ac3e ("mm/filemap: Add NUMA mempolicy support to
+ * filemap_alloc_folio()") in v6.19 added a struct mempolicy * argument to
+ * filemap_alloc_folio_noprof().
+ *
+ * A fexit program receives the return value in the register that follows the
+ * arguments declared by the kernel BTF, and the kernel does not check that a
+ * fexit program declares as many arguments as its target. With only the
+ * program above, ret would be read from the policy argument and silently be
+ * NULL on such kernels, so the read-ahead pages would never pair up with the
+ * later mark-accessed events.
+ */
+SEC("fexit/filemap_alloc_folio_noprof")
+int BPF_PROG(filemap_alloc_folio_noprof_mpol_ret, gfp_t gfp,
+	unsigned int order, struct mempolicy *policy, struct folio *ret)
+{
+	if (!ret)
+		return 0;
 	return alloc_done(&ret->page);
 }
 
