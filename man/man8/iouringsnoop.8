@@ -1,0 +1,160 @@
+.TH iouringsnoop 8  "2024-10-01" "USER COMMANDS"
+.SH NAME
+iouringsnoop \- Trace io_uring request latency. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B iouringsnoop [\-h] [\-p PID] [\-c COMM] [\-m MIN_US] [\-r CTX] [\-e] [\-T] [\-v] [duration]
+.SH DESCRIPTION
+iouringsnoop traces Linux io_uring requests from submission to completion,
+reporting per-request latency in microseconds alongside the operation
+opcode, PID, process name, and CQE result code.
+
+io_uring is the Linux kernel's high-performance asynchronous I/O interface
+(introduced in Linux 5.1).  Traditional tools such as
+.BR biosnoop (8),
+.BR fileslower (8),
+and
+.BR syscount (8)
+do not observe io_uring traffic because io_uring bypasses the standard VFS
+system call path.  iouringsnoop fills this gap.
+
+This tool attaches to the kernel tracepoints:
+.IP \(bu 2
+.B io_uring:io_uring_submit_req
+(available since Linux 5.17)
+.IP \(bu 2
+.B io_uring:io_uring_complete
+(available since Linux 5.10)
+
+State (submission timestamp and PID/comm) is stored in a
+.B BPF_MAP_TYPE_HASH
+keyed by the
+.I io_kiocb
+request pointer.  On completion the entry is deleted to prevent map leaks.
+
+When kernel BTF support is present (CONFIG_DEBUG_INFO_BTF=y), the tool
+uses
+.B tp_btf
+programs (type-safe tracepoint programs).  On older kernels without full
+BTF support for these tracepoints, it falls back automatically to
+.B raw_tp
+programs.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+.TP
+CONFIG_IO_URING=y
+(Linux 5.1 or later)
+.TP
+CONFIG_DEBUG_INFO_BTF=y
+Recommended for CO-RE and tp_btf support.  raw_tp fallback works
+without this option.
+.TP
+Linux kernel >= 5.17
+Required for the
+.I io_uring_submit_req
+tracepoint.  On kernels 5.10\-5.16 only
+.I io_uring_complete
+is available; iouringsnoop will report an error on those kernels.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-p PID
+Trace this process ID only (filtered in-kernel).
+.TP
+\-c COMM
+Trace processes whose name starts with COMM (filtered in-kernel).
+.TP
+\-m MIN_US
+Only report requests whose latency exceeds MIN_US microseconds.
+.TP
+\-r CTX
+Trace only the io_ring_ctx at the given hexadecimal address.  Useful when
+a process has multiple rings open.
+.TP
+\-e
+Report only requests that completed with a negative result (errors).
+.TP
+\-T
+Include a wall-clock TIME column in the output.
+.TP
+\-v
+Verbose debug output (libbpf log).
+.TP
+duration
+Trace for this many seconds, then exit.
+.SH EXAMPLES
+.TP
+Trace all io_uring activity system-wide:
+.B # iouringsnoop
+.TP
+Trace PID 12345 only:
+.B # iouringsnoop \-p 12345
+.TP
+Trace a process named 'fio':
+.B # iouringsnoop \-c fio
+.TP
+Show only slow requests (latency > 1 ms = 1000 µs):
+.B # iouringsnoop \-m 1000
+.TP
+Show only failed requests:
+.B # iouringsnoop \-e
+.TP
+Trace for 10 seconds with timestamps:
+.B # iouringsnoop \-T 10
+.SH OUTPUT
+.TP
+TIME
+Wall-clock timestamp (only with \-T flag).
+.TP
+COMM
+Name of the process that submitted the request.
+.TP
+PID
+Process ID of the submitter.
+.TP
+OPCODE
+Human-readable io_uring opcode name.  Examples:
+.BR READV ,
+.BR WRITEV ,
+.BR ACCEPT ,
+.BR CONNECT ,
+.BR SEND ,
+.BR RECV ,
+.BR SPLICE ,
+.BR POLL_ADD ,
+.BR TIMEOUT .
+.TP
+LAT(us)
+Submission-to-completion latency in microseconds.
+.TP
+RET
+CQE result code.  Negative values indicate errors (errno negated).
+Positive values are typically byte counts or file descriptors.
+.SH OVERHEAD
+iouringsnoop attaches to two kernel tracepoints and performs one hash map
+lookup and deletion per request completion.  At moderate io_uring rates
+(up to tens of thousands of requests per second) the overhead is expected
+to be well under 1 % CPU.  At very high rates (hundreds of thousands per
+second) consider using the \-m option to filter slow requests in-kernel
+and reduce the volume of perf buffer events.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _example.txt file
+containing example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable \- in development.
+.SH AUTHOR
+Added via BCC community contribution.
+.SH SEE ALSO
+.BR biosnoop (8),
+.BR biolatency (8),
+.BR fileslower (8),
+.BR syscount (8),
+.BR opensnoop (8)

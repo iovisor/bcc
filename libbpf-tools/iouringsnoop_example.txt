@@ -1,0 +1,126 @@
+Demonstrations of iouringsnoop, the Linux BPF CO-RE version.
+
+
+iouringsnoop traces all io_uring requests system-wide, printing each
+request's opcode, PID, process name, latency (µs) and CQE return value.
+
+Example output (running against fio with io_uring engine):
+
+  # iouringsnoop
+
+  Tracing io_uring requests... Hit Ctrl-C to end.
+  COMM             PID     OPCODE               LAT(us)    RET
+  fio              28192   READV                     87   4096
+  fio              28192   WRITEV                   124   4096
+  fio              28192   READV                      92   4096
+  fio              28192   WRITEV                  1023   4096
+  fio              28193   READ                       45   65536
+  fio              28193   WRITE                      58   65536
+  nginx            1441    ACCEPT                     12      5
+  envoy            9922    RECV                       18   1024
+  envoy            9922    SEND                       22    512
+  scylla           19820   READV                    3804   32768
+  ^C
+
+  The 'LAT(us)' column shows submission-to-completion latency in
+  microseconds.  'RET' is the CQE result: positive = bytes/fd,
+  negative = -errno (error).
+
+
+Filtering by PID:
+
+  # iouringsnoop -p 28192
+
+  Tracing io_uring requests... Hit Ctrl-C to end.
+  COMM             PID     OPCODE               LAT(us)    RET
+  fio              28192   READV                     87   4096
+  fio              28192   WRITEV                   124   4096
+  fio              28192   READV                      92   4096
+  ^C
+
+
+Show only slow requests (latency > 1 ms = 1000 µs):
+
+  # iouringsnoop -m 1000
+
+  Tracing io_uring requests... Hit Ctrl-C to end.
+  COMM             PID     OPCODE               LAT(us)    RET
+  fio              28192   WRITEV                  1023   4096
+  scylla           19820   READV                   3804  32768
+  scylla           19820   WRITEV                  2101  32768
+  ^C
+
+  Only requests with latency > 1000 µs are shown.  This is evaluated
+  in-kernel so the perf buffer overhead is minimal.
+
+
+Show only failed requests (res < 0):
+
+  # iouringsnoop -e
+
+  Tracing io_uring requests... Hit Ctrl-C to end.
+  COMM             PID     OPCODE               LAT(us)    RET
+  fio              28192   READV                     12     -9
+  nginx            1441    CONNECT                    4   -111
+  ^C
+
+  RET = -9  is -EBADF (bad file descriptor).
+  RET = -111 is -ECONNREFUSED.
+
+
+Trace with wall-clock timestamps for 5 seconds:
+
+  # iouringsnoop -T 5
+
+  Tracing io_uring requests for 5 seconds...
+  TIME      COMM             PID     OPCODE               LAT(us)    RET
+  10:42:01  fio              28192   READV                     87   4096
+  10:42:01  fio              28192   WRITEV                   124   4096
+  10:42:02  envoy            9922    ACCEPT                    19      6
+  10:42:02  envoy            9922    RECV                      22   2048
+  10:42:02  nginx            1441    SEND                      31   1024
+
+
+Trace a process named 'scylla':
+
+  # iouringsnoop -c scylla
+
+  Tracing io_uring requests... Hit Ctrl-C to end.
+  COMM             PID     OPCODE               LAT(us)    RET
+  scylla           19820   READV                   3804  32768
+  scylla           19820   WRITEV                  2101  32768
+  scylla           19821   POLL_ADD                   3      1
+  ^C
+
+
+USAGE message:
+
+  # iouringsnoop --help
+
+  Usage: iouringsnoop [OPTION...] [duration]
+  Trace io_uring request submission-to-completion latency.
+
+  USAGE: iouringsnoop [--help] [-p PID] [-c COMM] [-m MIN_US]
+                      [-r CTX] [-e] [-T] [duration]
+
+  EXAMPLES:
+      iouringsnoop              # trace all io_uring requests
+      iouringsnoop -p 1234      # trace PID 1234 only
+      iouringsnoop -c fio       # trace process named 'fio'
+      iouringsnoop -m 1000      # show requests > 1000 µs (1 ms)
+      iouringsnoop -e           # show only failed requests (res < 0)
+      iouringsnoop -T           # include timestamp column
+      iouringsnoop 10           # trace for 10 seconds then exit
+
+    -c, --comm=COMM         Trace this process name only
+    -e, --errors            Show only failed requests
+    -m, --min-us=MIN_US     Minimum latency to report, in microseconds
+    -p, --pid=PID           Trace this PID only
+    -r, --ring=CTX          Trace this io_ring_ctx pointer (hex) only
+    -T, --timestamp         Include timestamp column
+    -v, --verbose           Verbose debug output
+    -?, --help              Give this help list
+        --usage             Give a short usage message
+    -V, --version           Print program version
+
+  Report bugs to <https://github.com/iovisor/bcc/issues>.
