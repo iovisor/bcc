@@ -56,6 +56,9 @@ Show extended fields.
 \-f FLAG
 Filter on open() flags, e.g., O_WRONLY.
 .TP
+\-b BUFFER_PAGES, \-\-buffer\-pages BUFFER_PAGES
+Size of the perf ring buffer (must be a power of two number of pages and defaults to 64)
+.TP
 \-F
 Show full path for an open file with relative path.
 .TP
@@ -109,6 +112,10 @@ Only print calls for writing:
 Trace a set of cgroups only (see special_filtering.md from bcc sources for more details):
 #
 .B opensnoop \-\-cgroupmap /sys/fs/bpf/test01
+.TP
+Trace with a larger perf ring buffer (128 pages):
+#
+.B opensnoop \-b 128
 .SH FIELDS
 .TP
 TIME(s)
