@@ -551,6 +551,7 @@ end
 
 local function LOAD(dst, src, off, vtype)
 	local base = V[src].const
+	local stack_value = false
 	assert(base and base.__dissector, 'NYI: load() on variable that doesn\'t have dissector')
 	assert(V[src].source, 'NYI: load() on variable with unknown source')
 	-- Cast to different type if requested
@@ -577,11 +578,12 @@ local function LOAD(dst, src, off, vtype)
 	elseif V[src].source:find('ptr_to_probe', 1, true) then
 		BUILTIN(builtins[builtins.probe_read], nil, dst, src, vtype, off)
 		V[dst].source = V[src].source -- Builtin handles everything
+		stack_value = true -- probe_read copied the value into allocated stack memory
 	else
 		error('NYI: load() on variable from ' .. V[src].source)
 	end
 	V[dst].type = vtype
-	V[dst].const = nil -- Dissected value is not constant anymore
+	if not stack_value then V[dst].const = nil end -- Dissected value is not constant anymore
 end
 
 local function CALL(a, b, d)
@@ -1043,6 +1045,8 @@ local BC = {
 				-- Pointer access with a dissector (traditional uses BPF_LD, direct uses BPF_MEM)
 				elseif V[b].source and V[b].source:find('ptr_to_') then
 					LOAD(a, b, ofs, atype)
+					-- Keep probe_read's stack-backed value for scalar and map-key consumers.
+					if V[b].source:find('ptr_to_probe', 1, true) then new_const = V[a].const end
 				else
 					error('NYI: B[C] where B is not Lua table, BPF map, or pointer')
 				end
