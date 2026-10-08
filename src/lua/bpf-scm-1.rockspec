@@ -29,6 +29,7 @@ build = {
     bpf = "src/lua/bpf/bpf.lua",
     ["bpf.builtins"] = "src/lua/bpf/builtins.lua",
     ["bpf.cdef"] = "src/lua/bpf/cdef.lua",
+    ["bpf.tracepoint_type"] = "src/lua/bpf/tracepoint_type.lua",
     ["bpf.elf"] = "src/lua/bpf/elf.lua",
     ["bpf.init"] = "src/lua/bpf/init.lua",
     ["bpf.ljbytecode"] = "src/lua/bpf/ljbytecode.lua",
