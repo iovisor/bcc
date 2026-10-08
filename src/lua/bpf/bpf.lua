@@ -212,7 +212,10 @@ local function vreg(var, reg, reserve, vtype)
 		reg_fill(var, reg)
 	elseif src.const then
 		vtype = vtype or src.type
-		if type(src.const) == 'table' and src.const.__base then
+		if type(src.const) == 'table' and src.const.__value then
+			-- A probe_read scalar lives in stack memory; load its bytes, not its address.
+			emit(BPF.MEM + BPF.LDX + const_width[ffi.sizeof(vtype)], reg, 10, -src.const.__base, 0)
+		elseif type(src.const) == 'table' and src.const.__base then
 			-- Load pointer type
 			emit(BPF.ALU64 + BPF.MOV + BPF.X, reg, 10, 0, 0)
 			emit(BPF.ALU64 + BPF.ADD + BPF.K, reg, 0, 0, -src.const.__base)
@@ -303,6 +306,8 @@ local function vscalar(a, w)
 		vderef(tmp_reg, tmp_reg, V[a])
 		src_reg = tmp_reg -- Materialize and dereference it
 	-- Source is a value on stack, we must load it first
+	elseif type(V[a].const) == 'table' and V[a].const.__value then
+		src_reg = vreg(a) -- vreg loads the scalar bytes from the stack slot
 	elseif type(V[a].const) == 'table' and V[a].const.__base > 0 then
 		src_reg = vreg(a)
 		emit(BPF.MEM + BPF.LDX + const_width[w], src_reg, 10, -V[a].const.__base, 0)
@@ -551,6 +556,7 @@ end
 
 local function LOAD(dst, src, off, vtype)
 	local base = V[src].const
+	local stack_value = false
 	assert(base and base.__dissector, 'NYI: load() on variable that doesn\'t have dissector')
 	assert(V[src].source, 'NYI: load() on variable with unknown source')
 	-- Cast to different type if requested
@@ -577,11 +583,17 @@ local function LOAD(dst, src, off, vtype)
 	elseif V[src].source:find('ptr_to_probe', 1, true) then
 		BUILTIN(builtins[builtins.probe_read], nil, dst, src, vtype, off)
 		V[dst].source = V[src].source -- Builtin handles everything
+		stack_value = true -- probe_read copied the value into allocated stack memory
 	else
 		error('NYI: load() on variable from ' .. V[src].source)
 	end
 	V[dst].type = vtype
-	V[dst].const = nil -- Dissected value is not constant anymore
+	if stack_value then
+		assert(V[dst].const and V[dst].const.__base > 0, 'probe_read did not allocate stack storage')
+		V[dst].const.__value = true -- Distinguish scalar bytes from a pointer to the stack slot
+	else
+		V[dst].const = nil -- Dissected value is not constant anymore
+	end
 end
 
 local function CALL(a, b, d)
@@ -1043,6 +1055,8 @@ local BC = {
 				-- Pointer access with a dissector (traditional uses BPF_LD, direct uses BPF_MEM)
 				elseif V[b].source and V[b].source:find('ptr_to_') then
 					LOAD(a, b, ofs, atype)
+					-- Keep probe_read's stack-backed value for scalar and map-key consumers.
+					if V[b].source:find('ptr_to_probe', 1, true) then new_const = V[a].const end
 				else
 					error('NYI: B[C] where B is not Lua table, BPF map, or pointer')
 				end
