@@ -93,5 +93,7 @@ add_test(NAME py_queuestack WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_queuestack sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_queuestack.py)
 add_test(NAME py_test_map_batch_ops WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_test_map_batch_ops sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_map_batch_ops.py)
+add_test(NAME py_test_map_batch_mock WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  COMMAND ${TEST_WRAPPER} py_test_map_batch_mock simple ${CMAKE_CURRENT_SOURCE_DIR}/test_map_batch_mock.py)
 add_test(NAME py_test_map_in_map WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_test_map_in_map sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_map_in_map.py)

@@ -581,45 +581,58 @@ class TableBase(MutableMapping):
             bpf_batch = lib.bpf_lookup_batch
             bpf_cmd = "BPF_MAP_LOOKUP_BATCH"
 
-        # alloc keys and values to the max size
+                # Reuse a full-capacity buffer for each syscall. A single traversal can
+        # observe more than max_entries elements when the map changes between
+        # buckets. Accumulating those elements in one buffer leaves too little
+        # room for a later bucket and can make the next call fail with ENOSPC.
         ct_buf_size, ct_keys, ct_values = self._alloc_keys_values(alloc_k=True,
                                                                   alloc_v=True)
-        ct_out_batch = ct_cnt = ct.c_uint32(0)
-        total = 0
+        ct_out_batch = ct.c_uint32(0)
+        ct_cnt = ct.c_uint32(0)
+        first_batch = True
         while True:
-            ct_cnt.value = ct_buf_size.value - total
+            ct_cnt.value = ct_buf_size.value
             res = bpf_batch(self.map_fd,
-                            ct.byref(ct_out_batch) if total else None,
+                            None if first_batch else ct.byref(ct_out_batch),
                             ct.byref(ct_out_batch),
-                            ct.byref(ct_keys, ct.sizeof(self.Key) * total),
-                            ct.byref(ct_values, ct.sizeof(self.Leaf) * total),
+                            ct.byref(ct_keys),
+                            ct.byref(ct_values),
                             ct.byref(ct_cnt)
                             )
-            errcode = ct.get_errno()
-            total += ct_cnt.value
-            if (res != 0 and errcode != errno.ENOENT):
+            errcode = ct.get_errno() if res != 0 else 0
+
+            # The batch API documents count as unreliable after EFAULT. For
+            # other errors it is the number of elements processed before the
+            # error, so preserve those results before raising below.
+            if res != 0 and errcode == errno.EFAULT:
                 raise Exception("%s has failed: %s" % (bpf_cmd,
                                                        os.strerror(errcode)))
 
+            count = ct_cnt.value
+            if count > ct_buf_size.value:
+                raise Exception("%s returned an invalid element count: %d"
+                                % (bpf_cmd, count))
+
+            for i in range(count):
+                k = ct_keys[i]
+                v = ct_values[i]
+                if not isinstance(k, ct.Structure):
+                    k = self.Key(k)
+                if not isinstance(v, ct.Structure):
+                    v = self.Leaf(v)
+                yield (k, v)
+
             if res != 0:
-                break  # success
+                if errcode == errno.ENOENT:
+                    break
+                raise Exception("%s has failed: %s" % (bpf_cmd,
+                                                       os.strerror(errcode)))
 
-            if total == ct_buf_size.value:  # buffer full, we can't progress
+            if count == 0:
+                # Avoid retrying forever if concurrent updates prevent progress.
                 break
 
-            if ct_cnt.value == 0:
-                # no progress, probably because concurrent update
-                # puts too many elements in one bucket.
-                break
-
-        for i in range(0, total):
-            k = ct_keys[i]
-            v = ct_values[i]
-            if not isinstance(k, ct.Structure):
-                k = self.Key(k)
-            if not isinstance(v, ct.Structure):
-                v = self.Leaf(v)
-            yield (k, v)
+            first_batch = False
 
     def zero(self):
         # Even though this is not very efficient, we grab the entire list of
