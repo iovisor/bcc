@@ -166,10 +166,21 @@ if not cpp_demangler then
 		end
 	end
 end
+-- Shell-quote a single argument (single-quote wrapping, POSIX-safe)
+local function shell_quote(s)
+	s = tostring(s)
+	if s == '' then
+		return "''"
+	end
+	if not s:find('[^%w@%%+=:,./%-]') then
+		return s
+	end
+	return "'" .. s:gsub("'", "'\\''") .. "'"
+end
 local cpp_demangle = function (name) return name end
 if cpp_demangler then
 	cpp_demangle = function (name)
-		local cmd = string.format('%s -p %s', cpp_demangler, name)
+		local cmd = string.format('%s -p %s', shell_quote(cpp_demangler), shell_quote(name))
 		local fp = assert(io.popen(cmd, 'r'))
 		local output = fp:read('*all')
 		fp:close()
