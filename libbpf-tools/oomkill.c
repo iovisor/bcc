@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
 // Copyright (c) 2022 Jingxiang Zeng
 // Copyright (c) 2022 Krisztian Fekete
+// Copyright (c) 2025 Rong Tao
 //
 // Based on oomkill(8) from BCC by Brendan Gregg.
 // 13-Jan-2022   Jingxiang Zeng   Created this.
 // 17-Oct-2022   Krisztian Fekete Edited this.
+// 03-Aug-2025   Rong Tao         Support display cgroup.
 #include <argp.h>
 #include <errno.h>
 #include <signal.h>
@@ -20,13 +22,15 @@
 #include "compat.h"
 #include "oomkill.h"
 #include "btf_helpers.h"
+#include "cgroup_helpers.h"
 #include "trace_helpers.h"
 
 static volatile sig_atomic_t exiting = 0;
 
 static bool verbose = false;
+static bool display_cgroup = false;
 
-const char *argp_program_version = "oomkill 0.1";
+const char *argp_program_version = "oomkill 0.2";
 const char *argp_program_bug_address =
 	"https://github.com/iovisor/bcc/tree/master/libbpf-tools";
 const char argp_program_doc[] =
@@ -35,10 +39,12 @@ const char argp_program_doc[] =
 "USAGE: oomkill [-h]\n"
 "\n"
 "EXAMPLES:\n"
-"    oomkill               # trace OOM kills\n";
+"    oomkill               # trace OOM kills\n"
+"    oomkill --cgroup      # trace OOM kills with cgroup display\n";
 
 static const struct argp_option opts[] = {
 	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
+	{ "cgroup", 'c', NULL, 0, "Display cgroup information", 0 },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
 	{},
 };
@@ -46,6 +52,9 @@ static const struct argp_option opts[] = {
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
 	switch (key) {
+	case 'c':
+		display_cgroup = true;
+		break;
 	case 'v':
 		verbose = true;
 		break;
@@ -60,18 +69,28 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 
 static int handle_event(void *ctx, void *data, size_t len)
 {
-	char loadavg[256];
+	char loadavg[256], cgroup_path[PATH_MAX];
 	char ts[32];
 	struct data_t *e = data;
 
 	str_timestamp("%H:%M:%S", ts, sizeof(ts));
+	printf("%s Triggered by PID %d (\"%s\"),", ts, e->tpid, e->tcomm);
+	if (display_cgroup) {
+		get_cgroupid_path(e->cgroupid, cgroup_path, sizeof(cgroup_path));
+		printf(" CGROUP %lld (\"%s\"),", e->cgroupid, cgroup_path);
+		if (e->mem_cgroupid) {
+			if (e->mem_cgroupid != e->cgroupid)
+				get_cgroupid_path(e->mem_cgroupid, cgroup_path,
+						  sizeof(cgroup_path));
+			printf(" MEMCG %lld (\"%s\"),", e->mem_cgroupid, cgroup_path);
+		}
+	}
+	printf(" OOM kill of PID %d (\"%s\"), %lld pages", e->tpid, e->tcomm, e->pages);
 
 	if (str_loadavg(loadavg, sizeof(loadavg)) > 0)
-		printf("%s Triggered by PID %d (\"%s\"), OOM kill of PID %d (\"%s\"), %lld pages, loadavg: %s",
-			ts, e->fpid, e->fcomm, e->tpid, e->tcomm, e->pages, loadavg);
+		printf(", loadavg: %s\n", loadavg);
 	else
-		printf("%s Triggered by PID %d (\"%s\"), OOM kill of PID %d (\"%s\"), %lld pages\n",
-			ts, e->fpid, e->fcomm, e->tpid, e->tcomm, e->pages);
+		printf("\n");
 
 	return 0;
 }
