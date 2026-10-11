@@ -284,7 +284,7 @@ print_ustack:
 
 skip_ustack:
 		printf("    %-16s %s (%d)\n", "-", val.comm, next_key.pid);
-		printf("        %" PRIu64 "\n\n", val.delta);
+		printf("        %" PRIu64 "\n\n", (uint64_t)val.delta);
 	}
 
 cleanup:

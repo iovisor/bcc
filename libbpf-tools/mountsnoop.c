@@ -405,7 +405,8 @@ static int handle_event(void *ctx, void *data, size_t len)
 	printf("%sCOMM:   %s\n", indent, e->comm);
 	printf("%sOP:     %s\n", indent, op_name[e->op]);
 	printf("%sRET:    %s\n", indent, strerrno(e->ret));
-	printf("%sLAT:    %" PRIu64 "us\n", indent, e->delta / 1000);
+	printf("%sLAT:    %" PRIu64 "us\n", indent,
+	       (uint64_t)(e->delta / 1000));
 	printf("%sMNT_NS: %u\n", indent, e->mnt_ns);
 	switch (e->op) {
 	case MOUNT:

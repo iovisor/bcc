@@ -585,7 +585,7 @@ static void print_acq_stat(struct ksyms *ksyms, struct stack_stat *ss,
 	printf("%37s %9s %8llu %10s %12s\n",
 	       symname(ksyms, ss->bt[offset], buf, sizeof(buf)),
 	       print_time(avg, sizeof(avg), ss->ls.acq_total_time / ss->ls.acq_count),
-	       ss->ls.acq_count,
+	       (unsigned long long)ss->ls.acq_count,
 	       print_time(max, sizeof(max), ss->ls.acq_max_time),
 	       print_time(tot, sizeof(tot), ss->ls.acq_total_time));
 	for (i = offset + 1; i < nr_stack_entries + offset; i++) {
@@ -595,10 +595,10 @@ static void print_acq_stat(struct ksyms *ksyms, struct stack_stat *ss,
 	}
 	if (nr_stack_entries > 1 && !env.per_thread)
 		printf("                              Max PID %" PRIu64 ", COMM %s, Lock %s (0x%" PRIx64 ")%s\n",
-		       ss->ls.acq_max_id >> 32,
+		       (uint64_t)(ss->ls.acq_max_id >> 32),
 		       ss->ls.acq_max_comm,
 		       get_lock_name(ksyms, ss->ls.acq_max_lock_ptr),
-		       ss->ls.acq_max_lock_ptr,
+		       (uint64_t)ss->ls.acq_max_lock_ptr,
 		       get_nltype_ioctl(ss->ls.acq_max_nltype, ss->ls.acq_max_ioctl));
 }
 
@@ -612,7 +612,7 @@ static void print_acq_task(struct stack_stat *ss)
 	printf("%37s %9s %8llu %10s %12s\n",
 	       print_caller(buf, sizeof(buf), ss),
 	       print_time(avg, sizeof(avg), ss->ls.acq_total_time / ss->ls.acq_count),
-	       ss->ls.acq_count,
+	       (unsigned long long)ss->ls.acq_count,
 	       print_time(max, sizeof(max), ss->ls.acq_max_time),
 	       print_time(tot, sizeof(tot), ss->ls.acq_total_time));
 }
@@ -640,7 +640,7 @@ static void print_hld_stat(struct ksyms *ksyms, struct stack_stat *ss,
 	printf("%37s %9s %8llu %10s %12s\n",
 	       symname(ksyms, ss->bt[offset], buf, sizeof(buf)),
 	       print_time(avg, sizeof(avg), ss->ls.hld_total_time / ss->ls.hld_count),
-	       ss->ls.hld_count,
+	       (unsigned long long)ss->ls.hld_count,
 	       print_time(max, sizeof(max), ss->ls.hld_max_time),
 	       print_time(tot, sizeof(tot), ss->ls.hld_total_time));
 	for (i = offset + 1; i < nr_stack_entries + offset; i++) {
@@ -650,10 +650,10 @@ static void print_hld_stat(struct ksyms *ksyms, struct stack_stat *ss,
 	}
 	if (nr_stack_entries > 1 && !env.per_thread)
 		printf("                              Max PID %" PRIu64 ", COMM %s, Lock %s (0x%" PRIx64 ")%s\n",
-		       ss->ls.hld_max_id >> 32,
+		       (uint64_t)(ss->ls.hld_max_id >> 32),
 		       ss->ls.hld_max_comm,
 		       get_lock_name(ksyms, ss->ls.hld_max_lock_ptr),
-		       ss->ls.hld_max_lock_ptr,
+		       (uint64_t)ss->ls.hld_max_lock_ptr,
 		       get_nltype_ioctl(ss->ls.hld_max_nltype, ss->ls.hld_max_ioctl));
 }
 
@@ -667,7 +667,7 @@ static void print_hld_task(struct stack_stat *ss)
 	printf("%37s %9s %8llu %10s %12s\n",
 	       print_caller(buf, sizeof(buf), ss),
 	       print_time(avg, sizeof(avg), ss->ls.hld_total_time / ss->ls.hld_count),
-	       ss->ls.hld_count,
+	       (unsigned long long)ss->ls.hld_count,
 	       print_time(max, sizeof(max), ss->ls.hld_max_time),
 	       print_time(tot, sizeof(tot), ss->ls.hld_total_time));
 }

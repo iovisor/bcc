@@ -104,6 +104,7 @@ static void sig_handler(int sig)
 
 static int get_meminfo(__u64 *buffers, __u64 *cached)
 {
+	uint64_t buffer_count, cached_count;
 	FILE *f;
 
 	f = fopen("/proc/meminfo", "r");
@@ -115,11 +116,13 @@ static int get_meminfo(__u64 *buffers, __u64 *cached)
 		   "MemAvailable: %*u kB\n"
 		   "Buffers: %" SCNu64 " kB\n"
 		   "Cached: %" SCNu64 " kB\n",
-		   buffers, cached) != 2) {
+		   &buffer_count, &cached_count) != 2) {
 		fclose(f);
 		return -1;
 	}
 	fclose(f);
+	*buffers = buffer_count;
+	*cached = cached_count;
 	return 0;
 }
 

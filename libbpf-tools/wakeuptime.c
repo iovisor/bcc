@@ -195,7 +195,7 @@ static void print_map(struct ksyms *ksyms, struct wakeuptime_bpf *obj)
 		printf("	%16s %s\n","waker:", next_key.waker);
 		/*to convert val in microseconds*/
 		val /= 1000;
-		printf("	%" PRIu64 "\n", val);
+		printf("	%" PRIu64 "\n", (uint64_t)val);
 	}
 
 	free(ip);

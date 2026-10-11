@@ -206,7 +206,8 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	printf("Tracing run queue latency higher than %" PRIu64 " us\n", env.min_us);
+	printf("Tracing run queue latency higher than %" PRIu64 " us\n",
+	       (uint64_t)env.min_us);
 	if (env.previous)
 		printf("%-8s %-16s %-6s %14s %-16s %-6s\n", "TIME", "COMM", "TID", "LAT(us)", "PREV COMM", "PREV TID");
 	else

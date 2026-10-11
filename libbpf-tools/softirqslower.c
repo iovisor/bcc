@@ -216,7 +216,7 @@ int main(int argc, char **argv)
 	}
 
 	printf("Tracing softirq latency higher than %" PRIu64 " us... "
-			"Hit Ctrl-C to end.\n", env.min_us);
+			"Hit Ctrl-C to end.\n", (uint64_t)env.min_us);
 	printf("%-8s %-20s %-8s %-14s %-6s %-16s\n",
 			"TIME", "STAGE", "SOFTIRQ", "LAT(us)", "CPU", "COMM");
 

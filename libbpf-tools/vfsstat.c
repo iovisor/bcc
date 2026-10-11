@@ -117,7 +117,7 @@ static void print_and_reset_stats(__u64 stats[S_MAXSTAT])
 	printf("%-8s: ", s);
 	for (i = 0; i < S_MAXSTAT; i++) {
 		val = __atomic_exchange_n(&stats[i], 0, __ATOMIC_RELAXED);
-		printf(" %8llu", val / env.interval);
+		printf(" %8llu", (unsigned long long)(val / env.interval));
 	}
 	printf("\n");
 }

@@ -69,10 +69,11 @@ static int handle_event(void *ctx, void *data, size_t len)
 
 	if (str_loadavg(loadavg, sizeof(loadavg)) > 0)
 		printf("%s Triggered by PID %d (\"%s\"), OOM kill of PID %d (\"%s\"), %" PRIu64 " pages, loadavg: %s",
-			ts, e->fpid, e->fcomm, e->tpid, e->tcomm, e->pages, loadavg);
+		ts, e->fpid, e->fcomm, e->tpid, e->tcomm, (uint64_t)e->pages,
+		loadavg);
 	else
 		printf("%s Triggered by PID %d (\"%s\"), OOM kill of PID %d (\"%s\"), %" PRIu64 " pages\n",
-			ts, e->fpid, e->fcomm, e->tpid, e->tcomm, e->pages);
+			ts, e->fpid, e->fcomm, e->tpid, e->tcomm, (uint64_t)e->pages);
 
 	return 0;
 }

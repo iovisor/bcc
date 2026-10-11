@@ -291,9 +291,10 @@ static int print_map(struct futexctn_bpf *obj)
 		    "%s[%u] lock 0x%" PRIx64 " contended %" PRIu64
 		    " times, %" PRIu64 " avg %s [max: %" PRIu64
 		    " %s, min %" PRIu64 " %s]\n",
-		    hist.comm, (__u32)next_key.pid_tgid, next_key.uaddr,
-		    hist.contended, hist.total_elapsed / hist.contended, units,
-		    hist.max, units, hist.min, units);
+		    hist.comm, (__u32)next_key.pid_tgid, (uint64_t)next_key.uaddr,
+		    (uint64_t)hist.contended,
+		    (uint64_t)(hist.total_elapsed / hist.contended), units,
+		    (uint64_t)hist.max, units, (uint64_t)hist.min, units);
 		if (!env.summary) {
 			printf("    -\n");
 			print_stack(obj, &next_key);

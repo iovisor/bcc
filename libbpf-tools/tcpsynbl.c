@@ -152,7 +152,7 @@ static int print_log2_hists(int fd)
 			fprintf(stderr, "failed to lookup hist: %d\n", err);
 			return -1;
 		}
-		printf("backlog_max = %" PRIu64 "\n", next_key);
+		printf("backlog_max = %" PRIu64 "\n", (uint64_t)next_key);
 		print_log2_hist(hist.slots, MAX_SLOTS, "backlog");
 		lookup_key = next_key;
 	}
