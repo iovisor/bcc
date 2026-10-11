@@ -154,8 +154,10 @@ class ProcSyms : SymbolCache {
       uint64_t start;
       uint64_t end;
       uint64_t file_offset;
-      Range(uint64_t s, uint64_t e, uint64_t f)
-          : start(s), end(e), file_offset(f) {}
+      uint64_t elf_so_addr;
+      uint64_t elf_so_offset;
+      Range(uint64_t s, uint64_t e, uint64_t f, uint64_t elf_so_addr, uint64_t elf_so_offset)
+          : start(s), end(e), file_offset(f), elf_so_addr(elf_so_addr), elf_so_offset(elf_so_offset) {}
     };
 
     Module(const char *name, std::shared_ptr<ModulePath> path,
@@ -167,10 +169,6 @@ class ProcSyms : SymbolCache {
     bool loaded_;
     bcc_symbol_option *symbol_option_;
     ModuleType type_;
-
-    // The file offset within the ELF of the SO's first text section.
-    uint64_t elf_so_offset_;
-    uint64_t elf_so_addr_;
 
     std::unordered_set<std::string> symnames_;
     std::vector<Symbol> syms_;
