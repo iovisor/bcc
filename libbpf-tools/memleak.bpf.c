@@ -7,6 +7,7 @@
 #include "maps.bpf.h"
 #include "memleak.h"
 #include "core_fixes.bpf.h"
+#include "unwind_helpers.bpf.h"
 
 const volatile size_t min_size = 0;
 const volatile size_t max_size = -1;
@@ -123,7 +124,10 @@ static int gen_alloc_exit2(void *ctx, u64 address)
 	if (address != 0 && address != MAP_FAILED) {
 		info.timestamp_ns = bpf_ktime_get_ns();
 
-		info.stack_id = bpf_get_stackid(ctx, &stack_traces, stack_flags);
+		if (!dwarf_unwind)
+			info.stack_id = bpf_get_stackid(ctx, &stack_traces, stack_flags);
+		else
+			info.stack_id = uw_get_stackid();
 
 		bpf_map_update_elem(&allocs, &address, &info, BPF_ANY);
 
