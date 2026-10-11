@@ -20,10 +20,13 @@ from __future__ import print_function
 from bcc import BPF
 import argparse
 import os
+import time
+from datetime import datetime
 
 # arguments
 examples = """examples:
-    ./biosnoop           # trace all block I/O
+    ./biosnoop           # trace all block I/O (relative time)
+    ./biosnoop -t        # include wall-clock timestamps
     ./biosnoop -Q        # include OS queued time
     ./biosnoop -d sdc    # trace sdc only
     ./biosnoop -P        # display block I/O pattern
@@ -38,6 +41,8 @@ parser.add_argument("-d", "--disk", type=str,
     help="trace this disk only")
 parser.add_argument("-P", "--pattern", action="store_true",
     help="display block I/O pattern (sequential or random)")
+parser.add_argument("-t", "--timestamps", action="store_true",
+    help="include wall-clock timestamps")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
@@ -45,14 +50,19 @@ debug = 0
 
 # define BPF program
 bpf_text = """
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-declarations"
+
+#undef static_assert
+#define static_assert(...)
+#undef __static_assert
+#define __static_assert(...)
+#undef _Static_assert
+#define _Static_assert(...)
+
 #include <uapi/linux/ptrace.h>
 #include <linux/blk-mq.h>
-"""
 
-if args.pattern:
-    bpf_text += "#define INCLUDE_PATTERN\n"
-
-bpf_text += """
 // for saving the timestamp and __data_len of each request
 struct start_req_t {
     u64 ts;
@@ -135,7 +145,7 @@ static int get_rwflag_tp(char *rwbs) {
     for (int i = 0; i < RWBS_LEN; i++) {
         if (rwbs[i] == 'W')
             return 1;
-        if (rwbs[i] == '\\0')
+        if (rwbs[i] == 0)
             return 0;
     }
     return 0;
@@ -263,33 +273,6 @@ int trace_req_completion(struct pt_regs *ctx, struct request *req)
     return __trace_req_completion(ctx, key);
 }
 """
-
-tp_start_text = """
-TRACEPOINT_PROBE(block, block_io_start)
-{
-    struct hash_key key = {
-        .dev = args->dev,
-        .rwflag = get_rwflag_tp(args->rwbs),
-        .sector = args->sector
-    };
-
-    return __trace_pid_start(key);
-}
-"""
-
-tp_done_text = """
-TRACEPOINT_PROBE(block, block_io_done)
-{
-    struct hash_key key = {
-        .dev = args->dev,
-        .rwflag = get_rwflag_tp(args->rwbs),
-        .sector = args->sector
-    };
-
-    return __trace_req_completion(args, key);
-}
-"""
-
 if args.queue:
     bpf_text = bpf_text.replace('##QUEUE##', '1')
 else:
@@ -318,51 +301,92 @@ if args.disk is not None:
 else:
     bpf_text = bpf_text.replace('DISK_FILTER', '')
 
+# Pre-determine tracepoint vs kprobe routing pathways
+is_tp_start = False
+is_tp_done = False
+kprobe_start = None
+kprobe_done = None
+
+if BPF.tracepoint_exists("block", "block_io_start"):
+    is_tp_start = True
+elif BPF.get_kprobe_functions(b'__blk_account_io_start'):
+    kprobe_start = "__blk_account_io_start"
+elif BPF.get_kprobe_functions(b'blk_account_io_start'):
+    kprobe_start = "blk_account_io_start"
+else:
+    print("ERROR: No found any block io start probe/tp.")
+    exit(1)
+
+if BPF.tracepoint_exists("block", "block_io_done"):
+    is_tp_done = True
+elif BPF.get_kprobe_functions(b'__blk_account_io_done'):
+    kprobe_done = "__blk_account_io_done"
+elif BPF.get_kprobe_functions(b'blk_account_io_done'):
+    kprobe_done = "blk_account_io_done"
+else:
+    print("ERROR: No found any block io done probe/tp.")
+    exit(1)
+
+# Dynamically append stable tracepoint hooks if target system supports them
+if is_tp_start:
+    bpf_text += """
+TRACEPOINT_PROBE(block, block_io_start)
+{
+    struct hash_key key = {
+        .dev = args->dev,
+        .rwflag = get_rwflag_tp(args->rwbs),
+        .sector = args->sector
+    };
+
+    return __trace_pid_start(key);
+}
+"""
+
+if is_tp_done:
+    bpf_text += """
+TRACEPOINT_PROBE(block, block_io_done)
+{
+    struct hash_key key = {
+        .dev = args->dev,
+        .rwflag = get_rwflag_tp(args->rwbs),
+        .sector = args->sector
+    };
+
+    return __trace_req_completion(args, key);
+}
+"""
+
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
         exit()
 
-if BPF.tracepoint_exists("block", "block_io_start"):
-    bpf_text += tp_start_text
-    tp_start = True
-else:
-    tp_start = False
-
-if BPF.tracepoint_exists("block", "block_io_done"):
-    bpf_text += tp_done_text
-    tp_done = True
-else:
-    tp_done = False
-
 # initialize BPF
 b = BPF(text=bpf_text)
-if not tp_start:
-    if BPF.get_kprobe_functions(b'__blk_account_io_start'):
-        b.attach_kprobe(event="__blk_account_io_start", fn_name="trace_pid_start")
-    elif BPF.get_kprobe_functions(b'blk_account_io_start'):
-        b.attach_kprobe(event="blk_account_io_start", fn_name="trace_pid_start")
-    else:
-        print("ERROR: No found any block io start probe/tp.")
-        exit(1)
+
+# Explicitly register kprobes only when tracepoints are unavailable
+if not is_tp_start:
+    b.attach_kprobe(event=kprobe_start, fn_name="trace_pid_start")
 
 if BPF.get_kprobe_functions(b'blk_start_request'):
     b.attach_kprobe(event="blk_start_request", fn_name="trace_req_start")
 b.attach_kprobe(event="blk_mq_start_request", fn_name="trace_req_start")
 
-if not tp_done:
-    if BPF.get_kprobe_functions(b'__blk_account_io_done'):
-        b.attach_kprobe(event="__blk_account_io_done", fn_name="trace_req_completion")
-    elif BPF.get_kprobe_functions(b'blk_account_io_done'):
-        b.attach_kprobe(event="blk_account_io_done", fn_name="trace_req_completion")
-    else:
-        print("ERROR: No found any block io done probe/tp.")
-        exit(1)
+if not is_tp_done:
+    b.attach_kprobe(event=kprobe_done, fn_name="trace_req_completion")
 
+# Safely isolate high-precision wall clock calculations
+if args.timestamps:
+    mono_to_wall_offset = time.clock_gettime(time.CLOCK_REALTIME) - time.clock_gettime(time.CLOCK_MONOTONIC)
 
 # header
-print("%-11s %-14s %-7s %-9s %-1s %-10s %-7s" % ("TIME(s)", "COMM", "PID",
-    "DISK", "T", "SECTOR", "BYTES"), end="")
+if args.timestamps:
+    print("%-26s %-14s %-7s %-9s %-1s %-10s %-7s" % ("TIME", "COMM", "PID",
+        "DISK", "T", "SECTOR", "BYTES"), end="")
+else:
+    print("%-11s %-14s %-7s %-9s %-1s %-10s %-7s" % ("TIME(s)", "COMM", "PID",
+        "DISK", "T", "SECTOR", "BYTES"), end="")
+
 if args.pattern:
     print("%-1s " % ("P"), end="")
 if args.queue:
@@ -393,8 +417,6 @@ def disk_print(d):
 rwflg = ""
 pattern = ""
 start_ts = 0
-prev_ts = 0
-delta = 0
 
 P_SEQUENTIAL = 1
 P_RANDOM = 2
@@ -412,13 +434,21 @@ def print_event(cpu, data, size):
     else:
         rwflg = "R"
 
-    delta = float(event.ts) - start_ts
-
     disk_name = disk_print(event.dev)
 
-    print("%-11.6f %-14.14s %-7s %-9s %-1s %-10s %-7s" % (
-        delta / 1000000, event.name.decode('utf-8', 'replace'), event.pid,
-        disk_name, rwflg, event.sector, event.len), end="")
+    if args.timestamps:
+        event_mono_sec = float(event.ts) / 1000000.0
+        event_wall_sec = event_mono_sec + mono_to_wall_offset
+        time_str = datetime.fromtimestamp(event_wall_sec).strftime('%Y-%m-%d %H:%M:%S.%f')
+        print("%-26s %-14.14s %-7s %-9s %-1s %-10s %-7s" % (
+            time_str, event.name.decode('utf-8', 'replace'), event.pid,
+            disk_name, rwflg, event.sector, event.len), end="")
+    else:
+        delta = float(event.ts) - start_ts
+        print("%-11.6f %-14.14s %-7s %-9s %-1s %-10s %-7s" % (
+            delta / 1000000, event.name.decode('utf-8', 'replace'), event.pid,
+            disk_name, rwflg, event.sector, event.len), end="")
+
     if args.pattern:
         if event.pattern == P_SEQUENTIAL:
             pattern = "S"
