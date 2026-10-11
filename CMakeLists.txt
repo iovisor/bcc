@@ -121,6 +121,10 @@ if(CMAKE_USE_LIBBPF_PACKAGE)
   find_package(LibBpf)
 endif()
 
+if(NOT PYTHON_CMD)
+  set(PYTHON_CMD "python3")
+endif()
+
 if(NOT PYTHON_ONLY)
   find_package(LLVM REQUIRED CONFIG)
   message(STATUS "Found LLVM: ${LLVM_INCLUDE_DIRS} ${LLVM_PACKAGE_VERSION} (Use LLVM_ROOT envronment variable for another version of LLVM)")
@@ -234,5 +238,8 @@ if(NOT TARGET uninstall)
     IMMEDIATE @ONLY)
 
   add_custom_target(uninstall
-    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/CmakeUninstall.cmake)
+    COMMAND ${CMAKE_COMMAND} -DPYTHON_CMD=\"${PYTHON_CMD}\"
+                             -DREVISION=${REVISION}
+                             -P ${CMAKE_CURRENT_BINARY_DIR}/CmakeUninstall.cmake
+  )
 endif()
