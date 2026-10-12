@@ -11,11 +11,11 @@ struct key_t {
 	__u32 tgid;
 	int user_stack_id;
 	int kern_stack_id;
+	char comm[TASK_COMM_LEN];
 };
 
 struct val_t {
 	__u64 delta;
-	char comm[TASK_COMM_LEN];
 };
 
 #endif /* __OFFCPUTIME_H */
