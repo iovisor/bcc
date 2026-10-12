@@ -282,7 +282,7 @@ print_ustack:
 		}
 
 skip_ustack:
-		printf("    %-16s %s (%d)\n", "-", val.comm, next_key.pid);
+		printf("    %-16s %s (%d)\n", "-", next_key.comm, next_key.pid);
 		printf("        %lld\n\n", val.delta);
 	}
 
