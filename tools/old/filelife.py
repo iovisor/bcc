@@ -30,7 +30,7 @@ parser = argparse.ArgumentParser(
     description="Trace stat() syscalls",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
-parser.add_argument("-p", "--pid",
+parser.add_argument("-p", "--pid", type=int,
     help="trace this PID only")
 args = parser.parse_args()
 debug = 0

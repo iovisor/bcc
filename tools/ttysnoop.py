@@ -46,9 +46,9 @@ parser.add_argument("-C", "--noclear", action="store_true",
     help="don't clear the screen")
 parser.add_argument("device", default="-1",
     help="path to a tty device (eg, /dev/tty0) or pts number")
-parser.add_argument("-s", "--datasize", default="256",
+parser.add_argument("-s", "--datasize", default=256, type=int,
     help="size of the transmitting buffer (default 256)")
-parser.add_argument("-c", "--datacount", default="16",
+parser.add_argument("-c", "--datacount", default=16, type=int,
     help="number of times we check for 'data-size' data (default 16)")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
@@ -229,8 +229,8 @@ if debug or args.ebpf:
     if args.ebpf:
         exit()
 
-bpf_text = bpf_text.replace('USER_DATASIZE', '%s' % args.datasize)
-bpf_text = bpf_text.replace('USER_DATACOUNT', '%s' % args.datacount)
+bpf_text = bpf_text.replace('USER_DATASIZE', str(args.datasize))
+bpf_text = bpf_text.replace('USER_DATACOUNT', str(args.datacount))
 
 # initialize BPF
 b = BPF(text=bpf_text)

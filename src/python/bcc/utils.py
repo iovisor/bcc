@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import argparse
 import ctypes as ct
 import sys
 import traceback
@@ -18,6 +19,34 @@ import warnings
 import re
 
 from .libbcc import lib
+
+def positive_int(value):
+    """argparse type: accept integers >= 0, reject non-numeric strings."""
+    ival = int(value)
+    if ival < 0:
+        raise argparse.ArgumentTypeError(
+            "%s is not a non-negative integer" % value)
+    return ival
+
+def positive_nonzero_int(value):
+    """argparse type: accept integers >= 1, reject zero and non-numeric strings."""
+    ival = int(value)
+    if ival <= 0:
+        raise argparse.ArgumentTypeError(
+            "%s is not a positive integer" % value)
+    return ival
+
+def positive_int_list(value):
+    """argparse type: accept comma-separated list of non-negative integers."""
+    result = []
+    for item in value.split(','):
+        item = item.strip()
+        ival = int(item)
+        if ival < 0:
+            raise argparse.ArgumentTypeError(
+                "%s is not a non-negative integer" % item)
+        result.append(ival)
+    return result
 
 def _read_cpu_range(path):
     cpus = []

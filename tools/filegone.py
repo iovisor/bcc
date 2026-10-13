@@ -26,7 +26,7 @@ parser = argparse.ArgumentParser(
     description="Trace why file gone (deleted or renamed)",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
-parser.add_argument("-p", "--pid",
+parser.add_argument("-p", "--pid", type=int,
     help="trace this PID only")
 parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
