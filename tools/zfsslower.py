@@ -26,6 +26,7 @@
 #
 # 14-Feb-2016   Brendan Gregg   Created this.
 # 16-Oct-2016   Dina Goldshtein -p to filter by process ID.
+# 08-Sep-2026   zpl_iter_{read,write} use kiocb, not the old zpl_read args.
 
 from __future__ import print_function
 from bcc import BPF
@@ -111,6 +112,28 @@ int trace_rw_entry(struct pt_regs *ctx, struct file *filp, char __user *buf,
     val.ts = bpf_ktime_get_ns();
     val.fp = filp;
     val.offset = *ppos;
+    if (val.fp)
+        entryinfo.update(&id, &val);
+
+    return 0;
+}
+
+// zpl_iter_read(), zpl_iter_write():
+int trace_zpl_iter_rw_entry(struct pt_regs *ctx, struct kiocb *iocb)
+{
+    u64 id = bpf_get_current_pid_tgid();
+    u32 pid = id >> 32; // PID is higher part
+
+    if (FILTER_PID)
+        return 0;
+
+    if (!iocb)
+        return 0;
+
+    struct val_t val = {};
+    val.ts = bpf_ktime_get_ns();
+    val.fp = iocb->ki_filp;
+    val.offset = iocb->ki_pos;
     if (val.fp)
         entryinfo.update(&id, &val);
 
@@ -265,8 +288,8 @@ b = BPF(text=bpf_text)
 
 # common file functions
 if BPF.get_kprobe_functions(b'zpl_iter.*'):
-    b.attach_kprobe(event="zpl_iter_read", fn_name="trace_rw_entry")
-    b.attach_kprobe(event="zpl_iter_write", fn_name="trace_rw_entry")
+    b.attach_kprobe(event="zpl_iter_read", fn_name="trace_zpl_iter_rw_entry")
+    b.attach_kprobe(event="zpl_iter_write", fn_name="trace_zpl_iter_rw_entry")
 elif BPF.get_kprobe_functions(b'zpl_aio.*'):
     b.attach_kprobe(event="zpl_aio_read", fn_name="trace_rw_entry")
     b.attach_kprobe(event="zpl_aio_write", fn_name="trace_rw_entry")

@@ -141,6 +141,9 @@ int KBuildHelper::get_flags(const char *uname_machine, vector<string> *cflags) {
   cflags->push_back("-fms-extensions");
   cflags->push_back("-Wno-microsoft-anon-tag");
 
+  // Prevent warnings from typeof(x) expressions in some kernel headers
+  cflags->push_back("-Wno-default-const-init-var-unsafe");
+
   /*
    * kernel is usually build with gcc and the kernel devel header
    * reflects that fact. However we build with clang and this must be
