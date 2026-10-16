@@ -164,6 +164,7 @@ int BPF_KRETPROBE(vfs_unlink_ret)
 	eventp = reserve_buf(sizeof(*eventp));
 	if (!eventp)
 		return 0;
+	zero_buf(eventp, sizeof(*eventp));
 
 	eventp->tgid = unlink_event->tgid;
 	eventp->delta_ns = unlink_event->delta_ns;
