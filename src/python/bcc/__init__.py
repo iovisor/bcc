@@ -1461,7 +1461,7 @@ class BPF(object):
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = self._get_uprobe_evname(b"p", path, addr, pid)
-        fd = lib.bpf_attach_uprobe(fn.fd, 0, ev_name, path, addr, pid)
+        fd = lib.bpf_attach_uprobe(fn.fd, 0, ev_name, path, addr, pid, 0)
         if fd < 0:
             raise Exception("Failed to attach BPF to uprobe")
         self._add_uprobe_fd(ev_name, fd)
@@ -1493,7 +1493,7 @@ class BPF(object):
         self._check_probe_quota(1)
         fn = self.load_func(fn_name, BPF.KPROBE)
         ev_name = self._get_uprobe_evname(b"r", path, addr, pid)
-        fd = lib.bpf_attach_uprobe(fn.fd, 1, ev_name, path, addr, pid)
+        fd = lib.bpf_attach_uprobe(fn.fd, 1, ev_name, path, addr, pid, 0)
         if fd < 0:
             raise Exception("Failed to attach BPF to uretprobe")
         self._add_uprobe_fd(ev_name, fd)
