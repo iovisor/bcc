@@ -112,7 +112,7 @@ lib.bpf_detach_kprobe.restype = ct.c_int
 lib.bpf_detach_kprobe.argtypes = [ct.c_char_p]
 lib.bpf_attach_uprobe.restype = ct.c_int
 lib.bpf_attach_uprobe.argtypes = [ct.c_int, ct.c_int, ct.c_char_p, ct.c_char_p,
-        ct.c_ulonglong, ct.c_int]
+        ct.c_ulonglong, ct.c_int, ct.c_uint]
 lib.bpf_detach_uprobe.restype = ct.c_int
 lib.bpf_detach_uprobe.argtypes = [ct.c_char_p]
 lib.bpf_attach_tracepoint.restype = ct.c_int
