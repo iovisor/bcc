@@ -29,7 +29,7 @@ def setUpModule():
     c_src_full = os.path.abspath(os.path.dirname(sys.argv[0])) + os.path.sep + c_src
     exec_dst = tmp_dir + os.path.sep + 'leaker_app'
 
-    if subprocess.call(['gcc', '-g', '-O0', '-o', exec_dst, c_src_full]) != 0:
+    if subprocess.call(['gcc', '-g', '-O0', '-rdynamic', '-o', exec_dst, c_src_full]) != 0:
         print("can't compile the leaking application")
         raise Exception
 
@@ -43,6 +43,12 @@ def setUpModule():
         'stdbuf -o 0 -i 0 timeout -s KILL 10s ' + TOOLS_DIR +
         'memleak.py -c "{} {{}} {}" -T 1 1 2'.format(exec_dst,
                                                      cfg.leaking_amount))
+    cfg.custom_cmd_format = (
+        'stdbuf -o 0 -i 0 timeout -s KILL 10s ' + TOOLS_DIR +
+        'memleak.py -O {} --symbols-prefix=je_ '
+        '--malloc-symbol=je_malloc_default --free-symbol=je_free_default '
+        '-c "{} {{}} {}" -T 1 1 2'.format(exec_dst, exec_dst,
+                                           cfg.leaking_amount))
 
 
 @skipUnless(kernel_version_ge(4, 6), "requires kernel >= 4.6")
@@ -50,9 +56,11 @@ class MemleakToolTests(TestCase):
     def tearDown(self):
         if self.p:
             del(self.p)
-    def run_leaker(self, leak_kind):
+    def run_leaker(self, leak_kind, cmd_format=None):
         # Starting memleak.py, which in turn launches the leaking application.
-        self.p = subprocess.Popen(cfg.cmd_format.format(leak_kind),
+        if cmd_format is None:
+            cmd_format = cfg.cmd_format
+        self.p = subprocess.Popen(cmd_format.format(leak_kind),
                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                   shell=True)
 
@@ -75,6 +83,10 @@ class MemleakToolTests(TestCase):
         # start with "N bytes from"
         x = [x for x in out.split(b'\n') if b'byte' in x]
 
+        if leak_kind == "custom_no_leak":
+            self.assertEqual([], x)
+            return 0
+
         self.assertTrue(len(x) >= 1,
                         msg="At least one line should have 'byte' substring.")
 
@@ -85,6 +97,15 @@ class MemleakToolTests(TestCase):
 
         # First word is the leak amount in bytes.
         return int(x[0])
+
+    def test_custom_allocator_symbols(self):
+        self.assertEqual(
+            cfg.leaking_amount,
+            self.run_leaker("custom_malloc", cfg.custom_cmd_format))
+
+    def test_custom_allocator_free_symbol(self):
+        self.assertEqual(
+            0, self.run_leaker("custom_no_leak", cfg.custom_cmd_format))
 
     def test_malloc(self):
         self.assertEqual(cfg.leaking_amount, self.run_leaker("malloc"))
