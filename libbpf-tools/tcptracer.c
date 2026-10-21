@@ -226,7 +226,7 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 {
-	warn("Lost %llu events on CPU #%d!\n", lost_cnt, cpu);
+	warn("Lost %llu events on CPU #%d!\n", (unsigned long long)lost_cnt, cpu);
 }
 
 static void print_events(int perf_map_fd)

@@ -165,10 +165,14 @@ static int print_map(struct bpf_map *map)
 		if (!env.distributed)
 			if (env.cpu)
 				printf("%-33s %11llu %11llu %9llu %3u\n", next_key.name,
-				       info.count, info.total_time, info.max_time, next_key.cpu);
+				       (unsigned long long)info.count,
+				       (unsigned long long)info.total_time,
+				       (unsigned long long)info.max_time, next_key.cpu);
 			else
 				printf("%-33s %11llu %11llu %9llu\n", next_key.name,
-				       info.count, info.total_time, info.max_time);
+				       (unsigned long long)info.count,
+				       (unsigned long long)info.total_time,
+				       (unsigned long long)info.max_time);
 		else {
 			if (env.cpu)
 				printf("cpu = %u ", next_key.cpu);

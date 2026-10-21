@@ -4,6 +4,7 @@
 // Based on runqslower(8) from BCC by Ivan Babrou.
 // 11-Feb-2020   Andrii Nakryiko   Created this.
 #include <argp.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -141,14 +142,16 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	str_timestamp("%H:%M:%S", ts, sizeof(ts));
 
 	if (env.previous)
-		printf("%-8s %-16s %-6d %14llu %-16s %-6d\n", ts, e.task, e.pid, e.delta_us, e.prev_task, e.prev_pid);
+		printf("%-8s %-16s %-6d %14llu %-16s %-6d\n", ts, e.task, e.pid,
+		       (unsigned long long)e.delta_us, e.prev_task, e.prev_pid);
 	else
-		printf("%-8s %-16s %-6d %14llu\n", ts, e.task, e.pid, e.delta_us);
+		printf("%-8s %-16s %-6d %14llu\n", ts, e.task, e.pid,
+		       (unsigned long long)e.delta_us);
 }
 
 void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 {
-	printf("Lost %llu events on CPU #%d!\n", lost_cnt, cpu);
+	printf("Lost %llu events on CPU #%d!\n", (unsigned long long)lost_cnt, cpu);
 }
 
 int main(int argc, char **argv)
@@ -205,7 +208,8 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	printf("Tracing run queue latency higher than %llu us\n", env.min_us);
+	printf("Tracing run queue latency higher than %" PRIu64 " us\n",
+	       (uint64_t)env.min_us);
 	if (env.previous)
 		printf("%-8s %-16s %-6s %14s %-16s %-6s\n", "TIME", "COMM", "TID", "LAT(us)", "PREV COMM", "PREV TID");
 	else

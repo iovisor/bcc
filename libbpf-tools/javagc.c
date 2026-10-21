@@ -103,7 +103,7 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	char ts[16];
 
 	str_timestamp("%H:%M:%S", ts, sizeof(ts));
-	printf("%-8s %-7d %-7d %-7lld\n", ts, e->cpu, e->pid, e->ts/1000);
+	printf("%-8s %-7d %-7d %-7lld\n", ts, e->cpu, e->pid, (long long)(e->ts / 1000));
 }
 
 static void handle_lost_events(void *ctx, int cpu, __u64 data_sz)

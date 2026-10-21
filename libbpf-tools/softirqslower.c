@@ -6,6 +6,7 @@
 // 27-May-2026   Ported to libbpf.
 #include <argp.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -94,8 +95,8 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		}
 		nr_cpus = libbpf_num_possible_cpus();
 		if (nr_cpus > 0 && val >= nr_cpus) {
-			fprintf(stderr, "cpu %lld out of range, system has %d CPUs (0-%d)\n",
-				val, nr_cpus, nr_cpus - 1);
+			fprintf(stderr, "cpu %d out of range, system has %d CPUs (0-%d)\n",
+				(int)val, nr_cpus, nr_cpus - 1);
 			argp_usage(state);
 		}
 		env.targ_cpu = (int)val;
@@ -152,14 +153,14 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 			ts,
 			e.stage < ARRAY_SIZE(stage_names) ? stage_names[e.stage] : "unknown",
 			e.vec  < NR_SOFTIRQS ? vec_names[e.vec] : "unknown",
-			e.delta_us,
+			(unsigned long long)e.delta_us,
 			e.cpu,
 			e.task);
 }
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 {
-	printf("Lost %llu events on CPU #%d!\n", lost_cnt, cpu);
+	printf("Lost %llu events on CPU #%d!\n", (unsigned long long)lost_cnt, cpu);
 }
 
 int main(int argc, char **argv)
@@ -214,8 +215,8 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	printf("Tracing softirq latency higher than %llu us... "
-			"Hit Ctrl-C to end.\n", env.min_us);
+	printf("Tracing softirq latency higher than %" PRIu64 " us... "
+			"Hit Ctrl-C to end.\n", (uint64_t)env.min_us);
 	printf("%-8s %-20s %-8s %-14s %-6s %-16s\n",
 			"TIME", "STAGE", "SOFTIRQ", "LAT(us)", "CPU", "COMM");
 
