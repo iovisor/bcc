@@ -142,9 +142,11 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	str_timestamp("%H:%M:%S", ts, sizeof(ts));
 
 	if (env.previous)
-		printf("%-8s %-16s %-6d %14llu %-16s %-6d\n", ts, e.task, e.pid, e.delta_us, e.prev_task, e.prev_pid);
+		printf("%-8s %-16s %-6d %14llu %-16s %-6d\n", ts, e.task, e.pid,
+		       (unsigned long long)e.delta_us, e.prev_task, e.prev_pid);
 	else
-		printf("%-8s %-16s %-6d %14llu\n", ts, e.task, e.pid, e.delta_us);
+		printf("%-8s %-16s %-6d %14llu\n", ts, e.task, e.pid,
+		       (unsigned long long)e.delta_us);
 }
 
 void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)

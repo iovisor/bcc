@@ -142,8 +142,8 @@ int main(int argc, char **argv)
 		sleep(1);
 		str_timestamp("%H:%M:%S", ts, sizeof(ts));
 		printf("%-10s %18lld %18lld\n", ts,
-			__atomic_exchange_n(&obj->bss->num, 0, __ATOMIC_RELAXED),
-			__atomic_exchange_n(&obj->bss->latency, 0, __ATOMIC_RELAXED));
+			(long long)__atomic_exchange_n(&obj->bss->num, 0, __ATOMIC_RELAXED),
+			(long long)__atomic_exchange_n(&obj->bss->latency, 0, __ATOMIC_RELAXED));
 	}
 
 cleanup:

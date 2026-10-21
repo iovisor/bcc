@@ -131,9 +131,9 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	str_timestamp("%H:%M:%S", ts, sizeof(ts));
 	printf("%-8s %-16s %-6d %8.3f %5lld",
 	       ts, e.task, e.pid, e.delta_ns / 1000000.0,
-	       e.nr_reclaimed);
+	       (long long)e.nr_reclaimed);
 	if (env.extended)
-		printf(" %8llu", e.nr_free_pages * page_size / 1024);
+		printf(" %8llu", (unsigned long long)(e.nr_free_pages * page_size / 1024));
 	printf("\n");
 }
 

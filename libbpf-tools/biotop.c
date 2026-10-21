@@ -338,7 +338,7 @@ static int print_stat(struct biotop_bpf *obj)
 		printf("%-7d %-16s %1s %-3d %-3d %-8s %5d %7lld %6.2f\n",
 		       key->pid, key->name, key->rwflag ? "W": "R",
 		       major, minor, search_disk_name(major, minor),
-		       value->io, value->bytes / 1024, avg_ms);
+		       value->io, (long long)(value->bytes / 1024), avg_ms);
 	}
 
 	printf("\n");

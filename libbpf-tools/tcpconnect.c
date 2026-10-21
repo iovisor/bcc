@@ -232,7 +232,7 @@ static void print_count_ipv4(int map_fd)
 		if (env.source_port)
 			printf(" %-20d", keys[i].sport);
 		printf(" %-20d", ntohs(keys[i].dport));
-		printf(" %-10llu", counts[i]);
+		printf(" %-10llu", (unsigned long long)counts[i]);
 		printf("\n");
 	}
 }
@@ -265,7 +265,7 @@ static void print_count_ipv6(int map_fd)
 		if (env.source_port)
 			printf(" %-20d", keys[i].sport);
 		printf(" %-20d", ntohs(keys[i].dport));
-		printf(" %-10llu", counts[i]);
+		printf(" %-10llu", (unsigned long long)counts[i]);
 		printf("\n");
 	}
 }

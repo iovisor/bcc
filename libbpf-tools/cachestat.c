@@ -268,8 +268,10 @@ int main(int argc, char **argv)
 			printf("%-8s ", ts);
 		}
 		printf("%8lld %8lld %8llu %7.2f%% %12llu %10llu\n",
-			hits, misses, mbd, 100 * ratio,
-			buffers / 1024, cached / 1024);
+			(long long)hits, (long long)misses,
+			(unsigned long long)mbd, 100 * ratio,
+			(unsigned long long)(buffers / 1024),
+			(unsigned long long)(cached / 1024));
 
 		if (exiting || --env.times == 0)
 			break;

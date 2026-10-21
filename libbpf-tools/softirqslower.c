@@ -153,7 +153,7 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 			ts,
 			e.stage < ARRAY_SIZE(stage_names) ? stage_names[e.stage] : "unknown",
 			e.vec  < NR_SOFTIRQS ? vec_names[e.vec] : "unknown",
-			e.delta_us,
+			(unsigned long long)e.delta_us,
 			e.cpu,
 			e.task);
 }
