@@ -324,4 +324,29 @@ static __always_inline __u8 cfs_rq_get_nr_running_or_nr_queued(void *cfs_rq)
 	return BPF_CORE_READ((struct cfs_rq *)cfs_rq, nr_queued);
 }
 
+/**
+ * commit 4d25ca2d6801 ("net: Rename mono_delivery_time to tstamp_type for
+ * scalabilty") replace binary flag sk_buff::mono_delivery_time [0] with enum
+ * sk_buff::tstamp_type [1]. When either of these are set to a non-zero value,
+ * the timestamp in sk_buff::tstamp is not based on clock REALTIME (with
+ * tstamp_type indicating the clock type, or mono_delivery_time indicating clock
+ * MONOTONIC), and on ingress the tstamp may be a preserved delivery timestamp
+ * rather than a rcv timestamp.
+ *
+ * References:
+ *   [0] https://github.com/torvalds/linux/commit/a1ac9c8acec1
+ *   [1] https://github.com/torvalds/linux/commit/4d25ca2d6801
+ */
+struct sk_buff___pre_v611 {
+	__u8 mono_delivery_time:1;
+} __attribute__((preserve_access_index));
+
+static __always_inline bool skb_non_realtime_tstamp(void *skb)
+{
+	if (bpf_core_field_exists(struct sk_buff___pre_v611, mono_delivery_time))
+		return BPF_CORE_READ_BITFIELD((struct sk_buff___pre_v611 *)skb, mono_delivery_time);
+
+	return BPF_CORE_READ_BITFIELD((struct sk_buff *)skb, tstamp_type);
+}
+
 #endif /* __CORE_FIXES_BPF_H */
