@@ -275,18 +275,21 @@ int Context::_each_module(mod_info *mod, int enter_ns, void *p) {
 }
 
 void Context::add_probe(const char *binpath, const struct bcc_elf_usdt *probe) {
-  for (auto &p : probes_) {
-    if (p->provider_ == probe->provider && p->name_ == probe->name) {
-      p->add_location(probe->pc, binpath, probe->arg_fmt);
-      return;
-    }
+  auto &probes_by_name = probes_by_provider_[probe->provider];
+  auto it = probes_by_name.find(probe->name);
+  if (it != probes_by_name.end()) {
+    it->second->add_location(probe->pc, binpath, probe->arg_fmt);
+    return;
   }
 
-  probes_.emplace_back(
-    new Probe(binpath, probe->provider, probe->name, probe->semaphore,
-              probe->semaphore_offset, pid_, mod_match_inode_only_)
-  );
-  probes_.back()->add_location(probe->pc, binpath, probe->arg_fmt);
+  std::unique_ptr<Probe> new_probe(new Probe(binpath, probe->provider,
+                                             probe->name, probe->semaphore,
+                                             probe->semaphore_offset, pid_,
+                                             mod_match_inode_only_));
+  Probe *probe_ptr = new_probe.get();
+  probe_ptr->add_location(probe->pc, binpath, probe->arg_fmt);
+  probes_.emplace_back(std::move(new_probe));
+  probes_by_name.emplace(probe->name, probe_ptr);
 }
 
 std::string Context::resolve_bin_path(const std::string &bin_path) {
