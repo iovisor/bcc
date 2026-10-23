@@ -35,6 +35,14 @@ static int a_probed_function() {
   return an_int;
 }
 
+static int another_probed_function() {
+  int an_int = 23 + getpid();
+  void *a_pointer = malloc(4);
+  FOLLY_SDT(libbcc_test, sample_probe_1, an_int, a_pointer);
+  free(a_pointer);
+  return an_int;
+}
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0)
 FOLLY_SDT_DEFINE_SEMAPHORE(libbcc_test, sample_probe_2)
 static int a_probed_function_with_sem() {
@@ -66,9 +74,10 @@ TEST_CASE("test finding a probe in our own process", "[usdt]") {
     REQUIRE(probe->provider() == "libbcc_test");
     REQUIRE(probe->bin_path().find("/test_libbcc") != std::string::npos);
 
-    REQUIRE(probe->num_locations() == 1);
+    REQUIRE(probe->num_locations() == 2);
     REQUIRE(probe->num_arguments() == 2);
     REQUIRE(probe->need_enable() == false);
+    REQUIRE(another_probed_function() != 0);
 
     REQUIRE(a_probed_function() != 0);
   }
