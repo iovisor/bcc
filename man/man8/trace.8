@@ -20,6 +20,9 @@ CONFIG_BPF and bcc.
 \-h
 Print usage message.
 .TP
+\-b BUFFER_PAGES
+Number of pages to use for the perf_events ring buffer. The default is 64.
+.TP
 \-p PID
 Trace only functions in the process PID.
 .TP
@@ -32,7 +35,7 @@ Trace only functions from user UID.
 \-v
 Display the generated BPF program, for debugging purposes.
 .TP
-\-z STRING_SIZE
+\-Z STRING_SIZE
 When collecting string arguments (of type char*), collect up to STRING_SIZE
 characters. Longer strings will be truncated.
 .TP
