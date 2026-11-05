@@ -2,7 +2,7 @@
 .SH NAME
 filetop \- File reads and writes by filename and process. Top for files.
 .SH SYNOPSIS
-.B filetop [\-h] [\-a] [\-C] [\-r MAXROWS] [\-s {reads,writes,rbytes,wbytes}] [\-p PID] [\-\-read-only] [\-\-write-only] [interval] [count]
+.B filetop [\-h] [\-a] [\-C] [\-r MAXROWS] [\-s {reads,writes,rbytes,wbytes}] [\-p PID] [\-d DIRECTORY] [\-\-read-only] [\-\-write-only] [interval] [count]
 .SH DESCRIPTION
 This is top for files.
 
@@ -47,6 +47,9 @@ Sort column. Default is rbytes (read throughput).
 .TP
 \-p PID
 Trace this PID only.
+.TP
+\-d DIRECTORY
+Trace this directory only.
 .TP
 \-\-read-only
 Trace read operations only
