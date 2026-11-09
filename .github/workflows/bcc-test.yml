@@ -176,7 +176,7 @@ jobs:
                    bcc-docker \
                    /bin/bash -c \
                    'mkdir -p /bcc/build && cd /bcc/build && \
-                    cmake -DCMAKE_BUILD_TYPE=${TYPE} -DENABLE_LLVM_SHARED=ON -DRUN_LUA_TESTS=OFF .. && make -j9'"
+                    cmake -DCMAKE_BUILD_TYPE=${TYPE} -DENABLE_LLVM_SHARED=ON -DRUN_LUA_TESTS=OFF -DENABLE_LIBBPF_TOOLS_TESTS=ON .. && make -j9'"
     - name: Run libbpf-tools build
       env: ${{ matrix.env }}
       run: |

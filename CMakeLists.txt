@@ -108,6 +108,10 @@ option(ENABLE_EXAMPLES "Build examples" ON)
 option(ENABLE_MAN "Build man pages" ON)
 option(ENABLE_TESTS "Build tests" ON)
 option(RUN_LUA_TESTS "Run lua tests" ON)
+# libbpf-tools are built separately with libbpf-tools/Makefile, which only the
+# Fedora CI job does, so this option is enabled only there. Remove it once the
+# tests are verified on Ubuntu CI.
+option(ENABLE_LIBBPF_TOOLS_TESTS "Run tests for separately built libbpf-tools" OFF)
 option(ENABLE_LIBDEBUGINFOD "Use libdebuginfod as a source of debug symbols" ON)
 CMAKE_DEPENDENT_OPTION(ENABLE_CPP_API "Enable C++ API" ON "ENABLE_USDT" OFF)
 
