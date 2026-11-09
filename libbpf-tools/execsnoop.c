@@ -60,7 +60,9 @@ const char argp_program_doc[] =
 "   ./execsnoop -t        # include timestamps\n"
 "   ./execsnoop -q        # add \"quotemarks\" around arguments\n"
 "   ./execsnoop -n main   # only print command lines containing \"main\"\n"
-"   ./execsnoop -l tpkg   # only print command where arguments contains \"tpkg\""
+"   ./execsnoop -l tpkg   # only print commands whose arguments contain \"tpkg\"\n"
+"                         # matching is a case-sensitive literal substring\n"
+"                         # (unlike the Python tool's regex matching)\n"
 "   ./execsnoop -c CG     # Trace process under cgroupsPath CG\n";
 
 static const struct argp_option opts[] = {
@@ -70,7 +72,8 @@ static const struct argp_option opts[] = {
 	{ "uid", 'u', "UID", 0, "trace this UID only", 0 },
 	{ "quote", 'q', NULL, 0, "Add quotemarks (\") around arguments", 0 },
 	{ "name", 'n', "NAME", 0, "only print commands matching this name, any arg", 0 },
-	{ "line", 'l', "LINE", 0, "only print commands where arg contains this line", 0 },
+	{ "line", 'l', "LINE", 0,
+		"case-sensitive literal substring matching (unlike Python regex)", 0 },
 	{ "print-uid", 'U', NULL, 0, "print UID column", 0 },
 	{ "max-args", MAX_ARGS_KEY, "MAX_ARGS", 0,
 		"maximum number of arguments parsed and displayed, defaults to 20", 0 },
@@ -226,6 +229,31 @@ static void print_args(const struct event *e, bool quote)
 	}
 }
 
+/* Match the joined argument line, mirroring the Python tool's behavior
+ * (b' '.join(argv)): arguments are NUL-separated in the event, so replace
+ * the separators with spaces to allow strstr() to match across argument
+ * boundaries (e.g. -l "a b" matching "echo a b").
+ */
+static bool args_contains_line(const struct event *e, const char *line)
+{
+	char buf[FULL_MAX_ARGS_ARR];
+	int i, n = 0;
+
+	for (i = 0; i < e->args_size && n < (int)sizeof(buf) - 1; i++) {
+		char c = e->args[i];
+
+		/* args_size includes the final NUL terminator.  Preserve it as the
+		 * end of the line rather than appending a spurious trailing space.
+		 */
+		if (c == '\0' && i + 1 == e->args_size)
+			break;
+		buf[n++] = (c == '\0') ? ' ' : c;
+	}
+	buf[n] = '\0';
+
+	return strstr(buf, line) != NULL;
+}
+
 static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	const struct event *e = data;
@@ -236,7 +264,7 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		return;
 
 	/* TODO: use pcre lib */
-	if (env.line && strstr(e->comm, env.line) == NULL)
+	if (env.line && !args_contains_line(e, env.line))
 		return;
 
 	str_timestamp("%H:%M:%S", ts, sizeof(ts));
