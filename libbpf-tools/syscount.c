@@ -163,7 +163,8 @@ static void print_latency(struct data_ext_t *vals, size_t count)
 	for (i = 0; i < count && i < env.top; i++)
 		printf("%-22s %8llu %16.3lf\n",
 		       agg_col(&vals[i], buf, sizeof(buf)),
-		       vals[i].count, vals[i].total_ns / div);
+		       (unsigned long long)vals[i].count,
+		       vals[i].total_ns / div);
 	printf("\n");
 }
 
@@ -175,7 +176,8 @@ static void print_count(struct data_ext_t *vals, size_t count)
 	print_count_header();
 	for (i = 0; i < count && i < env.top; i++)
 		printf("%-22s %8llu\n",
-		       agg_col(&vals[i], buf, sizeof(buf)), vals[i].count);
+		       agg_col(&vals[i], buf, sizeof(buf)),
+		       (unsigned long long)vals[i].count);
 	printf("\n");
 }
 

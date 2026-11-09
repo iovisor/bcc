@@ -12,6 +12,7 @@
  * 27-Oct-2023  Pcheng Cui   Add support for F2FS.
  */
 #include <argp.h>
+#include <inttypes.h>
 #include <libgen.h>
 #include <signal.h>
 #include <stdio.h>
@@ -346,7 +347,8 @@ static void print_headers()
 	}
 
 	if (min_lat_ms)
-		printf("Tracing %s operations slower than %llu ms", fs, min_lat_ms);
+		printf("Tracing %s operations slower than %" PRIu64 " ms", fs,
+		       (uint64_t)min_lat_ms);
 	else
 		printf("Tracing %s operations", fs);
 
@@ -372,12 +374,14 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	memcpy(&e, data, sizeof(e));
 
 	if (csv) {
-		printf("%lld,%s,%d,%c,", e.end_ns, e.task, e.pid, file_op[e.op]);
+		printf("%" PRIu64 ",%s,%d,%c,", (uint64_t)e.end_ns,
+		       e.task, e.pid, file_op[e.op]);
 		if (e.size == LLONG_MAX)
 			printf("LL_MAX,");
 		else
 			printf("%zd,", e.size);
-		printf("%lld,%lld,%s\n", e.offset, e.delta_us, e.file);
+		printf("%" PRId64 ",%" PRIu64 ",%s\n",
+		       (int64_t)e.offset, (uint64_t)e.delta_us, e.file);
 		return;
 	}
 
@@ -388,12 +392,13 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		printf("%-7s ", "LL_MAX");
 	else
 		printf("%-7zd ", e.size);
-	printf("%-8lld %7.2f %s\n", e.offset / 1024, (double)e.delta_us / 1000, e.file);
+	printf("%-8" PRId64 " %7.2f %s\n",
+	       (int64_t)(e.offset / 1024), (double)e.delta_us / 1000, e.file);
 }
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 {
-	warn("lost %llu events on CPU #%d\n", lost_cnt, cpu);
+	warn("lost %llu events on CPU #%d\n", (unsigned long long)lost_cnt, cpu);
 }
 
 int main(int argc, char **argv)

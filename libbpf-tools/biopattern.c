@@ -137,7 +137,7 @@ static int print_map(struct bpf_map *counters, struct partitions *partitions)
 			partition ? partition->name : "Unknown",
 			counter.random * 100L / total,
 			counter.sequential * 100L / total, total,
-			counter.bytes / 1024);
+			(long long)(counter.bytes / 1024));
 	}
 
 	lookup_key = -1;

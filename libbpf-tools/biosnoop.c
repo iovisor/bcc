@@ -205,7 +205,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	partition = partitions__get_by_dev(partitions, e.dev);
 	printf("%-14.14s %-7d %-7s %-4s %-10lld %-7d ",
 		e.comm, e.pid, partition ? partition->name : "Unknown", rwbs,
-		e.sector, e.len);
+		(long long)e.sector, e.len);
 	if (env.queued)
 		printf("%7.3f ", e.qdelta != -1 ?
 			e.qdelta / 1000000.0 : -1);
@@ -214,7 +214,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 
 void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 {
-	fprintf(stderr, "lost %llu events on CPU #%d\n", lost_cnt, cpu);
+	fprintf(stderr, "lost %llu events on CPU #%d\n", (unsigned long long)lost_cnt, cpu);
 }
 
 static void blk_account_io_set_attach_target(struct biosnoop_bpf *obj)

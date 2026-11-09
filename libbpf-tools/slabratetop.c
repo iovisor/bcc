@@ -204,7 +204,8 @@ static int print_stat(struct slabratetop_bpf *obj)
 	rows = rows < output_rows ? rows : output_rows;
 	for (i = 0; i < rows; i++)
 		printf("%-32s %6lld %10lld\n",
-		       values[i].name, values[i].count, values[i].size);
+		       values[i].name, (long long)values[i].count,
+		       (long long)values[i].size);
 
 	printf("\n");
 	prev_key = NULL;

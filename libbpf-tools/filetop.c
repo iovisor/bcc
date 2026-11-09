@@ -218,8 +218,10 @@ static int print_stat(struct filetop_bpf *obj)
 	rows = rows < output_rows ? rows : output_rows;
 	for (i = 0; i < rows; i++)
 		printf("%-7d %-16s %-6lld %-6lld %-7lld %-7lld %c %s\n",
-		       values[i].tid, values[i].comm, values[i].reads, values[i].writes,
-		       values[i].read_bytes / 1024, values[i].write_bytes / 1024,
+		       values[i].tid, values[i].comm,
+		       (long long)values[i].reads, (long long)values[i].writes,
+		       (long long)(values[i].read_bytes / 1024),
+		       (long long)(values[i].write_bytes / 1024),
 		       values[i].type, values[i].filename);
 
 	printf("\n");

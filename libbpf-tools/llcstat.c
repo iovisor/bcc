@@ -5,6 +5,7 @@
 // 29-Sep-2020   Wenbo Zhang   Created this.
 // 20-Jun-2022   YeZhengMao    Added tid info.
 #include <argp.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -158,15 +159,16 @@ static void print_map(struct bpf_map *map)
 			printf("%-8u ", tid);
 		}
 		printf("%-16s %-4u %12llu %12llu %6.2f%%\n",
-			info.comm, cpu, info.ref, info.miss,
+			info.comm, cpu, (unsigned long long)info.ref,
+			(unsigned long long)info.miss,
 			info.ref > 0 ? hit * 1.0 / info.ref * 100 : 0);
 		total_miss += info.miss;
 		total_ref += info.ref;
 		lookup_key = next_key;
 	}
 	total_hit = total_ref > total_miss ? total_ref - total_miss : 0;
-	printf("Total References: %llu Total Misses: %llu Hit Rate: %.2f%%\n",
-		total_ref, total_miss, total_ref > 0 ?
+	printf("Total References: %" PRIu64 " Total Misses: %" PRIu64 " Hit Rate: %.2f%%\n",
+		(uint64_t)total_ref, (uint64_t)total_miss, total_ref > 0 ?
 		total_hit * 1.0 / total_ref * 100 : 0);
 
 	lookup_key.cpu = -1;

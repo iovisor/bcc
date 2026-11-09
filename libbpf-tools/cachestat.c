@@ -7,6 +7,7 @@
 //                             use fentry/kprobe
 // 15-Feb-2023   Rong Tao      Add tracepoint writeback_dirty_{page,folio}
 #include <argp.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -103,6 +104,7 @@ static void sig_handler(int sig)
 
 static int get_meminfo(__u64 *buffers, __u64 *cached)
 {
+	uint64_t buffer_count, cached_count;
 	FILE *f;
 
 	f = fopen("/proc/meminfo", "r");
@@ -112,13 +114,15 @@ static int get_meminfo(__u64 *buffers, __u64 *cached)
 		   "MemTotal: %*u kB\n"
 		   "MemFree: %*u kB\n"
 		   "MemAvailable: %*u kB\n"
-		   "Buffers: %llu kB\n"
-		   "Cached: %llu kB\n",
-		   buffers, cached) != 2) {
+		   "Buffers: %" SCNu64 " kB\n"
+		   "Cached: %" SCNu64 " kB\n",
+		   &buffer_count, &cached_count) != 2) {
 		fclose(f);
 		return -1;
 	}
 	fclose(f);
+	*buffers = buffer_count;
+	*cached = cached_count;
 	return 0;
 }
 
@@ -264,8 +268,10 @@ int main(int argc, char **argv)
 			printf("%-8s ", ts);
 		}
 		printf("%8lld %8lld %8llu %7.2f%% %12llu %10llu\n",
-			hits, misses, mbd, 100 * ratio,
-			buffers / 1024, cached / 1024);
+			(long long)hits, (long long)misses,
+			(unsigned long long)mbd, 100 * ratio,
+			(unsigned long long)(buffers / 1024),
+			(unsigned long long)(cached / 1024));
 
 		if (exiting || --env.times == 0)
 			break;

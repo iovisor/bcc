@@ -174,18 +174,20 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	if (wide_output) {
 		family = e.family == AF_INET ? 4 : 6;
 		printf("%-16llx %-7d %-16s %-2d %-39s %-5d %-39s %-5d %-11s -> %-11s %.3f\n",
-		       e.skaddr, e.pid, e.task, family, saddr, e.sport, daddr, e.dport,
+		       (unsigned long long)e.skaddr, e.pid, e.task, family,
+		       saddr, e.sport, daddr, e.dport,
 		       tcp_states[e.oldstate], tcp_states[e.newstate], (double)e.delta_us / 1000);
 	} else {
 		printf("%-16llx %-7d %-10.10s %-15s %-5d %-15s %-5d %-11s -> %-11s %.3f\n",
-		       e.skaddr, e.pid, e.task, saddr, e.sport, daddr, e.dport,
+		       (unsigned long long)e.skaddr, e.pid, e.task,
+		       saddr, e.sport, daddr, e.dport,
 		       tcp_states[e.oldstate], tcp_states[e.newstate], (double)e.delta_us / 1000);
 	}
 }
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 {
-	warn("lost %llu events on CPU #%d\n", lost_cnt, cpu);
+	warn("lost %llu events on CPU #%d\n", (unsigned long long)lost_cnt, cpu);
 }
 
 int main(int argc, char **argv)

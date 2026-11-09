@@ -172,9 +172,10 @@ static int print_count(struct softirqs_bpf__bss *bss)
 		count = __atomic_exchange_n(&bss->counts[vec], 0,
 					__ATOMIC_RELAXED);
 		if (count > 0) {
-			printf("%-16s %11llu", vec_names[vec], time);
+			printf("%-16s %11llu", vec_names[vec],
+			       (unsigned long long)time);
 			if (env.count) {
-				printf("  %11llu", count);
+				printf("  %11llu", (unsigned long long)count);
 			}
 			printf("\n");
 		}
