@@ -36,8 +36,8 @@ interval = int(args.interval)
 countdown = int(args.count)
 debug = 0
 
-# load BPF program
-b = BPF(text="""
+# define BPF program
+bpf_text = """
 #include <linux/sched.h>
 
 struct key_t {
@@ -57,11 +57,14 @@ int trace_swap_read(struct pt_regs *ctx)
     ++(*val);
     return 0;
 }
-""")
+"""
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
         exit()
+
+# load BPF program
+b = BPF(text=bpf_text)
 
 # check whether hash table batch ops is supported
 htab_batch_ops = True if BPF.kernel_struct_has_field(b'bpf_map_ops',
