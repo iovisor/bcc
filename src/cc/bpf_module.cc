@@ -254,7 +254,11 @@ void BPFModule::dump_ir(Module &mod) {
   ModuleAnalysisManager MAM;
 
   // Create the pass manager
+#if LLVM_VERSION_MAJOR >= 24
+  PassBuilder PB(mod.getContext());
+#else
   PassBuilder PB;
+#endif
   PB.registerModuleAnalyses(MAM);
   PB.registerCGSCCAnalyses(CGAM);
   PB.registerFunctionAnalyses(FAM);
@@ -287,7 +291,11 @@ int BPFModule::run_pass_manager(Module &mod) {
   ModuleAnalysisManager MAM;
 
   // Create the pass manager
+#if LLVM_VERSION_MAJOR >= 24
+  PassBuilder PB(mod.getContext());
+#else
   PassBuilder PB;
+#endif
   PB.registerModuleAnalyses(MAM);
   PB.registerCGSCCAnalyses(CGAM);
   PB.registerFunctionAnalyses(FAM);
