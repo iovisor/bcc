@@ -1,0 +1,47 @@
+metrics:
+  histograms:
+    - name: netstack_latency_seconds
+      help: Latency for packets (skbs) to reach various points in the kernel network stack
+      bucket_type: exp2
+      bucket_min: 0
+      bucket_max: 34
+      bucket_multiplier: 0.000000001 # nanoseconds to seconds
+      labels:
+        - name: cgroup
+          size: 8
+          decoders:
+            - name: uint
+            - name: cgroup
+        - name: iface
+          size: 4
+          decoders:
+            # If including output from a different network namespace than ebpf-exporter
+            # you probably just want to decode as a uint (ifindex) instead
+            # - name: uint # For the ifname decoder you apparently don't first need a uint decoder like the others
+            - name: ifname
+        - name: hook
+          size: 2
+          decoders:
+            - name: uint
+            - name: static_map
+              static_map:
+                1: "ip-start"
+                2: "tcp-start"
+                3: "udp-start"
+                4: "tcp-socket-enqueued"
+                5: "udp-socket-enqueued"
+                6: "tcp-socket-read"
+                7: "udp-socket-read"
+        - name: bucket
+          size: 2
+          decoders:
+            - name: uint
+
+cgroup_id_map:
+  name: netstack_cgroupfilter
+  type: hash
+  regexps:
+    # Change this to match the cgroups you want to include.
+    # Only has an effect if user_config.filter_cgroup is true.
+    - ^.*(system.slice/.*)$
+

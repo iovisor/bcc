@@ -185,7 +185,7 @@ static int print_count(struct softirqs_bpf__bss *bss)
 
 static struct hist zero;
 
-static int print_hist(struct softirqs_bpf__bss *bss)
+static int print_hists(struct softirqs_bpf__bss *bss)
 {
 	const char *units = env.nanoseconds ? "nsecs" : "usecs";
 	__u32 vec;
@@ -274,7 +274,7 @@ int main(int argc, char **argv)
 		if (!env.distributed)
 			err = print_count(obj->bss);
 		else
-			err = print_hist(obj->bss);
+			err = print_hists(obj->bss);
 		if (err)
 			break;
 
