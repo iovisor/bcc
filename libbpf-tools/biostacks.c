@@ -138,6 +138,8 @@ static void disable_block_io_tracepoints(struct biostacks_bpf *obj)
 {
 	bpf_program__set_autoload(obj->progs.block_io_start, false);
 	bpf_program__set_autoload(obj->progs.block_io_done, false);
+	bpf_program__set_autoload(obj->progs.block_io_start_btf, false);
+	bpf_program__set_autoload(obj->progs.block_io_done_btf, false);
 }
 
 static void disable_blk_account_io_fentry(struct biostacks_bpf *obj)
@@ -205,11 +207,64 @@ int main(int argc, char **argv)
 
 	obj->rodata->targ_ms = env.milliseconds;
 
-	if (has_block_io_tracepoints())
+	/*
+	 * Prefer the block_io_* tracepoints (v5.11+). On older kernels fall back
+	 * to the blk_account_io_* functions, using fentry when BTF is available
+	 * and kprobes otherwise so old LTS kernels keep working.
+	 */
+	if (has_block_io_tracepoints()) {
 		disable_blk_account_io_fentry(obj);
-	else {
+		bpf_program__set_autoload(obj->progs.kprobe___blk_account_io_start, false);
+		bpf_program__set_autoload(obj->progs.kprobe_blk_account_io_start, false);
+		bpf_program__set_autoload(obj->progs.kprobe___blk_account_io_done, false);
+		bpf_program__set_autoload(obj->progs.kprobe_blk_account_io_done, false);
+		if (probe_tp_btf("block_io_start")) {
+			bpf_program__set_autoload(obj->progs.block_io_start, false);
+			bpf_program__set_autoload(obj->progs.block_io_done, false);
+		} else {
+			bpf_program__set_autoload(obj->progs.block_io_start_btf, false);
+			bpf_program__set_autoload(obj->progs.block_io_done_btf, false);
+		}
+	} else {
+		bool use_fentry;
+
 		disable_block_io_tracepoints(obj);
-		blk_account_io_set_attach_target(obj);
+
+		use_fentry = fentry_can_attach("blk_account_io_start", NULL) &&
+			     fentry_can_attach("blk_account_io_done", NULL);
+		if (use_fentry) {
+			bpf_program__set_autoload(obj->progs.kprobe___blk_account_io_start, false);
+			bpf_program__set_autoload(obj->progs.kprobe_blk_account_io_start, false);
+			bpf_program__set_autoload(obj->progs.kprobe___blk_account_io_done, false);
+			bpf_program__set_autoload(obj->progs.kprobe_blk_account_io_done, false);
+			blk_account_io_set_attach_target(obj);
+		} else {
+			bool has_us_start = kprobe_exists("__blk_account_io_start");
+			bool has_plain_start = kprobe_exists("blk_account_io_start");
+			bool has_us_done = kprobe_exists("__blk_account_io_done");
+			bool has_plain_done = kprobe_exists("blk_account_io_done");
+
+			/* Prefer the internal __-prefixed symbols, like the Python tool. */
+			disable_blk_account_io_fentry(obj);
+			bpf_program__set_autoload(obj->progs.kprobe___blk_account_io_start,
+						  has_us_start);
+			bpf_program__set_autoload(obj->progs.kprobe_blk_account_io_start,
+						  !has_us_start && has_plain_start);
+			bpf_program__set_autoload(obj->progs.kprobe___blk_account_io_done,
+						  has_us_done);
+			bpf_program__set_autoload(obj->progs.kprobe_blk_account_io_done,
+						  !has_us_done && has_plain_done);
+			if (!has_us_start && !has_plain_start) {
+				fprintf(stderr, "failed to find blk_account_io_start\n");
+				err = -1;
+				goto cleanup;
+			}
+			if (!has_us_done && !has_plain_done) {
+				fprintf(stderr, "failed to find blk_account_io_done\n");
+				err = -1;
+				goto cleanup;
+			}
+		}
 	}
 
 	ksyms = ksyms__load();

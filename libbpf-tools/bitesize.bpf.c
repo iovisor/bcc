@@ -60,7 +60,12 @@ static int trace_rq_issue(struct request *rq)
 		if (!histp)
 			return 0;
 	}
-	slot = log2l(rq->__data_len / 1024);
+	/*
+	 * BPF_CORE_READ, rather than a direct dereference: the raw_tp fallback
+	 * gets its arguments as untyped scalars, so a plain rq->__data_len
+	 * would be rejected by the verifier.
+	 */
+	slot = log2l(BPF_CORE_READ(rq, __data_len) / 1024);
 	if (slot >= MAX_SLOTS)
 		slot = MAX_SLOTS - 1;
 	__sync_fetch_and_add(&histp->slots[slot], 1);
@@ -68,8 +73,7 @@ static int trace_rq_issue(struct request *rq)
 	return 0;
 }
 
-SEC("tp_btf/block_rq_issue")
-int BPF_PROG(block_rq_issue)
+static int handle_block_rq_issue(u64 *ctx)
 {
 	/**
 	 * commit a54895fa (block: remove the request_queue to argument
@@ -83,6 +87,23 @@ int BPF_PROG(block_rq_issue)
 		return trace_rq_issue((void *)ctx[0]);
 	else
 		return trace_rq_issue((void *)ctx[1]);
+}
+
+SEC("tp_btf/block_rq_issue")
+int block_rq_issue_btf(u64 *ctx)
+{
+	return handle_block_rq_issue(ctx);
+}
+
+/*
+ * raw_tp is used as a fallback for kernels without BTF-enabled raw
+ * tracepoints (tp_btf), which are only available since v5.5. This
+ * allows the tool to run on older LTS kernels such as v4.19 and v5.4.
+ */
+SEC("raw_tp/block_rq_issue")
+int BPF_PROG(block_rq_issue)
+{
+	return handle_block_rq_issue(ctx);
 }
 
 char LICENSE[] SEC("license") = "GPL";
