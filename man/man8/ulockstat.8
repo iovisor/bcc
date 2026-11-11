@@ -1,0 +1,109 @@
+.TH ulockstat 8  "2026-09-19" "USER COMMANDS"
+.SH NAME
+ulockstat \- Summarize user-space mutex lock contention. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B ulockstat [\-h] [\-p PID] [\-t TID] [\-d DURATION] [\-i INTERVAL] [\-n COUNT] [\-s DEPTH] [\-m MIN_US]
+.SH DESCRIPTION
+ulockstat traces pthread mutex lock events and displays lock statistics,
+using the USDT probes that glibc's NPTL provides. It displays the following
+data:
+
+.nf
+     PID      Mutex (hex)   Avg Wait   Count   Max Wait  Total Wait
+  --------------------------------------------------------------------
+   12345       55f3e4a2c010        12.4      31       88.1       384.4
+
+     PID      Mutex (hex)   Avg Hold   Count   Max Hold  Total Hold
+  --------------------------------------------------------------------
+   12345       55f3e4a2c010        45.2      31      120.3      1401.2
+.fi
+
+The first block shows the lock acquisition (wait) data: how long threads
+blocked waiting to acquire each mutex.
+
+  'PID'          - process the mutex belongs to
+  'Mutex (hex)'  - address of the mutex
+  'Avg Wait'     - average time to acquire the mutex
+  'Count'        - number of acquisitions that had to wait
+  'Max Wait'     - maximum time to acquire the mutex
+  'Total Wait'   - total time spent acquiring the mutex
+
+The second block shows the lock holding data: how long each mutex was held.
+
+  'PID'          - process the mutex belongs to
+  'Mutex (hex)'  - address of the mutex
+  'Avg Hold'     - average time the mutex was held
+  'Count'        - number of times the mutex was held (always all of them)
+  'Max Hold'     - maximum time the mutex was held
+  'Total Hold'   - total time the mutex was held
+
+Times are in microseconds. Below each wait row the stack trace of the call
+site that blocked on the lock is printed, which shows where the contention
+is created.
+
+This works by attaching USDT probes to the glibc mutex_entry,
+mutex_acquired, and mutex_release probe points. The time between
+mutex_entry and mutex_acquired is the wait time, and the time between
+mutex_acquired and mutex_release is the hold time.
+
+Since this instruments every lock and unlock, it can add noticeable
+overhead on a process with a high lock rate. Use it for short periods of
+investigation.
+.SH REQUIREMENTS
+Linux with eBPF and BCC, and a glibc that was built with USDT (SystemTap
+probe) support. Up to glibc 2.33 the probes use the "libpthread" provider,
+starting with glibc 2.34 they use the "libc" provider.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-p PID
+Trace this process ID only.
+.TP
+\-t TID
+Trace this thread ID only.
+.TP
+\-d DURATION
+Total duration of trace in seconds.
+.TP
+\-i INTERVAL
+Print summary at this interval, in seconds.
+.TP
+\-n COUNT
+Print this many top locks, by total wait and hold time.
+.TP
+\-s DEPTH
+Print this many stack frames for each lock. Default is 1.
+.TP
+\-m MIN_US
+Only count acquisitions that had to wait at least this many microseconds.
+glibc fires the mutex probes on every lock call, including the uncontended
+fast path, so this is the usual way to look at real contention. Hold times
+are always recorded, so the two blocks can have different counts.
+.SH EXAMPLES
+.TP
+Trace how long a process spends waiting on its mutexes:
+#
+.B ulockstat -p 123 -d 5
+.TP
+Trace only a single thread:
+#
+.B ulockstat -t 4567
+.SH OVERHEAD
+This traces all mutex lock and unlock events of the traced process and
+collects a user stack trace for every contended lock. On a lock-heavy
+process this can be significant, so prefer short runs and, when possible,
+a PID or TID filter.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Quchaosheng
+.SH SEE ALSO
+klockstat(8), deadlock(8)
