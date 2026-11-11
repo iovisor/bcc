@@ -451,10 +451,10 @@ if args.full_path:
     bpf_text = bpf_text.replace('SUBMIT_DATA', """
     if (data->name[0] != '/') { // relative path
         struct task_struct *task;
-        struct dentry *dentry, *parent_dentry, *mnt_root;
-        struct vfsmount *vfsmnt;
+        struct dentry *dentry, *parent_dentry, *mnt_root, *root_dentry;
+        struct vfsmount *vfsmnt, *root_vfsmnt;
         struct fs_struct *fs;
-        struct path *path;
+        struct path *path, *root_path;
         struct mount *mnt;
         size_t filepart_length;
         char *payload = data->name;
@@ -467,10 +467,17 @@ if args.full_path:
         path = &fs->pwd;
         dentry = path->dentry;
         vfsmnt = path->mnt;
+        root_path = &fs->root;
+        root_dentry = root_path->dentry;
+        root_vfsmnt = root_path->mnt;
 
         mnt = container_of(vfsmnt, struct mount, mnt);
 
         for (i = 1, payload += NAME_MAX; i < MAX_ENTRIES; i++) {
+            /* Keep the reported path inside this task's root. */
+            if (dentry == root_dentry && vfsmnt == root_vfsmnt)
+                break;
+
             bpf_probe_read_kernel(&d_name, sizeof(d_name), &dentry->d_name);
             filepart_length =
                 bpf_probe_read_kernel_str(payload, NAME_MAX, (void *)d_name.name);

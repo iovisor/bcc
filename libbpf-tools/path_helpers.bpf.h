@@ -12,6 +12,7 @@
 static __always_inline
 int bpf_dentry_full_path(char *pathes, int name_len, int max_depth,
 			 struct dentry *dentry, struct vfsmount *vfsmnt,
+			 struct dentry *root_dentry, struct vfsmount *root_vfsmnt,
 			 int *failed, __u32 *path_depth)
 {
 	int depth;
@@ -24,6 +25,10 @@ int bpf_dentry_full_path(char *pathes, int name_len, int max_depth,
 	mnt_root = BPF_CORE_READ(vfsmnt, mnt_root);
 
 	for (depth = 0; depth < max_depth; depth++) {
+		/* Do not walk out of this task's chroot or mount namespace root. */
+		if (dentry == root_dentry && vfsmnt == root_vfsmnt)
+			break;
+
 		filepart_length =
 			bpf_probe_read_kernel_str(payload, name_len,
 					BPF_CORE_READ(dentry, d_name.name));
@@ -75,12 +80,16 @@ int bpf_getcwd(char *pathes, int name_len, int max_depth, int *failed,
 	struct task_struct *task;
 	struct dentry *dentry;
 	struct vfsmount *vfsmnt;
+	struct dentry *root_dentry;
+	struct vfsmount *root_vfsmnt;
 
 	task = (struct task_struct *)bpf_get_current_task_btf();
 	dentry = BPF_CORE_READ(task, fs, pwd.dentry);
 	vfsmnt = BPF_CORE_READ(task, fs, pwd.mnt);
+	root_dentry = BPF_CORE_READ(task, fs, root.dentry);
+	root_vfsmnt = BPF_CORE_READ(task, fs, root.mnt);
 
 	return bpf_dentry_full_path(pathes, name_len, max_depth, dentry, vfsmnt,
-			     failed, path_depth);
+			     root_dentry, root_vfsmnt, failed, path_depth);
 }
 #endif
