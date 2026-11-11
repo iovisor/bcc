@@ -62,6 +62,11 @@ Trace mount namespaces in this BPF map only (filtered in-kernel).
 \-P PPID
 Trace this parent PID only.
 .TP
+\-C
+Include a CPU column.
+.TP
+\-M
+Include a parent command (PCOMM) column.
 .SH EXAMPLES
 .TP
 Trace all exec() syscalls:
