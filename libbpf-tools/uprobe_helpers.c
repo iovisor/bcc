@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -46,31 +47,38 @@ int get_pid_binary_path(pid_t pid, char *path, size_t path_sz)
 }
 
 /*
- * Returns 0 on success; -1 on failure.  On success, returns via `path` the full
- * path to a library matching the name `lib` that is loaded into pid's address
- * space.
+ * Finds the mapping of a library matching the name `lib` in pid's address
+ * space.  With text_only the search skips every mapping that does not carry
+ * the library's code.  With quiet a failure reports nothing.
  */
-int get_pid_lib_path(pid_t pid, const char *lib, char *path, size_t path_sz)
+static int find_pid_lib_path(pid_t pid, const char *lib, char *path,
+			     size_t path_sz, bool text_only, bool quiet)
 {
 	FILE *maps;
 	char *p;
 	char proc_pid_maps[32];
 	char line_buf[1024];
 	char path_buf[1024];
+	char perm[8];
 	int err = -1;
 
 	if (snprintf(proc_pid_maps, sizeof(proc_pid_maps), "/proc/%d/maps", pid)
 	    >= sizeof(proc_pid_maps)) {
-		warn("snprintf /proc/PID/maps failed");
+		if (!quiet)
+			warn("snprintf /proc/PID/maps failed");
 		return -1;
 	}
 	maps = fopen(proc_pid_maps, "r");
 	if (!maps) {
-		warn("No such pid %d\n", pid);
+		if (!quiet)
+			warn("No such pid %d\n", pid);
 		return -1;
 	}
 	while (fgets(line_buf, sizeof(line_buf), maps)) {
-		if (sscanf(line_buf, "%*x-%*x %*s %*x %*s %*u %s", path_buf) != 1)
+		if (sscanf(line_buf, "%*x-%*x %7s %*x %*s %*u %1023s",
+			   perm, path_buf) != 2)
+			continue;
+		if (text_only && !strchr(perm, 'x'))
 			continue;
 		/* e.g. /usr/lib/x86_64-linux-gnu/libc-2.31.so */
 		p = strrchr(path_buf, '/');
@@ -85,8 +93,9 @@ int get_pid_lib_path(pid_t pid, const char *lib, char *path, size_t path_sz)
 		/* libraries can have - or . after the name */
 		if (*p != '.' && *p != '-')
 			continue;
-		if (strnlen(path_buf, 1024) >= path_sz) {
-			warn("path size too small\n");
+		if (strnlen(path_buf, sizeof(path_buf)) >= path_sz) {
+			if (!quiet)
+				warn("path size too small\n");
 			goto cleanup;
 		}
 		strcpy(path, path_buf);
@@ -94,10 +103,33 @@ int get_pid_lib_path(pid_t pid, const char *lib, char *path, size_t path_sz)
 		goto cleanup;
 	}
 
-	warn("Cannot find library %s\n", lib);
+	if (!quiet)
+		warn("Cannot find library %s\n", lib);
 cleanup:
 	fclose(maps);
 	return err;
+}
+
+/*
+ * Returns 0 on success; -1 on failure.  On success, returns via `path` the full
+ * path to a library matching the name `lib` that is loaded into pid's address
+ * space.
+ */
+int get_pid_lib_path(pid_t pid, const char *lib, char *path, size_t path_sz)
+{
+	return find_pid_lib_path(pid, lib, path, path_sz, false, false);
+}
+
+/*
+ * Same as get_pid_lib_path(), but succeeds only once the mapping that carries
+ * the library's code is there, and reports nothing on failure.  The dynamic
+ * linker maps the read-only header first, so a caller that polls a process
+ * while the library is being brought in, and that needs to resolve symbols in
+ * it, has to wait for the segment that holds them.
+ */
+int get_pid_lib_text_path(pid_t pid, const char *lib, char *path, size_t path_sz)
+{
+	return find_pid_lib_path(pid, lib, path, path_sz, true, true);
 }
 
 /*

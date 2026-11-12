@@ -9,6 +9,7 @@
 
 int get_pid_binary_path(pid_t pid, char *path, size_t path_sz);
 int get_pid_lib_path(pid_t pid, const char *lib, char *path, size_t path_sz);
+int get_pid_lib_text_path(pid_t pid, const char *lib, char *path, size_t path_sz);
 int resolve_binary_path(const char *binary, pid_t pid, char *path, size_t path_sz);
 off_t get_elf_func_offset(const char *path, const char *func);
 Elf *open_elf(const char *path, int *fd_close);
