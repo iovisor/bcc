@@ -297,7 +297,10 @@ public:
 };
 
 class Context {
+  // Keep iteration order while avoiding a linear search when adding probes.
   std::vector<std::unique_ptr<Probe>> probes_;
+  std::unordered_map<std::string,
+                     std::unordered_map<std::string, Probe *>> probes_by_provider_;
   std::unordered_set<std::string> modules_;
 
   optional<int> pid_;
