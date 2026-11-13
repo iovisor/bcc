@@ -130,6 +130,7 @@ int trace_exit(struct syscall_trace_exit* ctx)
 	eventp = reserve_buf(sizeof(*eventp));
 	if (!eventp)
 		goto cleanup;
+	zero_buf(eventp, sizeof(*eventp));
 
 	/* event data */
 	eventp->pid = bpf_get_current_pid_tgid() >> 32;

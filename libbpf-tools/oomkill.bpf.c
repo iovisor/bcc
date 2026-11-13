@@ -16,6 +16,7 @@ int BPF_KPROBE(oom_kill_process, struct oom_control *oc, const char *message)
 	data = reserve_buf(sizeof(*data));
 	if (!data)
 		return 0;
+	zero_buf(data, sizeof(*data));
 
 	data->fpid = bpf_get_current_pid_tgid() >> 32;
 	data->tpid = BPF_CORE_READ(oc, chosen, tgid);
