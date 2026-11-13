@@ -10,6 +10,44 @@ import subprocess
 import shutil
 import time
 import unittest
+from unittest.mock import Mock, patch
+
+class TestUprobeSignature(unittest.TestCase):
+    def test_native_signature(self):
+        self.assertEqual(bcc.lib.bpf_attach_uprobe.argtypes, [
+            ctypes.c_int, ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p,
+            ctypes.c_ulonglong, ctypes.c_int, ctypes.c_uint,
+        ])
+
+    def test_ref_ctr_offset(self):
+        # A strict native signature catches omitted arguments deterministically.
+        # Calling libbcc with too few arguments otherwise reads an undefined
+        # ref_ctr_offset from a register or the stack.
+        calls = []
+
+        @ctypes.CFUNCTYPE(
+            ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_char_p,
+            ctypes.c_char_p, ctypes.c_ulonglong, ctypes.c_int, ctypes.c_uint)
+        def attach(*args):
+            calls.append(args)
+            return 23
+
+        for attach_type, method in enumerate(
+                [bcc.BPF.attach_uprobe, bcc.BPF.attach_uretprobe]):
+            with self.subTest(method=method.__name__):
+                bpf = Mock(spec=bcc.BPF)
+                bpf.load_func.return_value.fd = 11
+                bpf._get_uprobe_evname.return_value = b"test_probe"
+                with patch.object(bcc.BPF, "_check_path_symbol",
+                                  return_value=(b"/test.so", 0x1234)), \
+                        patch.object(bcc.lib, "bpf_attach_uprobe", attach):
+                    result = method(bpf, name=b"/test.so", sym=b"probe",
+                                    fn_name=b"trace", pid=123)
+                self.assertIs(result, bpf)
+                self.assertEqual(calls[-1], (
+                    11, attach_type, b"test_probe", b"/test.so", 0x1234, 123, 0))
+                bpf._add_uprobe_fd.assert_called_once_with(b"test_probe", 23)
+
 
 class TestUprobes(unittest.TestCase):
     def test_simple_library(self):
