@@ -122,12 +122,14 @@ static int get_libc_path(char *path)
 {
 	char proc_path[PATH_MAX + 32] = {};
 	char buf[PATH_MAX] = {};
+	char *map_path;
 	char *filename;
 	float version;
 	FILE *f;
 
 	if (libc_path) {
-		memcpy(path, libc_path, strlen(libc_path));
+		if (snprintf(path, PATH_MAX, "%s", libc_path) >= PATH_MAX)
+			return -ENAMETOOLONG;
 		return 0;
 	}
 
@@ -140,17 +142,30 @@ static int get_libc_path(char *path)
 	if (!f)
 		return -errno;
 
-	while (fscanf(f, "%*x-%*x %*s %*s %*s %*s %[^\n]\n", buf) != EOF) {
-		if (strchr(buf, '/') != buf)
+	while (fgets(buf, sizeof(buf), f)) {
+		map_path = strchr(buf, '/');
+		if (!map_path)
 			continue;
-		filename = strrchr(buf, '/') + 1;
+		map_path[strcspn(map_path, "\n")] = '\0';
+		filename = strrchr(map_path, '/') + 1;
 		if (sscanf(filename, "libc-%f.so", &version) == 1 ||
 		    sscanf(filename, "libc.so.%f", &version) == 1) {
 			if (target_pid == 0) {
-				memcpy(path, buf, strlen(buf));
+				if (snprintf(path, PATH_MAX, "%s", map_path) >= PATH_MAX) {
+					fclose(f);
+					return -ENAMETOOLONG;
+				}
 			} else {
-				snprintf(proc_path, sizeof(proc_path), "/proc/%d/root%s", target_pid, buf);
-				memcpy(path, proc_path, strlen(proc_path));
+				if (snprintf(proc_path, sizeof(proc_path),
+					     "/proc/%d/root%s", target_pid,
+					     map_path) >= sizeof(proc_path)) {
+					fclose(f);
+					return -ENAMETOOLONG;
+				}
+				if (snprintf(path, PATH_MAX, "%s", proc_path) >= PATH_MAX) {
+					fclose(f);
+					return -ENAMETOOLONG;
+				}
 			}
 			fclose(f);
 			return 0;
