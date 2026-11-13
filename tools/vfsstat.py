@@ -32,7 +32,7 @@ parser = argparse.ArgumentParser(
     description="Count some VFS calls.",
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=examples)
-parser.add_argument("-p", "--pid",
+parser.add_argument("-p", "--pid", type=int,
     help="trace this PID only")
 parser.add_argument("interval", nargs="?", default=1,
     help="output interval, in seconds")

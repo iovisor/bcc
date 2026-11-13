@@ -36,7 +36,7 @@ parser = argparse.ArgumentParser(
     epilog=examples)
 parser.add_argument("-u", "--useronly", action="store_true",
     help="user threads only (no kernel threads)")
-parser.add_argument("-p", "--pid",
+parser.add_argument("-p", "--pid", type=int,
     help="trace this PID only")
 parser.add_argument("-v", "--verbose", action="store_true",
     help="show raw addresses")

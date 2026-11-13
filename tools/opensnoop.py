@@ -58,9 +58,9 @@ parser.add_argument("-U", "--print-uid", action="store_true",
     help="print UID column")
 parser.add_argument("-x", "--failed", action="store_true",
     help="only show failed opens")
-parser.add_argument("-p", "--pid",
+parser.add_argument("-p", "--pid", type=int,
     help="trace this PID only")
-parser.add_argument("-t", "--tid",
+parser.add_argument("-t", "--tid", type=int,
     help="trace this TID only")
 parser.add_argument("--cgroupmap",
     help="trace cgroups in this BPF map only")

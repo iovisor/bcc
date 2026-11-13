@@ -53,7 +53,7 @@ supports NFSv{3,4}""",
 
 parser.add_argument("-j", "--csv", action="store_true",
                     help="just print fields: comma-separated values")
-parser.add_argument("-p", "--pid", help="Trace this pid only")
+parser.add_argument("-p", "--pid", type=int, help="Trace this pid only")
 parser.add_argument("min_ms", nargs="?", default='10',
                     help="Minimum IO duration to trace in ms (default=10ms)")
 parser.add_argument("--ebpf", action="store_true",

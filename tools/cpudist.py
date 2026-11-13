@@ -46,7 +46,7 @@ parser.add_argument("-P", "--pids", action="store_true",
     help="print a histogram per process ID")
 parser.add_argument("-L", "--tids", action="store_true",
     help="print a histogram per thread ID")
-parser.add_argument("-p", "--pid",
+parser.add_argument("-p", "--pid", type=int,
     help="trace this PID only")
 parser.add_argument("-I", "--include-idle", action="store_true",
     help="include CPU idle time")

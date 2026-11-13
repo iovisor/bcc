@@ -693,7 +693,7 @@ int BPFModule::annotate_prog_tag(const string &name, int prog_fd,
     return -1;
   }
 
-  err = mkdir(BCC_PROG_TAG_DIR, 0777);
+  err = mkdir(BCC_PROG_TAG_DIR, 0700);
   if (err && errno != EEXIST) {
     fprintf(stderr, "cannot create " BCC_PROG_TAG_DIR "\n");
     return -1;
@@ -701,7 +701,7 @@ int BPFModule::annotate_prog_tag(const string &name, int prog_fd,
 
   char buf[128];
   ::snprintf(buf, sizeof(buf), BCC_PROG_TAG_DIR "/bpf_prog_%llx", tag1);
-  err = mkdir(buf, 0777);
+  err = mkdir(buf, 0700);
   if (err && errno != EEXIST) {
     fprintf(stderr, "cannot create %s\n", buf);
     return -1;
@@ -709,37 +709,46 @@ int BPFModule::annotate_prog_tag(const string &name, int prog_fd,
 
   ::snprintf(buf, sizeof(buf), BCC_PROG_TAG_DIR "/bpf_prog_%llx/%s.c",
              tag1, name.data());
-  FileDesc fd(open(buf, O_CREAT | O_WRONLY | O_TRUNC, 0644));
+  FileDesc fd(open(buf, O_CREAT | O_WRONLY | O_TRUNC | O_NOFOLLOW, 0644));
   if (fd < 0) {
     fprintf(stderr, "cannot create %s\n", buf);
     return -1;
   }
 
   const char *src = function_source(name);
-  write(fd, src, strlen(src));
+  if (write(fd, src, strlen(src)) < 0) {
+    fprintf(stderr, "cannot write to %s\n", buf);
+    return -1;
+  }
 
   ::snprintf(buf, sizeof(buf), BCC_PROG_TAG_DIR "/bpf_prog_%llx/%s.rewritten.c",
              tag1, name.data());
-  fd = open(buf, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+  fd = open(buf, O_CREAT | O_WRONLY | O_TRUNC | O_NOFOLLOW, 0644);
   if (fd < 0) {
     fprintf(stderr, "cannot create %s\n", buf);
     return -1;
   }
 
   src = function_source_rewritten(name);
-  write(fd, src, strlen(src));
+  if (write(fd, src, strlen(src)) < 0) {
+    fprintf(stderr, "cannot write to %s\n", buf);
+    return -1;
+  }
 
   if (!src_dbg_fmap_[name].empty()) {
     ::snprintf(buf, sizeof(buf), BCC_PROG_TAG_DIR "/bpf_prog_%llx/%s.dis.txt",
                tag1, name.data());
-    fd = open(buf, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    fd = open(buf, O_CREAT | O_WRONLY | O_TRUNC | O_NOFOLLOW, 0644);
     if (fd < 0) {
       fprintf(stderr, "cannot create %s\n", buf);
       return -1;
     }
 
     const char *src = src_dbg_fmap_[name].c_str();
-    write(fd, src, strlen(src));
+    if (write(fd, src, strlen(src)) < 0) {
+      fprintf(stderr, "cannot write to %s\n", buf);
+      return -1;
+    }
   }
 
   return 0;
