@@ -81,6 +81,8 @@ parser.add_argument("--ebpf", action="store_true",
     help=argparse.SUPPRESS)
 args = parser.parse_args()
 debug = 0
+want_ipv4 = not args.ipv6
+want_ipv6 = not args.ipv4
 
 # define BPF program
 bpf_text = """
@@ -90,47 +92,8 @@ bpf_text = """
 
 BPF_HASH(currsock, u32, struct sock *);
 
-// separate data structs for ipv4 and ipv6
-struct ipv4_data_t {
-    u64 ts_us;
-    u32 pid;
-    u32 uid;
-    u32 saddr;
-    u32 daddr;
-    u64 ip;
-    u16 lport;
-    u16 dport;
-    char task[TASK_COMM_LEN];
-};
-BPF_PERF_OUTPUT(ipv4_events);
-
-struct ipv6_data_t {
-    u64 ts_us;
-    u32 pid;
-    u32 uid;
-    unsigned __int128 saddr;
-    unsigned __int128 daddr;
-    u64 ip;
-    u16 lport;
-    u16 dport;
-    char task[TASK_COMM_LEN];
-};
-BPF_PERF_OUTPUT(ipv6_events);
-
-// separate flow keys per address family
-struct ipv4_flow_key_t {
-    u32 saddr;
-    u32 daddr;
-    u16 dport;
-};
-BPF_HASH(ipv4_count, struct ipv4_flow_key_t);
-
-struct ipv6_flow_key_t {
-    unsigned __int128 saddr;
-    unsigned __int128 daddr;
-    u16 dport;
-};
-BPF_HASH(ipv6_count, struct ipv6_flow_key_t);
+IPV4_DECLARATIONS
+IPV6_DECLARATIONS
 
 int trace_connect_entry(struct pt_regs *ctx, struct sock *sk)
 {
@@ -179,29 +142,79 @@ static int trace_connect_return(struct pt_regs *ctx, short ipver)
 
     FILTER_PORT
 
-    FILTER_FAMILY
-
-    if (ipver == 4) {
-        IPV4_CODE
-    } else /* 6 */ {
-        IPV6_CODE
-    }
+    FAMILY_CODE
 
     currsock.delete(&tid);
 
     return 0;
 }
 
+IPV4_PROBE
+IPV6_PROBE
+"""
+
+family_bpf_text = {
+    'ipv4': {
+        'declarations': """
+// IPv4 data and flow declarations
+struct ipv4_data_t {
+    u64 ts_us;
+    u32 pid;
+    u32 uid;
+    u32 saddr;
+    u32 daddr;
+    u64 ip;
+    u16 lport;
+    u16 dport;
+    char task[TASK_COMM_LEN];
+};
+BPF_PERF_OUTPUT(ipv4_events);
+
+struct ipv4_flow_key_t {
+    u32 saddr;
+    u32 daddr;
+    u16 dport;
+};
+BPF_HASH(ipv4_count, struct ipv4_flow_key_t);
+""",
+        'probe': """
 int trace_connect_v4_return(struct pt_regs *ctx)
 {
     return trace_connect_return(ctx, 4);
 }
+"""
+    },
+    'ipv6': {
+        'declarations': """
+// IPv6 data and flow declarations
+struct ipv6_data_t {
+    u64 ts_us;
+    u32 pid;
+    u32 uid;
+    unsigned __int128 saddr;
+    unsigned __int128 daddr;
+    u64 ip;
+    u16 lport;
+    u16 dport;
+    char task[TASK_COMM_LEN];
+};
+BPF_PERF_OUTPUT(ipv6_events);
 
+struct ipv6_flow_key_t {
+    unsigned __int128 saddr;
+    unsigned __int128 daddr;
+    u16 dport;
+};
+BPF_HASH(ipv6_count, struct ipv6_flow_key_t);
+""",
+        'probe': """
 int trace_connect_v6_return(struct pt_regs *ctx)
 {
     return trace_connect_return(ctx, 6);
 }
 """
+    }
+}
 
 struct_init = {'ipv4':
         {'count':
@@ -257,8 +270,6 @@ struct_init = {'ipv4':
 # uses a percpu array of length 1 to store the dns_data_t off the stack to
 # allow for a maximum DNS packet length of 512 bytes.
 dns_bpf_text = """
-#include <net/inet_sock.h>
-
 #define MAX_PKT 512
 struct dns_data_t {
     u8  pkt[MAX_PKT];
@@ -266,11 +277,15 @@ struct dns_data_t {
 
 BPF_PERF_OUTPUT(dns_events);
 
-// store msghdr pointer captured on syscall entry to parse on syscall return
-BPF_HASH(tbl_udp_msg_hdr, u64, struct msghdr *);
-
 // single element per-cpu array to hold the current event off the stack
 BPF_PERCPU_ARRAY(dns_data,struct dns_data_t,1);
+"""
+
+dns_ipv4_bpf_text = """
+#include <net/inet_sock.h>
+
+// store msghdr pointer captured on syscall entry to parse on syscall return
+BPF_HASH(tbl_udp_msg_hdr, u64, struct msghdr *);
 
 int trace_udp_recvmsg(struct pt_regs *ctx)
 {
@@ -321,7 +336,9 @@ delete_and_return:
     tbl_udp_msg_hdr.delete(&pid_tgid);
     return 0;
 }
+"""
 
+dns_ipv6_bpf_text = """
 #include <uapi/linux/udp.h>
 
 int trace_udpv6_recvmsg(struct pt_regs *ctx)
@@ -354,12 +371,47 @@ if args.count and args.dns:
     exit()
 
 # code substitutions
-if args.count:
-    bpf_text = bpf_text.replace("IPV4_CODE", struct_init['ipv4']['count'])
-    bpf_text = bpf_text.replace("IPV6_CODE", struct_init['ipv6']['count'])
+for family in ('ipv4', 'ipv6'):
+    family_enabled = want_ipv4 if family == 'ipv4' else want_ipv6
+    bpf_text = bpf_text.replace(
+        family.upper() + '_DECLARATIONS',
+        family_bpf_text[family]['declarations'] if family_enabled else '')
+    bpf_text = bpf_text.replace(
+        family.upper() + '_PROBE',
+        family_bpf_text[family]['probe'] if family_enabled else '')
+
+if want_ipv4 and want_ipv6:
+    family_code = """
+    if (ipver == 4) {
+        IPV4_CODE
+    } else /* 6 */ {
+        IPV6_CODE
+    }
+"""
+elif want_ipv4:
+    family_code = """
+    if (ipver == 4) {
+        IPV4_CODE
+    }
+"""
 else:
-    bpf_text = bpf_text.replace("IPV4_CODE", struct_init['ipv4']['trace'])
-    bpf_text = bpf_text.replace("IPV6_CODE", struct_init['ipv6']['trace'])
+    family_code = """
+    if (ipver == 6) {
+        IPV6_CODE
+    }
+"""
+bpf_text = bpf_text.replace('FAMILY_CODE', family_code)
+
+if args.count:
+    if want_ipv4:
+        bpf_text = bpf_text.replace("IPV4_CODE", struct_init['ipv4']['count'])
+    if want_ipv6:
+        bpf_text = bpf_text.replace("IPV6_CODE", struct_init['ipv6']['count'])
+else:
+    if want_ipv4:
+        bpf_text = bpf_text.replace("IPV4_CODE", struct_init['ipv4']['trace'])
+    if want_ipv6:
+        bpf_text = bpf_text.replace("IPV6_CODE", struct_init['ipv6']['trace'])
 
 if args.pid:
     bpf_text = bpf_text.replace('FILTER_PID',
@@ -369,12 +421,6 @@ if args.port:
     dports_if = ' && '.join(['dport != %d' % ntohs(dport) for dport in dports])
     bpf_text = bpf_text.replace('FILTER_PORT',
         'if (%s) { currsock.delete(&tid); return 0; }' % dports_if)
-if args.ipv4:
-    bpf_text = bpf_text.replace('FILTER_FAMILY',
-        'if (ipver != 4) { return 0; }')
-elif args.ipv6:
-    bpf_text = bpf_text.replace('FILTER_FAMILY',
-        'if (ipver != 6) { return 0; }')
 if args.uid:
     bpf_text = bpf_text.replace('FILTER_UID',
         'if (uid != %s) { return 0; }' % args.uid)
@@ -382,19 +428,23 @@ bpf_text = filter_by_containers(args) + bpf_text
 
 bpf_text = bpf_text.replace('FILTER_PID', '')
 bpf_text = bpf_text.replace('FILTER_PORT', '')
-bpf_text = bpf_text.replace('FILTER_FAMILY', '')
 bpf_text = bpf_text.replace('FILTER_UID', '')
 
 if args.dns:
-    if BPF.kernel_struct_has_field(b'iov_iter', b'type') == 1:
-        dns_bpf_text = dns_bpf_text.replace('TYPE_FIELD', 'type')
-    else:
-        dns_bpf_text = dns_bpf_text.replace('TYPE_FIELD', 'iter_type')
-    if BPF.kernel_struct_has_field(b'iov_iter', b'iov') == 1:
-        dns_bpf_text = dns_bpf_text.replace('IOV_FIELD', 'iov')
-    else:
-        dns_bpf_text = dns_bpf_text.replace('IOV_FIELD', '__iov')
+    if want_ipv4:
+        if BPF.kernel_struct_has_field(b'iov_iter', b'type') == 1:
+            dns_ipv4_bpf_text = dns_ipv4_bpf_text.replace('TYPE_FIELD', 'type')
+        else:
+            dns_ipv4_bpf_text = dns_ipv4_bpf_text.replace('TYPE_FIELD', 'iter_type')
+        if BPF.kernel_struct_has_field(b'iov_iter', b'iov') == 1:
+            dns_ipv4_bpf_text = dns_ipv4_bpf_text.replace('IOV_FIELD', 'iov')
+        else:
+            dns_ipv4_bpf_text = dns_ipv4_bpf_text.replace('IOV_FIELD', '__iov')
     bpf_text += dns_bpf_text
+    if want_ipv4:
+        bpf_text += dns_ipv4_bpf_text
+    if want_ipv6:
+        bpf_text += dns_ipv6_bpf_text
 
 if debug or args.ebpf:
     print(bpf_text)
@@ -532,14 +582,18 @@ if args.dns:
 
 # initialize BPF
 b = BPF(text=bpf_text)
-b.attach_kprobe(event="tcp_v4_connect", fn_name="trace_connect_entry")
-b.attach_kprobe(event="tcp_v6_connect", fn_name="trace_connect_entry")
-b.attach_kretprobe(event="tcp_v4_connect", fn_name="trace_connect_v4_return")
-b.attach_kretprobe(event="tcp_v6_connect", fn_name="trace_connect_v6_return")
+if want_ipv4:
+    b.attach_kprobe(event="tcp_v4_connect", fn_name="trace_connect_entry")
+    b.attach_kretprobe(event="tcp_v4_connect", fn_name="trace_connect_v4_return")
+if want_ipv6:
+    b.attach_kprobe(event="tcp_v6_connect", fn_name="trace_connect_entry")
+    b.attach_kretprobe(event="tcp_v6_connect", fn_name="trace_connect_v6_return")
 if args.dns:
-    b.attach_kprobe(event="udp_recvmsg", fn_name="trace_udp_recvmsg")
-    b.attach_kretprobe(event="udp_recvmsg", fn_name="trace_udp_ret_recvmsg")
-    b.attach_kprobe(event="udpv6_queue_rcv_one_skb", fn_name="trace_udpv6_recvmsg")
+    if want_ipv4:
+        b.attach_kprobe(event="udp_recvmsg", fn_name="trace_udp_recvmsg")
+        b.attach_kretprobe(event="udp_recvmsg", fn_name="trace_udp_ret_recvmsg")
+    if want_ipv6:
+        b.attach_kprobe(event="udpv6_queue_rcv_one_skb", fn_name="trace_udpv6_recvmsg")
 
 print("Tracing connect ... Hit Ctrl-C to end")
 if args.count:
@@ -552,8 +606,10 @@ if args.count:
     # header
     print("\n%-25s %-25s %-20s %-10s" % (
         "LADDR", "RADDR", "RPORT", "CONNECTS"))
-    depict_cnt(b["ipv4_count"])
-    depict_cnt(b["ipv6_count"], l3prot='ipv6')
+    if want_ipv4:
+        depict_cnt(b["ipv4_count"])
+    if want_ipv6:
+        depict_cnt(b["ipv6_count"], l3prot='ipv6')
 # read events
 else:
     # header
@@ -575,8 +631,10 @@ else:
     start_ts = 0
 
     # read events
-    b["ipv4_events"].open_perf_buffer(print_ipv4_event)
-    b["ipv6_events"].open_perf_buffer(print_ipv6_event)
+    if want_ipv4:
+        b["ipv4_events"].open_perf_buffer(print_ipv4_event)
+    if want_ipv6:
+        b["ipv6_events"].open_perf_buffer(print_ipv6_event)
     if args.dns:
         b["dns_events"].open_perf_buffer(save_dns)
     while True:
