@@ -17,6 +17,7 @@ local ffi = require('ffi')
 local bit = require('bit')
 local has_syscall, S = pcall(require, 'syscall')
 local M = {}
+local tracepoint_type = require('bpf.tracepoint_type')
 
 ffi.cdef [[
 struct bpf {
@@ -269,12 +270,7 @@ function M.tracepoint_type(tp)
 	local fp = assert(io.open('/sys/kernel/debug/tracing/events/'..tp..'/format', 'r'))
 	local fmt = fp:read '*a'
 	fp:close()
-	-- Parse struct fields
-	local fields = {}
-	for f in fmt:gmatch 'field:([^;]+;)' do
-		table.insert(fields, f)
-	end
-	return string.format('struct { %s }', table.concat(fields))
+	return tracepoint_type.from_format(fmt)
 end
 
 return M
