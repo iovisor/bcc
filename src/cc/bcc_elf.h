@@ -73,8 +73,8 @@ int bcc_elf_foreach_sym_lazy(const char *path, bcc_elf_symcb_lazy callback,
 // Returns -1 on error, and 0 on success or stopped by callback
 int bcc_elf_foreach_vdso_sym(bcc_elf_symcb callback, void *payload);
 
-int bcc_elf_get_text_scn_info(const char *path, uint64_t *addr,
-                              uint64_t *offset);
+int bcc_elf_get_scn_info(const char *path, uint64_t segment_offset,
+                              uint64_t *addr, uint64_t *offset);
 
 int bcc_elf_get_type(const char *path);
 int bcc_elf_is_pie(const char *path);

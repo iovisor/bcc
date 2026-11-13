@@ -204,19 +204,6 @@ int ProcSyms::_add_module(mod_info *mod, int enter_ns, void *payload) {
     auto module = Module(
         mod->name, modpath, &ps->symbol_option_);
 
-    // pid/maps doesn't account for file_offset of text within the ELF.
-    // It only gives the mmap offset. We need the real offset for symbol
-    // lookup.
-    if (module.type_ == ModuleType::SO) {
-      if (bcc_elf_get_text_scn_info(modpath->path(), &module.elf_so_addr_,
-                                    &module.elf_so_offset_) < 0) {
-        fprintf(stderr, "WARNING: Couldn't find .text section in %s\n",
-                modpath->alt_path());
-        fprintf(stderr, "WARNING: BCC can't handle sym look ups for %s",
-                modpath->alt_path());
-      }
-    }
-
     if (!bcc_is_perf_map(modpath->path()) ||
         module.type_ != ModuleType::UNKNOWN)
       // Always add the module even if we can't read it, so that we could
@@ -226,7 +213,24 @@ int ProcSyms::_add_module(mod_info *mod, int enter_ns, void *payload) {
     else
       return 0;
   }
-  it->ranges_.emplace_back(mod->start_addr, mod->end_addr, mod->file_offset);
+  // pid/maps doesn't account for file_offset of text within the ELF.
+  // It only gives the mmap offset. We need the real offset for symbol
+  // lookup.
+  // since there will be different real offset, so we must calculate each time.
+  uint64_t elf_so_offset;
+  uint64_t elf_so_addr;
+  if (it->type_ == ModuleType::SO) {
+    if (bcc_elf_get_scn_info(modpath->path(), static_cast<uint64_t>(mod->file_offset), 
+       &elf_so_addr, &elf_so_offset) < 0) {
+      fprintf(stderr, "WARNING: Couldn't find .text section in %s\n",
+              modpath->alt_path());
+      fprintf(stderr, "WARNING: BCC can't handle sym look ups for %s",
+              modpath->alt_path());
+    }
+  }
+
+  it->ranges_.emplace_back(mod->start_addr, mod->end_addr, mod->file_offset,
+    elf_so_addr, elf_so_offset);
   // perf-PID map is added last. We try both inside the Process's mount
   // namespace + chroot, and in global /tmp. Make sure we only add one.
   if (it->type_ == ModuleType::PERF_MAP)
@@ -310,10 +314,6 @@ ProcSyms::Module::Module(const char *name, std::shared_ptr<ModulePath> path,
     type_ = ModuleType::PERF_MAP;
   else if (bcc_elf_is_vdso(path_->path()) == 1)
     type_ = ModuleType::VDSO;
-
-  // Will be stored later
-  elf_so_offset_ = 0;
-  elf_so_addr_ = 0;
 }
 
 int ProcSyms::Module::_add_symbol(const char *symname, uint64_t start,
@@ -361,7 +361,7 @@ bool ProcSyms::Module::contains(uint64_t addr, uint64_t &offset) const {
     if (addr >= range.start && addr < range.end) {
       if (type_ == ModuleType::SO || type_ == ModuleType::VDSO) {
         offset = __so_calc_mod_offset(range.start, range.file_offset,
-                                      elf_so_addr_, elf_so_offset_, addr);
+                                      range.elf_so_addr, range.elf_so_offset, addr);
       } else {
         offset = addr;
       }
@@ -721,7 +721,7 @@ int bcc_resolve_global_addr(int pid, const char *module, const uint64_t address,
       mod.start == 0x0)
     return -1;
 
-  if (bcc_elf_get_text_scn_info(module, &elf_so_addr, &elf_so_offset) < 0)
+  if (bcc_elf_get_scn_info(module, mod.file_offset, &elf_so_addr, &elf_so_offset) < 0)
     return -1;
 
   *global = __so_calc_global_addr(mod.start, mod.file_offset, elf_so_addr,
