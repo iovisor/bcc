@@ -5,6 +5,7 @@
 // 08-Feb-2024   Tiago Ilieve   Created this.
 // 19-Jul-2024   Rong Tao       Support more sync syscalls
 #include <argp.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
 #include <bpf/libbpf.h>
@@ -77,7 +78,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 
 void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 {
-	printf("Lost %llu events on CPU #%d!\n", lost_cnt, cpu);
+	printf("Lost %" PRIu64" events on CPU #%d!\n", (uint64_t)lost_cnt, cpu);
 }
 
 static void sig_int(int signo)

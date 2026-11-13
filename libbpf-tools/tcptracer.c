@@ -6,6 +6,7 @@
 #include <sys/resource.h>
 #include <arpa/inet.h>
 #include <argp.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <limits.h>
 #include <unistd.h>
@@ -226,7 +227,7 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 {
-	warn("Lost %llu events on CPU #%d!\n", lost_cnt, cpu);
+	warn("Lost %" PRIu64" events on CPU #%d!\n", (uint64_t)lost_cnt, cpu);
 }
 
 static void print_events(int perf_map_fd)
