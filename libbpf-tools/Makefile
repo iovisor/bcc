@@ -83,6 +83,7 @@ APPS = \
 	softirqs \
 	softirqslower \
 	solisten \
+	sslsniff \
 	statsnoop \
 	syncsnoop \
 	syscount \
