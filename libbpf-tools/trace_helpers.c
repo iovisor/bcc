@@ -97,7 +97,7 @@ static int ksym_cmp(const void *p1, const void *p2)
 
 struct ksyms *ksyms__load(void)
 {
-	char sym_type, sym_name[256];
+	char sym_type, sym_name[2048];
 	struct ksyms *ksyms;
 	unsigned long sym_addr;
 	int i, ret;
@@ -112,7 +112,7 @@ struct ksyms *ksyms__load(void)
 		goto err_out;
 
 	while (true) {
-		ret = fscanf(f, "%lx %c %s%*[^\n]\n",
+		ret = fscanf(f, "%lx %c %2047s%*[^\n]\n",
 			     &sym_addr, &sym_type, sym_name);
 		if (ret == EOF && feof(f))
 			break;
