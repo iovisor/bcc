@@ -225,6 +225,139 @@ class bcc_stacktrace_build_id(ct.Structure):
             ('u',bcc_ip_offset_union)
          ]
 
+GU_ARCH_NATIVE = 0
+GU_ARCH_X86_64 = 1
+GU_ARCH_ARM64 = 2
+GU_REGS_VERSION = 1
+GU_REGS_MAX_DWARF_REGS = 64
+
+BCC_DWARF_UNWIND_REASON_OK = 0
+BCC_DWARF_UNWIND_REASON_NO_REGS = 1
+BCC_DWARF_UNWIND_REASON_NO_ELF = 2
+BCC_DWARF_UNWIND_REASON_NO_CFI = 3
+BCC_DWARF_UNWIND_REASON_CFI_FAIL = 4
+BCC_DWARF_UNWIND_REASON_ARCH_FAIL = 5
+BCC_DWARF_UNWIND_REASON_PROCESS_EXIT = 6
+BCC_DWARF_UNWIND_REASON_LANG_SKIP = 7
+BCC_DWARF_UNWIND_REASON_TRUNCATED = 8
+BCC_DWARF_UNWIND_REASON_NO_EXEC_PC = 9
+BCC_DWARF_UNWIND_REASON_CFI_FRAME_DECODE_FAILED = 10
+BCC_DWARF_UNWIND_REASON_CFI_FRAME_CFA_FAILED = 11
+BCC_DWARF_UNWIND_REASON_CFI_FRAME_CFA_CALC_FAILED = 12
+BCC_DWARF_UNWIND_REASON_END_OF_STACK = 13
+BCC_DWARF_UNWIND_REASON_STACK_READ_OUT_OF_RANGE = 14
+BCC_DWARF_UNWIND_REASON_FRAME_LIMIT = 15
+BCC_DWARF_UNWIND_REASON_UNKNOWN = 0xff
+
+class gu_regs(ct.Structure):
+    _fields_ = [
+            ('size', ct.c_size_t),
+            ('version', ct.c_uint32),
+            ('arch', ct.c_int),
+            ('valid_mask', ct.c_uint64),
+            ('dwarf', ct.c_uint64 * GU_REGS_MAX_DWARF_REGS),
+        ]
+
+    def __init__(self, arch=GU_ARCH_NATIVE):
+        super(gu_regs, self).__init__()
+        self.size = ct.sizeof(self)
+        self.version = GU_REGS_VERSION
+        self.arch = arch
+
+class bcc_dwarf_unwind_options(ct.Structure):
+    _fields_ = [
+            ('size', ct.c_uint32),
+            ('flags', ct.c_uint32),
+        ]
+
+    def __init__(self):
+        super(bcc_dwarf_unwind_options, self).__init__()
+        self.size = ct.sizeof(self)
+
+class bcc_dwarf_unwind_sample(ct.Structure):
+    _fields_ = [
+            ('size', ct.c_uint32),
+            ('flags', ct.c_uint32),
+            ('pid', ct.c_int),
+            ('unique_id', ct.c_uint64),
+            ('regs', ct.c_void_p),
+            ('stack_data', ct.POINTER(ct.c_uint8)),
+            ('stack_size', ct.c_size_t),
+            ('ustack_fp', ct.POINTER(ct.c_uint64)),
+            ('ustack_fp_level', ct.c_uint64),
+            ('max_frames', ct.c_uint32),
+        ]
+
+    def __init__(self):
+        super(bcc_dwarf_unwind_sample, self).__init__()
+        self.size = ct.sizeof(self)
+
+class bcc_dwarf_unwind_elf(ct.Structure):
+    _fields_ = [
+            ('size', ct.c_uint32),
+            ('base_name', ct.c_char_p),
+            ('elf_file_path', ct.c_char_p),
+            ('debug_file_path', ct.c_char_p),
+            ('build_id', ct.POINTER(ct.c_uint8)),
+            ('build_id_len', ct.c_size_t),
+            ('golang', ct.c_bool),
+        ]
+
+    def __init__(self):
+        super(bcc_dwarf_unwind_elf, self).__init__()
+        self.size = ct.sizeof(self)
+
+class bcc_dwarf_unwind_frame(ct.Structure):
+    pass
+
+bcc_dwarf_unwind_frame._fields_ = [
+        ('size', ct.c_uint32),
+        ('flags', ct.c_uint32),
+        ('pc', ct.c_uint64),
+        ('abs_pc', ct.c_uint64),
+        ('offset', ct.c_uint64),
+        ('symbol', ct.c_char_p),
+        ('elf', bcc_dwarf_unwind_elf),
+    ]
+
+def _bcc_dwarf_unwind_frame_init(self):
+    super(bcc_dwarf_unwind_frame, self).__init__()
+    self.size = ct.sizeof(self)
+
+bcc_dwarf_unwind_frame.__init__ = _bcc_dwarf_unwind_frame_init
+
+class bcc_dwarf_unwind_result(ct.Structure):
+    pass
+
+bcc_dwarf_unwind_result._fields_ = [
+        ('size', ct.c_uint32),
+        ('unwind_ret', ct.c_int),
+        ('stop_reason', ct.c_int),
+        ('frame_count', ct.c_size_t),
+        ('frames', ct.POINTER(bcc_dwarf_unwind_frame)),
+    ]
+
+def _bcc_dwarf_unwind_result_init(self):
+    super(bcc_dwarf_unwind_result, self).__init__()
+    self.size = ct.sizeof(self)
+
+bcc_dwarf_unwind_result.__init__ = _bcc_dwarf_unwind_result_init
+
+lib.bcc_dwarf_unwind_supported.restype = ct.c_bool
+lib.bcc_dwarf_unwind_supported.argtypes = None
+lib.bcc_dwarf_unwind_context_new.restype = ct.c_int
+lib.bcc_dwarf_unwind_context_new.argtypes = [
+        ct.POINTER(bcc_dwarf_unwind_options), ct.POINTER(ct.c_void_p)]
+lib.bcc_dwarf_unwind_context_free.restype = None
+lib.bcc_dwarf_unwind_context_free.argtypes = [ct.c_void_p]
+lib.bcc_dwarf_unwind_sample.restype = ct.c_int
+lib.bcc_dwarf_unwind_sample.argtypes = [
+        ct.c_void_p, ct.POINTER(bcc_dwarf_unwind_sample),
+        ct.POINTER(ct.POINTER(bcc_dwarf_unwind_result))]
+lib.bcc_dwarf_unwind_result_free.restype = None
+lib.bcc_dwarf_unwind_result_free.argtypes = [
+        ct.POINTER(bcc_dwarf_unwind_result)]
+
 class bcc_symbol_option(ct.Structure):
     _fields_ = [
             ('use_debug_file', ct.c_int),

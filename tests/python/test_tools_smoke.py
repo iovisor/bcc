@@ -2,8 +2,10 @@
 # Copyright (c) Sasha Goldshtein, 2017
 # Licensed under the Apache License, Version 2.0 (the "License")
 
+import ast
 import subprocess
 import os
+import platform
 import re
 from unittest import main, skipUnless, TestCase
 from utils import mayFail, kernel_version_ge
@@ -131,6 +133,37 @@ class SmokeTests(TestCase):
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_capable(self):
         self.run_with_int("capable.py")
+
+    def test_capable_dwarf_requires_user_stacks(self):
+        command = [TOOLS_DIR + "capable.py", "--dwarf", "--ebpf"]
+        proc = subprocess.Popen(command, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+        stdout, stderr = proc.communicate()
+        self.assertNotEqual(0, proc.returncode)
+        self.assertIn(b"--dwarf currently requires -U", stderr)
+
+    def test_capable_dwarf_rejects_unique(self):
+        command = [TOOLS_DIR + "capable.py", "--dwarf", "-U", "--unique",
+                   "--ebpf"]
+        proc = subprocess.Popen(command, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+        stdout, stderr = proc.communicate()
+        self.assertNotEqual(0, proc.returncode)
+        self.assertIn(b"--dwarf does not support --unique yet", stderr)
+
+    @skipUnless(platform.machine() in ("x86_64", "amd64"),
+                "DWARF stacks currently support x86_64 only")
+    def test_capable_dwarf_ebpf_uses_hook_helper(self):
+        command = [TOOLS_DIR + "capable.py", "--dwarf", "-U", "--ebpf"]
+        proc = subprocess.Popen(command, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+        stdout, stderr = proc.communicate()
+        self.assertEqual(0, proc.returncode, stderr)
+        self.assertIn(b"struct bcc_dwarf_sample", stdout)
+        self.assertIn(b"bcc_dwarf_fill_sample_from_regs", stdout)
+        self.assertIn(b"(struct bcc_dwarf_sample *)&data->stack_size",
+                      stdout)
+        self.assertNotIn(b"bcc_dwarf_raw_task_regs_fallback", stdout)
 
     def test_cpudist(self):
         self.run_with_duration("cpudist.py 1 1")
@@ -302,6 +335,48 @@ class SmokeTests(TestCase):
     @skipUnless(kernel_version_ge(4,9), "requires kernel >= 4.9")
     def test_profile(self):
         self.run_with_duration("profile.py 1")
+
+    def test_profile_dwarf_requires_user_stacks_only(self):
+        command = [TOOLS_DIR + "profile.py", "--dwarf", "--ebpf"]
+        proc = subprocess.Popen(command, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+        stdout, stderr = proc.communicate()
+        self.assertNotEqual(0, proc.returncode)
+        self.assertIn(b"--dwarf currently requires -U", stderr)
+
+    def test_profile_dwarf_rejects_kernel_stacks_only(self):
+        command = [TOOLS_DIR + "profile.py", "--dwarf", "-K", "--ebpf"]
+        proc = subprocess.Popen(command, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+        stdout, stderr = proc.communicate()
+        self.assertNotEqual(0, proc.returncode)
+        self.assertIn(b"--dwarf currently requires -U", stderr)
+
+    def test_profile_dwarf_lost_callback_takes_lost_count(self):
+        with open(TOOLS_DIR + "profile.py") as profile_file:
+            profile_tree = ast.parse(profile_file.read())
+
+        callbacks = [node for node in ast.walk(profile_tree)
+                     if isinstance(node, ast.FunctionDef) and
+                     node.name == "record_dwarf_lost"]
+
+        self.assertEqual(1, len(callbacks))
+        self.assertEqual(["count"],
+                         [arg.arg for arg in callbacks[0].args.args])
+
+    @skipUnless(platform.machine() in ("x86_64", "amd64"),
+                "DWARF profiling currently supports x86_64 only")
+    def test_profile_dwarf_ebpf_uses_perf_events(self):
+        command = [TOOLS_DIR + "profile.py", "--dwarf", "-U", "--ebpf"]
+        proc = subprocess.Popen(command, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+        stdout, stderr = proc.communicate()
+        self.assertEqual(0, proc.returncode, stderr)
+        self.assertIn(b"BPF_PERF_OUTPUT(dwarf_events)", stdout)
+        self.assertIn(b"struct dwarf_event_t", stdout)
+        self.assertIn(b"bcc_dwarf_fill_sample", stdout)
+        self.assertIn(b"bpf_task_pt_regs(task)", stdout)
+        self.assertNotIn(b"bcc_dwarf_raw_task_regs_fallback", stdout)
 
     def test_runqlat(self):
         self.run_with_duration("runqlat.py 1 1")

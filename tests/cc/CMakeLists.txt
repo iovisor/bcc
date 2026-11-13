@@ -28,6 +28,25 @@ if(${LLVM_PACKAGE_VERSION} VERSION_EQUAL 16 OR ${LLVM_PACKAGE_VERSION} VERSION_G
 set(CMAKE_CXX_STANDARD 14)
 endif()
 
+add_executable(test_dwarf_unwind
+	test_libbcc.cc
+	test_dwarf_unwind.cc)
+add_dependencies(test_dwarf_unwind bcc-shared)
+if(ENABLE_DWARF_UNWINDER AND LIBGUNWINDER_FOUND)
+  target_compile_definitions(test_dwarf_unwind PRIVATE
+    HAVE_LIBGUNWINDER
+    BCC_DWARF_UNWIND_TESTING)
+  target_sources(test_dwarf_unwind PRIVATE
+    ${PROJECT_SOURCE_DIR}/src/cc/bcc_dwarf_unwind.cc)
+  target_include_directories(test_dwarf_unwind PRIVATE
+    ${LIBGUNWINDER_INCLUDE_DIRS})
+  target_link_libraries(test_dwarf_unwind ${LIBGUNWINDER_TARGET})
+endif()
+target_link_libraries(test_dwarf_unwind ${PROJECT_BINARY_DIR}/src/cc/libbcc.so)
+set_target_properties(test_dwarf_unwind PROPERTIES INSTALL_RPATH ${PROJECT_BINARY_DIR}/src/cc)
+
+add_test(NAME test_dwarf_unwind COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_dwarf_unwind)
+
 if(ENABLE_USDT)
 set(TEST_LIBBCC_SOURCES
 	test_libbcc.cc

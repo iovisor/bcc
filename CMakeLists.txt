@@ -109,6 +109,9 @@ option(ENABLE_MAN "Build man pages" ON)
 option(ENABLE_TESTS "Build tests" ON)
 option(RUN_LUA_TESTS "Run lua tests" ON)
 option(ENABLE_LIBDEBUGINFOD "Use libdebuginfod as a source of debug symbols" ON)
+# Optional dependency for the cc/libbcc build. Packagers enabling this option
+# should add the libgunwinder development package; the default remains OFF.
+option(ENABLE_DWARF_UNWINDER "Enable external libgunwinder support" OFF)
 CMAKE_DEPENDENT_OPTION(ENABLE_CPP_API "Enable C++ API" ON "ENABLE_USDT" OFF)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
@@ -119,6 +122,10 @@ endif()
 
 if(CMAKE_USE_LIBBPF_PACKAGE)
   find_package(LibBpf)
+endif()
+
+if(ENABLE_DWARF_UNWINDER AND NOT PYTHON_ONLY)
+  find_package(LibGunwinder REQUIRED)
 endif()
 
 if(NOT PYTHON_ONLY)
