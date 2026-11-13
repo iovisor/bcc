@@ -136,6 +136,13 @@ endef
 $(call allow-override,CC,$(CROSS_COMPILE)cc)
 $(call allow-override,LD,$(CROSS_COMPILE)ld)
 
+# Clang's BPF target does not search the host's multiarch include directory.
+# Debian installs architecture-specific UAPI headers, such as asm/errno.h, there.
+HOST_MULTIARCH := $(shell $(CC) -print-multiarch 2>/dev/null)
+ifneq ($(strip $(HOST_MULTIARCH)),)
+BPF_ARCH_INCLUDES := -I/usr/include/$(HOST_MULTIARCH)
+endif
+
 .PHONY: all
 all: $(APPS) $(APP_ALIASES)
 
@@ -209,7 +216,8 @@ $(OUTPUT)/softirqs.bpf.o: BPFCFLAGS = $(BPFCFLAGS_softirqs)
 $(OUTPUT)/%.bpf.o: %.bpf.c $(LIBBPF_OBJ) $(wildcard %.h) $(ARCH)/vmlinux.h | $(OUTPUT)
 	$(call msg,BPF,$@)
 	$(Q)$(CLANG) $(BPFCFLAGS) -target bpf -D__TARGET_ARCH_$(ARCH)	      \
-		     -I$(ARCH)/ $(INCLUDES) -c $(filter %.c,$^) -o $@ &&      \
+		     -I$(ARCH)/ $(INCLUDES) $(BPF_ARCH_INCLUDES)              \
+             -c $(filter %.c,$^) -o $@ &&      \
 	$(LLVM_STRIP) -g $@
 
 btfhub-archive: force
