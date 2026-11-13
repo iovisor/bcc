@@ -116,23 +116,9 @@ bpf_text = """
 #include <linux/fcntl.h>
 #include <linux/sched.h>
 #ifdef FULLPATH
-#include <linux/fs_struct.h>
-#include <linux/dcache.h>
-#include <linux/fs.h>
-#include <linux/mount.h>
-
-/* see https://github.com/torvalds/linux/blob/master/fs/mount.h */
-struct mount {
-    struct hlist_node mnt_hash;
-    struct mount *mnt_parent;
-    struct dentry *mnt_mountpoint;
-    struct vfsmount mnt;
-    /* ... */
-};
+INCLUDE_FULL_PATH_H
+INCLUDE_PATH_HELPERS_BPF_H
 #endif
-
-#define NAME_MAX 255
-#define MAX_ENTRIES 32
 
 struct val_t {
     u64 id;
@@ -150,15 +136,7 @@ struct data_t {
     char comm[TASK_COMM_LEN];
     u32 path_depth;
 #ifdef FULLPATH
-    /**
-     * Example: "/CCCCC/BB/AAAA"
-     * name[]: "AAAA000000000000BB0000000000CCCCC00000000000"
-     *          |<- NAME_MAX ->|
-     *
-     * name[] must be u8, because char [] will be truncated by ctypes.cast(),
-     * such as above example, will be truncated to "AAAA0".
-     */
-    u8 name[NAME_MAX * MAX_ENTRIES];
+    FULL_PATH_FIELD(name);
 #else
     /* If not fullpath, avoid transfer big data */
     char name[NAME_MAX];
@@ -201,7 +179,9 @@ int trace_return(struct pt_regs *ctx)
     data->mode = valp->mode; // EXTENDED_STRUCT_MEMBER
     data->ret = PT_REGS_RC(ctx);
 
-    SUBMIT_DATA
+    GET_FULL_PATH
+
+    events.ringbuf_submit(data, sizeof(*data));
 
 cleanup:
     infotmp.delete(&id);
@@ -362,7 +342,9 @@ bpf_text_kfunc_body = """
     data->mode  = mode; // EXTENDED_STRUCT_MEMBER
     data->ret   = ret;
 
-    SUBMIT_DATA
+    GET_FULL_PATH
+
+    events.ringbuf_submit(data, sizeof(*data));
 
     return 0;
 }
@@ -448,73 +430,22 @@ if not (args.extended_fields or args.flag_filter):
         if 'EXTENDED_STRUCT_MEMBER' not in x)
 
 if args.full_path:
-    bpf_text = bpf_text.replace('SUBMIT_DATA', """
+    bpf_text = bpf_text.replace('GET_FULL_PATH', """
     if (data->name[0] != '/') { // relative path
-        struct task_struct *task;
-        struct dentry *dentry, *parent_dentry, *mnt_root;
-        struct vfsmount *vfsmnt;
-        struct fs_struct *fs;
-        struct path *path;
-        struct mount *mnt;
-        size_t filepart_length;
-        char *payload = data->name;
-        struct qstr d_name;
-        int i;
-
-        task = (struct task_struct *)bpf_get_current_task_btf();
-
-        fs = task->fs;
-        path = &fs->pwd;
-        dentry = path->dentry;
-        vfsmnt = path->mnt;
-
-        mnt = container_of(vfsmnt, struct mount, mnt);
-
-        for (i = 1, payload += NAME_MAX; i < MAX_ENTRIES; i++) {
-            bpf_probe_read_kernel(&d_name, sizeof(d_name), &dentry->d_name);
-            filepart_length =
-                bpf_probe_read_kernel_str(payload, NAME_MAX, (void *)d_name.name);
-
-            if (filepart_length < 0 || filepart_length > NAME_MAX)
-                break;
-
-            bpf_probe_read_kernel(&mnt_root, sizeof(mnt_root), &vfsmnt->mnt_root);
-            bpf_probe_read_kernel(&parent_dentry, sizeof(parent_dentry), &dentry->d_parent);
-
-            if (dentry == parent_dentry || dentry == mnt_root) {
-                struct mount *mnt_parent;
-                bpf_probe_read_kernel(&mnt_parent, sizeof(mnt_parent), &mnt->mnt_parent);
-
-                if (mnt != mnt_parent) {
-                    bpf_probe_read_kernel(&dentry, sizeof(dentry), &mnt->mnt_mountpoint);
-
-                    mnt = mnt_parent;
-                    vfsmnt = &mnt->mnt;
-
-                    bpf_probe_read_kernel(&mnt_root, sizeof(mnt_root), &vfsmnt->mnt_root);
-
-                    data->path_depth++;
-                    payload += NAME_MAX;
-                    continue;
-                } else {
-                    /* Real root directory */
-                    break;
-                }
-            }
-
-            payload += NAME_MAX;
-
-            dentry = parent_dentry;
-            data->path_depth++;
-        }
+        bpf_getcwd(data->name + NAME_MAX, NAME_MAX, MAX_ENTRIES - 1,
+                    &data->path_depth);
     }
+    """)
 
-    events.ringbuf_submit(data, sizeof(*data));
-    """)
+    with open(BPF._find_file("full_path.h".encode("utf-8"))) as fileobj:
+        progtxt = fileobj.read()
+    bpf_text = bpf_text.replace('INCLUDE_FULL_PATH_H', progtxt)
+
+    with open(BPF._find_file("path_helpers.bpf.c".encode("utf-8"))) as fileobj:
+        progtxt = fileobj.read()
+    bpf_text = bpf_text.replace('INCLUDE_PATH_HELPERS_BPF_H', progtxt)
 else:
-    bpf_text = bpf_text.replace('SUBMIT_DATA', """
-    events.ringbuf_submit(data, sizeof(*data));
-    """)
+    bpf_text = bpf_text.replace('GET_FULL_PATH', """""")
 
 if debug or args.ebpf:
     print(bpf_text)
@@ -551,12 +482,6 @@ if args.extended_fields:
 print("PATH")
 
 entries = defaultdict(list)
-
-def split_names(str):
-    NAME_MAX = 255
-    MAX_ENTRIES = 32
-    chunks = [str[i:i + NAME_MAX] for i in range(0, NAME_MAX * MAX_ENTRIES, NAME_MAX)]
-    return [chunk.split(b'\x00', 1)[0] for chunk in chunks]
 
 # process event
 def print_event(cpu, data, size):
@@ -604,17 +529,10 @@ def print_event(cpu, data, size):
                 printb(b"%08o %04o " % (event.flags, event.mode), nl="")
 
         if args.full_path:
-            # see struct data_t::name field comment.
-            names = split_names(bytes(event.name))
-            picked = names[:event.path_depth + 1]
-            picked_str = []
-            for x in picked:
-                s = x.decode('utf-8', 'ignore') if isinstance(x, bytes) else str(x)
-                # remove mountpoint '/' and empty string
-                if s != "/" and s != "":
-                    picked_str.append(s)
-            joined = '/'.join(picked_str[::-1])
-            result = joined if joined.startswith('/') else '/' + joined
+            import sys
+            sys.path.append(os.path.dirname(sys.argv[0]))
+            from path_helpers import get_full_path
+            result = get_full_path(event.name, event.path_depth)
             printb(b"%s" % result.encode("utf-8"))
         else:
             printb(b"%s" % event.name)
