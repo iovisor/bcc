@@ -9,8 +9,45 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+/* Export jemalloc-style symbols for custom allocator probe tests. */
+void *je_malloc_default(size_t size) {
+  return malloc(size);
+}
+
+void je_free_default(void *ptr) {
+  free(ptr);
+}
+
+void *je_calloc(size_t count, size_t size) {
+  return calloc(count, size);
+}
+
+void *je_realloc(void *ptr, size_t size) {
+  return realloc(ptr, size);
+}
+
+int je_posix_memalign(void **ptr, size_t alignment, size_t size) {
+  return posix_memalign(ptr, alignment, size);
+}
+
+void *je_memalign(size_t alignment, size_t size) {
+  return memalign(alignment, size);
+}
+
 static void generate_leak(const char *kind, int amount) {
   void *ptr = NULL;
+
+  if (strcmp(kind, "custom_malloc") == 0) {
+    printf("leaking via custom malloc, %p\n", je_malloc_default(amount));
+    return;
+  }
+
+  if (strcmp(kind, "custom_no_leak") == 0) {
+    ptr = je_malloc_default(amount);
+    je_free_default(ptr);
+    printf("freed custom allocation, %p\n", ptr);
+    return;
+  }
 
   if (strcmp(kind, "malloc") == 0) {
     printf("leaking via malloc, %p\n", malloc(amount));
