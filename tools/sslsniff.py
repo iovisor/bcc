@@ -292,9 +292,9 @@ def attach_openssl(lib):
     b.attach_uretprobe(name=lib, sym="SSL_read",
                        fn_name="probe_SSL_read_exit", pid=args.pid or -1)
     if args.latency and args.handshake:
-        b.attach_uprobe(name="ssl", sym="SSL_do_handshake",
+        b.attach_uprobe(name=lib, sym="SSL_do_handshake",
                         fn_name="probe_SSL_do_handshake_enter", pid=args.pid or -1)
-        b.attach_uretprobe(name="ssl", sym="SSL_do_handshake",
+        b.attach_uretprobe(name=lib, sym="SSL_do_handshake",
                            fn_name="probe_SSL_do_handshake_exit", pid=args.pid or -1)
 
 def attach_gnutls(lib):
