@@ -15,6 +15,7 @@
  */
 
 #include <linux/version.h>
+#include <netinet/in.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -25,9 +26,10 @@
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 18, 0)
 
-// Prior to 5.15, the socket must be TCP established socket to be updatable.
-// https://git.kernel.org/pub/scm/linux/kernel/git/bpf/bpf-next.git/commit/?id=0c48eefae712c2fd91480346a07a1a9cd0f9470b
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0)
+// UDP sockets can be added to sockmap/sockhash since 5.7, but only once bound.
+// 5.15 briefly allowed unbound UDP sockets (commit 0c48eefae712); that was
+// reverted by commit 66efd3368ae1, so the tests bind the socket first.
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 7, 0)
   bool expected_update_result = false;
 #else
   bool expected_update_result = true;
@@ -60,6 +62,12 @@ int test(struct bpf_sock_ops *skops)
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     REQUIRE(sockfd >= 0);
 
+    struct sockaddr_in addr = {};
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    REQUIRE(bind(sockfd, reinterpret_cast<struct sockaddr*>(&addr),
+                 sizeof(addr)) == 0);
+
     auto sk_map = bpf.get_sockmap_table("sk_map1");
     int key = 0, val = sockfd;
 
@@ -68,6 +76,8 @@ int test(struct bpf_sock_ops *skops)
 
     res = sk_map.update_value(key, val);
     REQUIRE(res.ok() == expected_update_result);
+
+    close(sockfd);
   }
 }
 
@@ -102,6 +112,12 @@ int test(struct bpf_sock_ops *skops)
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     REQUIRE(sockfd >= 0);
 
+    struct sockaddr_in addr = {};
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    REQUIRE(bind(sockfd, reinterpret_cast<struct sockaddr*>(&addr),
+                 sizeof(addr)) == 0);
+
     auto sk_hash = bpf.get_sockhash_table("sk_hash1");
     int key = 0, val = sockfd;
 
@@ -110,6 +126,8 @@ int test(struct bpf_sock_ops *skops)
 
     res = sk_hash.update_value(key, val);
     REQUIRE(res.ok() == expected_update_result);
+
+    close(sockfd);
   }
 }
 
