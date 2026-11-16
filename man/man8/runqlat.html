@@ -1,170 +1,163 @@
-Content-type: text/html; charset=UTF-8
-
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<HTML><HEAD><TITLE>Man page of runqlat</TITLE>
-</HEAD><BODY>
-<H1>runqlat</H1>
-Section: Maintenance Commands (8)<BR>Updated: 2016-02-07<BR><A HREF="#index">Index</A>
-<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
-
-<A NAME="lbAB">&nbsp;</A>
-<H2>NAME</H2>
-
-runqlat - Run queue (scheduler) latency as a histogram.
-<A NAME="lbAC">&nbsp;</A>
-<H2>SYNOPSIS</H2>
-
-<B>runqlat [-h] [-T] [-m] [-P] [--pidnss] [-L] [-p PID] [interval] [count]</B>
-
-<A NAME="lbAD">&nbsp;</A>
-<H2>DESCRIPTION</H2>
-
-This measures the time a task spends waiting on a run queue (or equivalent
-scheduler data structure) for a turn on-CPU, and shows this time as a
-histogram. This time should be small, but a task may need to wait its turn due
-to CPU load. The higher the CPU load, the longer a task will generally need to
-wait its turn.
-<P>
-This tool measures two types of run queue latency:
-<P>
-1. The time from a task being enqueued on a run queue to its context switch
-and execution. This traces ttwu_do_wakeup(), wake_up_new_task() -&gt;
-finish_task_switch() with either raw tracepoints (if supported) or kprobes
-and instruments the run queue latency after a voluntary context switch.
-<P>
-2. The time from when a task was involuntary context switched and still
-in the runnable state, to when it next executed. This is instrumented
-from finish_task_switch() alone.
-<P>
-This tool uses in-kernel eBPF maps for storing timestamps and the histogram,
-for efficiency. Despite this, the overhead of this tool may become significant
-for some workloads: see the OVERHEAD section.
-<P>
-This works by tracing various kernel scheduler functions using dynamic tracing,
-and will need updating to match any changes to these functions.
-<P>
-Since this uses BPF, only the root user can use this tool.
-<A NAME="lbAE">&nbsp;</A>
-<H2>REQUIREMENTS</H2>
-
-CONFIG_BPF and bcc.
-<A NAME="lbAF">&nbsp;</A>
-<H2>OPTIONS</H2>
-
-<DL COMPACT>
-<DT>-h<DD>
-Print usage message.
-<DT>-T<DD>
-Include timestamps on output.
-<DT>-m<DD>
-Output histogram in milliseconds.
-<DT>-P<DD>
-Print a histogram for each PID.
-<DT>--pidnss<DD>
-Print a histogram for each PID namespace (short for PID namespaces). For
-container analysis.
-<DT>-L<DD>
-Print a histogram for each thread ID.
-<DT>-p PID<DD>
-Only show this PID (filtered in kernel for efficiency).
-<DT>interval<DD>
-Output interval, in seconds.
-<DT>count<DD>
-Number of outputs.
-</DL>
-<A NAME="lbAG">&nbsp;</A>
-<H2>EXAMPLES</H2>
-
-<DL COMPACT>
-<DT>Summarize run queue latency as a histogram:<DD>
-#
-<B>runqlat</B>
-
-<DT>Print 1 second summaries, 10 times:<DD>
-#
-<B>runqlat 1 10</B>
-
-<DT>Print 1 second summaries, using milliseconds as units for the histogram, and include timestamps on output:<DD>
-#
-<B>runqlat -mT 1</B>
-
-<DT>Trace PID 186 only, 1 second summaries:<DD>
-#
-<B>runqlat -P 185 1</B>
-
-</DL>
-<A NAME="lbAH">&nbsp;</A>
-<H2>FIELDS</H2>
-
-<DL COMPACT>
-<DT>usecs<DD>
-Microsecond range
-<DT>msecs<DD>
-Millisecond range
-<DT>count<DD>
-How many times a task event fell into this range
-<DT>distribution<DD>
-An ASCII bar chart to visualize the distribution (count column)
-</DL>
-<A NAME="lbAI">&nbsp;</A>
-<H2>OVERHEAD</H2>
-
-This traces scheduler functions, which can become very frequent. While eBPF
-has very low overhead, and this tool uses in-kernel maps for efficiency, the
-frequency of scheduler events for some workloads may be high enough that the
-overhead of this tool becomes significant. Measure in a lab environment
-to quantify the overhead before use.
-<A NAME="lbAJ">&nbsp;</A>
-<H2>SOURCE</H2>
-
-This is from bcc.
-<DL COMPACT>
-<DT><DD>
-<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
-</DL>
-<P>
-
-Also look in the bcc distribution for a companion _examples.txt file containing
-example usage, output, and commentary for this tool.
-<A NAME="lbAK">&nbsp;</A>
-<H2>OS</H2>
-
-Linux
-<A NAME="lbAL">&nbsp;</A>
-<H2>STABILITY</H2>
-
-Unstable - in development.
-<A NAME="lbAM">&nbsp;</A>
-<H2>AUTHOR</H2>
-
-Brendan Gregg
-<A NAME="lbAN">&nbsp;</A>
-<H2>SEE ALSO</H2>
-
-<A HREF="https://iovisor.github.io/bcc?8+runqlen">runqlen</A>(8), <A HREF="https://iovisor.github.io/bcc?8+runqslower">runqslower</A>(8), <A HREF="https://iovisor.github.io/bcc?1+pidstat">pidstat</A>(1)
-<P>
-
-<HR>
-<A NAME="index">&nbsp;</A><H2>Index</H2>
-<DL>
-<DT><A HREF="#lbAB">NAME</A><DD>
-<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
-<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
-<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
-<DT><A HREF="#lbAF">OPTIONS</A><DD>
-<DT><A HREF="#lbAG">EXAMPLES</A><DD>
-<DT><A HREF="#lbAH">FIELDS</A><DD>
-<DT><A HREF="#lbAI">OVERHEAD</A><DD>
-<DT><A HREF="#lbAJ">SOURCE</A><DD>
-<DT><A HREF="#lbAK">OS</A><DD>
-<DT><A HREF="#lbAL">STABILITY</A><DD>
-<DT><A HREF="#lbAM">AUTHOR</A><DD>
-<DT><A HREF="#lbAN">SEE ALSO</A><DD>
-</DL>
-<HR>
-This document was created by
-<A HREF="https://iovisor.github.io/bcc">man2html</A>,
-using the manual pages.<BR>
-Time: 17:11:49 GMT, February 25, 2020
-</BODY>
-</HTML>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>runqlat(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">runqlat(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">runqlat(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">runqlat - Run queue (scheduler) latency as a histogram.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>runqlat [-h] [-T] [-m] [-P] [--pidnss] [-L] [-p PID] [interval]
+    [count]</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">This measures the time a task spends waiting on a run queue (or
+    equivalent scheduler data structure) for a turn on-CPU, and shows this time
+    as a histogram. This time should be small, but a task may need to wait its
+    turn due to CPU load. The higher the CPU load, the longer a task will
+    generally need to wait its turn.</p>
+<p class="Pp">This tool measures two types of run queue latency:</p>
+<p class="Pp">1. The time from a task being enqueued on a run queue to its
+    context switch and execution. This traces ttwu_do_wakeup(),
+    wake_up_new_task() -&gt; finish_task_switch() with either raw tracepoints
+    (if supported) or kprobes and instruments the run queue latency after a
+    voluntary context switch.</p>
+<p class="Pp">2. The time from when a task was involuntary context switched and
+    still in the runnable state, to when it next executed. This is instrumented
+    from finish_task_switch() alone.</p>
+<p class="Pp">This tool uses in-kernel eBPF maps for storing timestamps and the
+    histogram, for efficiency. Despite this, the overhead of this tool may
+    become significant for some workloads: see the OVERHEAD section.</p>
+<p class="Pp">This works by tracing various kernel scheduler functions using
+    dynamic tracing, and will need updating to match any changes to these
+    functions.</p>
+<p class="Pp">Since this uses BPF, only the root user can use this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REQUIREMENTS"><a class="permalink" href="#REQUIREMENTS">REQUIREMENTS</a></h1>
+<p class="Pp">CONFIG_BPF and bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+<dl class="Bl-tag">
+  <dt id="h"><a class="permalink" href="#h">-h</a></dt>
+  <dd>Print usage message.</dd>
+  <dt id="T"><a class="permalink" href="#T">-T</a></dt>
+  <dd>Include timestamps on output.</dd>
+  <dt id="m"><a class="permalink" href="#m">-m</a></dt>
+  <dd>Output histogram in milliseconds.</dd>
+  <dt id="P"><a class="permalink" href="#P">-P</a></dt>
+  <dd>Print a histogram for each PID.</dd>
+  <dt id="pidnss"><a class="permalink" href="#pidnss">--pidnss</a></dt>
+  <dd>Print a histogram for each PID namespace (short for PID namespaces). For
+      container analysis.</dd>
+  <dt id="L"><a class="permalink" href="#L">-L</a></dt>
+  <dd>Print a histogram for each thread ID.</dd>
+  <dt id="p"><a class="permalink" href="#p">-p PID</a></dt>
+  <dd>Only show this PID (filtered in kernel for efficiency).</dd>
+  <dt id="interval"><a class="permalink" href="#interval">interval</a></dt>
+  <dd>Output interval, in seconds.</dd>
+  <dt id="count"><a class="permalink" href="#count">count</a></dt>
+  <dd>Number of outputs.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Summarize"><a class="permalink" href="#Summarize">Summarize run queue
+    latency as a histogram:</a></dt>
+  <dd># <b>runqlat</b></dd>
+  <dt id="Print"><a class="permalink" href="#Print">Print 1 second summaries, 10
+    times:</a></dt>
+  <dd># <b>runqlat 1 10</b></dd>
+  <dt id="Print~2"><a class="permalink" href="#Print~2">Print 1 second
+    summaries, using milliseconds as units for the histogram, and include
+    timestamps on output:</a></dt>
+  <dd># <b>runqlat -mT 1</b></dd>
+  <dt id="Trace"><a class="permalink" href="#Trace">Trace PID 186 only, 1 second
+    summaries:</a></dt>
+  <dd># <b>runqlat -P 185 1</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="FIELDS"><a class="permalink" href="#FIELDS">FIELDS</a></h1>
+<dl class="Bl-tag">
+  <dt id="usecs"><a class="permalink" href="#usecs">usecs</a></dt>
+  <dd>Microsecond range</dd>
+  <dt id="msecs"><a class="permalink" href="#msecs">msecs</a></dt>
+  <dd>Millisecond range</dd>
+  <dt id="count~2"><a class="permalink" href="#count~2">count</a></dt>
+  <dd>How many times a task event fell into this range</dd>
+  <dt id="distribution"><a class="permalink" href="#distribution">distribution</a></dt>
+  <dd>An ASCII bar chart to visualize the distribution (count column)</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OVERHEAD"><a class="permalink" href="#OVERHEAD">OVERHEAD</a></h1>
+<p class="Pp">This traces scheduler functions, which can become very frequent.
+    While eBPF has very low overhead, and this tool uses in-kernel maps for
+    efficiency, the frequency of scheduler events for some workloads may be high
+    enough that the overhead of this tool becomes significant. Measure in a lab
+    environment to quantify the overhead before use.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _examples.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Brendan Gregg</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h1>
+<p class="Pp">runqlen(8), runqslower(8), pidstat(1)</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>

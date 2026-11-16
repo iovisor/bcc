@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>kvmexit(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">kvmexit(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">kvmexit(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">kvmexit - Display the exit_reason and its statistics of each vm
+    exit.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>kvmexit [-h] [-p PID [-v VCPU | -a] ] [-t TID | -T 'TID1,TID2']
+    [duration]</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">Considering virtual machines' frequent exits can cause performance
+    problems, this tool aims to locate the frequent exited reasons and then find
+    solutions to reduce or even avoid the exit, by displaying the detail exit
+    reasons and the counts of each vm exit for all vms running on one physical
+    machine.</p>
+<p class="Pp">This tool uses a PERCPU_ARRAY: pcpuArrayA and a percpu_hash: hashA
+    to collaboratively store each kvm exit reason and its count. The reason is
+    there exists a rule when one vcpu exits and re-enters, it tends to continue
+    to run on the same physical cpu as the last cycle, which is also called
+    'cache hit'. Thus we turn to use a PERCPU_ARRAY to record the 'cache hit'
+    situation to speed things up; and for other cases, then use a
+  percpu_hash.</p>
+<p class="Pp">As RAW_TRACEPOINT_PROBE(kvm_exit) consumes less cpu cycles, when
+    this tool is used, it firstly tries to employ raw tracepoints in modules,
+    and if failes, then fall back to regular tracepoint.</p>
+<p class="Pp">Limitation: In view of the hardware-assisted virtualization
+    technology of different architectures, currently we only adapt on vmx in
+    intel.</p>
+<p class="Pp">Since this uses BPF, only the root user can use this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REQUIREMENTS"><a class="permalink" href="#REQUIREMENTS">REQUIREMENTS</a></h1>
+<p class="Pp">CONFIG_BPF and bcc.</p>
+<p class="Pp">This also requires Linux 4.7+ (BPF_PROG_TYPE_TRACEPOINT
+  support).</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+<dl class="Bl-tag">
+  <dt id="h"><a class="permalink" href="#h">-h</a></dt>
+  <dd>Print usage message.</dd>
+  <dt id="p"><a class="permalink" href="#p">-p PID</a></dt>
+  <dd>Display process with this PID only, collpase all tids with exit reasons
+      sorted in descending order.</dd>
+  <dt id="v"><a class="permalink" href="#v">-v VCPU</a></dt>
+  <dd>Display this VCPU only for this PID.</dd>
+  <dt id="a"><a class="permalink" href="#a">-a ALLTIDS</a></dt>
+  <dd>Display all TIDS for this PID.</dd>
+  <dt id="t"><a class="permalink" href="#t">-t TID</a></dt>
+  <dd>Display thread with this TID only with exit reasons sorted in descending
+      order.</dd>
+  <dt id="T"><a class="permalink" href="#T">-T 'TID1,TID2'</a></dt>
+  <dd>Display threads for a union like {395490, 395491}.</dd>
+  <dt id="duration"><a class="permalink" href="#duration">duration</a></dt>
+  <dd>Duration of display, after sleeping several seconds.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Display"><a class="permalink" href="#Display">Display kvm exit reasons
+    and statistics for all threads... Hit Ctrl-C to end:</a></dt>
+  <dd># <b>kvmexit</b></dd>
+  <dt id="Display~2"><a class="permalink" href="#Display~2">Display kvm exit
+    reasons and statistics for all threads after sleeping 6 secs:</a></dt>
+  <dd># <b>kvmexit 6</b></dd>
+  <dt id="Display~3"><a class="permalink" href="#Display~3">Display kvm exit
+    reasons and statistics for PID 1273795 after sleeping 5 secs:</a></dt>
+  <dd># <b>kvmexit -p 1273795 5</b></dd>
+  <dt id="Display~4"><a class="permalink" href="#Display~4">Display kvm exit
+    reasons and statistics for PID 1273795 and its all threads after sleeping 5
+    secs:</a></dt>
+  <dd># <b>kvmexit -p 1273795 5 -a</b></dd>
+  <dt id="Display~5"><a class="permalink" href="#Display~5">Display kvm exit
+    reasons and statistics for PID 1273795 VCPU 0... Hit Ctrl-C to end:</a></dt>
+  <dd># <b>kvmexit -p 1273795 -v 0</b></dd>
+  <dt id="Display~6"><a class="permalink" href="#Display~6">Display kvm exit
+    reasons and statistics for PID 1273795 VCPU 0 after sleeping 4
+    secs:</a></dt>
+  <dd># <b>kvmexit -p 1273795 -v 0 4</b></dd>
+  <dt id="Display~7"><a class="permalink" href="#Display~7">Display kvm exit
+    reasons and statistics for TID 1273819 after sleeping 10 secs:</a></dt>
+  <dd># <b>kvmexit -t 1273819 10</b></dd>
+  <dt id="Display~8"><a class="permalink" href="#Display~8">Display kvm exit
+    reasons and statistics for TIDS ['1273820', '1273819']... Hit Ctrl-C to
+    end:</a></dt>
+  <dd># <b>kvmexit -T '1273820,1273819'</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OVERHEAD"><a class="permalink" href="#OVERHEAD">OVERHEAD</a></h1>
+<p class="Pp">This traces the &quot;kvm_exit&quot; kernel function, records the
+    exit reason and calculates its counts. Contrast with filling more vm-exit
+    reason debug entries, this tool is more easily and flexibly: the bcc python
+    logic could provide nice kernel aggregation and custom output, the bpf
+    in-kernel percpu_array and percpu_cache further improves performance.</p>
+<p class="Pp">The impact of using this tool on the host should be negligible.
+    While this tool is very efficient, it does affect the guest virtual machine
+    itself, the average test results on guest vm are as follows:
+  <br/>
+   | cpu cycles
+  <br/>
+   no TP | 1127
+  <br/>
+   regular TP | 1277 (13% downgrade)
+  <br/>
+   RAW TP | 1187 (5% downgrade)</p>
+<p class="Pp">Host: echo 1 &gt; /proc/sys/net/core/bpf_jit_enable</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _examples.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Fei Li &lt;lifei.shirley@bytedance.com&gt;</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>

@@ -1,99 +1,100 @@
-Content-type: text/html; charset=UTF-8
-
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<HTML><HEAD><TITLE>Man page of SOLISTEN</TITLE>
-</HEAD><BODY>
-<H1>SOLISTEN</H1>
-Section: Maintenance Commands (8)<BR>Updated: 2019-07-29<BR><A HREF="#index">Index</A>
-<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
-
-<A NAME="lbAB">&nbsp;</A>
-<H2>NAME</H2>
-
-solisten - Trace listening socket
-<A NAME="lbAC">&nbsp;</A>
-<H2>SYNOPSIS</H2>
-
-usage: solisten [-h] [--show-netns] [-p PID] [-n NETNS]
-<A NAME="lbAD">&nbsp;</A>
-<H2>DESCRIPTION</H2>
-
-All IPv4 and IPv6 listen attempts are traced, even if they ultimately
-fail or the listening program is not willing to accept().
-<A NAME="lbAE">&nbsp;</A>
-<H3>optional arguments:</H3>
-
-<DL COMPACT>
-<DT><B>-h</B>, <B>--help</B><DD>
-show this help message and exit
-<DT><B>--show-netns</B><DD>
-show network namespace
-<DT><B>-p</B> PID, <B>--pid</B> PID<DD>
-trace this PID only
-<DT><B>-n</B> NETNS, <B>--netns</B> NETNS<DD>
-trace this Network Namespace only
-</DL>
-<A NAME="lbAF">&nbsp;</A>
-<H2>EXAMPLES</H2>
-
-<DL COMPACT>
-<DT>Stream socket listen:<DD>
-#
-<B>solisten</B>
-
-<DT>Stream socket listen for specified PID only<DD>
-#
-<B>solisten -p 1234</B>
-
-<DT>Stream socket listen for the specified network namespace ID only<DD>
-#
-<B>solisten --netns 4242</B>
-
-<DT>Show network ns ID (useful for containers)<DD>
-#
-<B>solisten --show-netns</B>
-
-</DL>
-<A NAME="lbAG">&nbsp;</A>
-<H2>SOURCE</H2>
-
-This is from bcc.
-<DL COMPACT>
-<DT><DD>
-<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
-</DL>
-<P>
-
-Also look in the bcc distribution for a companion _examples.txt file containing
-example usage, output, and commentary for this tool.
-<A NAME="lbAH">&nbsp;</A>
-<H2>OS</H2>
-
-Linux
-<A NAME="lbAI">&nbsp;</A>
-<H2>STABILITY</H2>
-
-Unstable - in development.
-<P>
-
-<HR>
-<A NAME="index">&nbsp;</A><H2>Index</H2>
-<DL>
-<DT><A HREF="#lbAB">NAME</A><DD>
-<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
-<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
-<DL>
-<DT><A HREF="#lbAE">optional arguments:</A><DD>
-</DL>
-<DT><A HREF="#lbAF">EXAMPLES</A><DD>
-<DT><A HREF="#lbAG">SOURCE</A><DD>
-<DT><A HREF="#lbAH">OS</A><DD>
-<DT><A HREF="#lbAI">STABILITY</A><DD>
-</DL>
-<HR>
-This document was created by
-<A HREF="https://iovisor.github.io/bcc">man2html</A>,
-using the manual pages.<BR>
-Time: 17:11:49 GMT, February 25, 2020
-</BODY>
-</HTML>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>SOLISTEN(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">SOLISTEN(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">SOLISTEN(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">solisten - Trace listening socket</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp">usage: solisten [-h] [--show-netns] [-p PID] [-n NETNS]</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">All IPv4 and IPv6 listen attempts are traced, even if they
+    ultimately fail or the listening program is not willing to accept().</p>
+<section class="Ss">
+<h2 class="Ss" id="optional_arguments:"><a class="permalink" href="#optional_arguments:">optional
+  arguments:</a></h2>
+<dl class="Bl-tag">
+  <dt id="h"><a class="permalink" href="#h"><b>-h</b>, <b>--help</b></a></dt>
+  <dd>show this help message and exit</dd>
+  <dt id="show"><a class="permalink" href="#show"><b>--show-netns</b></a></dt>
+  <dd>show network namespace</dd>
+  <dt id="p"><a class="permalink" href="#p"><b>-p</b> PID, <b>--pid</b>
+    PID</a></dt>
+  <dd>trace this PID only</dd>
+  <dt id="n"><a class="permalink" href="#n"><b>-n</b> NETNS, <b>--netns</b>
+    NETNS</a></dt>
+  <dd>trace this Network Namespace only</dd>
+</dl>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Stream"><a class="permalink" href="#Stream">Stream socket
+    listen:</a></dt>
+  <dd># <b>solisten</b></dd>
+  <dt id="Stream~2"><a class="permalink" href="#Stream~2">Stream socket listen
+    for specified PID only</a></dt>
+  <dd># <b>solisten -p 1234</b></dd>
+  <dt id="Stream~3"><a class="permalink" href="#Stream~3">Stream socket listen
+    for the specified network namespace ID only</a></dt>
+  <dd># <b>solisten --netns 4242</b></dd>
+  <dt id="Show"><a class="permalink" href="#Show">Show network ns ID (useful for
+    containers)</a></dt>
+  <dd># <b>solisten --show-netns</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _examples.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>

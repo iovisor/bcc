@@ -1,114 +1,111 @@
-Content-type: text/html; charset=UTF-8
-
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<HTML><HEAD><TITLE>Man page of reset-trace</TITLE>
-</HEAD><BODY>
-<H1>reset-trace</H1>
-Section: Maintenance Commands (8)<BR>Updated: 2016-10-18<BR><A HREF="#index">Index</A>
-<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
-
-<A NAME="lbAB">&nbsp;</A>
-<H2>NAME</H2>
-
-reset-trace - reset the state of tracing.
-<A NAME="lbAC">&nbsp;</A>
-<H2>SYNOPSIS</H2>
-
-<B>reset-trace [-F] [-h] [-q] [-v]</B>
-
-<A NAME="lbAD">&nbsp;</A>
-<H2>DESCRIPTION</H2>
-
-You will probably never need this tool. If you kill -9 a bcc tool (plus other
-signals, like SIGTERM), or if a bcc tool crashes, then kernel tracing can be
-left in a semi-enabled state. It's not as bad as it sounds: there may just be
-overhead for writing to ring buffers that are never read. This tool can be
-used to clean up the tracing state, and reset and disable active tracing.
-<P>
-Make sure no other tracing sessions are active. This tool might stop them from
-functioning (perhaps ungracefully).
-<P>
-This specifically clears the state in at least the following files in
-/sys/kernel/debug/tracing: kprobe_events, uprobe_events, trace_pipe.
-Other tracing facilities (ftrace) are checked, and if not in an expected state,
-a note is printed. All tracing files can be reset with -F for force, but this
-will interfere with any other running tracing sessions (eg, ftrace).
-<A NAME="lbAE">&nbsp;</A>
-<H2>REQUIREMENTS</H2>
-
-/sys/kernel/debug mounted as debugfs
-<A NAME="lbAF">&nbsp;</A>
-<H2>OPTIONS</H2>
-
-<DL COMPACT>
-<DT>-F<DD>
-Force. Will reset all tracing facilities, including those not used by bcc
-(ftrace). You shouldn't need to use this.
-<DT>-h<DD>
-USAGE message.
-<DT>-q<DD>
-Quiet. No output while working.
-<DT>-v<DD>
-Verbose: print what it is doing.
-</DL>
-<A NAME="lbAG">&nbsp;</A>
-<H2>EXAMPLES</H2>
-
-<DL COMPACT>
-<DT>Reset the state of tracing:<DD>
-#
-<B>reset-trace</B>
-
-<DT>Verbose:<DD>
-#
-<B>reset-trace -v</B>
-
-<DT></DL>
-<A NAME="lbAH">&nbsp;</A>
-<H2>SOURCE</H2>
-
-<DD>
-This is from bcc.
-<DL COMPACT>
-<DT><DD>
-<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
-</DL>
-<P>
-
-Also look in the bcc distribution for a companion _examples.txt file containing
-example usage, output, and commentary for this tool.
-<A NAME="lbAI">&nbsp;</A>
-<H2>OS</H2>
-
-Linux
-<A NAME="lbAJ">&nbsp;</A>
-<H2>STABILITY</H2>
-
-Unstable - in development.
-<A NAME="lbAK">&nbsp;</A>
-<H2>AUTHOR</H2>
-
-Brendan Gregg
-<P>
-
-<HR>
-<A NAME="index">&nbsp;</A><H2>Index</H2>
-<DL>
-<DT><A HREF="#lbAB">NAME</A><DD>
-<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
-<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
-<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
-<DT><A HREF="#lbAF">OPTIONS</A><DD>
-<DT><A HREF="#lbAG">EXAMPLES</A><DD>
-<DT><A HREF="#lbAH">SOURCE</A><DD>
-<DT><A HREF="#lbAI">OS</A><DD>
-<DT><A HREF="#lbAJ">STABILITY</A><DD>
-<DT><A HREF="#lbAK">AUTHOR</A><DD>
-</DL>
-<HR>
-This document was created by
-<A HREF="https://iovisor.github.io/bcc">man2html</A>,
-using the manual pages.<BR>
-Time: 17:11:49 GMT, February 25, 2020
-</BODY>
-</HTML>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>reset-trace(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">reset-trace(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">reset-trace(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">reset-trace - reset the state of tracing.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>reset-trace [-F] [-h] [-q] [-v]</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">You will probably never need this tool. If you kill -9 a bcc tool
+    (plus other signals, like SIGTERM), or if a bcc tool crashes, then kernel
+    tracing can be left in a semi-enabled state. It's not as bad as it sounds:
+    there may just be overhead for writing to ring buffers that are never read.
+    This tool can be used to clean up the tracing state, and reset and disable
+    active tracing.</p>
+<p class="Pp">Make sure no other tracing sessions are active. This tool might
+    stop them from functioning (perhaps ungracefully).</p>
+<p class="Pp">This specifically clears the state in at least the following files
+    in /sys/kernel/debug/tracing: kprobe_events, uprobe_events, trace_pipe.
+    Other tracing facilities (ftrace) are checked, and if not in an expected
+    state, a note is printed. All tracing files can be reset with -F for force,
+    but this will interfere with any other running tracing sessions (eg,
+    ftrace).</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REQUIREMENTS"><a class="permalink" href="#REQUIREMENTS">REQUIREMENTS</a></h1>
+<p class="Pp">/sys/kernel/debug mounted as debugfs</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+<dl class="Bl-tag">
+  <dt id="F"><a class="permalink" href="#F">-F</a></dt>
+  <dd>Force. Will reset all tracing facilities, including those not used by bcc
+      (ftrace). You shouldn't need to use this.</dd>
+  <dt id="h"><a class="permalink" href="#h">-h</a></dt>
+  <dd>USAGE message.</dd>
+  <dt id="q"><a class="permalink" href="#q">-q</a></dt>
+  <dd>Quiet. No output while working.</dd>
+  <dt id="v"><a class="permalink" href="#v">-v</a></dt>
+  <dd>Verbose: print what it is doing.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Reset"><a class="permalink" href="#Reset">Reset the state of
+    tracing:</a></dt>
+  <dd># <b>reset-trace</b></dd>
+  <dt id="Verbose:"><a class="permalink" href="#Verbose:">Verbose:</a></dt>
+  <dd># <b>reset-trace -v</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _examples.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Brendan Gregg</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>

@@ -1,170 +1,160 @@
-Content-type: text/html; charset=UTF-8
-
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<HTML><HEAD><TITLE>Man page of uflow</TITLE>
-</HEAD><BODY>
-<H1>uflow</H1>
-Section: Maintenance Commands (8)<BR>Updated: 2018-10-09<BR><A HREF="#index">Index</A>
-<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
-
-<A NAME="lbAB">&nbsp;</A>
-<H2>NAME</H2>
-
-uflow, javaflow, perlflow, phpflow, pythonflow, rubyflow, tclflow - Print a flow graph of method
-calls in high-level languages.
-<A NAME="lbAC">&nbsp;</A>
-<H2>SYNOPSIS</H2>
-
-<B>javaflow [-h] [-M METHOD] [-C CLAZZ] [-v] pid</B>
-
-<BR>
-
-<B>perlflow [-h] [-M METHOD] [-C CLAZZ] [-v] pid</B>
-
-<BR>
-
-<B>phpflow [-h] [-M METHOD] [-C CLAZZ] [-v] pid</B>
-
-<BR>
-
-<B>pythonflow [-h] [-M METHOD] [-C CLAZZ] [-v] pid</B>
-
-<BR>
-
-<B>rubyflow [-h] [-M METHOD] [-C CLAZZ] [-v] pid</B>
-
-<BR>
-
-<B>tclflow [-h] [-M METHOD] [-C CLAZZ] [-v] pid</B>
-
-<BR>
-
-<B>uflow [-h] [-M METHOD] [-C CLAZZ] [-v] [-l {java,perl,php,python,ruby,tcl}] pid</B>
-
-<A NAME="lbAD">&nbsp;</A>
-<H2>DESCRIPTION</H2>
-
-uflow traces method calls and prints them in a flow graph that can facilitate
-debugging and diagnostics by following the program's execution (method flow).
-<P>
-This tool relies on USDT probes embedded in many high-level languages, such as
-Java, Perl, PHP, Python, Ruby, and Tcl. It requires a runtime instrumented with these
-probes, which in some cases requires building from source with a USDT-specific
-flag, such as &quot;--enable-dtrace&quot; or &quot;--with-dtrace&quot;. For Java processes, the
-startup flag &quot;-XX:+ExtendedDTraceProbes&quot; is required. For PHP processes, the
-environment variable USE_ZEND_DTRACE must be set to 1.
-<P>
-Since this uses BPF, only the root user can use this tool.
-<A NAME="lbAE">&nbsp;</A>
-<H2>REQUIREMENTS</H2>
-
-CONFIG_BPF and bcc.
-<A NAME="lbAF">&nbsp;</A>
-<H2>OPTIONS</H2>
-
-<DL COMPACT>
-<DT>-M METHOD<DD>
-Print only method calls where the method name begins with this string.
-<DT>-C CLAZZ<DD>
-Print only method calls where the class name begins with this string. The class
-name interpretation strongly depends on the language. For example, in Java use
-&quot;package/subpackage/ClassName&quot; to refer to classes.
-<DT>-v<DD>
-Print the resulting BPF program, for debugging purposes.
-<DT>{java,perl,php,python,ruby,tcl}<DD>
-The language to trace.
-<DT>pid<DD>
-The process id to trace.
-</DL>
-<A NAME="lbAG">&nbsp;</A>
-<H2>EXAMPLES</H2>
-
-<DL COMPACT>
-<DT>Follow method flow in a Ruby process:<DD>
-#
-<B>uflow ruby 148</B>
-
-<DT>Follow method flow in a Java process where the class name is java.lang.Thread:<DD>
-#
-<B>uflow -C java/lang/Thread java 1802</B>
-
-</DL>
-<A NAME="lbAH">&nbsp;</A>
-<H2>FIELDS</H2>
-
-<DL COMPACT>
-<DT>CPU<DD>
-The CPU number on which the method was invoked. This is useful to easily see
-where the output skips to a different CPU.
-<DT>PID<DD>
-The process id.
-<DT>TID<DD>
-The thread id.
-<DT>TIME<DD>
-The duration of the method call.
-<DT>METHOD<DD>
-The method name.
-</DL>
-<A NAME="lbAI">&nbsp;</A>
-<H2>OVERHEAD</H2>
-
-This tool has extremely high overhead because it prints every method call. For
-some scenarios, you might see lost samples in the output as the tool is unable
-to keep up with the rate of data coming from the kernel. Filtering by class 
-or method prefix can help reduce the amount of data printed, but there is still
-a very high overhead in the collection mechanism. Do not use for performance-
-sensitive production scenarios, and always test first.
-<A NAME="lbAJ">&nbsp;</A>
-<H2>SOURCE</H2>
-
-This is from bcc.
-<DL COMPACT>
-<DT><DD>
-<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
-</DL>
-<P>
-
-Also look in the bcc distribution for a companion _example.txt file containing
-example usage, output, and commentary for this tool.
-<A NAME="lbAK">&nbsp;</A>
-<H2>OS</H2>
-
-Linux
-<A NAME="lbAL">&nbsp;</A>
-<H2>STABILITY</H2>
-
-Unstable - in development.
-<A NAME="lbAM">&nbsp;</A>
-<H2>AUTHOR</H2>
-
-Sasha Goldshtein
-<A NAME="lbAN">&nbsp;</A>
-<H2>SEE ALSO</H2>
-
-<A HREF="https://iovisor.github.io/bcc?8+trace">trace</A>(8), <A HREF="https://iovisor.github.io/bcc?8+ustat">ustat</A>(8)
-<P>
-
-<HR>
-<A NAME="index">&nbsp;</A><H2>Index</H2>
-<DL>
-<DT><A HREF="#lbAB">NAME</A><DD>
-<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
-<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
-<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
-<DT><A HREF="#lbAF">OPTIONS</A><DD>
-<DT><A HREF="#lbAG">EXAMPLES</A><DD>
-<DT><A HREF="#lbAH">FIELDS</A><DD>
-<DT><A HREF="#lbAI">OVERHEAD</A><DD>
-<DT><A HREF="#lbAJ">SOURCE</A><DD>
-<DT><A HREF="#lbAK">OS</A><DD>
-<DT><A HREF="#lbAL">STABILITY</A><DD>
-<DT><A HREF="#lbAM">AUTHOR</A><DD>
-<DT><A HREF="#lbAN">SEE ALSO</A><DD>
-</DL>
-<HR>
-This document was created by
-<A HREF="https://iovisor.github.io/bcc">man2html</A>,
-using the manual pages.<BR>
-Time: 17:11:49 GMT, February 25, 2020
-</BODY>
-</HTML>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>uflow(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">uflow(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">uflow(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">uflow, javaflow, perlflow, phpflow, pythonflow, rubyflow, tclflow
+    - Print a flow graph of method calls in high-level languages.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>javaflow [-h] [-M METHOD] [-C CLAZZ] [-v] pid</b>
+  <br/>
+  <b>perlflow [-h] [-M METHOD] [-C CLAZZ] [-v] pid</b>
+  <br/>
+  <b>phpflow [-h] [-M METHOD] [-C CLAZZ] [-v] pid</b>
+  <br/>
+  <b>pythonflow [-h] [-M METHOD] [-C CLAZZ] [-v] pid</b>
+  <br/>
+  <b>rubyflow [-h] [-M METHOD] [-C CLAZZ] [-v] pid</b>
+  <br/>
+  <b>tclflow [-h] [-M METHOD] [-C CLAZZ] [-v] pid</b>
+  <br/>
+  <b>uflow [-h] [-M METHOD] [-C CLAZZ] [-v] [-l {java,perl,php,python,ruby,tcl}]
+    pid</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">uflow traces method calls and prints them in a flow graph that can
+    facilitate debugging and diagnostics by following the program's execution
+    (method flow).</p>
+<p class="Pp">This tool relies on USDT probes embedded in many high-level
+    languages, such as Java, Perl, PHP, Python, Ruby, and Tcl. It requires a
+    runtime instrumented with these probes, which in some cases requires
+    building from source with a USDT-specific flag, such as
+    &quot;--enable-dtrace&quot; or &quot;--with-dtrace&quot;. For Java
+    processes, the startup flag &quot;-XX:+ExtendedDTraceProbes&quot; is
+    required. For PHP processes, the environment variable USE_ZEND_DTRACE must
+    be set to 1.</p>
+<p class="Pp">Since this uses BPF, only the root user can use this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REQUIREMENTS"><a class="permalink" href="#REQUIREMENTS">REQUIREMENTS</a></h1>
+<p class="Pp">CONFIG_BPF and bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+<dl class="Bl-tag">
+  <dt id="M"><a class="permalink" href="#M">-M METHOD</a></dt>
+  <dd>Print only method calls where the method name begins with this
+    string.</dd>
+  <dt id="C"><a class="permalink" href="#C">-C CLAZZ</a></dt>
+  <dd>Print only method calls where the class name begins with this string. The
+      class name interpretation strongly depends on the language. For example,
+      in Java use &quot;package/subpackage/ClassName&quot; to refer to
+    classes.</dd>
+  <dt id="v"><a class="permalink" href="#v">-v</a></dt>
+  <dd>Print the resulting BPF program, for debugging purposes.</dd>
+  <dt>{java,perl,php,python,ruby,tcl}</dt>
+  <dd>The language to trace.</dd>
+  <dt id="pid"><a class="permalink" href="#pid">pid</a></dt>
+  <dd>The process id to trace.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Follow"><a class="permalink" href="#Follow">Follow method flow in a
+    Ruby process:</a></dt>
+  <dd># <b>uflow ruby 148</b></dd>
+  <dt id="Follow~2"><a class="permalink" href="#Follow~2">Follow method flow in
+    a Java process where the class name is java.lang.Thread:</a></dt>
+  <dd># <b>uflow -C java/lang/Thread java 1802</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="FIELDS"><a class="permalink" href="#FIELDS">FIELDS</a></h1>
+<dl class="Bl-tag">
+  <dt id="CPU"><a class="permalink" href="#CPU">CPU</a></dt>
+  <dd>The CPU number on which the method was invoked. This is useful to easily
+      see where the output skips to a different CPU.</dd>
+  <dt id="PID"><a class="permalink" href="#PID">PID</a></dt>
+  <dd>The process id.</dd>
+  <dt id="TID"><a class="permalink" href="#TID">TID</a></dt>
+  <dd>The thread id.</dd>
+  <dt id="TIME"><a class="permalink" href="#TIME">TIME</a></dt>
+  <dd>The duration of the method call.</dd>
+  <dt id="METHOD"><a class="permalink" href="#METHOD">METHOD</a></dt>
+  <dd>The method name.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OVERHEAD"><a class="permalink" href="#OVERHEAD">OVERHEAD</a></h1>
+<p class="Pp">This tool has extremely high overhead because it prints every
+    method call. For some scenarios, you might see lost samples in the output as
+    the tool is unable to keep up with the rate of data coming from the kernel.
+    Filtering by class or method prefix can help reduce the amount of data
+    printed, but there is still a very high overhead in the collection
+    mechanism. Do not use for performance- sensitive production scenarios, and
+    always test first.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _example.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Sasha Goldshtein</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h1>
+<p class="Pp">trace(8), ustat(8)</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>

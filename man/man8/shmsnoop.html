@@ -1,130 +1,129 @@
-Content-type: text/html; charset=UTF-8
-
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<HTML><HEAD><TITLE>Man page of shmsnoop</TITLE>
-</HEAD><BODY>
-<H1>shmsnoop</H1>
-Section: Maintenance Commands (8)<BR>Updated: 2018-09-24<BR><A HREF="#index">Index</A>
-<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
-
-<A NAME="lbAB">&nbsp;</A>
-<H2>NAME</H2>
-
-shmsnoop - Trace System V shared memory syscalls. Uses Linux eBPF/bcc.
-<A NAME="lbAC">&nbsp;</A>
-<H2>SYNOPSIS</H2>
-
-<B>shmsnoop [-h] [-T] [-p] [-t] [-d DURATION] [-n NAME]</B>
-
-<A NAME="lbAD">&nbsp;</A>
-<H2>DESCRIPTION</H2>
-
-shmsnoop traces System V shared memory syscalls: shmget, shmat, shmdt, shmctl
-<P>
-Since this uses BPF, only the root user can use this tool.
-<A NAME="lbAE">&nbsp;</A>
-<H2>REQUIREMENTS</H2>
-
-CONFIG_BPF and bcc.
-<A NAME="lbAF">&nbsp;</A>
-<H2>OPTIONS</H2>
-
-<DL COMPACT>
-<DT>-h<DD>
-Print usage message.
-<DT>-T<DD>
-Include a timestamp column.
-<DT>-p PID<DD>
-Trace this process ID only (filtered in-kernel).
-<DT>-t TID<DD>
-Trace this thread ID only (filtered in-kernel).
-<DT>-d DURATION<DD>
-Total duration of trace in seconds.
-<DT>-n NAME<DD>
-Only print command lines matching this command name (regex)
-</DL>
-<A NAME="lbAG">&nbsp;</A>
-<H2>EXAMPLES</H2>
-
-<DL COMPACT>
-<DT>Trace all shm* syscalls:<DD>
-#
-<B>shmsnoop</B>
-
-<DT>Trace all shm* syscalls, and include timestamps:<DD>
-#
-<B>shmsnoop -T</B>
-
-<DT>Only trace shm* syscalls where the process contains &quot;server&quot;:<DD>
-#
-<B>shmsnoop -n server</B>
-
-</DL>
-<A NAME="lbAH">&nbsp;</A>
-<H2>FIELDS</H2>
-
-<DL COMPACT>
-<DT>TIME(s)<DD>
-Time of shm syscall return, in seconds.
-<DT>PID<DD>
-Process ID
-<DT>COMM<DD>
-Process/command name.
-<DT>RET<DD>
-Return value of shm syscall.
-<DT>ARGS<DD>
-&quot;arg: value&quot; couples that represent given syscall arguments as described in their manpage
-</DL>
-<A NAME="lbAI">&nbsp;</A>
-<H2>SOURCE</H2>
-
-This is from bcc.
-<DL COMPACT>
-<DT><DD>
-<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
-</DL>
-<P>
-
-Also look in the bcc distribution for a companion _examples.txt file containing
-example usage, output, and commentary for this tool.
-<A NAME="lbAJ">&nbsp;</A>
-<H2>OS</H2>
-
-Linux
-<A NAME="lbAK">&nbsp;</A>
-<H2>STABILITY</H2>
-
-Unstable - in development.
-<A NAME="lbAL">&nbsp;</A>
-<H2>AUTHOR</H2>
-
-Jiri Olsa
-<A NAME="lbAM">&nbsp;</A>
-<H2>SEE ALSO</H2>
-
-<A HREF="https://iovisor.github.io/bcc?1+opensnoop">opensnoop</A>(1)
-<P>
-
-<HR>
-<A NAME="index">&nbsp;</A><H2>Index</H2>
-<DL>
-<DT><A HREF="#lbAB">NAME</A><DD>
-<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
-<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
-<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
-<DT><A HREF="#lbAF">OPTIONS</A><DD>
-<DT><A HREF="#lbAG">EXAMPLES</A><DD>
-<DT><A HREF="#lbAH">FIELDS</A><DD>
-<DT><A HREF="#lbAI">SOURCE</A><DD>
-<DT><A HREF="#lbAJ">OS</A><DD>
-<DT><A HREF="#lbAK">STABILITY</A><DD>
-<DT><A HREF="#lbAL">AUTHOR</A><DD>
-<DT><A HREF="#lbAM">SEE ALSO</A><DD>
-</DL>
-<HR>
-This document was created by
-<A HREF="https://iovisor.github.io/bcc">man2html</A>,
-using the manual pages.<BR>
-Time: 17:11:49 GMT, February 25, 2020
-</BODY>
-</HTML>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>shmsnoop(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">shmsnoop(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">shmsnoop(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">shmsnoop - Trace System V shared memory syscalls. Uses Linux
+    eBPF/bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>shmsnoop [-h] [-T] [-p] [-t] [-d DURATION] [-n NAME]</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">shmsnoop traces System V shared memory syscalls: shmget, shmat,
+    shmdt, shmctl</p>
+<p class="Pp">Since this uses BPF, only the root user can use this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REQUIREMENTS"><a class="permalink" href="#REQUIREMENTS">REQUIREMENTS</a></h1>
+<p class="Pp">CONFIG_BPF and bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+<dl class="Bl-tag">
+  <dt id="h"><a class="permalink" href="#h">-h</a></dt>
+  <dd>Print usage message.</dd>
+  <dt id="T"><a class="permalink" href="#T">-T</a></dt>
+  <dd>Include a timestamp column.</dd>
+  <dt id="p"><a class="permalink" href="#p">-p PID</a></dt>
+  <dd>Trace this process ID only (filtered in-kernel).</dd>
+  <dt id="t"><a class="permalink" href="#t">-t TID</a></dt>
+  <dd>Trace this thread ID only (filtered in-kernel).</dd>
+  <dt id="d"><a class="permalink" href="#d">-d DURATION</a></dt>
+  <dd>Total duration of trace in seconds.</dd>
+  <dt id="n"><a class="permalink" href="#n">-n NAME</a></dt>
+  <dd>Only print command lines matching this command name (regex)</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Trace"><a class="permalink" href="#Trace">Trace all shm*
+    syscalls:</a></dt>
+  <dd># <b>shmsnoop</b></dd>
+  <dt id="Trace~2"><a class="permalink" href="#Trace~2">Trace all shm* syscalls,
+    and include timestamps:</a></dt>
+  <dd># <b>shmsnoop -T</b></dd>
+  <dt id="Only"><a class="permalink" href="#Only">Only trace shm* syscalls where
+    the process contains &quot;server&quot;:</a></dt>
+  <dd># <b>shmsnoop -n server</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="FIELDS"><a class="permalink" href="#FIELDS">FIELDS</a></h1>
+<dl class="Bl-tag">
+  <dt id="TIME(s)"><a class="permalink" href="#TIME(s)">TIME(s)</a></dt>
+  <dd>Time of shm syscall return, in seconds.</dd>
+  <dt id="PID"><a class="permalink" href="#PID">PID</a></dt>
+  <dd>Process ID</dd>
+  <dt id="COMM"><a class="permalink" href="#COMM">COMM</a></dt>
+  <dd>Process/command name.</dd>
+  <dt id="RET"><a class="permalink" href="#RET">RET</a></dt>
+  <dd>Return value of shm syscall.</dd>
+  <dt id="ARGS"><a class="permalink" href="#ARGS">ARGS</a></dt>
+  <dd>&quot;arg: value&quot; couples that represent given syscall arguments as
+      described in their manpage</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _examples.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Jiri Olsa</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h1>
+<p class="Pp">opensnoop(1)</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>funcinterval(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">funcinterval(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">funcinterval(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">funcinterval - Time interval between the same function, tracepoint
+    as a histogram.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>funcinterval [-h] [-p PID] [-i INTERVAL] [-d DURATION] [-T]
+    [-u] [-m] [-v] pattern</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">This tool times interval between the same function as a
+  histogram.</p>
+<p class="Pp">eBPF/bcc is very suitable for platform performance tuning. By
+    funclatency, we can profile specific functions to know how latency this
+    function costs. However, sometimes performance drop is not about the latency
+    of function but the interval between function calls. funcinterval is born
+    for this purpose.</p>
+<p class="Pp">This tool uses in-kernel eBPF maps for storing timestamps and the
+    histogram, for efficiency.</p>
+<p class="Pp">WARNING: This uses dynamic tracing of (what can be many)
+    functions, an activity that has had issues on some kernel versions (risk of
+    panics or freezes). Test, and know what you are doing, before use.</p>
+<p class="Pp">Since this uses BPF, only the root user can use this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REQUIREMENTS"><a class="permalink" href="#REQUIREMENTS">REQUIREMENTS</a></h1>
+<p class="Pp">CONFIG_BPF and bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+<p class="Pp">pattern Function name. -h Print usage message.</p>
+<dl class="Bl-tag">
+  <dt id="p"><a class="permalink" href="#p">-p PID</a></dt>
+  <dd>Trace this process ID only.</dd>
+  <dt id="i"><a class="permalink" href="#i">-i INTERVAL</a></dt>
+  <dd>Print output every interval seconds.</dd>
+  <dt id="d"><a class="permalink" href="#d">-d DURATION</a></dt>
+  <dd>Total duration of trace, in seconds.</dd>
+  <dt id="T"><a class="permalink" href="#T">-T</a></dt>
+  <dd>Include timestamps on output.</dd>
+  <dt id="u"><a class="permalink" href="#u">-u</a></dt>
+  <dd>Output histogram in microseconds.</dd>
+  <dt id="m"><a class="permalink" href="#m">-m</a></dt>
+  <dd>Output histogram in milliseconds.</dd>
+  <dt id="v"><a class="permalink" href="#v">-v</a></dt>
+  <dd>Print the BPF program (for debugging purposes).</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Time"><a class="permalink" href="#Time">Time the interval of
+    do_sys_open() kernel function as a histogram:</a></dt>
+  <dd># <b>funcinterval do_sys_open</b></dd>
+  <dt id="Time~2"><a class="permalink" href="#Time~2">Time the interval of
+    xhci_ring_ep_doorbell(), in microseconds:</a></dt>
+  <dd># <b>funcinterval -u xhci_ring_ep_doorbell</b></dd>
+  <dt id="Time~3"><a class="permalink" href="#Time~3">Time the interval of
+    do_nanosleep(), in milliseconds</a></dt>
+  <dd># <b>funcinterval -m do_nanosleep</b></dd>
+  <dt id="Output"><a class="permalink" href="#Output">Output every 5 seconds,
+    with timestamps:</a></dt>
+  <dd># <b>funcinterval -mTi 5 vfs_read</b></dd>
+  <dt id="Time~4"><a class="permalink" href="#Time~4">Time process 181
+    only:</a></dt>
+  <dd># <b>funcinterval -p 181 vfs_read</b></dd>
+  <dt id="Time~5"><a class="permalink" href="#Time~5">Time the interval of
+    mm_vmscan_direct_reclaim_begin tracepoint:</a></dt>
+  <dd># <b>funcinterval t:vmscan:mm_vmscan_direct_reclaim_begin</b></dd>
+  <dt id="Time~6"><a class="permalink" href="#Time~6">Time the interval of
+    c:malloc used by top every 3 seconds:</a></dt>
+  <dd># <b>funcinterval -p `pidof -s top` -i 3 c:malloc</b></dd>
+  <dt id="Time~7"><a class="permalink" href="#Time~7">Time /usr/local/bin/python
+    main function:</a></dt>
+  <dd># <b>funcinterval /usr/local/bin/python:main</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="FIELDS"><a class="permalink" href="#FIELDS">FIELDS</a></h1>
+<dl class="Bl-tag">
+  <dt id="necs"><a class="permalink" href="#necs">necs</a></dt>
+  <dd>Nanosecond range</dd>
+  <dt id="usecs"><a class="permalink" href="#usecs">usecs</a></dt>
+  <dd>Microsecond range</dd>
+  <dt id="msecs"><a class="permalink" href="#msecs">msecs</a></dt>
+  <dd>Millisecond range</dd>
+  <dt id="count"><a class="permalink" href="#count">count</a></dt>
+  <dd>How many calls fell into this range</dd>
+  <dt id="distribution"><a class="permalink" href="#distribution">distribution</a></dt>
+  <dd>An ASCII bar chart to visualize the distribution (count column)</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OVERHEAD"><a class="permalink" href="#OVERHEAD">OVERHEAD</a></h1>
+<p class="Pp">This traces kernel functions and maintains in-kernel timestamps
+    and a histogram, which are asynchronously copied to user-space. While this
+    method is very efficient, the rate of kernel functions can also be very high
+    (&gt;1M/sec), at which point the overhead is expected to be measurable.
+    Measure in a test environment and understand overheads before use. You can
+    also use funccount to measure the rate of kernel functions over a short
+    duration, to set some expectations before use.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _examples.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Edward Wu</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h1>
+<p class="Pp">funclatency(8) funccount(8)</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>

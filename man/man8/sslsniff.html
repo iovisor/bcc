@@ -1,108 +1,163 @@
-Content-type: text/html; charset=UTF-8
-
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<HTML><HEAD><TITLE>Man page of sslsniff</TITLE>
-</HEAD><BODY>
-<H1>sslsniff</H1>
-Section: Maintenance Commands (8)<BR>Updated: 2016-08-16<BR><A HREF="#index">Index</A>
-<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
-
-<A NAME="lbAB">&nbsp;</A>
-<H2>NAME</H2>
-
-sslsniff - Print data passed to OpenSSL, GnuTLS or NSS. Uses Linux eBPF/bcc.
-<A NAME="lbAC">&nbsp;</A>
-<H2>SYNOPSIS</H2>
-
-<B>sslsniff [-h] [-p PID] [-c COMM] [-o] [-g] [-n] [-d]</B>
-
-<A NAME="lbAD">&nbsp;</A>
-<H2>DESCRIPTION</H2>
-
-sslsniff prints data sent to write/send and read/recv functions of
-OpenSSL, GnuTLS and NSS, allowing us to read plain text content before
-encryption (when writing) and after decryption (when reading).
-<P>
-This works reading the second parameter of both functions (*buf).
-<P>
-Since this uses BPF, only the root user can use this tool.
-<A NAME="lbAE">&nbsp;</A>
-<H2>REQUIREMENTS</H2>
-
-CONFIG_BPF and bcc.
-<A NAME="lbAF">&nbsp;</A>
-<H2>EXAMPLES</H2>
-
-<DL COMPACT>
-<DT>Print all calls to SSL write/send and read/recv system-wide:<DD>
-#
-<B>sslsniff</B>
-
-</DL>
-<A NAME="lbAG">&nbsp;</A>
-<H2>FIELDS</H2>
-
-<DL COMPACT>
-<DT>FUNC<DD>
-Which function is being called (write/send or read/recv)
-<DT>TIME<DD>
-Time of the command, in seconds.
-<DT>COMM<DD>
-Entered command.
-<DT>PID<DD>
-Process ID calling SSL.
-<DT>LEN<DD>
-Bytes written or read by SSL functions.
-</DL>
-<A NAME="lbAH">&nbsp;</A>
-<H2>SOURCE</H2>
-
-This is from bcc.
-<DL COMPACT>
-<DT><DD>
-<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
-</DL>
-<P>
-
-Also look in the bcc distribution for a companion _examples.txt file containing
-example usage, output, and commentary for this tool.
-<A NAME="lbAI">&nbsp;</A>
-<H2>OS</H2>
-
-Linux
-<A NAME="lbAJ">&nbsp;</A>
-<H2>STABILITY</H2>
-
-Unstable - in development.
-<A NAME="lbAK">&nbsp;</A>
-<H2>AUTHORS</H2>
-
-Adrian Lopez and Mark Drayton
-<A NAME="lbAL">&nbsp;</A>
-<H2>SEE ALSO</H2>
-
-<A HREF="https://iovisor.github.io/bcc?8+trace">trace</A>(8)
-<P>
-
-<HR>
-<A NAME="index">&nbsp;</A><H2>Index</H2>
-<DL>
-<DT><A HREF="#lbAB">NAME</A><DD>
-<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
-<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
-<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
-<DT><A HREF="#lbAF">EXAMPLES</A><DD>
-<DT><A HREF="#lbAG">FIELDS</A><DD>
-<DT><A HREF="#lbAH">SOURCE</A><DD>
-<DT><A HREF="#lbAI">OS</A><DD>
-<DT><A HREF="#lbAJ">STABILITY</A><DD>
-<DT><A HREF="#lbAK">AUTHORS</A><DD>
-<DT><A HREF="#lbAL">SEE ALSO</A><DD>
-</DL>
-<HR>
-This document was created by
-<A HREF="https://iovisor.github.io/bcc">man2html</A>,
-using the manual pages.<BR>
-Time: 17:11:49 GMT, February 25, 2020
-</BODY>
-</HTML>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>sslsniff(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">sslsniff(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">sslsniff(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">sslsniff - Print data passed to OpenSSL, GnuTLS or NSS. Uses Linux
+    eBPF/bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>sslsniff [-h] [-p PID] [-u UID] [-x] [-c COMM] [-o] [-g] [-n]
+    [-d]</b> <b>[--hexdump] [--max-buffer-size SIZE] [-l] [--handshake]</b>
+    <b>[--extra-lib EXTRA_LIB]</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">sslsniff prints data sent to write/send and read/recv functions of
+    OpenSSL, GnuTLS and NSS, allowing us to read plain text content before
+    encryption (when writing) and after decryption (when reading).</p>
+<p class="Pp">This works reading the second parameter of both functions
+  (*buf).</p>
+<p class="Pp">Since this uses BPF, only the root user can use this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REQUIREMENTS"><a class="permalink" href="#REQUIREMENTS">REQUIREMENTS</a></h1>
+<p class="Pp">CONFIG_BPF and bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+<dl class="Bl-tag">
+  <dt id="h"><a class="permalink" href="#h">-h</a></dt>
+  <dd>Print usage message.</dd>
+  <dt id="p"><a class="permalink" href="#p">-p PID</a></dt>
+  <dd>Trace only functions in this process PID.</dd>
+  <dt id="u"><a class="permalink" href="#u">-u UID</a></dt>
+  <dd>Trace only calls made by this UID.</dd>
+  <dt id="x"><a class="permalink" href="#x">-x</a></dt>
+  <dd>Show extra fields: UID and TID.</dd>
+  <dt id="c"><a class="permalink" href="#c">-c COMM</a></dt>
+  <dd>Show only processes that match this COMM exactly.</dd>
+  <dt id="o,"><a class="permalink" href="#o,">-o, --no-openssl</a></dt>
+  <dd>Do not trace OpenSSL functions.</dd>
+  <dt id="g,"><a class="permalink" href="#g,">-g, --no-gnutls</a></dt>
+  <dd>Do not trace GnuTLS functions.</dd>
+  <dt id="n,"><a class="permalink" href="#n,">-n, --no-nss</a></dt>
+  <dd>Do not trace GnuTLS functions.</dd>
+  <dt id="hexdump"><a class="permalink" href="#hexdump">--hexdump</a></dt>
+  <dd>Show data as hexdump instead of trying to decode it as UTF-8</dd>
+  <dt id="max_buffer_size"><a class="permalink" href="#max_buffer_size">--max-buffer-size
+    SIZE</a></dt>
+  <dd>Sets maximum buffer size of intercepted data. Longer values would be
+      truncated. Default value is 8 Kib, maximum possible value is a bit less
+      than 32 Kib.</dd>
+  <dt id="l,"><a class="permalink" href="#l,">-l, --latency</a></dt>
+  <dd>Show function latency in ms.</dd>
+  <dt id="handshake"><a class="permalink" href="#handshake">--handshake</a></dt>
+  <dd>Show handshake latency, enabled only if latency option is on.</dd>
+  <dt id="extra_lib"><a class="permalink" href="#extra_lib">--extra-lib
+    EXTRA_LIB</a></dt>
+  <dd>Consist type of the library and library path separated by colon. Supported
+      library types are: openssl, gnutls, nss. Can be specified multiple
+    times.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Print"><a class="permalink" href="#Print">Print all calls to SSL
+    write/send and read/recv system-wide:</a></dt>
+  <dd># <b>sslsniff</b></dd>
+  <dt id="Print~2"><a class="permalink" href="#Print~2">Print only OpenSSL calls
+    issued by user with UID 1000</a></dt>
+  <dd># <b>sslsniff -u 1000 --no-nss --no-gnutls</b></dd>
+  <dt id="Print~3"><a class="permalink" href="#Print~3">Print SSL handshake
+    event and latency for all traced functions:</a></dt>
+  <dd># <b>sslsniff -l --handshake</b></dd>
+  <dt id="Print~4"><a class="permalink" href="#Print~4">Print only calls to
+    OpenSSL from /some/path/libssl.so</a></dt>
+  <dd><b>sslsniff --no-openssl --no-gnutls --no-nss --extra-lib</b>
+      <b>openssl:/some/path/libssl.so</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="FIELDS"><a class="permalink" href="#FIELDS">FIELDS</a></h1>
+<dl class="Bl-tag">
+  <dt id="FUNC"><a class="permalink" href="#FUNC">FUNC</a></dt>
+  <dd>Which function is being called (write/send or read/recv)</dd>
+  <dt id="TIME"><a class="permalink" href="#TIME">TIME</a></dt>
+  <dd>Time of the command, in seconds.</dd>
+  <dt id="COMM"><a class="permalink" href="#COMM">COMM</a></dt>
+  <dd>Entered command.</dd>
+  <dt id="PID"><a class="permalink" href="#PID">PID</a></dt>
+  <dd>Process ID calling SSL.</dd>
+  <dt id="LEN"><a class="permalink" href="#LEN">LEN</a></dt>
+  <dd>Bytes written or read by SSL functions.</dd>
+  <dt id="UID"><a class="permalink" href="#UID">UID</a></dt>
+  <dd>UID of the process, displayed only if launched with -x.</dd>
+  <dt id="TID"><a class="permalink" href="#TID">TID</a></dt>
+  <dd>Thread ID, displayed only if launched with -x.</dd>
+  <dt id="LAT(ms)"><a class="permalink" href="#LAT(ms)">LAT(ms)</a></dt>
+  <dd>Function latency in ms.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _examples.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHORS"><a class="permalink" href="#AUTHORS">AUTHORS</a></h1>
+<p class="Pp">Adrian Lopez and Mark Drayton</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h1>
+<p class="Pp">trace(8)</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>

@@ -1,179 +1,239 @@
-Content-type: text/html; charset=UTF-8
-
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<HTML><HEAD><TITLE>Man page of tcpconnect</TITLE>
-</HEAD><BODY>
-<H1>tcpconnect</H1>
-Section: Maintenance Commands (8)<BR>Updated: 2020-02-20<BR><A HREF="#index">Index</A>
-<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
-
-<A NAME="lbAB">&nbsp;</A>
-<H2>NAME</H2>
-
-tcpconnect - Trace TCP active connections (connect()). Uses Linux eBPF/bcc.
-<A NAME="lbAC">&nbsp;</A>
-<H2>SYNOPSIS</H2>
-
-<B>tcpconnect [-h] [-c] [-t] [-x] [-p PID] [-P PORT] [--cgroupmap MAPPATH]</B>
-
-<A NAME="lbAD">&nbsp;</A>
-<H2>DESCRIPTION</H2>
-
-This tool traces active TCP connections (eg, via a connect() syscall;
-accept() are passive connections). This can be useful for general
-troubleshooting to see what connections are initiated by the local server.
-<P>
-All connection attempts are traced, even if they ultimately fail.
-<P>
-This works by tracing the kernel tcp_v4_connect() and tcp_v6_connect() functions
-using dynamic tracing, and will need updating to match any changes to these
-functions.
-<P>
-Since this uses BPF, only the root user can use this tool.
-<A NAME="lbAE">&nbsp;</A>
-<H2>REQUIREMENTS</H2>
-
-CONFIG_BPF and bcc.
-<A NAME="lbAF">&nbsp;</A>
-<H2>OPTIONS</H2>
-
-<DL COMPACT>
-<DT>-h<DD>
-Print usage message.
-<DT>-t<DD>
-Include a timestamp column.
-<DT>-c<DD>
-Count connects per src ip and dest ip/port.
-<DT>-p PID<DD>
-Trace this process ID only (filtered in-kernel).
-<DT>-P PORT<DD>
-Comma-separated list of destination ports to trace (filtered in-kernel).
-<DT>--cgroupmap MAPPATH<DD>
-Trace cgroups in this BPF map only (filtered in-kernel).
-</DL>
-<A NAME="lbAG">&nbsp;</A>
-<H2>EXAMPLES</H2>
-
-<DL COMPACT>
-<DT>-U<DD>
-Include a UID column.
-<DT>-u UID<DD>
-Trace this UID only (filtered in-kernel).
-<DT>Trace all active TCP connections:<DD>
-#
-<B>tcpconnect</B>
-
-<DT>Trace all TCP connects, and include timestamps:<DD>
-#
-<B>tcpconnect -t</B>
-
-<DT>Trace PID 181 only:<DD>
-#
-<B>tcpconnect -p 181</B>
-
-<DT>Trace ports 80 and 81 only:<DD>
-#
-<B>tcpconnect -P 80,81</B>
-
-<DT>Trace all TCP connects, and include UID:<DD>
-#
-<B>tcpconnect -U</B>
-
-<DT>Trace UID 1000 only:<DD>
-#
-<B>tcpconnect -u 1000</B>
-
-<DT>Count connects per src ip and dest ip/port:<DD>
-#
-<B>tcpconnect -c</B>
-
-<DT>Trace a set of cgroups only (see filtering_by_cgroups.md from bcc sources for more details):<DD>
-#
-<B>tcpconnect --cgroupmap /sys/fs/bpf/test01</B>
-
-</DL>
-<A NAME="lbAH">&nbsp;</A>
-<H2>FIELDS</H2>
-
-<DL COMPACT>
-<DT>TIME(s)<DD>
-Time of the call, in seconds.
-<DT>UID<DD>
-User ID
-<DT>PID<DD>
-Process ID
-<DT>COMM<DD>
-Process name
-<DT>IP<DD>
-IP address family (4 or 6)
-<DT>SADDR<DD>
-Source IP address.
-<DT>DADDR<DD>
-Destination IP address.
-<DT>DPORT<DD>
-Destination port
-<DT>CONNECTS<DD>
-Accumulated active connections since start.
-</DL>
-<A NAME="lbAI">&nbsp;</A>
-<H2>OVERHEAD</H2>
-
-This traces the kernel tcp_v[46]_connect functions and prints output for each
-event. As the rate of this is generally expected to be low (&lt; 1000/s), the
-overhead is also expected to be negligible. If you have an application that
-is calling a high rate of connect()s, such as a proxy server, then test and
-understand this overhead before use.
-<A NAME="lbAJ">&nbsp;</A>
-<H2>SOURCE</H2>
-
-This is from bcc.
-<DL COMPACT>
-<DT><DD>
-<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
-</DL>
-<P>
-
-Also look in the bcc distribution for a companion _examples.txt file containing
-example usage, output, and commentary for this tool.
-<A NAME="lbAK">&nbsp;</A>
-<H2>OS</H2>
-
-Linux
-<A NAME="lbAL">&nbsp;</A>
-<H2>STABILITY</H2>
-
-Unstable - in development.
-<A NAME="lbAM">&nbsp;</A>
-<H2>AUTHOR</H2>
-
-Brendan Gregg
-<A NAME="lbAN">&nbsp;</A>
-<H2>SEE ALSO</H2>
-
-<A HREF="https://iovisor.github.io/bcc?8+tcptracer">tcptracer</A>(8), <A HREF="https://iovisor.github.io/bcc?8+tcpaccept">tcpaccept</A>(8), <A HREF="https://iovisor.github.io/bcc?8+funccount">funccount</A>(8), <A HREF="https://iovisor.github.io/bcc?8+tcpdump">tcpdump</A>(8)
-<P>
-
-<HR>
-<A NAME="index">&nbsp;</A><H2>Index</H2>
-<DL>
-<DT><A HREF="#lbAB">NAME</A><DD>
-<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
-<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
-<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
-<DT><A HREF="#lbAF">OPTIONS</A><DD>
-<DT><A HREF="#lbAG">EXAMPLES</A><DD>
-<DT><A HREF="#lbAH">FIELDS</A><DD>
-<DT><A HREF="#lbAI">OVERHEAD</A><DD>
-<DT><A HREF="#lbAJ">SOURCE</A><DD>
-<DT><A HREF="#lbAK">OS</A><DD>
-<DT><A HREF="#lbAL">STABILITY</A><DD>
-<DT><A HREF="#lbAM">AUTHOR</A><DD>
-<DT><A HREF="#lbAN">SEE ALSO</A><DD>
-</DL>
-<HR>
-This document was created by
-<A HREF="https://iovisor.github.io/bcc">man2html</A>,
-using the manual pages.<BR>
-Time: 17:11:49 GMT, February 25, 2020
-</BODY>
-</HTML>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>tcpconnect(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">tcpconnect(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">tcpconnect(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">tcpconnect - Trace TCP active connections (connect()). Uses Linux
+    eBPF/bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>tcpconnect [-h] [-c] [-t] [-p PID] [-P PORT] [-4 | -6] [-L] [-u
+    UID] [-U] [--cgroupmap MAPPATH] [--mntnsmap MAPPATH] [-d]</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">This tool traces active TCP connections (eg, via a connect()
+    syscall; accept() are passive connections). This can be useful for general
+    troubleshooting to see what connections are initiated by the local
+  server.</p>
+<p class="Pp">All connection attempts are traced, even if they ultimately
+  fail.</p>
+<p class="Pp">This works by tracing the kernel tcp_v4_connect() and
+    tcp_v6_connect() functions using dynamic tracing, and will need updating to
+    match any changes to these functions.</p>
+<p class="Pp">When provided with the -d or --dns option, this tool will also
+    correlate connect calls with the most recent DNS query that matches the IP
+    connected. This feature works by tracing the kernel udp_recvmsg() function
+    to collect DNS responses.</p>
+<p class="Pp">Since this uses BPF, only the root user can use this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REQUIREMENTS"><a class="permalink" href="#REQUIREMENTS">REQUIREMENTS</a></h1>
+<p class="Pp">CONFIG_BPF and bcc.</p>
+<p class="Pp">If using the -d or --dns option, you must have the dnslib and
+    cachetools python packages installed. You can install them with pip3 or with
+    apt on Ubuntu 18.04+ using the python3-dnslib and python3-cachetools
+    packages.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+<dl class="Bl-tag">
+  <dt id="h"><a class="permalink" href="#h">-h</a></dt>
+  <dd>Print usage message.</dd>
+  <dt id="t"><a class="permalink" href="#t">-t</a></dt>
+  <dd>Include a timestamp column.</dd>
+  <dt id="c"><a class="permalink" href="#c">-c</a></dt>
+  <dd>Count connects per src ip and dest ip/port.</dd>
+  <dt id="p"><a class="permalink" href="#p">-p PID</a></dt>
+  <dd>Trace this process ID only (filtered in-kernel).</dd>
+  <dt id="P"><a class="permalink" href="#P">-P PORT</a></dt>
+  <dd>Comma-separated list of destination ports to trace (filtered
+    in-kernel).</dd>
+  <dt>-4</dt>
+  <dd>Trace IPv4 family only.</dd>
+  <dt>-6</dt>
+  <dd>Trace IPv6 family only.</dd>
+  <dt id="L"><a class="permalink" href="#L">-L</a></dt>
+  <dd>Include a LPORT column.</dd>
+  <dt id="U"><a class="permalink" href="#U">-U</a></dt>
+  <dd>Include a UID column.</dd>
+  <dt id="u"><a class="permalink" href="#u">-u UID</a></dt>
+  <dd>Trace this UID only (filtered in-kernel).</dd>
+  <dt id="cgroupmap"><a class="permalink" href="#cgroupmap">--cgroupmap
+    MAPPATH</a></dt>
+  <dd>Trace cgroups in this BPF map only (filtered in-kernel).</dd>
+  <dt id="mntnsmap"><a class="permalink" href="#mntnsmap">--mntnsmap
+    MAPPATH</a></dt>
+  <dd>Trace mount namespaces in this BPF map only (filtered in-kernel).</dd>
+  <dt id="d"><a class="permalink" href="#d">-d</a></dt>
+  <dd>Shows the most recent DNS query for the IP address in the connect call.
+      This is likely related to the TCP connection details in the other columns,
+      but is not guaranteed. This feature works by tracing the udp_recvmsg
+      kernel function and tracking DNS responses received by the server. It only
+      supports UDP DNS packets up to 512 bytes in length. The python code keeps
+      a cache of 10k DNS responses in memory for up 24 hours.
+    <p class="Pp">If the time difference in milliseconds between when the system
+        received a DNS response and when a connect syscall was traced using an
+        IP in that DNS response is greater than 100ms, this tool will report
+        this delta after the query. These deltas should be relatively short for
+        most applications. A long delay between the response and connect could
+        be either anomalous activity or indicate a misattribution between the
+        DNS name requested and the IP that the connect syscall is using.</p>
+    <p class="Pp">The -d option may not be used with the count feature (option
+        -c)</p>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Trace"><a class="permalink" href="#Trace">Trace all active TCP
+    connections:</a></dt>
+  <dd># <b>tcpconnect</b></dd>
+  <dt id="Trace~2"><a class="permalink" href="#Trace~2">Trace all TCP connects,
+    and include timestamps:</a></dt>
+  <dd># <b>tcpconnect -t</b></dd>
+  <dt id="Trace~3"><a class="permalink" href="#Trace~3">Trace all TCP connects,
+    and include most recent matching DNS query for each connected IP</a></dt>
+  <dd># <b>tcpconnect -d</b></dd>
+  <dt id="Trace~4"><a class="permalink" href="#Trace~4">Trace PID 181
+    only:</a></dt>
+  <dd># <b>tcpconnect -p 181</b></dd>
+  <dt id="Trace~5"><a class="permalink" href="#Trace~5">Trace ports 80 and 81
+    only:</a></dt>
+  <dd># <b>tcpconnect -P 80,81</b></dd>
+  <dt id="Trace~6"><a class="permalink" href="#Trace~6">Trace IPv4 family
+    only:</a></dt>
+  <dd># <b>tcpconnect -4</b></dd>
+  <dt id="Trace~7"><a class="permalink" href="#Trace~7">Trace IPv6 family
+    only:</a></dt>
+  <dd># <b>tcpconnect -6</b></dd>
+  <dt id="Trace~8"><a class="permalink" href="#Trace~8">Trace all TCP connects,
+    and include LPORT:</a></dt>
+  <dd># <b>tcpconnect -L</b></dd>
+  <dt id="Trace~9"><a class="permalink" href="#Trace~9">Trace all TCP connects,
+    and include UID:</a></dt>
+  <dd># <b>tcpconnect -U</b></dd>
+  <dt id="Trace~10"><a class="permalink" href="#Trace~10">Trace UID 1000
+    only:</a></dt>
+  <dd># <b>tcpconnect -u 1000</b></dd>
+  <dt id="Count"><a class="permalink" href="#Count">Count connects per src ip
+    and dest ip/port:</a></dt>
+  <dd># <b>tcpconnect -c</b></dd>
+  <dt id="Trace~11"><a class="permalink" href="#Trace~11">Trace a set of cgroups
+    only (see special_filtering.md from bcc sources for more details):</a></dt>
+  <dd># <b>tcpconnect --cgroupmap /sys/fs/bpf/test01</b></dd>
+  <dt id="Trace~12"><a class="permalink" href="#Trace~12">Trace a set of mount
+    namespaces only (see special_filtering.md from bcc sources for more
+    details):</a></dt>
+  <dd># <b>tcpconnect --mntnsmap /sys/fs/bpf/mnt_ns_set</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="FIELDS"><a class="permalink" href="#FIELDS">FIELDS</a></h1>
+<dl class="Bl-tag">
+  <dt id="TIME(s)"><a class="permalink" href="#TIME(s)">TIME(s)</a></dt>
+  <dd>Time of the call, in seconds.</dd>
+  <dt id="UID"><a class="permalink" href="#UID">UID</a></dt>
+  <dd>User ID</dd>
+  <dt id="PID"><a class="permalink" href="#PID">PID</a></dt>
+  <dd>Process ID</dd>
+  <dt id="COMM"><a class="permalink" href="#COMM">COMM</a></dt>
+  <dd>Process name</dd>
+  <dt id="IP"><a class="permalink" href="#IP">IP</a></dt>
+  <dd>IP address family (4 or 6)</dd>
+  <dt id="SADDR"><a class="permalink" href="#SADDR">SADDR</a></dt>
+  <dd>Source IP address.</dd>
+  <dt id="LPORT"><a class="permalink" href="#LPORT">LPORT</a></dt>
+  <dd>Source port</dd>
+  <dt id="DADDR"><a class="permalink" href="#DADDR">DADDR</a></dt>
+  <dd>Destination IP address.</dd>
+  <dt id="DPORT"><a class="permalink" href="#DPORT">DPORT</a></dt>
+  <dd>Destination port</dd>
+  <dt id="CONNECTS"><a class="permalink" href="#CONNECTS">CONNECTS</a></dt>
+  <dd>Accumulated active connections since start.</dd>
+  <dt id="QUERY"><a class="permalink" href="#QUERY">QUERY</a></dt>
+  <dd>Shows the most recent DNS query for the IP address in the connect call.
+      This is likely related to the TCP connection details in the other columns,
+      but is not guaranteed.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OVERHEAD"><a class="permalink" href="#OVERHEAD">OVERHEAD</a></h1>
+<p class="Pp">This traces the kernel tcp_v[46]_connect functions and prints
+    output for each event. As the rate of this is generally expected to be low
+    (&lt; 1000/s), the overhead is also expected to be negligible. If you have
+    an application that is calling a high rate of connect()s, such as a proxy
+    server, then test and understand this overhead before use.</p>
+<p class="Pp">If you are using the -d option to track DNS requests, this tool
+    will trace the udp_recvmsg function and generate an event for any packets
+    from UDP port 53. This event contains up to 512 bytes of the UDP packet
+    payload. Typical applications do not extensively use UDP, so the performance
+    overhead of tracing udp_recvmsg is expected to be negligible, However, if
+    you have an application that receives many UDP packets, then you should test
+    and understand the overhead of tracing every received UDP message.
+    Furthermore, performance overhead of running this tool on a DNS server is
+    expected to be higher than average because all DNS response packets will be
+    copied to userspace.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _examples.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Brendan Gregg</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h1>
+<p class="Pp">tcptracer(8), tcpaccept(8), funccount(8), tcpdump(8)</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>

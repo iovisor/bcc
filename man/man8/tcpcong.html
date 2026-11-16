@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>tcpcong(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">tcpcong(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">tcpcong(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">tcpcong - Measure tcp congestion state duration. Uses Linux
+    eBPF/bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>tcpcong [-h] [-T] [-L] [-R] [-u] [-d] [interval]
+  [outputs]</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">this tool measures tcp sockets congestion control status duration,
+    and prints a summary of tcp congestion state durations along with the number
+    of total state changes.</p>
+<p class="Pp">It uses dynamic tracing of kernel tcp congestion control status
+    updating functions, and will need to be updated to match kernel changes.</p>
+<p class="Pp">The traced functions are only called when there is congestion
+    state update, and therefore have low overhead. we also use BPF map to store
+    traced data to reduce overhead. See the OVERHEAD section for more details.
+    Since this uses BPF, only the root user can use this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REQUIREMENTS"><a class="permalink" href="#REQUIREMENTS">REQUIREMENTS</a></h1>
+<p class="Pp">CONFIG_BPF and bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+<dl class="Bl-tag">
+  <dt id="h"><a class="permalink" href="#h">-h</a></dt>
+  <dd>Print usage message.</dd>
+  <dt id="T"><a class="permalink" href="#T">-T</a></dt>
+  <dd>Include a timestamp column.</dd>
+  <dt id="L"><a class="permalink" href="#L">-L</a></dt>
+  <dd>Specify local tcp port range.</dd>
+  <dt id="R"><a class="permalink" href="#R">-R</a></dt>
+  <dd>Specify remote tcp port range.</dd>
+  <dt id="u"><a class="permalink" href="#u">-u</a></dt>
+  <dd>Output in microseconds.</dd>
+  <dt id="d"><a class="permalink" href="#d">-d</a></dt>
+  <dd>Show congestion status duration distribution as histograms.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Show"><a class="permalink" href="#Show">Show all tcp sockets
+    congestion status duration until Ctrl-C:</a></dt>
+  <dd># <b>tcpcongestdura</b></dd>
+  <dt id="Show~2"><a class="permalink" href="#Show~2">Show all tcp sockets
+    congestion status duration every 1 second and 10 times:</a></dt>
+  <dd># <b>tcpcong 1 10</b></dd>
+  <dt id="Show~3"><a class="permalink" href="#Show~3">Show only local port
+    3000-3006 congestion status duration every 1 second:</a></dt>
+  <dd># <b>tcpcong -L 3000-3006 1</b></dd>
+  <dt id="Show~4"><a class="permalink" href="#Show~4">Show only remote port
+    5000-5005 congestion status duration every 1 second:</a></dt>
+  <dd># <b>tcpcong -R 5000-5005 1</b></dd>
+  <dt id="Show~5"><a class="permalink" href="#Show~5">Show 1 second summaries,
+    printed in microseconds, with timestamps:</a></dt>
+  <dd># <b>tcpcong -uT 1</b></dd>
+  <dt id="Show~6"><a class="permalink" href="#Show~6">Show all tcp sockets
+    congestion status duration as histograms:</a></dt>
+  <dd># <b>tcpcong -d</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="FIELDS"><a class="permalink" href="#FIELDS">FIELDS</a></h1>
+<dl class="Bl-tag">
+  <dt id="LAddrPort"><a class="permalink" href="#LAddrPort">LAddrPort</a></dt>
+  <dd>local ip address and tcp socket port.</dd>
+  <dt id="RAddrPort"><a class="permalink" href="#RAddrPort">RAddrPort</a></dt>
+  <dd>remote ip address and tcp socket port.</dd>
+  <dt id="Open_us"><a class="permalink" href="#Open_us">Open_us</a></dt>
+  <dd>Total duration in open status for microseconds.</dd>
+  <dt id="Dod_us"><a class="permalink" href="#Dod_us">Dod_us</a></dt>
+  <dd>Total duration in disorder status for microseconds.</dd>
+  <dt id="Rcov_us"><a class="permalink" href="#Rcov_us">Rcov_us</a></dt>
+  <dd>Total duration in recovery status for microseconds.</dd>
+  <dt id="Cwr_us"><a class="permalink" href="#Cwr_us">Cwr_us</a></dt>
+  <dd>Total duration in cwr status for microseconds.</dd>
+  <dt id="Los_us"><a class="permalink" href="#Los_us">Los_us</a></dt>
+  <dd>Total duration in loss status for microseconds.</dd>
+  <dt id="Open_ms"><a class="permalink" href="#Open_ms">Open_ms</a></dt>
+  <dd>Total duration in open status for milliseconds.</dd>
+  <dt id="Dod_ms"><a class="permalink" href="#Dod_ms">Dod_ms</a></dt>
+  <dd>Total duration in disorder status for milliseconds.</dd>
+  <dt id="Rcov_ms"><a class="permalink" href="#Rcov_ms">Rcov_ms</a></dt>
+  <dd>Total duration in recovery status for milliseconds.</dd>
+  <dt id="Cwr_ms"><a class="permalink" href="#Cwr_ms">Cwr_ms</a></dt>
+  <dd>Total duration in cwr status for milliseconds.</dd>
+  <dt id="Loss_ms"><a class="permalink" href="#Loss_ms">Loss_ms</a></dt>
+  <dd>Total duration in loss status for milliseconds.</dd>
+  <dt id="Chgs"><a class="permalink" href="#Chgs">Chgs</a></dt>
+  <dd>Total number of status change.</dd>
+  <dt id="usecs"><a class="permalink" href="#usecs">usecs</a></dt>
+  <dd>Range of microseconds for this bucket.</dd>
+  <dt id="msecs"><a class="permalink" href="#msecs">msecs</a></dt>
+  <dd>Range of milliseconds for this bucket.</dd>
+  <dt id="count"><a class="permalink" href="#count">count</a></dt>
+  <dd>Number of congestion status in this time range.</dd>
+  <dt id="distribution"><a class="permalink" href="#distribution">distribution</a></dt>
+  <dd>ASCII representation of the distribution (the count column).</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OVERHEAD"><a class="permalink" href="#OVERHEAD">OVERHEAD</a></h1>
+<p class="Pp">This traces the kernel tcp congestion status change functions. As
+    called rate per second of these functions per socket is low(&lt;10000), the
+    overhead is also expected to be negligible. If you have an application that
+    will create thousands of tcp connections, then test and understand overhead
+    before use.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _examples.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">jacky gan</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h1>
+<p class="Pp">tcpretrans(8), tcpconnect(8), tcptop(8), tcpdrop(8)</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>

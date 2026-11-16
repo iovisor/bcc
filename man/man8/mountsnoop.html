@@ -1,110 +1,111 @@
-Content-type: text/html; charset=UTF-8
-
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<HTML><HEAD><TITLE>Man page of mountsnoop</TITLE>
-</HEAD><BODY>
-<H1>mountsnoop</H1>
-Section: Maintenance Commands (8)<BR>Updated: 2016-10-14<BR><A HREF="#index">Index</A>
-<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
-
-<A NAME="lbAB">&nbsp;</A>
-<H2>NAME</H2>
-
-mountsnoop - Trace mount() and umount() syscalls. Uses Linux eBPF/bcc.
-<A NAME="lbAC">&nbsp;</A>
-<H2>SYNOPSIS</H2>
-
-<B>mountsnoop</B>
-
-<A NAME="lbAD">&nbsp;</A>
-<H2>DESCRIPTION</H2>
-
-mountsnoop traces the mount() and umount() syscalls, showing which processes
-are mounting and unmounting filesystems in what mount namespaces. This can be
-useful for troubleshooting system and container setup.
-<P>
-This works by tracing the kernel sys_mount() and sys_umount() functions using
-dynamic tracing, and will need updating to match any changes to this function.
-<P>
-This makes use of a Linux 4.8 feature (bpf_get_current_task()).
-<P>
-Since this uses BPF, only the root user can use this tool.
-<A NAME="lbAE">&nbsp;</A>
-<H2>REQUIREMENTS</H2>
-
-CONFIG_BPF and bcc.
-<A NAME="lbAF">&nbsp;</A>
-<H2>FIELDS</H2>
-
-<DL COMPACT>
-<DT>COMM<DD>
-Process name
-<DT>PID<DD>
-Process ID
-<DT>TID<DD>
-Thread ID
-<DT>MNT_NS<DD>
-Mount namespace inode number
-<DT>CALL<DD>
-System call, arguments, and return value
-</DL>
-<A NAME="lbAG">&nbsp;</A>
-<H2>OVERHEAD</H2>
-
-This traces the kernel mount and umount functions and prints output for each
-event. As the rate of these calls is generally expected to be very low, the
-overhead is also expected to be negligible. If your system calls mount() and
-umount() at a high rate, then test and understand overhead before use.
-<A NAME="lbAH">&nbsp;</A>
-<H2>SOURCE</H2>
-
-This is from bcc.
-<DL COMPACT>
-<DT><DD>
-<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
-</DL>
-<P>
-
-Also look in the bcc distribution for a companion _examples.txt file containing
-example usage, output, and commentary for this tool.
-<A NAME="lbAI">&nbsp;</A>
-<H2>OS</H2>
-
-Linux
-<A NAME="lbAJ">&nbsp;</A>
-<H2>STABILITY</H2>
-
-Unstable - in development.
-<A NAME="lbAK">&nbsp;</A>
-<H2>AUTHOR</H2>
-
-Omar Sandoval
-<A NAME="lbAL">&nbsp;</A>
-<H2>SEE ALSO</H2>
-
-<A HREF="https://iovisor.github.io/bcc?2+mount">mount</A>(2)
-<A HREF="https://iovisor.github.io/bcc?2+umount">umount</A>(2)
-<P>
-
-<HR>
-<A NAME="index">&nbsp;</A><H2>Index</H2>
-<DL>
-<DT><A HREF="#lbAB">NAME</A><DD>
-<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
-<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
-<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
-<DT><A HREF="#lbAF">FIELDS</A><DD>
-<DT><A HREF="#lbAG">OVERHEAD</A><DD>
-<DT><A HREF="#lbAH">SOURCE</A><DD>
-<DT><A HREF="#lbAI">OS</A><DD>
-<DT><A HREF="#lbAJ">STABILITY</A><DD>
-<DT><A HREF="#lbAK">AUTHOR</A><DD>
-<DT><A HREF="#lbAL">SEE ALSO</A><DD>
-</DL>
-<HR>
-This document was created by
-<A HREF="https://iovisor.github.io/bcc">man2html</A>,
-using the manual pages.<BR>
-Time: 17:11:49 GMT, February 25, 2020
-</BODY>
-</HTML>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>mountsnoop(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">mountsnoop(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">mountsnoop(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">mountsnoop - Trace mount() and umount() syscalls. Uses Linux
+    eBPF/bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>mountsnoop</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">mountsnoop traces the mount() and umount() syscalls, showing which
+    processes are mounting and unmounting filesystems in what mount namespaces.
+    This can be useful for troubleshooting system and container setup.</p>
+<p class="Pp">This works by tracing the kernel sys_mount() and sys_umount()
+    functions using dynamic tracing, and will need updating to match any changes
+    to this function.</p>
+<p class="Pp">This makes use of a Linux 4.8 feature
+  (bpf_get_current_task()).</p>
+<p class="Pp">Since this uses BPF, only the root user can use this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REQUIREMENTS"><a class="permalink" href="#REQUIREMENTS">REQUIREMENTS</a></h1>
+<p class="Pp">CONFIG_BPF and bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="FIELDS"><a class="permalink" href="#FIELDS">FIELDS</a></h1>
+<dl class="Bl-tag">
+  <dt id="COMM"><a class="permalink" href="#COMM">COMM</a></dt>
+  <dd>Process name</dd>
+  <dt id="PID"><a class="permalink" href="#PID">PID</a></dt>
+  <dd>Process ID</dd>
+  <dt id="TID"><a class="permalink" href="#TID">TID</a></dt>
+  <dd>Thread ID</dd>
+  <dt id="MNT_NS"><a class="permalink" href="#MNT_NS">MNT_NS</a></dt>
+  <dd>Mount namespace inode number</dd>
+  <dt id="CALL"><a class="permalink" href="#CALL">CALL</a></dt>
+  <dd>System call, arguments, and return value</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OVERHEAD"><a class="permalink" href="#OVERHEAD">OVERHEAD</a></h1>
+<p class="Pp">This traces the kernel mount and umount functions and prints
+    output for each event. As the rate of these calls is generally expected to
+    be very low, the overhead is also expected to be negligible. If your system
+    calls mount() and umount() at a high rate, then test and understand overhead
+    before use.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _examples.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Omar Sandoval</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h1>
+<p class="Pp">mount(2) umount(2)</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>

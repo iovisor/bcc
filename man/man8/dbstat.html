@@ -1,132 +1,129 @@
-Content-type: text/html; charset=UTF-8
-
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<HTML><HEAD><TITLE>Man page of dbstat</TITLE>
-</HEAD><BODY>
-<H1>dbstat</H1>
-Section: Maintenance Commands (8)<BR>Updated: 2017-02-15<BR><A HREF="#index">Index</A>
-<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
-
-<A NAME="lbAB">&nbsp;</A>
-<H2>NAME</H2>
-
-dbstat - Collect histograms of MySQL/PostgreSQL query latencies.
-<A NAME="lbAC">&nbsp;</A>
-<H2>SYNOPSIS</H2>
-
-<B>dbstat [-v] [-p PID [PID ...]] [-m THRESHOLD] [-u] [-i INTERVAL] {mysql,postgres}</B>
-
-<A NAME="lbAD">&nbsp;</A>
-<H2>DESCRIPTION</H2>
-
-This traces queries served by a MySQL or PostgreSQL server, and collects a
-histogram of query latencies. The histogram is printed at the end of collection,
-or at specified intervals.
-<P>
-This uses User Statically-Defined Tracing (USDT) probes, a feature added to
-MySQL and PostgreSQL for DTrace support, but which may not be enabled on a
-given installation. See requirements.
-<P>
-Since this uses BPF, only the root user can use this tool.
-<A NAME="lbAE">&nbsp;</A>
-<H2>REQUIREMENTS</H2>
-
-CONFIG_BPF, bcc, and MySQL server with USDT probe support (when configuring
-the build: -DENABLE_DTRACE=1) or PostgreSQL server with USDT probe support
-(when configuring the build: --enable-dtrace).
-<A NAME="lbAF">&nbsp;</A>
-<H2>OPTIONS</H2>
-
--h
-Print usage message.
-<DL COMPACT>
-<DT>-p PID<DD>
-Trace this PID. If no PID is specified, the tool will attempt to automatically
-detect the MySQL or PostgreSQL processes running on the system.
-<DT>-m THRESHOLD<DD>
-Minimum query latency (duration) to trace, in milliseconds.
-Default is all queries.
-<DT>-u<DD>
-Display query latencies in microseconds (default: milliseconds).
-<DT>-i INTERVAL<DD>
-Print summaries (histograms) at this interval, specified in seconds.
-<DT>{mysql,postgres}<DD>
-The database engine to trace.
-</DL>
-<A NAME="lbAG">&nbsp;</A>
-<H2>EXAMPLES</H2>
-
-<DL COMPACT>
-<DT>Display histogram of MySQL query latencies:<DD>
-#
-<B>dbstat mysql</B>
-
-<DT>Display histogram of PostgreSQL query latencies slower than 10ms in pid 408:<DD>
-#
-<B>dbstat postgres -p 408 -m 10</B>
-
-<DT>Display histogram of PostgreSQL query latencies at 3-second intervals:<DD>
-#
-<B>dbstat postgres -i 3</B>
-
-</DL>
-<A NAME="lbAH">&nbsp;</A>
-<H2>OVERHEAD</H2>
-
-This adds low-overhead instrumentation to queries, and only emits output
-data from kernel to user-level if they query exceeds the threshold. If the
-server query rate is less than 1,000/sec, the overhead is expected to be
-negligible. If the query rate is higher, test to gauge overhead.
-<A NAME="lbAI">&nbsp;</A>
-<H2>SOURCE</H2>
-
-This is from bcc.
-<DL COMPACT>
-<DT><DD>
-<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
-</DL>
-<P>
-
-Also look in the bcc distribution for a companion _examples.txt file containing
-example usage, output, and commentary for this tool.
-<A NAME="lbAJ">&nbsp;</A>
-<H2>OS</H2>
-
-Linux
-<A NAME="lbAK">&nbsp;</A>
-<H2>STABILITY</H2>
-
-Unstable - in development.
-<A NAME="lbAL">&nbsp;</A>
-<H2>AUTHOR</H2>
-
-Sasha Goldshtein
-<A NAME="lbAM">&nbsp;</A>
-<H2>SEE ALSO</H2>
-
-<A HREF="https://iovisor.github.io/bcc?8+dbslower">dbslower</A>(8)
-<P>
-
-<HR>
-<A NAME="index">&nbsp;</A><H2>Index</H2>
-<DL>
-<DT><A HREF="#lbAB">NAME</A><DD>
-<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
-<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
-<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
-<DT><A HREF="#lbAF">OPTIONS</A><DD>
-<DT><A HREF="#lbAG">EXAMPLES</A><DD>
-<DT><A HREF="#lbAH">OVERHEAD</A><DD>
-<DT><A HREF="#lbAI">SOURCE</A><DD>
-<DT><A HREF="#lbAJ">OS</A><DD>
-<DT><A HREF="#lbAK">STABILITY</A><DD>
-<DT><A HREF="#lbAL">AUTHOR</A><DD>
-<DT><A HREF="#lbAM">SEE ALSO</A><DD>
-</DL>
-<HR>
-This document was created by
-<A HREF="https://iovisor.github.io/bcc">man2html</A>,
-using the manual pages.<BR>
-Time: 17:11:49 GMT, February 25, 2020
-</BODY>
-</HTML>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>dbstat(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">dbstat(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">dbstat(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">dbstat - Collect histograms of MySQL/PostgreSQL query
+  latencies.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>dbstat [-v] [-p PID [PID ...]] [-m THRESHOLD] [-u] [-i
+    INTERVAL] {mysql,postgres}</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">This traces queries served by a MySQL or PostgreSQL server, and
+    collects a histogram of query latencies. The histogram is printed at the end
+    of collection, or at specified intervals.</p>
+<p class="Pp">This uses User Statically-Defined Tracing (USDT) probes, a feature
+    added to MySQL and PostgreSQL for DTrace support, but which may not be
+    enabled on a given installation. See requirements.</p>
+<p class="Pp">Since this uses BPF, only the root user can use this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REQUIREMENTS"><a class="permalink" href="#REQUIREMENTS">REQUIREMENTS</a></h1>
+<p class="Pp">CONFIG_BPF, bcc, and MySQL server with USDT probe support (when
+    configuring the build: -DENABLE_DTRACE=1) or PostgreSQL server with USDT
+    probe support (when configuring the build: --enable-dtrace).</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+<p class="Pp">-h Print usage message.</p>
+<dl class="Bl-tag">
+  <dt id="p"><a class="permalink" href="#p">-p PID</a></dt>
+  <dd>Trace this PID. If no PID is specified, the tool will attempt to
+      automatically detect the MySQL or PostgreSQL processes running on the
+      system.</dd>
+  <dt id="m"><a class="permalink" href="#m">-m THRESHOLD</a></dt>
+  <dd>Minimum query latency (duration) to trace, in milliseconds. Default is all
+      queries.</dd>
+  <dt id="u"><a class="permalink" href="#u">-u</a></dt>
+  <dd>Display query latencies in microseconds (default: milliseconds).</dd>
+  <dt id="i"><a class="permalink" href="#i">-i INTERVAL</a></dt>
+  <dd>Print summaries (histograms) at this interval, specified in seconds.</dd>
+  <dt>{mysql,postgres}</dt>
+  <dd>The database engine to trace.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Display"><a class="permalink" href="#Display">Display histogram of
+    MySQL query latencies:</a></dt>
+  <dd># <b>dbstat mysql</b></dd>
+  <dt id="Display~2"><a class="permalink" href="#Display~2">Display histogram of
+    PostgreSQL query latencies slower than 10ms in pid 408:</a></dt>
+  <dd># <b>dbstat postgres -p 408 -m 10</b></dd>
+  <dt id="Display~3"><a class="permalink" href="#Display~3">Display histogram of
+    PostgreSQL query latencies at 3-second intervals:</a></dt>
+  <dd># <b>dbstat postgres -i 3</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OVERHEAD"><a class="permalink" href="#OVERHEAD">OVERHEAD</a></h1>
+<p class="Pp">This adds low-overhead instrumentation to queries, and only emits
+    output data from kernel to user-level if they query exceeds the threshold.
+    If the server query rate is less than 1,000/sec, the overhead is expected to
+    be negligible. If the query rate is higher, test to gauge overhead.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _examples.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Sasha Goldshtein</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h1>
+<p class="Pp">dbslower(8)</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>

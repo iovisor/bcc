@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>wqlat(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">wqlat(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">wqlat(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">wqlat - Summarize kernel workqueue latency as a histogram.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>wqlat [-h] [-T] [-N] [-W] [-w WQNAME] [interval
+  [count]]</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">wqlat traces work's waiting on workqueue, and records the
+    distribution of work's queuing latency (time). This is printed as a
+    histogram either on Ctrl-C, or after a given interval in seconds.</p>
+<p class="Pp">This tool uses in-kernel eBPF maps for storing timestamps and the
+    histogram, for efficiency.</p>
+<p class="Pp">This tool uses the workqueue:workqueue_queue_work and
+    workqueue:workqueue_execute_start kernel tracepoints, which is a stable
+    tracing mechanism. Please note BPF programs can attach to tracepoints from
+    Linux 4.7 only, so this tools can only support kernel 4.7 or later
+  version.</p>
+<p class="Pp">Since this uses BPF, only the root user can use this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REQUIREMENTS"><a class="permalink" href="#REQUIREMENTS">REQUIREMENTS</a></h1>
+<p class="Pp">CONFIG_BPF and bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+<p class="Pp">-h Print usage message.</p>
+<dl class="Bl-tag">
+  <dt id="T"><a class="permalink" href="#T">-T</a></dt>
+  <dd>Include timestamps on output.</dd>
+  <dt id="N"><a class="permalink" href="#N">-N</a></dt>
+  <dd>Output histogram in nanoseconds.</dd>
+  <dt id="W"><a class="permalink" href="#W">-W</a></dt>
+  <dd>Print a histogram per workqueue.</dd>
+  <dt id="w"><a class="permalink" href="#w">-w WQNAME</a></dt>
+  <dd>Trace this workqueue only</dd>
+  <dt id="interval"><a class="permalink" href="#interval">interval</a></dt>
+  <dd>Output interval, in seconds.</dd>
+  <dt id="count"><a class="permalink" href="#count">count</a></dt>
+  <dd>Number of outputs.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Summarize"><a class="permalink" href="#Summarize">Summarize kernel
+    workqueue latency as a histogram:</a></dt>
+  <dd># <b>wqlat</b></dd>
+  <dt id="Print"><a class="permalink" href="#Print">Print 1 second summaries, 10
+    times:</a></dt>
+  <dd># <b>wqlat 1 10</b></dd>
+  <dt id="Print~2"><a class="permalink" href="#Print~2">Print 1 second
+    summaries, using nanoseconds as units for the histogram, and</a></dt>
+  <dd>include timestamps on output: # <b>wqlat -NT 1</b></dd>
+  <dt id="Print~3"><a class="permalink" href="#Print~3">Print 1 second
+    summaries, 10 times per workqueue:</a></dt>
+  <dd># <b>wqlat -W 1 10</b></dd>
+  <dt id="Print~4"><a class="permalink" href="#Print~4">Print 1 second summaries
+    for workqueue nvmet_tcp_wq:</a></dt>
+  <dd># <b>wqlat -w nvmet_tcp_wq 1</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="FIELDS"><a class="permalink" href="#FIELDS">FIELDS</a></h1>
+<dl class="Bl-tag">
+  <dt id="usecs"><a class="permalink" href="#usecs">usecs</a></dt>
+  <dd>Microsecond range</dd>
+  <dt id="nsecs"><a class="permalink" href="#nsecs">nsecs</a></dt>
+  <dd>Nanosecond range</dd>
+  <dt id="count~2"><a class="permalink" href="#count~2">count</a></dt>
+  <dd>How many works into this range</dd>
+  <dt id="distribution"><a class="permalink" href="#distribution">distribution</a></dt>
+  <dd>An ASCII bar chart to visualize the distribution (count column)</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OVERHEAD"><a class="permalink" href="#OVERHEAD">OVERHEAD</a></h1>
+<p class="Pp">This traces kernel functions and maintains in-kernel timestamps
+    and a histogram, which are asynchronously copied to user-space. This method
+    is very efficient, and the overhead for most workqueue scheduling rates
+    (&lt; 100k) should be negligible.If you have a higher workqueue scheduling,
+    please test and quantify the overhead before use.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _examples.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Ping Gan</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h1>
+<p class="Pp">biolatency</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>

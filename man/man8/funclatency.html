@@ -1,191 +1,179 @@
-Content-type: text/html; charset=UTF-8
-
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<HTML><HEAD><TITLE>Man page of funclatency</TITLE>
-</HEAD><BODY>
-<H1>funclatency</H1>
-Section: Maintenance Commands (8)<BR>Updated: 2015-08-18<BR><A HREF="#index">Index</A>
-<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
-
-<A NAME="lbAB">&nbsp;</A>
-<H2>NAME</H2>
-
-funclatency - Time functions and print latency as a histogram.
-<A NAME="lbAC">&nbsp;</A>
-<H2>SYNOPSIS</H2>
-
-<B>funclatency [-h] [-p PID] [-i INTERVAL] [-d DURATION] [-T] [-u] [-m] [-F] [-r] [-v] pattern</B>
-
-<A NAME="lbAD">&nbsp;</A>
-<H2>DESCRIPTION</H2>
-
-This tool traces function calls and times their duration (latency), and
-shows the latency distribution as a histogram. The time is measured from when
-the function is called to when it returns, and is inclusive of both on-CPU
-time and time spent blocked.
-<P>
-This tool uses in-kernel eBPF maps for storing timestamps and the histogram,
-for efficiency.
-<P>
-Currently nested or recursive functions are not supported properly, and
-timestamps will be overwritten, creating dubious output. Try to match single
-functions, or groups of functions that run at the same stack layer, and
-don't ultimately call each other.
-<P>
-WARNING: This uses dynamic tracing of (what can be many) functions, an
-activity that has had issues on some kernel versions (risk of panics or
-freezes). Test, and know what you are doing, before use.
-<P>
-Since this uses BPF, only the root user can use this tool.
-<A NAME="lbAE">&nbsp;</A>
-<H2>REQUIREMENTS</H2>
-
-CONFIG_BPF and bcc.
-<A NAME="lbAF">&nbsp;</A>
-<H2>OPTIONS</H2>
-
-pattern
-Function name or search pattern. Supports &quot;*&quot; wildcards. See EXAMPLES.
-You can also use -r for regular expressions.
--h
-Print usage message.
-<DL COMPACT>
-<DT>-p PID<DD>
-Trace this process ID only.
-<DT>-i INTERVAL<DD>
-Print output every interval seconds.
-<DT>-d DURATION<DD>
-Total duration of trace, in seconds.
-<DT>-T<DD>
-Include timestamps on output.
-<DT>-u<DD>
-Output histogram in microseconds.
-<DT>-m<DD>
-Output histogram in milliseconds.
-<DT>-F<DD>
-Print a separate histogram per function matched.
-<DT>-r<DD>
-Use regular expressions for the search pattern.
-<DT>-v<DD>
-Print the BPF program (for debugging purposes).
-</DL>
-<A NAME="lbAG">&nbsp;</A>
-<H2>EXAMPLES</H2>
-
-<DL COMPACT>
-<DT>Time the do_sys_open() kernel function, and print the distribution as a histogram:<DD>
-#
-<B>funclatency do_sys_open</B>
-
-<DT>Time the read() function in libc across all processes on the system:<DD>
-#
-<B>funclatency c:read</B>
-
-<DT>Time vfs_read(), and print the histogram in units of microseconds:<DD>
-#
-<B>funclatency -u vfs_read</B>
-
-<DT>Time do_nanosleep(), and print the histogram in units of milliseconds:<DD>
-#
-<B>funclatency -m do_nanosleep</B>
-
-<DT>Time libc open(), and print output every 2 seconds, for duration 10 seconds:<DD>
-#
-<B>funclatency -i 2 -d 10 c:read</B>
-
-<DT>Time vfs_read(), and print output every 5 seconds, with timestamps:<DD>
-#
-<B>funclatency -mTi 5 vfs_read</B>
-
-<DT>Time vfs_read() for process ID 181 only:<DD>
-#
-<B>funclatency -p 181 vfs_read:</B>
-
-<DT>Time both vfs_fstat() and vfs_fstatat() calls, by use of a wildcard:<DD>
-#
-<B>funclatency 'vfs_fstat*'</B>
-
-<DT>Time both vfs_fstat* calls, and print a separate histogram for each:<DD>
-#
-<B>funclatency -F 'vfs_fstat*'</B>
-
-</DL>
-<A NAME="lbAH">&nbsp;</A>
-<H2>FIELDS</H2>
-
-<DL COMPACT>
-<DT>necs<DD>
-Nanosecond range
-<DT>usecs<DD>
-Microsecond range
-<DT>msecs<DD>
-Millisecond range
-<DT>count<DD>
-How many calls fell into this range
-<DT>distribution<DD>
-An ASCII bar chart to visualize the distribution (count column)
-</DL>
-<A NAME="lbAI">&nbsp;</A>
-<H2>OVERHEAD</H2>
-
-This traces kernel functions and maintains in-kernel timestamps and a histogram,
-which are asynchronously copied to user-space. While this method is very
-efficient, the rate of kernel functions can also be very high (&gt;1M/sec), at
-which point the overhead is expected to be measurable. Measure in a test
-environment and understand overheads before use. You can also use funccount
-to measure the rate of kernel functions over a short duration, to set some
-expectations before use.
-<A NAME="lbAJ">&nbsp;</A>
-<H2>SOURCE</H2>
-
-This is from bcc.
-<DL COMPACT>
-<DT><DD>
-<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
-</DL>
-<P>
-
-Also look in the bcc distribution for a companion _examples.txt file containing
-example usage, output, and commentary for this tool.
-<A NAME="lbAK">&nbsp;</A>
-<H2>OS</H2>
-
-Linux
-<A NAME="lbAL">&nbsp;</A>
-<H2>STABILITY</H2>
-
-Unstable - in development.
-<A NAME="lbAM">&nbsp;</A>
-<H2>AUTHOR</H2>
-
-Brendan Gregg, Sasha Goldshtein
-<A NAME="lbAN">&nbsp;</A>
-<H2>SEE ALSO</H2>
-
-<A HREF="https://iovisor.github.io/bcc?8+funccount">funccount</A>(8)
-<P>
-
-<HR>
-<A NAME="index">&nbsp;</A><H2>Index</H2>
-<DL>
-<DT><A HREF="#lbAB">NAME</A><DD>
-<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
-<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
-<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
-<DT><A HREF="#lbAF">OPTIONS</A><DD>
-<DT><A HREF="#lbAG">EXAMPLES</A><DD>
-<DT><A HREF="#lbAH">FIELDS</A><DD>
-<DT><A HREF="#lbAI">OVERHEAD</A><DD>
-<DT><A HREF="#lbAJ">SOURCE</A><DD>
-<DT><A HREF="#lbAK">OS</A><DD>
-<DT><A HREF="#lbAL">STABILITY</A><DD>
-<DT><A HREF="#lbAM">AUTHOR</A><DD>
-<DT><A HREF="#lbAN">SEE ALSO</A><DD>
-</DL>
-<HR>
-This document was created by
-<A HREF="https://iovisor.github.io/bcc">man2html</A>,
-using the manual pages.<BR>
-Time: 17:11:49 GMT, February 25, 2020
-</BODY>
-</HTML>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>funclatency(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">funclatency(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">funclatency(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">funclatency - Time functions and print latency as a histogram.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>funclatency [-h] [-p PID] [-i INTERVAL] [-d DURATION] [-T] [-u]
+    [-m] [-F] [-r] [-v] pattern</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">This tool traces function calls and times their duration
+    (latency), and shows the latency distribution as a histogram. The time is
+    measured from when the function is called to when it returns, and is
+    inclusive of both on-CPU time and time spent blocked.</p>
+<p class="Pp">This tool uses in-kernel eBPF maps for storing timestamps and the
+    histogram, for efficiency.</p>
+<p class="Pp">Currently nested or recursive functions are not supported
+    properly, and timestamps will be overwritten, creating dubious output. Try
+    to match single functions, or groups of functions that run at the same stack
+    layer, and don't ultimately call each other.</p>
+<p class="Pp">WARNING: This uses dynamic tracing of (what can be many)
+    functions, an activity that has had issues on some kernel versions (risk of
+    panics or freezes). Test, and know what you are doing, before use.</p>
+<p class="Pp">Since this uses BPF, only the root user can use this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REQUIREMENTS"><a class="permalink" href="#REQUIREMENTS">REQUIREMENTS</a></h1>
+<p class="Pp">CONFIG_BPF and bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+<p class="Pp">pattern Function name or search pattern. Supports &quot;*&quot;
+    wildcards. See EXAMPLES. You can also use -r for regular expressions.</p>
+<dl class="Bl-tag">
+  <dt id="h"><a class="permalink" href="#h">-h</a></dt>
+  <dd>Print usage message.</dd>
+  <dt id="p"><a class="permalink" href="#p">-p PID</a></dt>
+  <dd>Trace this process ID only.</dd>
+  <dt id="i"><a class="permalink" href="#i">-i INTERVAL</a></dt>
+  <dd>Print output every interval seconds.</dd>
+  <dt id="d"><a class="permalink" href="#d">-d DURATION</a></dt>
+  <dd>Total duration of trace, in seconds.</dd>
+  <dt id="l"><a class="permalink" href="#l">-l LEVEL</a></dt>
+  <dd>Set the level of nested or recursive functions.</dd>
+  <dt id="T"><a class="permalink" href="#T">-T</a></dt>
+  <dd>Include timestamps on output.</dd>
+  <dt id="u"><a class="permalink" href="#u">-u</a></dt>
+  <dd>Output histogram in microseconds.</dd>
+  <dt id="m"><a class="permalink" href="#m">-m</a></dt>
+  <dd>Output histogram in milliseconds.</dd>
+  <dt id="F"><a class="permalink" href="#F">-F</a></dt>
+  <dd>Print a separate histogram per function matched.</dd>
+  <dt id="r"><a class="permalink" href="#r">-r</a></dt>
+  <dd>Use regular expressions for the search pattern.</dd>
+  <dt id="v"><a class="permalink" href="#v">-v</a></dt>
+  <dd>Print the BPF program (for debugging purposes).</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Time"><a class="permalink" href="#Time">Time the do_sys_open() kernel
+    function, and print the distribution as a histogram:</a></dt>
+  <dd># <b>funclatency do_sys_open</b></dd>
+  <dt id="Time~2"><a class="permalink" href="#Time~2">Time the read() function
+    in libc across all processes on the system:</a></dt>
+  <dd># <b>funclatency c:read</b></dd>
+  <dt id="Time~3"><a class="permalink" href="#Time~3">Time vfs_read(), and print
+    the histogram in units of microseconds:</a></dt>
+  <dd># <b>funclatency -u vfs_read</b></dd>
+  <dt id="Time~4"><a class="permalink" href="#Time~4">Time do_nanosleep(), and
+    print the histogram in units of milliseconds:</a></dt>
+  <dd># <b>funclatency -m do_nanosleep</b></dd>
+  <dt id="Time~5"><a class="permalink" href="#Time~5">Time libc open(), and
+    print output every 2 seconds, for duration 10 seconds:</a></dt>
+  <dd># <b>funclatency -i 2 -d 10 c:read</b></dd>
+  <dt id="Time~6"><a class="permalink" href="#Time~6">Time vfs_read(), and print
+    output every 5 seconds, with timestamps:</a></dt>
+  <dd># <b>funclatency -mTi 5 vfs_read</b></dd>
+  <dt id="Time~7"><a class="permalink" href="#Time~7">Time vfs_read() for
+    process ID 181 only:</a></dt>
+  <dd># <b>funclatency -p 181 vfs_read</b></dd>
+  <dt id="Time~8"><a class="permalink" href="#Time~8">Time both vfs_fstat() and
+    vfs_fstatat() calls, by use of a wildcard:</a></dt>
+  <dd># <b>funclatency 'vfs_fstat*'</b></dd>
+  <dt id="Time~9"><a class="permalink" href="#Time~9">Time both vfs_fstat*
+    calls, and print a separate histogram for each:</a></dt>
+  <dd># <b>funclatency -F 'vfs_fstat*'</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="FIELDS"><a class="permalink" href="#FIELDS">FIELDS</a></h1>
+<dl class="Bl-tag">
+  <dt id="necs"><a class="permalink" href="#necs">necs</a></dt>
+  <dd>Nanosecond range</dd>
+  <dt id="usecs"><a class="permalink" href="#usecs">usecs</a></dt>
+  <dd>Microsecond range</dd>
+  <dt id="msecs"><a class="permalink" href="#msecs">msecs</a></dt>
+  <dd>Millisecond range</dd>
+  <dt id="count"><a class="permalink" href="#count">count</a></dt>
+  <dd>How many calls fell into this range</dd>
+  <dt id="distribution"><a class="permalink" href="#distribution">distribution</a></dt>
+  <dd>An ASCII bar chart to visualize the distribution (count column)</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OVERHEAD"><a class="permalink" href="#OVERHEAD">OVERHEAD</a></h1>
+<p class="Pp">This traces kernel functions and maintains in-kernel timestamps
+    and a histogram, which are asynchronously copied to user-space. While this
+    method is very efficient, the rate of kernel functions can also be very high
+    (&gt;1M/sec), at which point the overhead is expected to be measurable.
+    Measure in a test environment and understand overheads before use. You can
+    also use funccount to measure the rate of kernel functions over a short
+    duration, to set some expectations before use.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _examples.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Brendan Gregg, Sasha Goldshtein</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h1>
+<p class="Pp">funccount(8)</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>
