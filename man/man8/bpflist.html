@@ -1,119 +1,119 @@
-Content-type: text/html; charset=UTF-8
-
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<HTML><HEAD><TITLE>Man page of bpflist</TITLE>
-</HEAD><BODY>
-<H1>bpflist</H1>
-Section: Maintenance Commands (8)<BR>Updated: 2017-03-09<BR><A HREF="#index">Index</A>
-<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
-
-<A NAME="lbAB">&nbsp;</A>
-<H2>NAME</H2>
-
-bpflist - Display processes currently using BPF programs and maps.
-<A NAME="lbAC">&nbsp;</A>
-<H2>SYNOPSIS</H2>
-
-<B>bpflist [-v]</B>
-
-<A NAME="lbAD">&nbsp;</A>
-<H2>DESCRIPTION</H2>
-
-This tool displays processes currently using BPF programs and maps, and
-optionally also kprobes and uprobes on the system. This is useful to understand
-which BPF programs are loaded on the system.
-<P>
-Currently, for lack of a better alternative, this tool pipes into 'ls' and
-parses its output to snoop for BPF file descriptors in all running processes.
-In the future, when BPF accounting is provided by the kernel, this tool should
-use these accounting features.
-<P>
-Only the root user can use this tool, because it accesses debugfs.
-<A NAME="lbAE">&nbsp;</A>
-<H2>REQUIREMENTS</H2>
-
-bcc, debugfs
-<A NAME="lbAF">&nbsp;</A>
-<H2>OPTIONS</H2>
-
--h
-Print usage message.
-<DL COMPACT>
-<DT>-v<DD>
-Count kprobes and uprobes as well as BPF programs. Repeating verbose mode twice
-also prints the kprobe and uprobe definitions in addition to counting them.
-</DL>
-<A NAME="lbAG">&nbsp;</A>
-<H2>EXAMPLES</H2>
-
-<DL COMPACT>
-<DT>Display processes currently using BPF programs:<DD>
-#
-<B>bpflist</B>
-
-<DT>Also count kprobes and uprobes:<DD>
-#
-<B>bpflist -v</B>
-
-</DL>
-<A NAME="lbAH">&nbsp;</A>
-<H2>FIELDS</H2>
-
-<DL COMPACT>
-<DT>PID<DD>
-Process ID.
-<DT>COMM<DD>
-Process comm.
-<DT>TYPE<DD>
-The type of the data displayed: BPF program, BPF map, kprobe, or uprobe.
-<DT>COUNT<DD>
-The number of items of this type that belong to the specified process.
-</DL>
-<A NAME="lbAI">&nbsp;</A>
-<H2>SOURCE</H2>
-
-This is from bcc.
-<DL COMPACT>
-<DT><DD>
-<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
-</DL>
-<P>
-
-Also look in the bcc distribution for a companion _examples.txt file containing
-example usage, output, and commentary for this tool.
-<A NAME="lbAJ">&nbsp;</A>
-<H2>OS</H2>
-
-Linux
-<A NAME="lbAK">&nbsp;</A>
-<H2>STABILITY</H2>
-
-Unstable - in development.
-<A NAME="lbAL">&nbsp;</A>
-<H2>AUTHOR</H2>
-
-Sasha Goldshtein
-<P>
-
-<HR>
-<A NAME="index">&nbsp;</A><H2>Index</H2>
-<DL>
-<DT><A HREF="#lbAB">NAME</A><DD>
-<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
-<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
-<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
-<DT><A HREF="#lbAF">OPTIONS</A><DD>
-<DT><A HREF="#lbAG">EXAMPLES</A><DD>
-<DT><A HREF="#lbAH">FIELDS</A><DD>
-<DT><A HREF="#lbAI">SOURCE</A><DD>
-<DT><A HREF="#lbAJ">OS</A><DD>
-<DT><A HREF="#lbAK">STABILITY</A><DD>
-<DT><A HREF="#lbAL">AUTHOR</A><DD>
-</DL>
-<HR>
-This document was created by
-<A HREF="https://iovisor.github.io/bcc">man2html</A>,
-using the manual pages.<BR>
-Time: 17:11:49 GMT, February 25, 2020
-</BODY>
-</HTML>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>bpflist(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">bpflist(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">bpflist(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">bpflist - Display processes currently using BPF programs and
+  maps.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>bpflist [-v]</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">This tool displays processes currently using BPF programs and
+    maps, and optionally also kprobes and uprobes on the system. This is useful
+    to understand which BPF programs are loaded on the system.</p>
+<p class="Pp">Currently, for lack of a better alternative, this tool pipes into
+    'ls' and parses its output to snoop for BPF file descriptors in all running
+    processes. In the future, when BPF accounting is provided by the kernel,
+    this tool should use these accounting features.</p>
+<p class="Pp">Only the root user can use this tool, because it accesses
+  debugfs.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REQUIREMENTS"><a class="permalink" href="#REQUIREMENTS">REQUIREMENTS</a></h1>
+<p class="Pp">bcc, debugfs</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+<p class="Pp">-h Print usage message.</p>
+<dl class="Bl-tag">
+  <dt id="v"><a class="permalink" href="#v">-v</a></dt>
+  <dd>Count kprobes and uprobes as well as BPF programs. Repeating verbose mode
+      twice also prints the kprobe and uprobe definitions in addition to
+      counting them.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Display"><a class="permalink" href="#Display">Display processes
+    currently using BPF programs:</a></dt>
+  <dd># <b>bpflist</b></dd>
+  <dt id="Also"><a class="permalink" href="#Also">Also count kprobes and
+    uprobes:</a></dt>
+  <dd># <b>bpflist -v</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="FIELDS"><a class="permalink" href="#FIELDS">FIELDS</a></h1>
+<dl class="Bl-tag">
+  <dt id="PID"><a class="permalink" href="#PID">PID</a></dt>
+  <dd>Process ID.</dd>
+  <dt id="COMM"><a class="permalink" href="#COMM">COMM</a></dt>
+  <dd>Process comm.</dd>
+  <dt id="TYPE"><a class="permalink" href="#TYPE">TYPE</a></dt>
+  <dd>The type of the data displayed: BPF program, BPF map, kprobe, or
+    uprobe.</dd>
+  <dt id="COUNT"><a class="permalink" href="#COUNT">COUNT</a></dt>
+  <dd>The number of items of this type that belong to the specified
+    process.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _examples.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Sasha Goldshtein</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>

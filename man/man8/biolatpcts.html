@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>biolatpcts(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">biolatpcts(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">biolatpcts(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">biolatpcts - Monitor IO latency distribution of a block
+  device.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>biolatpcts [-h] [-i INTERVAL] [-w which] [-p PCT,...] [-j] [-v]
+    DEV</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">biolatpcts traces block device I/O (disk I/O) of the specified
+    device, and calculates and prints the completion latency distribution
+    percentiles per IO type periodically. Example:</p>
+<p class="Pp">
+  <br/>
+   # biolatpcts /dev/nvme0n1
+  <br/>
+   nvme0n1 p1 p5 p10 p16 p25 p50 p75 p84 p90 p95 p99 p100
+  <br/>
+   read 95us 175us 305us 515us 895us 985us 995us 1.5ms 2.5ms 3.5ms 4.5ms 10ms
+  <br/>
+   write 5us 5us 5us 15us 25us 135us 765us 855us 885us 895us 965us 1.5ms
+  <br/>
+   discard 5us 5us 5us 5us 135us 145us 165us 205us 385us 875us 1.5ms 2.5ms
+  <br/>
+   flush 5us 5us 5us 5us 5us 5us 5us 5us 5us 1.5ms 4.5ms 5.5ms
+  <br/>
+   [...]</p>
+<p class="Pp">biolatpcts prints a number of pre-set latency percentiles in
+    tabular form every three seconds. The interval can be changed with the -i
+    option.</p>
+<p class="Pp">The latency is measured between issue to the device and
+    completion. The starting point can be changed with the -w option.</p>
+<p class="Pp">Any number of percentiles can be specified using the -p option.
+    The input percentile string is used verbatim in the output to ease machine
+    consumption.</p>
+<p class="Pp">-j option enables json output. The result for each interval is
+    printed on a single line.</p>
+<p class="Pp">This tool works by tracing blk_account_io_done() with kprobe and
+    bucketing the completion latencies into percpu arrays. It may need updating
+    to match the changes to the function.</p>
+<p class="Pp">Since this uses BPF, only the root user can use this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REQUIREMENTS"><a class="permalink" href="#REQUIREMENTS">REQUIREMENTS</a></h1>
+<p class="Pp">CONFIG_BPF, CONFIG_KPROBES and bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+<p class="Pp">-h Print usage message.</p>
+<dl class="Bl-tag">
+  <dt id="i"><a class="permalink" href="#i">-i INTERVAL, --interval
+    INTERVAL</a></dt>
+  <dd>Report interval. (default: 3)</dd>
+  <dt id="w"><a class="permalink" href="#w">-w
+    {from-rq-alloc,after-rq-alloc,on-device}, --which
+    {from-rq-alloc,after-rq-alloc,on-device}</a></dt>
+  <dd>Which latency to measure. (default: on-device)</dd>
+  <dt id="p"><a class="permalink" href="#p">-p PCT,..., --pcts PCT,...</a></dt>
+  <dd>Percentiles to calculate. (default:
+    1,5,10,16,25,50,75,84,90,95,99,100)</dd>
+  <dt id="j,"><a class="permalink" href="#j,">-j, --json</a></dt>
+  <dd>Output in json.</dd>
+  <dt id="v,"><a class="permalink" href="#v,">-v, --verbose</a></dt>
+  <dd>Enable debug output.</dd>
+  <dt id="DEV"><a class="permalink" href="#DEV">DEV</a></dt>
+  <dd>Target block device. /dev/DEVNAME, DEVNAME or MAJ:MIN.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Print"><a class="permalink" href="#Print">Print sda's I/O latency
+    percentiles every second</a></dt>
+  <dd># <b>biolatpcts -i 1 sda</b></dd>
+  <dt id="Print~2"><a class="permalink" href="#Print~2">Print nvme0n1's all-9
+    I/O latency percentiles in json every second</a></dt>
+  <dd># <b>biolatpcts -p 99,99.9,99.99,99.999 -j -i 1 /dev/nvme0n1</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OVERHEAD"><a class="permalink" href="#OVERHEAD">OVERHEAD</a></h1>
+<p class="Pp">This traces kernel functions and maintains in-kernel per-cpu
+    latency buckets, which are asynchronously copied to user-space. This method
+    is very efficient, and the overhead for most storage I/O rates should be
+    negligible. If you have an extremely high IOPS storage device, test and
+    quantify the overhead before use.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _examples.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Tejun Heo</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h1>
+<p class="Pp">biolatency(8), biosnoop(8)</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>readahead(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">readahead(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">readahead(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">readahead - Show performance of read-ahead cache</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>readahead [-d DURATION]</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">The tool shows the performance of read-ahead caching on the system
+    under a given load to investigate any caching issues. It shows a count of
+    unused pages in the cache and also prints a histogram showing how long they
+    have remained there.</p>
+<p class="Pp">This tool traces the <b>__do_page_cache_readahead()</b> kernel
+    function to track entry and exit in the readahead mechanism in the kernel
+    and then uses <b>__page_cache_alloc()</b> and <b>mark_page_accessed()</b>
+    functions to calculate the age of the page in the cache as well as see how
+    many are left unaccessed.</p>
+<p class="Pp">Since this uses BPF, only the root user can use this tool.</p>
+<section class="Ss">
+<h2 class="Ss" id="NOTE_ON_KPROBES_USAGE"><a class="permalink" href="#NOTE_ON_KPROBES_USAGE">NOTE
+  ON KPROBES USAGE</a></h2>
+<p class="Pp">Since the tool uses Kprobes, depending on your linux kernel's
+    compilation, these functions may be inlined and hence not available for
+    Kprobes. To see whether you have the functions available, check
+    <b>vmlinux</b> source and binary to confirm whether inlining is happening or
+    not. You can also check <b>/proc/kallsyms</b> on the host and verify if the
+    target functions are present there before using this.</p>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REQUIREMENTS"><a class="permalink" href="#REQUIREMENTS">REQUIREMENTS</a></h1>
+<p class="Pp">CONFIG_BPF, bcc</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+<p class="Pp">-h Print usage message</p>
+<dl class="Bl-tag">
+  <dt id="d"><a class="permalink" href="#d">-d DURATION</a></dt>
+  <dd>Trace the read-ahead caching system for DURATION seconds</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Trace"><a class="permalink" href="#Trace">Trace for 30 seconds and
+    show histogram of page age (ms) in read-ahead cache along with unused page
+    count:</a></dt>
+  <dd># <b>readahead -d 30</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OVERHEAD"><a class="permalink" href="#OVERHEAD">OVERHEAD</a></h1>
+<p class="Pp">The kernel functions instrumented by this program could be
+    high-frequency depending on the profile of the application (for example
+    sequential IO). We advise the users to measure and monitor the overhead
+    before leaving this turned on in production environments.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This originated as a bpftrace tool from the book &quot;BPF
+    Performance Tools&quot;, published by Addison Wesley (2019):</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>http://www.brendangregg.com/bpf-performance-tools-book.html</dd>
+</dl>
+<p class="Pp">See the book for more documentation on this tool.</p>
+<p class="Pp">This version is in the BCC repository:</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _examples.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Suchakra Sharma</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h1>
+<p class="Pp">readahead(2), madvise(2)</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>SOFTIRQSLOWER(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">SOFTIRQSLOWER(8)</td>
+    <td class="head-vol">Linux Performance Analysis</td>
+    <td class="head-rtitle">SOFTIRQSLOWER(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">softirqslower - Trace softirq handlers with latency exceeding a
+    threshold</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>softirqslower.py</b> [min_us]
+  <br/>
+  <b>softirqslower.py</b> [<b>-c</b> <i>CPU</i>] [min_us]</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">The <b>softirqslower</b> tool traces softirq events that exceed a
+    specified latency threshold. This tool helps diagnose interrupt handling
+    bottlenecks by measuring two critical latency dimensions:</p>
+<p class="Pp"></p>
+<ul class="Bl-bullet">
+  <li><b>irq(hard) to softirq</b>: Time delay between hardware interrupt
+      completion and softirq execution start</li>
+  <li><b>softirq runtime</b>: Actual execution duration of softirq handlers</li>
+</ul>
+<p class="Pp">Developed as part of the BCC (BPF Compiler Collection) tools, it's
+    particularly useful for network stack optimization, scheduler tuning, and
+    real-time systems analysis.</p>
+<p class="Pp"></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+<dl class="Bl-tag">
+  <dt id="min_us"><a class="permalink" href="#min_us"><b>min_us</b></a></dt>
+  <dd>Minimum latency threshold to trace (in microseconds). Default: 10,000
+      &#x03BC;s (10 ms)</dd>
+  <dt id="c"><a class="permalink" href="#c"><b>-c</b>, <b>--cpu</b>
+    <b><i>CPU</i></b></a></dt>
+  <dd>Trace only events on the specified CPU core
+    <p class="Pp"></p>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OUTPUT_FORMAT"><a class="permalink" href="#OUTPUT_FORMAT">OUTPUT
+  FORMAT</a></h1>
+<p class="Pp">The tool outputs events in the following table format:</p>
+<p class="Pp">TIME STAGE SOFTIRQ LAT(us) CPU COMM</p>
+<p class="Pp">With fields defined as:</p>
+<dl class="Bl-tag">
+  <dt id="TIME"><a class="permalink" href="#TIME"><b>TIME</b></a></dt>
+  <dd>Event timestamp (HH:MM:SS format)</dd>
+  <dt id="STAGE"><a class="permalink" href="#STAGE"><b>STAGE</b></a></dt>
+  <dd>Latency measurement type:</dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="irq(hard)"><a class="permalink" href="#irq(hard)"><b>irq(hard) to
+    softirq</b></a></dt>
+  <dd>Time from hardware interrupt completion to softirq dispatch</dd>
+  <dt id="softirq"><a class="permalink" href="#softirq"><b>softirq
+    runtime</b></a></dt>
+  <dd>SoftIRQ handler execution duration</dd>
+</dl>
+</div>
+<dl class="Bl-tag">
+  <dt id="SOFTIRQ"><a class="permalink" href="#SOFTIRQ"><b>SOFTIRQ</b></a></dt>
+  <dd>SoftIRQ category (case-sensitive). Common values:</dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="NET_RX"><a class="permalink" href="#NET_RX"><b>NET_RX</b></a></dt>
+  <dd>Network reception processing</dd>
+  <dt id="NET_TX"><a class="permalink" href="#NET_TX"><b>NET_TX</b></a></dt>
+  <dd>Network transmission processing</dd>
+  <dt id="TIMER"><a class="permalink" href="#TIMER"><b>TIMER</b></a></dt>
+  <dd>Timer callbacks</dd>
+  <dt id="SCHED"><a class="permalink" href="#SCHED"><b>SCHED</b></a></dt>
+  <dd>Scheduler operations</dd>
+  <dt id="RCU"><a class="permalink" href="#RCU"><b>RCU</b></a></dt>
+  <dd>Read-Copy-Update synchronization</dd>
+  <dt id="TASKLET"><a class="permalink" href="#TASKLET"><b>TASKLET</b></a></dt>
+  <dd>Deferred task execution</dd>
+  <dt id="HRTIMER"><a class="permalink" href="#HRTIMER"><b>HRTIMER</b></a></dt>
+  <dd>High-resolution timers</dd>
+  <dt id="BLOCK"><a class="permalink" href="#BLOCK"><b>BLOCK</b></a></dt>
+  <dd>Block device operations</dd>
+</dl>
+</div>
+<dl class="Bl-tag">
+  <dt id="LAT(us)"><a class="permalink" href="#LAT(us)"><b>LAT(us)</b></a></dt>
+  <dd>Measured latency in microseconds</dd>
+  <dt id="CPU"><a class="permalink" href="#CPU"><b>CPU</b></a></dt>
+  <dd>CPU core where softirq was handled (0-based numbering)</dd>
+  <dt id="COMM"><a class="permalink" href="#COMM"><b>COMM</b></a></dt>
+  <dd>Process context handling the softirq:</dd>
+</dl>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="swapper/N"><a class="permalink" href="#swapper/N"><b>swapper/N</b></a></dt>
+  <dd>Idle thread for CPU N</dd>
+  <dt id="ksoftirqd/N"><a class="permalink" href="#ksoftirqd/N"><b>ksoftirqd/N</b></a></dt>
+  <dd>Softirq daemon for CPU N</dd>
+  <dt><b>&lt;process&gt;</b></dt>
+  <dd>User-space process</dd>
+</dl>
+</div>
+<p class="Pp"></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Trace"><a class="permalink" href="#Trace">Trace softirqs exceeding
+    10&#x03BC;s latency:</a></dt>
+  <dd><b>softirqslower 10</b></dd>
+  <dt id="Monitor"><a class="permalink" href="#Monitor">Monitor only CPU core
+    1:</a></dt>
+  <dd><b>softirqslower -c 1</b></dd>
+  <dt id="Trace~2"><a class="permalink" href="#Trace~2">Trace network-related
+    softirq delays (&gt;50&#x03BC;s):</a></dt>
+  <dd><b>softirqslower 50 | grep -E 'net_rx|net_tx'</b></dd>
+  <dt id="Capture"><a class="permalink" href="#Capture">Capture RCU delays
+    longer than 100&#x03BC;s to file:</a></dt>
+  <dd><b>softirqslower 100 | grep rcu &gt; rcu_latency.log</b>
+    <p class="Pp"></p>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SIGNALS"><a class="permalink" href="#SIGNALS">SIGNALS</a></h1>
+<p class="Pp"><b>Ctrl+C</b> Stop tracing and exit gracefully</p>
+<p class="Pp"></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Chenyue Zhou</p>
+<p class="Pp"></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h1>
+<p class="Pp"><b>runqslower</b>(8), <b>hardirqs</b>(8), <b>softirqs</b>(8),
+    <b>trace</b>(8), <b>funclatency</b>(8),</p>
+<p class="Pp"></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REPORTING_BUGS"><a class="permalink" href="#REPORTING_BUGS">REPORTING
+  BUGS</a></h1>
+<p class="Pp">BCC Tools Issue Tracker: https://github.com/iovisor/bcc/issues</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">BCC Tools</td>
+  </tr>
+</table>
+</body>
+</html>

@@ -1,146 +1,148 @@
-Content-type: text/html; charset=UTF-8
-
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<HTML><HEAD><TITLE>Man page of biosnoop</TITLE>
-</HEAD><BODY>
-<H1>biosnoop</H1>
-Section: Maintenance Commands (8)<BR>Updated: 2015-09-16<BR><A HREF="#index">Index</A>
-<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
-
-<A NAME="lbAB">&nbsp;</A>
-<H2>NAME</H2>
-
-biosnoop - Trace block device I/O and print details incl. issuing PID.
-<A NAME="lbAC">&nbsp;</A>
-<H2>SYNOPSIS</H2>
-
-<B>biosnoop [-hQ]</B>
-
-<A NAME="lbAD">&nbsp;</A>
-<H2>DESCRIPTION</H2>
-
-This tools traces block device I/O (disk I/O), and prints a one-line summary
-for each I/O showing various details. These include the latency from the time of
-issue to the device to its completion, and the PID and process name from when
-the I/O was first created (which usually identifies the responsible process).
-<P>
-This uses in-kernel eBPF maps to cache process details (PID and comm) by I/O
-request, as well as a starting timestamp for calculating I/O latency.
-<P>
-This works by tracing various kernel blk_*() functions using dynamic tracing,
-and will need updating to match any changes to these functions.
-<P>
-This makes use of a Linux 4.4 feature (bpf_perf_event_output());
-for kernels older than 4.4, see the version under tools/old,
-which uses an older mechanism
-<P>
-Since this uses BPF, only the root user can use this tool.
-<A NAME="lbAE">&nbsp;</A>
-<H2>REQUIREMENTS</H2>
-
-CONFIG_BPF and bcc.
-<A NAME="lbAF">&nbsp;</A>
-<H2>OPTIONS</H2>
-
-<DL COMPACT>
-<DT>-h<DD>
-Print usage message.
-<DT>-Q<DD>
-Include a column showing the time spent quueued in the OS.
-</DL>
-<A NAME="lbAG">&nbsp;</A>
-<H2>EXAMPLES</H2>
-
-<DL COMPACT>
-<DT>Trace all block device I/O and print a summary line per I/O:<DD>
-#
-<B>biosnoop</B>
-
-</DL>
-<A NAME="lbAH">&nbsp;</A>
-<H2>FIELDS</H2>
-
-<DL COMPACT>
-<DT>TIME(s)<DD>
-Time of the I/O completion, in seconds since the first I/O was seen.
-<DT>COMM<DD>
-Cached process name, if present. This usually (but isn't guaranteed) to identify
-the responsible process for the I/O.
-<DT>PID<DD>
-Cached process ID, if present. This usually (but isn't guaranteed) to identify
-the responsible process for the I/O.
-<DT>DISK<DD>
-Disk device name.
-<DT>T<DD>
-Type of I/O: R = read, W = write. This is a simplification.
-<DT>SECTOR<DD>
-Device sector for the I/O.
-<DT>BYTES<DD>
-Size of the I/O, in bytes.
-<DT>QUE(ms)<DD>
-Time the I/O was queued in the OS before being issued to the device,
-in milliseconds.
-<DT>LAT(ms)<DD>
-Time for the I/O (latency) from the issue to the device, to its completion,
-in milliseconds.
-</DL>
-<A NAME="lbAI">&nbsp;</A>
-<H2>OVERHEAD</H2>
-
-Since block device I/O usually has a relatively low frequency (&lt; 10,000/s),
-the overhead for this tool is expected to be negligible. For high IOPS storage
-systems, test and quantify before use.
-<A NAME="lbAJ">&nbsp;</A>
-<H2>SOURCE</H2>
-
-This is from bcc.
-<DL COMPACT>
-<DT><DD>
-<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
-</DL>
-<P>
-
-Also look in the bcc distribution for a companion _examples.txt file containing
-example usage, output, and commentary for this tool.
-<A NAME="lbAK">&nbsp;</A>
-<H2>OS</H2>
-
-Linux
-<A NAME="lbAL">&nbsp;</A>
-<H2>STABILITY</H2>
-
-Unstable - in development.
-<A NAME="lbAM">&nbsp;</A>
-<H2>AUTHOR</H2>
-
-Brendan Gregg
-<A NAME="lbAN">&nbsp;</A>
-<H2>SEE ALSO</H2>
-
-<A HREF="https://iovisor.github.io/bcc?8+disksnoop">disksnoop</A>(8), <A HREF="https://iovisor.github.io/bcc?1+iostat">iostat</A>(1)
-<P>
-
-<HR>
-<A NAME="index">&nbsp;</A><H2>Index</H2>
-<DL>
-<DT><A HREF="#lbAB">NAME</A><DD>
-<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
-<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
-<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
-<DT><A HREF="#lbAF">OPTIONS</A><DD>
-<DT><A HREF="#lbAG">EXAMPLES</A><DD>
-<DT><A HREF="#lbAH">FIELDS</A><DD>
-<DT><A HREF="#lbAI">OVERHEAD</A><DD>
-<DT><A HREF="#lbAJ">SOURCE</A><DD>
-<DT><A HREF="#lbAK">OS</A><DD>
-<DT><A HREF="#lbAL">STABILITY</A><DD>
-<DT><A HREF="#lbAM">AUTHOR</A><DD>
-<DT><A HREF="#lbAN">SEE ALSO</A><DD>
-</DL>
-<HR>
-This document was created by
-<A HREF="https://iovisor.github.io/bcc">man2html</A>,
-using the manual pages.<BR>
-Time: 17:11:49 GMT, February 25, 2020
-</BODY>
-</HTML>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>biosnoop(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">biosnoop(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">biosnoop(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">biosnoop - Trace block device I/O and print details incl. issuing
+    PID.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>biosnoop [-h] [-Q] [-d DISK] [-P]</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">This tools traces block device I/O (disk I/O), and prints a
+    one-line summary for each I/O showing various details. These include the
+    latency from the time of issue to the device to its completion, and the PID
+    and process name from when the I/O was first created (which usually
+    identifies the responsible process).</p>
+<p class="Pp">This uses in-kernel eBPF maps to cache process details (PID and
+    comm) by I/O request, as well as a starting timestamp for calculating I/O
+    latency.</p>
+<p class="Pp">This works by tracing various kernel blk_*() functions using
+    dynamic tracing, and will need updating to match any changes to these
+    functions.</p>
+<p class="Pp">This makes use of a Linux 4.4 feature (bpf_perf_event_output());
+    for kernels older than 4.4, see the version under tools/old, which uses an
+    older mechanism</p>
+<p class="Pp">Since this uses BPF, only the root user can use this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REQUIREMENTS"><a class="permalink" href="#REQUIREMENTS">REQUIREMENTS</a></h1>
+<p class="Pp">CONFIG_BPF and bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+<dl class="Bl-tag">
+  <dt id="h"><a class="permalink" href="#h">-h</a></dt>
+  <dd>Print usage message.</dd>
+  <dt id="Q"><a class="permalink" href="#Q">-Q</a></dt>
+  <dd>Include a column showing the time spent queued in the OS.</dd>
+  <dt id="d"><a class="permalink" href="#d">-d DISK</a></dt>
+  <dd>Trace this disk only.</dd>
+  <dt id="P"><a class="permalink" href="#P">-P</a></dt>
+  <dd>Display block I/O pattern (sequential or random).</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Trace"><a class="permalink" href="#Trace">Trace all block device I/O
+    and print a summary line per I/O:</a></dt>
+  <dd># <b>biosnoop</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="FIELDS"><a class="permalink" href="#FIELDS">FIELDS</a></h1>
+<dl class="Bl-tag">
+  <dt id="TIME(s)"><a class="permalink" href="#TIME(s)">TIME(s)</a></dt>
+  <dd>Time of the I/O completion, in seconds since the first I/O was seen.</dd>
+  <dt id="COMM"><a class="permalink" href="#COMM">COMM</a></dt>
+  <dd>Cached process name, if present. This usually (but isn't guaranteed) to
+      identify the responsible process for the I/O.</dd>
+  <dt id="PID"><a class="permalink" href="#PID">PID</a></dt>
+  <dd>Cached process ID, if present. This usually (but isn't guaranteed) to
+      identify the responsible process for the I/O.</dd>
+  <dt id="DISK"><a class="permalink" href="#DISK">DISK</a></dt>
+  <dd>Disk device name.</dd>
+  <dt id="T"><a class="permalink" href="#T">T</a></dt>
+  <dd>Type of I/O: R = read, W = write. This is a simplification.</dd>
+  <dt id="SECTOR"><a class="permalink" href="#SECTOR">SECTOR</a></dt>
+  <dd>Device sector for the I/O.</dd>
+  <dt id="BYTES"><a class="permalink" href="#BYTES">BYTES</a></dt>
+  <dd>Size of the I/O, in bytes.</dd>
+  <dt id="QUE(ms)"><a class="permalink" href="#QUE(ms)">QUE(ms)</a></dt>
+  <dd>Time the I/O was queued in the OS before being issued to the device, in
+      milliseconds.</dd>
+  <dt id="LAT(ms)"><a class="permalink" href="#LAT(ms)">LAT(ms)</a></dt>
+  <dd>Time for the I/O (latency) from the issue to the device, to its
+      completion, in milliseconds.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OVERHEAD"><a class="permalink" href="#OVERHEAD">OVERHEAD</a></h1>
+<p class="Pp">Since block device I/O usually has a relatively low frequency
+    (&lt; 10,000/s), the overhead for this tool is expected to be negligible.
+    For high IOPS storage systems, test and quantify before use.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _examples.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Brendan Gregg, Rocky Xing</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h1>
+<p class="Pp">disksnoop(8), iostat(1)</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>

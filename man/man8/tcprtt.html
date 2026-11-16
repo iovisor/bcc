@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>tcprtt(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">tcprtt(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">tcprtt(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">tcprtt - Trace TCP RTT of established connections. Uses Linux
+    eBPF/bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>tcprtt [-h] [-T] [-D] [-m] [-p LPORT] [-P RPORT] [-a LADDR] [-A
+    RADDR] [-i INTERVAL] [-d DURATION] [-b] [-B] [-e] [-4 | -6]</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">This tool traces established connections RTT(round-trip time) to
+    analyze the quality of network. This can be useful for general
+    troubleshooting to distinguish the network latency is from user process or
+    physical network.</p>
+<p class="Pp">Since this uses BPF, only the root user can use this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REQUIREMENTS"><a class="permalink" href="#REQUIREMENTS">REQUIREMENTS</a></h1>
+<p class="Pp">CONFIG_BPF and bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+<dl class="Bl-tag">
+  <dt id="h"><a class="permalink" href="#h">-h</a></dt>
+  <dd>Print usage message.</dd>
+  <dt id="T"><a class="permalink" href="#T">-T</a></dt>
+  <dd>Include a time column on output (HH:MM:SS).</dd>
+  <dt id="D"><a class="permalink" href="#D">-D</a></dt>
+  <dd>Show debug infomation of bpf text.</dd>
+  <dt id="m"><a class="permalink" href="#m">-m</a></dt>
+  <dd>Output histogram in milliseconds.</dd>
+  <dt id="i"><a class="permalink" href="#i">-i INTERVAL</a></dt>
+  <dd>Print output every interval seconds.</dd>
+  <dt id="d"><a class="permalink" href="#d">-d DURATION</a></dt>
+  <dd>Total duration of trace in seconds.</dd>
+  <dt id="p"><a class="permalink" href="#p">-p LPORT</a></dt>
+  <dd>Filter for local port.</dd>
+  <dt id="P"><a class="permalink" href="#P">-P RPORT</a></dt>
+  <dd>Filter for remote port.</dd>
+  <dt id="a"><a class="permalink" href="#a">-a LADDR</a></dt>
+  <dd>Filter for local address.</dd>
+  <dt id="A"><a class="permalink" href="#A">-A RADDR</a></dt>
+  <dd>Filter for remote address.</dd>
+  <dt id="b"><a class="permalink" href="#b">-b</a></dt>
+  <dd>Show sockets histogram by local address.</dd>
+  <dt id="B"><a class="permalink" href="#B">-B</a></dt>
+  <dd>Show sockets histogram by remote address.</dd>
+  <dt id="e"><a class="permalink" href="#e">-e</a></dt>
+  <dd>Show extension summary(average).</dd>
+  <dt>-4</dt>
+  <dd>Trace IPv4 family only.</dd>
+  <dt>-6</dt>
+  <dd>Trace IPv6 family only.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Trace"><a class="permalink" href="#Trace">Trace TCP RTT and print 1
+    second summaries, 10 times:</a></dt>
+  <dd># <b>tcprtt -i 1 -d 10</b></dd>
+  <dt id="Summarize"><a class="permalink" href="#Summarize">Summarize in
+    millisecond, and timestamps:</a></dt>
+  <dd># <b>tcprtt -m -T</b></dd>
+  <dt id="Only"><a class="permalink" href="#Only">Only trace TCP RTT for remote
+    address 192.168.1.100 and remote port 80:</a></dt>
+  <dd># <b>tcprtt -i 1 -d 10 -A 192.168.1.100 -P 80</b></dd>
+  <dt id="Trace~2"><a class="permalink" href="#Trace~2">Trace local port and
+    show a breakdown of remote hosts RTT:</a></dt>
+  <dd># <b>tcprtt -i 3 --lport 80 --byraddr</b></dd>
+  <dt id="Trace~3"><a class="permalink" href="#Trace~3">Trace IPv4 family
+    only:</a></dt>
+  <dd># <b>tcprtt -4</b></dd>
+  <dt id="Trace~4"><a class="permalink" href="#Trace~4">Trace IPv6 family
+    only:</a></dt>
+  <dd># <b>tcprtt -6</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OVERHEAD"><a class="permalink" href="#OVERHEAD">OVERHEAD</a></h1>
+<p class="Pp">This traces the kernel tcp_rcv_established function and collects
+    TCP RTT. The rate of this depends on your server application. If it is a web
+    or proxy server accepting many tens of thousands of connections per
+  second.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _examples.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">zhenwei pi</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h1>
+<p class="Pp">tcptracer(8), tcpconnect(8), funccount(8), tcpdump(8)</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>numasched(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">numasched(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">numasched(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">numasched - Tracing task switch NUMA. Uses bcc/eBPF.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>numasched</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">numasched tracked task switch of NUMA.</p>
+<p class="Pp">This program is also a basic example of bcc and tracepoint.</p>
+<p class="Pp">Since this uses BPF, only the root user can use this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REQUIREMENTS"><a class="permalink" href="#REQUIREMENTS">REQUIREMENTS</a></h1>
+<p class="Pp">CONFIG_BPF and bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+<dl class="Bl-tag">
+  <dt id="p,"><a class="permalink" href="#p,">-p, --pid PID</a></dt>
+  <dd>Trace this PID only.</dd>
+  <dt id="t,"><a class="permalink" href="#t,">-t, --tid TID</a></dt>
+  <dd>Trace this TID only.</dd>
+  <dt id="c,"><a class="permalink" href="#c,">-c, --comm COMM</a></dt>
+  <dd>Trace this COMM only.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Tracing"><a class="permalink" href="#Tracing">Tracing task switch
+    NUMA:</a></dt>
+  <dd># <b>numasched</b></dd>
+  <dt id="Trace"><a class="permalink" href="#Trace">Trace PID 181 only:</a></dt>
+  <dd># <b>numasched -p 181</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="FIELDS"><a class="permalink" href="#FIELDS">FIELDS</a></h1>
+<dl class="Bl-tag">
+  <dt id="TIME"><a class="permalink" href="#TIME">TIME</a></dt>
+  <dd>A timestamp on the output, in &quot;HH:MM:SS&quot; format.</dd>
+  <dt id="PID"><a class="permalink" href="#PID">PID</a></dt>
+  <dd>The process ID.</dd>
+  <dt id="TID"><a class="permalink" href="#TID">TID</a></dt>
+  <dd>The thread ID.</dd>
+  <dt id="SRC_NID"><a class="permalink" href="#SRC_NID">SRC_NID</a></dt>
+  <dd>Source NUMA ID.</dd>
+  <dt id="DST_NID"><a class="permalink" href="#DST_NID">DST_NID</a></dt>
+  <dd>Target NUMA ID.</dd>
+  <dt id="COMM"><a class="permalink" href="#COMM">COMM</a></dt>
+  <dd>The process COMM.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _examples.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Rong Tao &lt;rongtao@cestc.cn&gt;</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h1>
+<p class="Pp">opensnoop(8)</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>

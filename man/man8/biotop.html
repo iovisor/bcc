@@ -1,164 +1,158 @@
-Content-type: text/html; charset=UTF-8
-
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<HTML><HEAD><TITLE>Man page of biotop</TITLE>
-</HEAD><BODY>
-<H1>biotop</H1>
-Section: Maintenance Commands (8)<BR>Updated: 2016-02-06<BR><A HREF="#index">Index</A>
-<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
-
-<A NAME="lbAB">&nbsp;</A>
-<H2>NAME</H2>
-
-biotop - Block device (disk) I/O by process top.
-<A NAME="lbAC">&nbsp;</A>
-<H2>SYNOPSIS</H2>
-
-<B>biotop [-h] [-C] [-r MAXROWS] [interval] [count]</B>
-
-<A NAME="lbAD">&nbsp;</A>
-<H2>DESCRIPTION</H2>
-
-This is top for disks. 
-<P>
-This traces block device I/O (disk I/O), and prints a per-process summary every
-interval (by default, 1 second). The summary is sorted on the top disk
-consumers by throughput (Kbytes). The PID and process name shown are measured
-from when the I/O was first created, which usually identifies the responsible
-process.
-<P>
-For efficiency, this uses in-kernel eBPF maps to cache process details (PID and
-comm) by I/O request, as well as a starting timestamp for calculating I/O
-latency, and the final summary.
-<P>
-This works by tracing various kernel blk_*() functions using dynamic tracing,
-and will need updating to match any changes to these functions.
-<P>
-Since this uses BPF, only the root user can use this tool.
-<A NAME="lbAE">&nbsp;</A>
-<H2>REQUIREMENTS</H2>
-
-CONFIG_BPF and bcc.
-<A NAME="lbAF">&nbsp;</A>
-<H2>OPTIONS</H2>
-
-<DL COMPACT>
-<DT>-C<DD>
-Don't clear the screen.
-<DT>-r MAXROWS<DD>
-Maximum number of rows to print. Default is 20.
-<DT>interval<DD>
-Interval between updates, seconds.
-<DT>count<DD>
-Number of interval summaries.
-</DL>
-<A NAME="lbAG">&nbsp;</A>
-<H2>EXAMPLES</H2>
-
-<DL COMPACT>
-<DT>Summarize block device I/O by process, 1 second screen refresh:<DD>
-#
-<B>biotop</B>
-
-<DT>Don't clear the screen:<DD>
-#
-<B>biotop -C</B>
-
-<DT>5 second summaries, 10 times only:<DD>
-#
-<B>biotop 5 10</B>
-
-</DL>
-<A NAME="lbAH">&nbsp;</A>
-<H2>FIELDS</H2>
-
-<DL COMPACT>
-<DT>loadavg:<DD>
-The contents of /proc/loadavg
-<DT>PID<DD>
-Cached process ID, if present. This usually (but isn't guaranteed) to identify
-the responsible process for the I/O.
-<DT>COMM<DD>
-Cached process name, if present. This usually (but isn't guaranteed) to identify
-the responsible process for the I/O.
-<DT>D<DD>
-Direction: R == read, W == write. This is a simplification.
-<DT>MAJ<DD>
-Major device number.
-<DT>MIN<DD>
-Minor device number.
-<DT>DISK<DD>
-Disk device name.
-<DT>I/O<DD>
-Number of I/O during the interval.
-<DT>Kbytes<DD>
-Total Kbytes for these I/O, during the interval.
-<DT>AVGms<DD>
-Average time for the I/O (latency) from the issue to the device, to its
-completion, in milliseconds.
-</DL>
-<A NAME="lbAI">&nbsp;</A>
-<H2>OVERHEAD</H2>
-
-Since block device I/O usually has a relatively low frequency (&lt; 10,000/s),
-the overhead for this tool is expected to be low or negligible. For high IOPS
-storage systems, test and quantify before use.
-<A NAME="lbAJ">&nbsp;</A>
-<H2>SOURCE</H2>
-
-This is from bcc.
-<DL COMPACT>
-<DT><DD>
-<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
-</DL>
-<P>
-
-Also look in the bcc distribution for a companion _examples.txt file containing
-example usage, output, and commentary for this tool.
-<A NAME="lbAK">&nbsp;</A>
-<H2>OS</H2>
-
-Linux
-<A NAME="lbAL">&nbsp;</A>
-<H2>STABILITY</H2>
-
-Unstable - in development.
-<A NAME="lbAM">&nbsp;</A>
-<H2>AUTHOR</H2>
-
-Brendan Gregg
-<A NAME="lbAN">&nbsp;</A>
-<H2>INSPIRATION</H2>
-
-<A HREF="https://iovisor.github.io/bcc?1+top">top</A>(1) by William LeFebvre
-<A NAME="lbAO">&nbsp;</A>
-<H2>SEE ALSO</H2>
-
-<A HREF="https://iovisor.github.io/bcc?8+biosnoop">biosnoop</A>(8), <A HREF="https://iovisor.github.io/bcc?8+biolatency">biolatency</A>(8), <A HREF="https://iovisor.github.io/bcc?1+iostat">iostat</A>(1)
-<P>
-
-<HR>
-<A NAME="index">&nbsp;</A><H2>Index</H2>
-<DL>
-<DT><A HREF="#lbAB">NAME</A><DD>
-<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
-<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
-<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
-<DT><A HREF="#lbAF">OPTIONS</A><DD>
-<DT><A HREF="#lbAG">EXAMPLES</A><DD>
-<DT><A HREF="#lbAH">FIELDS</A><DD>
-<DT><A HREF="#lbAI">OVERHEAD</A><DD>
-<DT><A HREF="#lbAJ">SOURCE</A><DD>
-<DT><A HREF="#lbAK">OS</A><DD>
-<DT><A HREF="#lbAL">STABILITY</A><DD>
-<DT><A HREF="#lbAM">AUTHOR</A><DD>
-<DT><A HREF="#lbAN">INSPIRATION</A><DD>
-<DT><A HREF="#lbAO">SEE ALSO</A><DD>
-</DL>
-<HR>
-This document was created by
-<A HREF="https://iovisor.github.io/bcc">man2html</A>,
-using the manual pages.<BR>
-Time: 17:11:49 GMT, February 25, 2020
-</BODY>
-</HTML>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>biotop(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">biotop(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">biotop(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">biotop - Block device (disk) I/O by process top.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>biotop [-h] [-C] [-r MAXROWS] [-p PID] [interval]
+  [count]</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">This is top for disks.</p>
+<p class="Pp">This traces block device I/O (disk I/O), and prints a per-process
+    summary every interval (by default, 1 second). The summary is sorted on the
+    top disk consumers by throughput (Kbytes). The PID and process name shown
+    are measured from when the I/O was first created, which usually identifies
+    the responsible process.</p>
+<p class="Pp">For efficiency, this uses in-kernel eBPF maps to cache process
+    details (PID and comm) by I/O request, as well as a starting timestamp for
+    calculating I/O latency, and the final summary.</p>
+<p class="Pp">This works by tracing various kernel blk_*() functions using
+    dynamic tracing, and will need updating to match any changes to these
+    functions.</p>
+<p class="Pp">Since this uses BPF, only the root user can use this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REQUIREMENTS"><a class="permalink" href="#REQUIREMENTS">REQUIREMENTS</a></h1>
+<p class="Pp">CONFIG_BPF and bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+<dl class="Bl-tag">
+  <dt id="C"><a class="permalink" href="#C">-C</a></dt>
+  <dd>Don't clear the screen.</dd>
+  <dt id="r"><a class="permalink" href="#r">-r MAXROWS</a></dt>
+  <dd>Maximum number of rows to print. Default is 20.</dd>
+  <dt id="p"><a class="permalink" href="#p">-p PID</a></dt>
+  <dd>Trace this PID only.</dd>
+  <dt id="interval"><a class="permalink" href="#interval">interval</a></dt>
+  <dd>Interval between updates, seconds.</dd>
+  <dt id="count"><a class="permalink" href="#count">count</a></dt>
+  <dd>Number of interval summaries.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Summarize"><a class="permalink" href="#Summarize">Summarize block
+    device I/O by process, 1 second screen refresh:</a></dt>
+  <dd># <b>biotop</b></dd>
+  <dt id="Don't"><a class="permalink" href="#Don't">Don't clear the
+    screen:</a></dt>
+  <dd># <b>biotop -C</b></dd>
+  <dt>5 second summaries, 10 times only:</dt>
+  <dd># <b>biotop 5 10</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="FIELDS"><a class="permalink" href="#FIELDS">FIELDS</a></h1>
+<dl class="Bl-tag">
+  <dt id="loadavg:"><a class="permalink" href="#loadavg:">loadavg:</a></dt>
+  <dd>The contents of /proc/loadavg</dd>
+  <dt id="PID"><a class="permalink" href="#PID">PID</a></dt>
+  <dd>Cached process ID, if present. This usually (but isn't guaranteed) to
+      identify the responsible process for the I/O.</dd>
+  <dt id="COMM"><a class="permalink" href="#COMM">COMM</a></dt>
+  <dd>Cached process name, if present. This usually (but isn't guaranteed) to
+      identify the responsible process for the I/O.</dd>
+  <dt id="D"><a class="permalink" href="#D">D</a></dt>
+  <dd>Direction: R == read, W == write. This is a simplification.</dd>
+  <dt id="MAJ"><a class="permalink" href="#MAJ">MAJ</a></dt>
+  <dd>Major device number.</dd>
+  <dt id="MIN"><a class="permalink" href="#MIN">MIN</a></dt>
+  <dd>Minor device number.</dd>
+  <dt id="DISK"><a class="permalink" href="#DISK">DISK</a></dt>
+  <dd>Disk device name.</dd>
+  <dt id="I/O"><a class="permalink" href="#I/O">I/O</a></dt>
+  <dd>Number of I/O during the interval.</dd>
+  <dt id="Kbytes"><a class="permalink" href="#Kbytes">Kbytes</a></dt>
+  <dd>Total Kbytes for these I/O, during the interval.</dd>
+  <dt id="AVGms"><a class="permalink" href="#AVGms">AVGms</a></dt>
+  <dd>Average time for the I/O (latency) from the issue to the device, to its
+      completion, in milliseconds.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OVERHEAD"><a class="permalink" href="#OVERHEAD">OVERHEAD</a></h1>
+<p class="Pp">Since block device I/O usually has a relatively low frequency
+    (&lt; 10,000/s), the overhead for this tool is expected to be low or
+    negligible. For high IOPS storage systems, test and quantify before use.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _examples.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Brendan Gregg, Rocky Xing</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="INSPIRATION"><a class="permalink" href="#INSPIRATION">INSPIRATION</a></h1>
+<p class="Pp">top(1) by William LeFebvre</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h1>
+<p class="Pp">biosnoop(8), biolatency(8), iostat(1)</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>

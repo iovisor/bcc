@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>netqtop(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">netqtop(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">netqtop(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">netqtop - Summarize PPS, BPS, average size of packets and packet
+    counts ordered by packet sizes on each queue of a network interface.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>netqtop [-n nic] [-i interval] [-t throughput]</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">netqtop accounts statistics of both transmitted and received
+    packets on each queue of a specified network interface to help developers
+    check if its traffic load is balanced. The result is displayed as a table
+    with columns of PPS, BPS, average size and packet counts in range [0,64),
+    [64, 5120), [512, 2048), [2048, 16K), [16K, 64K). This is printed every
+    given interval (default 1) in seconds.</p>
+<p class="Pp">The tool uses the net:net_dev_start_xmit and net:netif_receive_skb
+    kernel tracepoints. Since it uses tracepoint, the tool only works on Linux
+    4.7+.</p>
+<p class="Pp">netqtop introduces significant overhead while network traffic is
+    large. See OVERHEAD section below.</p>
+<p class="Pp"></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REQUIREMENTS"><a class="permalink" href="#REQUIREMENTS">REQUIREMENTS</a></h1>
+<p class="Pp">CONFIG_bpf and bcc</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+<dl class="Bl-tag">
+  <dt id="n"><a class="permalink" href="#n">-n NIC</a></dt>
+  <dd>Specify the network interface card</dd>
+  <dt id="i"><a class="permalink" href="#i">-i INTERVAL</a></dt>
+  <dd>Print results every INTERVAL seconds. The default value is 1.</dd>
+  <dt id="t"><a class="permalink" href="#t">-t THROUGHPUT</a></dt>
+  <dd>Print BPS and PPS of each queue.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Account"><a class="permalink" href="#Account">Account statistics of
+    eth0 and output every 2 seconds:</a></dt>
+  <dd># <b>netqtop -n eth0 -i 1</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OVERHEAD"><a class="permalink" href="#OVERHEAD">OVERHEAD</a></h1>
+<p class="Pp">In performance test, netqtop introduces a overhead up to 30% PPS
+    drop while printing interval is set to 1 second. So be mindful of potential
+    packet drop when using this tool.</p>
+<p class="Pp">It also increases ping-pong latency by about 1 usec.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a netqtop_example.txt file
+    containing example usage, output and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Yolandajn</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>

@@ -1,110 +1,112 @@
-Content-type: text/html; charset=UTF-8
-
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<HTML><HEAD><TITLE>Man page of SOFDSNOOP</TITLE>
-</HEAD><BODY>
-<H1>SOFDSNOOP</H1>
-Section: Maintenance Commands (8)<BR>Updated: 2019-07-29<BR><A HREF="#index">Index</A>
-<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
-
-<A NAME="lbAB">&nbsp;</A>
-<H2>NAME</H2>
-
-sofdsnoop - traces FDs passed by sockets
-<A NAME="lbAC">&nbsp;</A>
-<H2>SYNOPSIS</H2>
-
-usage: sofdsnoop [-h] [-T] [-p PID] [-t TID] [-n NAME] [-d DURATION]
-<A NAME="lbAD">&nbsp;</A>
-<H2>DESCRIPTION</H2>
-
-Trace file descriptors passed via socket
-<A NAME="lbAE">&nbsp;</A>
-<H3>optional arguments:</H3>
-
-<DL COMPACT>
-<DT><B>-h</B>, <B>--help</B><DD>
-show this help message and exit
-<DT><B>-T</B>, <B>--timestamp</B><DD>
-include timestamp on output
-<DT><B>-p</B> PID, <B>--pid</B> PID<DD>
-trace this PID only
-<DT><B>-t</B> TID, <B>--tid</B> TID<DD>
-trace this TID only
-<DT><B>-n</B> NAME, <B>--name</B> NAME<DD>
-only print process names containing this name
-<DT><B>-d</B> DURATION, <B>--duration</B> DURATION<DD>
-total duration of trace in seconds
-</DL>
-<A NAME="lbAF">&nbsp;</A>
-<H2>EXAMPLES</H2>
-
-<DL COMPACT>
-<DT>Trace passed file descriptors<DD>
-#
-<B>sofdsnoop</B>
-
-<DT>Include timestamps<DD>
-#
-<B>sofdsnoop -T</B>
-
-<DT>Only trace PID 181<DD>
-#
-<B>sofdsnoop -p</B> 181
-
-<DT>Only trace TID 123<DD>
-#
-<B>sofdsnoop -t</B> 123
-
-<DT>Trace for 10 seconds only<DD>
-#
-<B>sofdsnoop -d</B> 10
-
-<DT>Only print process names containing &quot;main&quot;<DD>
-#
-<B>sofdsnoop -n</B> main
-
-</DL>
-<A NAME="lbAG">&nbsp;</A>
-<H2>SOURCE</H2>
-
-This is from bcc.
-<DL COMPACT>
-<DT><DD>
-<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
-</DL>
-<P>
-
-Also look in the bcc distribution for a companion _examples.txt file containing
-example usage, output, and commentary for this tool.
-<A NAME="lbAH">&nbsp;</A>
-<H2>OS</H2>
-
-Linux
-<A NAME="lbAI">&nbsp;</A>
-<H2>STABILITY</H2>
-
-Unstable - in development.
-<P>
-
-<HR>
-<A NAME="index">&nbsp;</A><H2>Index</H2>
-<DL>
-<DT><A HREF="#lbAB">NAME</A><DD>
-<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
-<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
-<DL>
-<DT><A HREF="#lbAE">optional arguments:</A><DD>
-</DL>
-<DT><A HREF="#lbAF">EXAMPLES</A><DD>
-<DT><A HREF="#lbAG">SOURCE</A><DD>
-<DT><A HREF="#lbAH">OS</A><DD>
-<DT><A HREF="#lbAI">STABILITY</A><DD>
-</DL>
-<HR>
-This document was created by
-<A HREF="https://iovisor.github.io/bcc">man2html</A>,
-using the manual pages.<BR>
-Time: 17:11:49 GMT, February 25, 2020
-</BODY>
-</HTML>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>SOFDSNOOP(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">SOFDSNOOP(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">SOFDSNOOP(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">sofdsnoop - traces FDs passed by sockets</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp">usage: sofdsnoop [-h] [-T] [-p PID] [-t TID] [-n NAME] [-d
+    DURATION]</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">Trace file descriptors passed via socket</p>
+<section class="Ss">
+<h2 class="Ss" id="optional_arguments:"><a class="permalink" href="#optional_arguments:">optional
+  arguments:</a></h2>
+<dl class="Bl-tag">
+  <dt id="h"><a class="permalink" href="#h"><b>-h</b>, <b>--help</b></a></dt>
+  <dd>show this help message and exit</dd>
+  <dt id="T"><a class="permalink" href="#T"><b>-T</b>,
+    <b>--timestamp</b></a></dt>
+  <dd>include timestamp on output</dd>
+  <dt id="p"><a class="permalink" href="#p"><b>-p</b> PID, <b>--pid</b>
+    PID</a></dt>
+  <dd>trace this PID only</dd>
+  <dt id="t"><a class="permalink" href="#t"><b>-t</b> TID, <b>--tid</b>
+    TID</a></dt>
+  <dd>trace this TID only</dd>
+  <dt id="n"><a class="permalink" href="#n"><b>-n</b> NAME, <b>--name</b>
+    NAME</a></dt>
+  <dd>only print process names containing this name</dd>
+  <dt id="d"><a class="permalink" href="#d"><b>-d</b> DURATION,
+    <b>--duration</b> DURATION</a></dt>
+  <dd>total duration of trace in seconds</dd>
+</dl>
+</section>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Trace"><a class="permalink" href="#Trace">Trace passed file
+    descriptors</a></dt>
+  <dd># <b>sofdsnoop</b></dd>
+  <dt id="Include"><a class="permalink" href="#Include">Include
+    timestamps</a></dt>
+  <dd># <b>sofdsnoop <b>-T</b></b></dd>
+  <dt id="Only"><a class="permalink" href="#Only">Only trace PID 181</a></dt>
+  <dd># <b>sofdsnoop <b>-p</b> 181</b></dd>
+  <dt id="Only~2"><a class="permalink" href="#Only~2">Only trace TID
+    123</a></dt>
+  <dd># <b>sofdsnoop <b>-t</b> 123</b></dd>
+  <dt id="Trace~2"><a class="permalink" href="#Trace~2">Trace for 10 seconds
+    only</a></dt>
+  <dd># <b>sofdsnoop <b>-d</b> 10</b></dd>
+  <dt id="Only~3"><a class="permalink" href="#Only~3">Only print process names
+    containing &quot;main&quot;</a></dt>
+  <dd># <b>sofdsnoop <b>-n</b> main</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _examples.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>

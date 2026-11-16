@@ -1,166 +1,130 @@
-Content-type: text/html; charset=UTF-8
-
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<HTML><HEAD><TITLE>Man page of bps</TITLE>
-</HEAD><BODY>
-<H1>bps</H1>
-Section: Maintenance Commands (8)<BR>Updated: 2017-10-19<BR><A HREF="#index">Index</A>
-<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
-
-<A NAME="lbAB">&nbsp;</A>
-<H2>NAME</H2>
-
-bps - List all BPF programs. 'ps' for BPF programs.
-<A NAME="lbAC">&nbsp;</A>
-<H2>SYNOPSIS</H2>
-
-<B>bps [bpf-prog-id]</B>
-
-<A NAME="lbAD">&nbsp;</A>
-<H2>DESCRIPTION</H2>
-
-<B>bps</B>
-
-lists all BPF programs loaded into the kernel.  It is similar
-to the ps command but for the BPF programs.
-<P>
-Each loaded bpf program is identified by an unique integer (i.e.
-<B>bpf-prog-id</B>
-
-or simply BID).  If
-a
-<B>bpf-prog-id</B>
-
-is specified, the maps used by
-<B>bpf-prog-id</B>
-
-will also be listed.
-<P>
-<A NAME="lbAE">&nbsp;</A>
-<H2>EXAMPLES</H2>
-
-<DL COMPACT>
-<DT>List all BPF programs loaded into the kernel:<DD>
-<B>bps</B>
-
-<DT>Show the details and maps of BID 6:<DD>
-<B>bps 6</B>
-
-</DL>
-<A NAME="lbAF">&nbsp;</A>
-<H2>BPF PROGRAM FIELDS</H2>
-
-<DL COMPACT>
-<DT><B>BID</B>
-
-<DD>
-BPF program ID.  It ends with '-' if it is not jitted.
-<DT><B>TYPE</B>
-
-<DD>
-The type of a BPF program. e.g. kprobe, tracepoint, xdp...etc.
-<DT><B>UID</B>
-
-<DD>
-The user ID that loaded the BPF program.
-<DT><B>#MAPS</B>
-
-<DD>
-Total number of maps used by a BPF program.
-<DT><B>LoadTime</B>
-
-<DD>
-When was the BPF program loaded?
-<DT><B>NAME</B>
-
-<DD>
-The name of a BPF program.  The user space library (like
-<B>bcc</B>
-
-) usually
-uses the C function name of the original BPF's source code as
-the program name.  It could be empty if the user space did not
-provide a name.
-<P>
-</DL>
-<A NAME="lbAG">&nbsp;</A>
-<H2>BPF MAP FIELDS</H2>
-
-<DL COMPACT>
-<DT><B>MID</B>
-
-<DD>
-BPF map ID.
-<DT><B>TYPE</B>
-
-<DD>
-The type of a BPF map. e.g. hash, array, stack trace...etc.
-<DT><B>FLAGS</B>
-
-<DD>
-The flags used to create the BP map.
-<DT><B>KeySz</B>
-
-<DD>
-The key size of a BPF map.
-<DT><B>ValueSz</B>
-
-<DD>
-The value size of a BPF map.
-<DT><B>MaxEnts</B>
-
-<DD>
-The maximum number of entries of a map.
-<DT><B>NAME</B>
-
-<DD>
-The name of a BPF map.  The user space library (like
-<B>bcc</B>
-
-) usually uses the C variable name of the BPF map as its name.
-It could be empty if the user space did not provide a name.
-<P>
-</DL>
-<A NAME="lbAH">&nbsp;</A>
-<H2>SOURCE</H2>
-
-This is from bcc.
-<DL COMPACT>
-<DT><DD>
-<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
-</DL>
-<A NAME="lbAI">&nbsp;</A>
-<H2>OS</H2>
-
-Linux
-<A NAME="lbAJ">&nbsp;</A>
-<H2>STABILITY</H2>
-
-Unstable - in development.
-<A NAME="lbAK">&nbsp;</A>
-<H2>AUTHOR</H2>
-
-Martin Lau
-<P>
-
-<HR>
-<A NAME="index">&nbsp;</A><H2>Index</H2>
-<DL>
-<DT><A HREF="#lbAB">NAME</A><DD>
-<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
-<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
-<DT><A HREF="#lbAE">EXAMPLES</A><DD>
-<DT><A HREF="#lbAF">BPF PROGRAM FIELDS</A><DD>
-<DT><A HREF="#lbAG">BPF MAP FIELDS</A><DD>
-<DT><A HREF="#lbAH">SOURCE</A><DD>
-<DT><A HREF="#lbAI">OS</A><DD>
-<DT><A HREF="#lbAJ">STABILITY</A><DD>
-<DT><A HREF="#lbAK">AUTHOR</A><DD>
-</DL>
-<HR>
-This document was created by
-<A HREF="https://iovisor.github.io/bcc">man2html</A>,
-using the manual pages.<BR>
-Time: 17:11:49 GMT, February 25, 2020
-</BODY>
-</HTML>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>bps(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">bps(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">bps(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">bps - List all BPF programs. 'ps' for BPF programs.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>bps [bpf-prog-id]</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp"><b>bps</b> lists all BPF programs loaded into the kernel. It is
+    similar to the ps command but for the BPF programs.</p>
+<p class="Pp">Each loaded bpf program is identified by an unique integer (i.e.
+    <b>bpf-prog-id</b> or simply BID). If a <b>bpf-prog-id</b> is specified, the
+    maps used by <b>bpf-prog-id</b> will also be listed.</p>
+<p class="Pp"></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="List"><a class="permalink" href="#List">List all BPF programs loaded
+    into the kernel:</a></dt>
+  <dd><b>bps</b></dd>
+  <dt id="Show"><a class="permalink" href="#Show">Show the details and maps of
+    BID 6:</a></dt>
+  <dd><b>bps 6</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="BPF_PROGRAM_FIELDS"><a class="permalink" href="#BPF_PROGRAM_FIELDS">BPF
+  PROGRAM FIELDS</a></h1>
+<dl class="Bl-tag">
+  <dt id="BID"><a class="permalink" href="#BID"><b>BID</b></a></dt>
+  <dd>BPF program ID. It ends with '-' if it is not jitted.</dd>
+  <dt id="TYPE"><a class="permalink" href="#TYPE"><b>TYPE</b></a></dt>
+  <dd>The type of a BPF program. e.g. kprobe, tracepoint, xdp...etc.</dd>
+  <dt id="UID"><a class="permalink" href="#UID"><b>UID</b></a></dt>
+  <dd>The user ID that loaded the BPF program.</dd>
+  <dt><b>#MAPS</b></dt>
+  <dd>Total number of maps used by a BPF program.</dd>
+  <dt id="LoadTime"><a class="permalink" href="#LoadTime"><b>LoadTime</b></a></dt>
+  <dd>When was the BPF program loaded?</dd>
+  <dt id="NAME~2"><a class="permalink" href="#NAME~2"><b>NAME</b></a></dt>
+  <dd>The name of a BPF program. The user space library (like <b>bcc</b> )
+      usually uses the C function name of the original BPF's source code as the
+      program name. It could be empty if the user space did not provide a name.
+    <p class="Pp"></p>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="BPF_MAP_FIELDS"><a class="permalink" href="#BPF_MAP_FIELDS">BPF
+  MAP FIELDS</a></h1>
+<dl class="Bl-tag">
+  <dt id="MID"><a class="permalink" href="#MID"><b>MID</b></a></dt>
+  <dd>BPF map ID.</dd>
+  <dt id="TYPE~2"><a class="permalink" href="#TYPE~2"><b>TYPE</b></a></dt>
+  <dd>The type of a BPF map. e.g. hash, array, stack trace...etc.</dd>
+  <dt id="FLAGS"><a class="permalink" href="#FLAGS"><b>FLAGS</b></a></dt>
+  <dd>The flags used to create the BP map.</dd>
+  <dt id="KeySz"><a class="permalink" href="#KeySz"><b>KeySz</b></a></dt>
+  <dd>The key size of a BPF map.</dd>
+  <dt id="ValueSz"><a class="permalink" href="#ValueSz"><b>ValueSz</b></a></dt>
+  <dd>The value size of a BPF map.</dd>
+  <dt id="MaxEnts"><a class="permalink" href="#MaxEnts"><b>MaxEnts</b></a></dt>
+  <dd>The maximum number of entries of a map.</dd>
+  <dt id="NAME~3"><a class="permalink" href="#NAME~3"><b>NAME</b></a></dt>
+  <dd>The name of a BPF map. The user space library (like <b>bcc</b> ) usually
+      uses the C variable name of the BPF map as its name. It could be empty if
+      the user space did not provide a name.
+    <p class="Pp"></p>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Martin Lau</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>

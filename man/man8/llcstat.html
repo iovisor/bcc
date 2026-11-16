@@ -1,134 +1,135 @@
-Content-type: text/html; charset=UTF-8
-
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<HTML><HEAD><TITLE>Man page of llcstat</TITLE>
-</HEAD><BODY>
-<H1>llcstat</H1>
-Section: Maintenance Commands (8)<BR>Updated: 2015-08-18<BR><A HREF="#index">Index</A>
-<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
-
-<A NAME="lbAB">&nbsp;</A>
-<H2>NAME</H2>
-
-llcstat - Summarize CPU cache references and misses by process. Uses Linux eBPF/bcc.
-<A NAME="lbAC">&nbsp;</A>
-<H2>SYNOPSIS</H2>
-
-<B>llcstat [-h] [-c SAMPLE_PERIOD] [duration]</B>
-
-<A NAME="lbAD">&nbsp;</A>
-<H2>DESCRIPTION</H2>
-
-llcstat instruments CPU cache references and cache misses system-side, and
-summarizes them by PID and CPU. These events have different meanings on
-different architecture. For x86-64, they mean misses and references to LLC.
-This can be useful to locate and debug performance issues
-caused by cache hit rate.
-<P>
-This works by sampling corresponding events defined in uapi/linux/perf_event.h,
-namely PERF_COUNT_HW_CACHE_REFERENCES and PERF_COUNT_HW_CACHE_MISSES, using
-BPF perf event tracing. Upon each sampled event, the attached BPF program
-records the PID and CPU ID on which the event happened, and stores it in table.
-<P>
-This makes use of a Linux 4.9 feature (BPF_PROG_TYPE_PERF_EVENT).
-<P>
-Since this uses BPF, only the root user can use this tool.
-<A NAME="lbAE">&nbsp;</A>
-<H2>REQUIREMENTS</H2>
-
-CONFIG_BPF and bcc.
-<A NAME="lbAF">&nbsp;</A>
-<H2>OPTIONS</H2>
-
-<DL COMPACT>
-<DT>-h<DD>
-Print usage message.
-<DT>-c SAMPLE_PERIOD<DD>
-Sample one in this many cache reference and cache miss events.
-<DT>duration<DD>
-Duration to trace, in seconds.
-</DL>
-<A NAME="lbAG">&nbsp;</A>
-<H2>EXAMPLES</H2>
-
-<DL COMPACT>
-<DT>Sample one in 100 events, trace for 20 seconds:<DD>
-#
-<B>llcstat -c 100 20</B>
-
-</DL>
-<A NAME="lbAH">&nbsp;</A>
-<H2>FIELDS</H2>
-
-<DL COMPACT>
-<DT>PID<DD>
-Process ID
-<DT>NAME<DD>
-Process name
-<DT>CPU<DD>
-CPU ID
-<DT>REFERENCE<DD>
-Number of cache reference events
-<DT>MISS<DD>
-Number of cache miss events
-<DT>HIT%<DD>
-Cache hit ratio
-</DL>
-<A NAME="lbAI">&nbsp;</A>
-<H2>SOURCE</H2>
-
-This is from bcc.
-<DL COMPACT>
-<DT><DD>
-<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
-</DL>
-<P>
-
-Also look in the bcc distribution for a companion _examples.txt file containing
-example usage, output, and commentary for this tool.
-<A NAME="lbAJ">&nbsp;</A>
-<H2>OS</H2>
-
-Linux
-<A NAME="lbAK">&nbsp;</A>
-<H2>STABILITY</H2>
-
-Unstable - in development.
-<A NAME="lbAL">&nbsp;</A>
-<H2>AUTHOR</H2>
-
-Teng Qin
-<A NAME="lbAM">&nbsp;</A>
-<H2>SEE ALSO</H2>
-
-<DL COMPACT>
-<DT>Perf can be used as a generic event counter tool. An example for LLC:<DD>
-#
-<B>perf top -e cache-misses -e cache-references -a -ns pid,cpu,comm</B>
-
-<P>
-</DL>
-
-<HR>
-<A NAME="index">&nbsp;</A><H2>Index</H2>
-<DL>
-<DT><A HREF="#lbAB">NAME</A><DD>
-<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
-<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
-<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
-<DT><A HREF="#lbAF">OPTIONS</A><DD>
-<DT><A HREF="#lbAG">EXAMPLES</A><DD>
-<DT><A HREF="#lbAH">FIELDS</A><DD>
-<DT><A HREF="#lbAI">SOURCE</A><DD>
-<DT><A HREF="#lbAJ">OS</A><DD>
-<DT><A HREF="#lbAK">STABILITY</A><DD>
-<DT><A HREF="#lbAL">AUTHOR</A><DD>
-<DT><A HREF="#lbAM">SEE ALSO</A><DD>
-</DL>
-<HR>
-This document was created by
-<A HREF="https://iovisor.github.io/bcc">man2html</A>,
-using the manual pages.<BR>
-Time: 17:11:49 GMT, February 25, 2020
-</BODY>
-</HTML>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>llcstat(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">llcstat(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">llcstat(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">llcstat - Summarize CPU cache references and misses by process.
+    Uses Linux eBPF/bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>llcstat [-h] [-c SAMPLE_PERIOD] [duration]</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">llcstat instruments CPU cache references and cache misses
+    system-side, and summarizes them by PID and CPU. These events have different
+    meanings on different architecture. For x86-64, they mean misses and
+    references to LLC. This can be useful to locate and debug performance issues
+    caused by cache hit rate.</p>
+<p class="Pp">This works by sampling corresponding events defined in
+    uapi/linux/perf_event.h, namely PERF_COUNT_HW_CACHE_REFERENCES and
+    PERF_COUNT_HW_CACHE_MISSES, using BPF perf event tracing. Upon each sampled
+    event, the attached BPF program records the PID and CPU ID on which the
+    event happened, and stores it in table.</p>
+<p class="Pp">This makes use of a Linux 4.9 feature
+  (BPF_PROG_TYPE_PERF_EVENT).</p>
+<p class="Pp">Since this uses BPF, only the root user can use this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REQUIREMENTS"><a class="permalink" href="#REQUIREMENTS">REQUIREMENTS</a></h1>
+<p class="Pp">CONFIG_BPF and bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+<dl class="Bl-tag">
+  <dt id="h"><a class="permalink" href="#h">-h</a></dt>
+  <dd>Print usage message.</dd>
+  <dt id="c"><a class="permalink" href="#c">-c SAMPLE_PERIOD</a></dt>
+  <dd>Sample one in this many cache reference and cache miss events.</dd>
+  <dt id="t"><a class="permalink" href="#t">-t</a></dt>
+  <dd>Summarize cache references and misses by PID/TID</dd>
+  <dt id="duration"><a class="permalink" href="#duration">duration</a></dt>
+  <dd>Duration to trace, in seconds.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Sample"><a class="permalink" href="#Sample">Sample one in 100 events,
+    trace for 20 seconds:</a></dt>
+  <dd># <b>llcstat -c 100 20</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="FIELDS"><a class="permalink" href="#FIELDS">FIELDS</a></h1>
+<dl class="Bl-tag">
+  <dt id="PID"><a class="permalink" href="#PID">PID</a></dt>
+  <dd>Process ID</dd>
+  <dt id="NAME~2"><a class="permalink" href="#NAME~2">NAME</a></dt>
+  <dd>Process name</dd>
+  <dt id="CPU"><a class="permalink" href="#CPU">CPU</a></dt>
+  <dd>CPU ID</dd>
+  <dt id="REFERENCE"><a class="permalink" href="#REFERENCE">REFERENCE</a></dt>
+  <dd>Number of cache reference events</dd>
+  <dt id="MISS"><a class="permalink" href="#MISS">MISS</a></dt>
+  <dd>Number of cache miss events</dd>
+  <dt id="HIT_"><a class="permalink" href="#HIT_">HIT%</a></dt>
+  <dd>Cache hit ratio</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _examples.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Teng Qin</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h1>
+<dl class="Bl-tag">
+  <dt id="Perf"><a class="permalink" href="#Perf">Perf can be used as a generic
+    event counter tool. An example for LLC:</a></dt>
+  <dd># <b>perf top -e cache-misses -e cache-references -a -ns
+    pid,cpu,comm</b></dd>
+</dl>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>

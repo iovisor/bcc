@@ -1,178 +1,167 @@
-Content-type: text/html; charset=UTF-8
-
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<HTML><HEAD><TITLE>Man page of fileslower</TITLE>
-</HEAD><BODY>
-<H1>fileslower</H1>
-Section: Maintenance Commands (8)<BR>Updated: 2016-02-07<BR><A HREF="#index">Index</A>
-<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
-
-<A NAME="lbAB">&nbsp;</A>
-<H2>NAME</H2>
-
-fileslower - Trace slow synchronous file reads and writes.
-<A NAME="lbAC">&nbsp;</A>
-<H2>SYNOPSIS</H2>
-
-<B>fileslower [-h] [-p PID] [-a] [min_ms]</B>
-
-<A NAME="lbAD">&nbsp;</A>
-<H2>DESCRIPTION</H2>
-
-This script uses kernel dynamic tracing of synchronous reads and writes
-at the VFS interface, to identify slow file reads and writes for any file
-system.
-<P>
-This version traces __vfs_read() and __vfs_write() and only showing
-synchronous I/O (the path to new_sync_read() and new_sync_write()), and
-I/O with filenames. This approach provides a view of just two file
-system request types: file reads and writes. There are typically many others:
-asynchronous I/O, directory operations, file handle operations, file open()s,
-fflush(), etc.
-<P>
-WARNING: See the OVERHEAD section.
-<P>
-By default, a minimum millisecond threshold of 10 is used.
-<P>
-Since this works by tracing various kernel __vfs_*() functions using dynamic
-tracing, it will need updating to match any changes to these functions. A
-future version should switch to using FS tracepoints instead.
-<P>
-Since this uses BPF, only the root user can use this tool.
-<A NAME="lbAE">&nbsp;</A>
-<H2>REQUIREMENTS</H2>
-
-CONFIG_BPF and bcc.
-<A NAME="lbAF">&nbsp;</A>
-<H2>OPTIONS</H2>
-
--p PID
-Trace this PID only.
-<DL COMPACT>
-<DT>-a<DD>
-Include non-regular file types in output (sockets, FIFOs, etc).
-<DT>min_ms<DD>
-Minimum I/O latency (duration) to trace, in milliseconds. Default is 10 ms.
-</DL>
-<A NAME="lbAG">&nbsp;</A>
-<H2>EXAMPLES</H2>
-
-<DL COMPACT>
-<DT>Trace synchronous file reads and writes slower than 10 ms:<DD>
-#
-<B>fileslower</B>
-
-<DT>Trace slower than 1 ms:<DD>
-#
-<B>fileslower 1</B>
-
-<DT>Trace slower than 1 ms, for PID 181 only:<DD>
-#
-<B>fileslower -p 181 1</B>
-
-</DL>
-<A NAME="lbAH">&nbsp;</A>
-<H2>FIELDS</H2>
-
-<DL COMPACT>
-<DT>TIME(s)<DD>
-Time of I/O completion since the first I/O seen, in seconds.
-<DT>COMM<DD>
-Process name.
-<DT>PID<DD>
-Process ID.
-<DT>D<DD>
-Direction of I/O. R == read, W == write.
-<DT>BYTES<DD>
-Size of I/O, in bytes.
-<DT>LAT(ms)<DD>
-Latency (duration) of I/O, measured from when the application issued it to VFS
-to when it completed. This time is inclusive of block device I/O, file system
-CPU cycles, file system locks, run queue latency, etc. It's a more accurate
-measure of the latency suffered by applications performing file system I/O,
-than to measure this down at the block device interface.
-<DT>FILENAME<DD>
-A cached kernel file name (comes from dentry-&gt;d_name.name).
-</DL>
-<A NAME="lbAI">&nbsp;</A>
-<H2>OVERHEAD</H2>
-
-Depending on the frequency of application reads and writes, overhead can become
-severe, in the worst case slowing applications by 2x. In the best case, the
-overhead is negligible. Hopefully for real world workloads the overhead is
-often at the lower end of the spectrum -- test before use. The reason for
-high overhead is that this traces VFS reads and writes, which includes FS
-cache reads and writes, and can exceed one million events per second if the
-application is I/O heavy. While the instrumentation is extremely lightweight,
-and uses in-kernel eBPF maps for efficient timing and filtering, multiply that
-cost by one million events per second and that cost becomes a million times
-worse. You can get an idea of the possible cost by just counting the
-instrumented events using the bcc funccount tool, eg:
-<P>
-
-# ./funccount.py -i 1 -r '^__vfs_(read|write)$'
-<P>
-
-This also costs overhead, but is somewhat less than fileslower.
-<P>
-
-If the overhead is prohibitive for your workload, I'd recommend moving
-down-stack a little from VFS into the file system functions (ext4, xfs, etc).
-Look for updates to bcc for specific file system tools that do this. The
-advantage of a per-file system approach is that we can trace post-cache,
-greatly reducing events and overhead. The disadvantage is needing custom
-tracing approaches for each different file system (whereas VFS is generic).
-<A NAME="lbAJ">&nbsp;</A>
-<H2>SOURCE</H2>
-
-This is from bcc.
-<DL COMPACT>
-<DT><DD>
-<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
-</DL>
-<P>
-
-Also look in the bcc distribution for a companion _examples.txt file containing
-example usage, output, and commentary for this tool.
-<A NAME="lbAK">&nbsp;</A>
-<H2>OS</H2>
-
-Linux
-<A NAME="lbAL">&nbsp;</A>
-<H2>STABILITY</H2>
-
-Unstable - in development.
-<A NAME="lbAM">&nbsp;</A>
-<H2>AUTHOR</H2>
-
-Brendan Gregg
-<A NAME="lbAN">&nbsp;</A>
-<H2>SEE ALSO</H2>
-
-<A HREF="https://iovisor.github.io/bcc?8+biosnoop">biosnoop</A>(8), <A HREF="https://iovisor.github.io/bcc?8+funccount">funccount</A>(8)
-<P>
-
-<HR>
-<A NAME="index">&nbsp;</A><H2>Index</H2>
-<DL>
-<DT><A HREF="#lbAB">NAME</A><DD>
-<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
-<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
-<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
-<DT><A HREF="#lbAF">OPTIONS</A><DD>
-<DT><A HREF="#lbAG">EXAMPLES</A><DD>
-<DT><A HREF="#lbAH">FIELDS</A><DD>
-<DT><A HREF="#lbAI">OVERHEAD</A><DD>
-<DT><A HREF="#lbAJ">SOURCE</A><DD>
-<DT><A HREF="#lbAK">OS</A><DD>
-<DT><A HREF="#lbAL">STABILITY</A><DD>
-<DT><A HREF="#lbAM">AUTHOR</A><DD>
-<DT><A HREF="#lbAN">SEE ALSO</A><DD>
-</DL>
-<HR>
-This document was created by
-<A HREF="https://iovisor.github.io/bcc">man2html</A>,
-using the manual pages.<BR>
-Time: 17:11:49 GMT, February 25, 2020
-</BODY>
-</HTML>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>fileslower(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">fileslower(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">fileslower(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">fileslower - Trace slow synchronous file reads and writes.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>fileslower [-h] [-p PID] [-a] [min_ms]</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">This script uses kernel dynamic tracing of synchronous reads and
+    writes at the VFS interface, to identify slow file reads and writes for any
+    file system.</p>
+<p class="Pp">This version traces __vfs_read() and __vfs_write() and only
+    showing synchronous I/O (the path to new_sync_read() and new_sync_write()),
+    and I/O with filenames. This approach provides a view of just two file
+    system request types: file reads and writes. There are typically many
+    others: asynchronous I/O, directory operations, file handle operations, file
+    open()s, fflush(), etc.</p>
+<p class="Pp">WARNING: See the OVERHEAD section.</p>
+<p class="Pp">By default, a minimum millisecond threshold of 10 is used.</p>
+<p class="Pp">Since this works by tracing various kernel __vfs_*() functions
+    using dynamic tracing, it will need updating to match any changes to these
+    functions. A future version should switch to using FS tracepoints
+  instead.</p>
+<p class="Pp">Since this uses BPF, only the root user can use this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REQUIREMENTS"><a class="permalink" href="#REQUIREMENTS">REQUIREMENTS</a></h1>
+<p class="Pp">CONFIG_BPF and bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+<p class="Pp">-p PID Trace this PID only.</p>
+<dl class="Bl-tag">
+  <dt id="a"><a class="permalink" href="#a">-a</a></dt>
+  <dd>Include non-regular file types in output (sockets, FIFOs, etc).</dd>
+  <dt id="min_ms"><a class="permalink" href="#min_ms">min_ms</a></dt>
+  <dd>Minimum I/O latency (duration) to trace, in milliseconds. Default is 10
+      ms.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Trace"><a class="permalink" href="#Trace">Trace synchronous file reads
+    and writes slower than 10 ms:</a></dt>
+  <dd># <b>fileslower</b></dd>
+  <dt id="Trace~2"><a class="permalink" href="#Trace~2">Trace slower than 1
+    ms:</a></dt>
+  <dd># <b>fileslower 1</b></dd>
+  <dt id="Trace~3"><a class="permalink" href="#Trace~3">Trace slower than 1 ms,
+    for PID 181 only:</a></dt>
+  <dd># <b>fileslower -p 181 1</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="FIELDS"><a class="permalink" href="#FIELDS">FIELDS</a></h1>
+<dl class="Bl-tag">
+  <dt id="TIME(s)"><a class="permalink" href="#TIME(s)">TIME(s)</a></dt>
+  <dd>Time of I/O completion since the first I/O seen, in seconds.</dd>
+  <dt id="COMM"><a class="permalink" href="#COMM">COMM</a></dt>
+  <dd>Process name.</dd>
+  <dt id="PID"><a class="permalink" href="#PID">PID</a></dt>
+  <dd>Process ID.</dd>
+  <dt id="D"><a class="permalink" href="#D">D</a></dt>
+  <dd>Direction of I/O. R == read, W == write.</dd>
+  <dt id="BYTES"><a class="permalink" href="#BYTES">BYTES</a></dt>
+  <dd>Size of I/O, in bytes.</dd>
+  <dt id="LAT(ms)"><a class="permalink" href="#LAT(ms)">LAT(ms)</a></dt>
+  <dd>Latency (duration) of I/O, measured from when the application issued it to
+      VFS to when it completed. This time is inclusive of block device I/O, file
+      system CPU cycles, file system locks, run queue latency, etc. It's a more
+      accurate measure of the latency suffered by applications performing file
+      system I/O, than to measure this down at the block device interface.</dd>
+  <dt id="FILENAME"><a class="permalink" href="#FILENAME">FILENAME</a></dt>
+  <dd>A cached kernel file name (comes from dentry-&gt;d_name.name).</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OVERHEAD"><a class="permalink" href="#OVERHEAD">OVERHEAD</a></h1>
+<p class="Pp">Depending on the frequency of application reads and writes,
+    overhead can become severe, in the worst case slowing applications by 2x. In
+    the best case, the overhead is negligible. Hopefully for real world
+    workloads the overhead is often at the lower end of the spectrum -- test
+    before use. The reason for high overhead is that this traces VFS reads and
+    writes, which includes FS cache reads and writes, and can exceed one million
+    events per second if the application is I/O heavy. While the instrumentation
+    is extremely lightweight, and uses in-kernel eBPF maps for efficient timing
+    and filtering, multiply that cost by one million events per second and that
+    cost becomes a million times worse. You can get an idea of the possible cost
+    by just counting the instrumented events using the bcc funccount tool,
+  eg:</p>
+<p class="Pp"># ./funccount.py -i 1 -r '^__vfs_(read|write)$'</p>
+<p class="Pp">This also costs overhead, but is somewhat less than
+  fileslower.</p>
+<p class="Pp">If the overhead is prohibitive for your workload, I'd recommend
+    moving down-stack a little from VFS into the file system functions (ext4,
+    xfs, etc). Look for updates to bcc for specific file system tools that do
+    this. The advantage of a per-file system approach is that we can trace
+    post-cache, greatly reducing events and overhead. The disadvantage is
+    needing custom tracing approaches for each different file system (whereas
+    VFS is generic).</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _examples.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Brendan Gregg</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h1>
+<p class="Pp">biosnoop(8), funccount(8)</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>

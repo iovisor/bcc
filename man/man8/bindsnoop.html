@@ -1,189 +1,224 @@
-Content-type: text/html; charset=UTF-8
-
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<HTML><HEAD><TITLE>Man page of bindsnoop</TITLE>
-</HEAD><BODY>
-<H1>bindsnoop</H1>
-Section:  (8)<BR>Updated: 12 February 2020<BR><A HREF="#index">Index</A>
-<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
-
-<A NAME="lbAB">&nbsp;</A>
-<H2>NAME</H2>
-
-bindsnoop - Trace bind() system calls.
-<A NAME="lbAC">&nbsp;</A>
-<H2>SYNOPSIS</H2>
-
-<B>bindsnoop.py [-h</B>] [<B>-w</B>] [<B>-t</B>] [<B>-p</B> PID] [<B>-P</B> PORT] [<B>-E</B>] [<B>-U</B>] [<B>-u</B> UID] [<B>--count</B>] [<B>--cgroupmap MAP</B>]
-
-<A NAME="lbAD">&nbsp;</A>
-<H2>DESCRIPTION</H2>
-
-bindsnoop reports socket options set before the bind call that would impact this system call behavior.
-<P>
-
-<A NAME="lbAE">&nbsp;</A>
-<H2>REQUIREMENTS</H2>
-
-CONFIG_BPF and bcc.
-<A NAME="lbAF">&nbsp;</A>
-<H2>OPTIONS:</H2>
-
-<DL COMPACT><DT><DD>
-<DL COMPACT>
-<DT>Show help message and exit:<DD>
-<DT><B>-h</B>, <B>--help</B>
-
-<DD>
-<DT>Include timestamp on output:<DD>
-<DT><B>-t</B>, <B>--timestamp</B>
-
-<DD>
-<DT>Wider columns (fit IPv6):<DD>
-<DT><B>-w</B>, <B>--wide</B>
-
-<DD>
-<DT>Trace this PID only:<DD>
-<DT><B>-p</B> PID, <B>--pid</B> PID
-
-<DD>
-<DT>Comma-separated list of ports to trace:<DD>
-<DT><B>-P</B> PORT, <B>--port</B> PORT
-
-<DD>
-<DT>Trace cgroups in this BPF map:<DD>
-<DT><B>--cgroupmap</B> MAP
-
-<DD>
-<DT>Include errors in the output:<DD>
-<DT><B>-E</B>, <B>--errors</B>
-
-<DD>
-<DT>Include UID on output:<DD>
-<DT><B>-U</B>, <B>--print-uid</B>
-
-<DD>
-<DT>Trace this UID only:<DD>
-<DT><B>-u</B> UID, <B>--uid</B> UID
-
-<DD>
-<DT>Count binds per src ip and port:<DD>
-<DT><B>--count</B>
-
-<DD>
-</DL>
-</DL>
-
-<P>
-
-<A NAME="lbAG">&nbsp;</A>
-<H2>EXAMPLES:</H2>
-
-<DL COMPACT><DT><DD>
-<DL COMPACT>
-<DT>Trace all IPv4 and IPv6 <B>bind</B>()s<DD>
-<DT><B>bindsnoop</B>
-
-<DD>
-<DT>Include timestamps<DD>
-<DT><B>bindsnoop -t</B>
-
-<DD>
-<DT>Trace PID 181<DD>
-<DT><B>bindsnoop -p</B> 181
-
-<DD>
-<DT>Trace port 80<DD>
-<DT><B>bindsnoop -P</B> 80
-
-<DD>
-<DT>Trace port 80 and 81<DD>
-<DT><B>bindsnoop -P</B> 80,81
-
-<DD>
-<DT>Include UID<DD>
-<DT><B>bindsnoop -U</B>
-
-<DD>
-<DT>Trace UID 1000<DD>
-<DT><B>bindsnoop -u</B> 1000
-
-<DD>
-<DT>Report bind errors<DD>
-<DT><B>bindsnoop -E</B>
-
-<DD>
-<DT>Count bind per src ip<DD>
-<DT><B>bindsnoop --count</B>
-
-<DD>
-</DL>
-</DL>
-
-<P>
-
-Trace IPv4 and IPv6 bind system calls and report socket options that would impact bind call behavior:
-<DL COMPACT><DT><DD>
-<DL COMPACT>
-<DT>SOL_IP IP_FREEBIND              F....<DD>
-<DT>SOL_IP IP_TRANSPARENT           .T...<DD>
-<DT>SOL_IP IP_BIND_ADDRESS_NO_PORT  ..N..<DD>
-<DT>SOL_SOCKET SO_REUSEADDR         ...R.<DD>
-<DT>SOL_SOCKET SO_REUSEPORT         ....r<DD>
-</DL>
-<P>
-
-SO_BINDTODEVICE interface is reported as &quot;IF&quot; index
-</DL>
-<A NAME="lbAH">&nbsp;</A>
-<H2>SOURCE</H2>
-
-This is from bcc.
-<DL COMPACT>
-<DT><DD>
-<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
-</DL>
-<P>
-
-Also look in the bcc distribution for a companion _examples.txt file containing
-example usage, output, and commentary for this tool.
-<A NAME="lbAI">&nbsp;</A>
-<H2>OS</H2>
-
-Linux
-<A NAME="lbAJ">&nbsp;</A>
-<H2>STABILITY</H2>
-
-Unstable - in development.
-<A NAME="lbAK">&nbsp;</A>
-<H2>AUTHOR</H2>
-
-Pavel Dubovitsky
-<A NAME="lbAL">&nbsp;</A>
-<H2>SEE ALSO</H2>
-
-<A HREF="https://iovisor.github.io/bcc?8+tcpaccept">tcpaccept</A>(8)
-<P>
-
-<HR>
-<A NAME="index">&nbsp;</A><H2>Index</H2>
-<DL>
-<DT><A HREF="#lbAB">NAME</A><DD>
-<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
-<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
-<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
-<DT><A HREF="#lbAF">OPTIONS:</A><DD>
-<DT><A HREF="#lbAG">EXAMPLES:</A><DD>
-<DT><A HREF="#lbAH">SOURCE</A><DD>
-<DT><A HREF="#lbAI">OS</A><DD>
-<DT><A HREF="#lbAJ">STABILITY</A><DD>
-<DT><A HREF="#lbAK">AUTHOR</A><DD>
-<DT><A HREF="#lbAL">SEE ALSO</A><DD>
-</DL>
-<HR>
-This document was created by
-<A HREF="https://iovisor.github.io/bcc">man2html</A>,
-using the manual pages.<BR>
-Time: 17:11:49 GMT, February 25, 2020
-</BODY>
-</HTML>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>bindsnoop(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">bindsnoop(8)</td>
+    <td class="head-vol"></td>
+    <td class="head-rtitle">bindsnoop(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">bindsnoop - Trace bind() system calls.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>bindsnoop [<b>-h</b>] [<b>-w</b>] [<b>-t</b>] [<b>-p</b> PID]
+    [<b>-P</b> PORT] [<b>-E</b>] [<b>-U</b>] [<b>-u</b> UID] [<b>--count</b>]
+    [<b>--cgroupmap MAP</b>] [<b>--mntnsmap MNTNSMAP</b>]</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">bindsnoop reports socket options set before the bind call that
+    would impact this system call behavior.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REQUIREMENTS"><a class="permalink" href="#REQUIREMENTS">REQUIREMENTS</a></h1>
+<p class="Pp">CONFIG_BPF and bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS:"><a class="permalink" href="#OPTIONS:">OPTIONS:</a></h1>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="Show"><a class="permalink" href="#Show">Show help message and
+    exit:</a></dt>
+  <dd></dd>
+  <dt id="h"><a class="permalink" href="#h"><b><b>-h</b>,
+    <b>--help</b></b></a></dt>
+  <dd></dd>
+  <dt id="Include"><a class="permalink" href="#Include">Include timestamp on
+    output:</a></dt>
+  <dd></dd>
+  <dt id="t"><a class="permalink" href="#t"><b><b>-t</b>,
+    <b>--timestamp</b></b></a></dt>
+  <dd></dd>
+  <dt id="Wider"><a class="permalink" href="#Wider">Wider columns (fit
+    IPv6):</a></dt>
+  <dd></dd>
+  <dt id="w"><a class="permalink" href="#w"><b><b>-w</b>,
+    <b>--wide</b></b></a></dt>
+  <dd></dd>
+  <dt id="Trace"><a class="permalink" href="#Trace">Trace this PID
+    only:</a></dt>
+  <dd></dd>
+  <dt id="p"><a class="permalink" href="#p"><b><b>-p</b> PID, <b>--pid</b>
+    PID</b></a></dt>
+  <dd></dd>
+  <dt id="Comma_separated"><a class="permalink" href="#Comma_separated">Comma-separated
+    list of ports to trace:</a></dt>
+  <dd></dd>
+  <dt id="P"><a class="permalink" href="#P"><b><b>-P</b> PORT, <b>--port</b>
+    PORT</b></a></dt>
+  <dd></dd>
+  <dt id="Trace~2"><a class="permalink" href="#Trace~2">Trace cgroups in this
+    BPF map:</a></dt>
+  <dd></dd>
+  <dt id="cgroupmap"><a class="permalink" href="#cgroupmap"><b><b>--cgroupmap</b>
+    MAP</b></a></dt>
+  <dd></dd>
+  <dt id="Trace~3"><a class="permalink" href="#Trace~3">Trace mount namespaces
+    in this BPF map:</a></dt>
+  <dd></dd>
+  <dt id="mntnsmap"><a class="permalink" href="#mntnsmap"><b><b>--mntnsmap</b>
+    MNTNSMAP</b></a></dt>
+  <dd></dd>
+  <dt id="Include~2"><a class="permalink" href="#Include~2">Include errors in
+    the output:</a></dt>
+  <dd></dd>
+  <dt id="E"><a class="permalink" href="#E"><b><b>-E</b>,
+    <b>--errors</b></b></a></dt>
+  <dd></dd>
+  <dt id="Include~3"><a class="permalink" href="#Include~3">Include UID on
+    output:</a></dt>
+  <dd></dd>
+  <dt id="U"><a class="permalink" href="#U"><b><b>-U</b>,
+    <b>--print-uid</b></b></a></dt>
+  <dd></dd>
+  <dt id="Trace~4"><a class="permalink" href="#Trace~4">Trace this UID
+    only:</a></dt>
+  <dd></dd>
+  <dt id="u"><a class="permalink" href="#u"><b><b>-u</b> UID, <b>--uid</b>
+    UID</b></a></dt>
+  <dd></dd>
+  <dt id="Count"><a class="permalink" href="#Count">Count binds per src ip and
+    port:</a></dt>
+  <dd></dd>
+  <dt id="count"><a class="permalink" href="#count"><b><b>--count</b></b></a></dt>
+  <dd></dd>
+</dl>
+</div>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES:"><a class="permalink" href="#EXAMPLES:">EXAMPLES:</a></h1>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="Trace~5"><a class="permalink" href="#Trace~5">Trace all IPv4 and IPv6
+    <b>bind</b>()s</a></dt>
+  <dd></dd>
+  <dt id="bindsnoop"><a class="permalink" href="#bindsnoop"><b>bindsnoop</b></a></dt>
+  <dd></dd>
+  <dt id="Include~4"><a class="permalink" href="#Include~4">Include
+    timestamps</a></dt>
+  <dd></dd>
+  <dt><b>bindsnoop <b>-t</b></b></dt>
+  <dd></dd>
+  <dt id="Trace~6"><a class="permalink" href="#Trace~6">Trace PID 181</a></dt>
+  <dd></dd>
+  <dt><b>bindsnoop <b>-p</b> 181</b></dt>
+  <dd></dd>
+  <dt id="Trace~7"><a class="permalink" href="#Trace~7">Trace port 80</a></dt>
+  <dd></dd>
+  <dt><b>bindsnoop <b>-P</b> 80</b></dt>
+  <dd></dd>
+  <dt id="Trace~8"><a class="permalink" href="#Trace~8">Trace port 80 and
+    81</a></dt>
+  <dd></dd>
+  <dt><b>bindsnoop <b>-P</b> 80,81</b></dt>
+  <dd></dd>
+  <dt id="Include~5"><a class="permalink" href="#Include~5">Include UID</a></dt>
+  <dd></dd>
+  <dt><b>bindsnoop <b>-U</b></b></dt>
+  <dd></dd>
+  <dt id="Trace~9"><a class="permalink" href="#Trace~9">Trace UID 1000</a></dt>
+  <dd></dd>
+  <dt><b>bindsnoop <b>-u</b> 1000</b></dt>
+  <dd></dd>
+  <dt id="Report"><a class="permalink" href="#Report">Report bind
+    errors</a></dt>
+  <dd></dd>
+  <dt><b>bindsnoop <b>-E</b></b></dt>
+  <dd></dd>
+  <dt id="Count~2"><a class="permalink" href="#Count~2">Count bind per src
+    ip</a></dt>
+  <dd></dd>
+  <dt><b>bindsnoop <b>--count</b></b></dt>
+  <dd></dd>
+</dl>
+</div>
+<p class="Pp">Trace IPv4 and IPv6 bind system calls and report socket options
+    that would impact bind call behavior:</p>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="SOL_IP"><a class="permalink" href="#SOL_IP">SOL_IP IP_FREEBIND
+    F....</a></dt>
+  <dd></dd>
+  <dt id="SOL_IP~2"><a class="permalink" href="#SOL_IP~2">SOL_IP IP_TRANSPARENT
+    .T...</a></dt>
+  <dd></dd>
+  <dt id="SOL_IP~3"><a class="permalink" href="#SOL_IP~3">SOL_IP
+    IP_BIND_ADDRESS_NO_PORT ..N..</a></dt>
+  <dd></dd>
+  <dt id="SOL_SOCKET"><a class="permalink" href="#SOL_SOCKET">SOL_SOCKET
+    SO_REUSEADDR ...R.</a></dt>
+  <dd></dd>
+  <dt id="SOL_SOCKET~2"><a class="permalink" href="#SOL_SOCKET~2">SOL_SOCKET
+    SO_REUSEPORT ....r</a></dt>
+  <dd></dd>
+</dl>
+<p class="Pp">SO_BINDTODEVICE interface is reported as &quot;IF&quot; index</p>
+</div>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _examples.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Pavel Dubovitsky</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h1>
+<p class="Pp">tcpaccept(8)</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">12 February 2020</td>
+    <td class="foot-os"></td>
+  </tr>
+</table>
+</body>
+</html>

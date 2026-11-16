@@ -1,148 +1,159 @@
-Content-type: text/html; charset=UTF-8
-
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<HTML><HEAD><TITLE>Man page of tcpretrans</TITLE>
-</HEAD><BODY>
-<H1>tcpretrans</H1>
-Section: Maintenance Commands (8)<BR>Updated: 2016-02-14<BR><A HREF="#index">Index</A>
-<A HREF="https://iovisor.github.io/bcc">Return to Main Contents</A><HR>
-
-<A NAME="lbAB">&nbsp;</A>
-<H2>NAME</H2>
-
-tcpretrans - Trace or count TCP retransmits and TLPs. Uses Linux eBPF/bcc.
-<A NAME="lbAC">&nbsp;</A>
-<H2>SYNOPSIS</H2>
-
-<B>tcpretrans [-h] [-l] [-c]</B>
-
-<A NAME="lbAD">&nbsp;</A>
-<H2>DESCRIPTION</H2>
-
-This traces TCP retransmits, showing address, port, and TCP state information,
-and sometimes the PID (although usually not, since retransmits are usually
-sent by the kernel on timeouts). To keep overhead very low, only
-the TCP retransmit functions are traced. This does not trace every packet
-(like <A HREF="https://iovisor.github.io/bcc?8+tcpdump">tcpdump</A>(8) or a packet sniffer). Optionally, it can count retransmits
-over a user signalled interval to spot potentially dropping network paths the
-flows are traversing. 
-<P>
-This uses dynamic tracing of the kernel tcp_retransmit_skb() and
-tcp_send_loss_probe() functions, and will need to be updated to
-match kernel changes to these functions.
-<P>
-Since this uses BPF, only the root user can use this tool.
-<A NAME="lbAE">&nbsp;</A>
-<H2>REQUIREMENTS</H2>
-
-CONFIG_BPF and bcc.
-<A NAME="lbAF">&nbsp;</A>
-<H2>OPTIONS</H2>
-
-<DL COMPACT>
-<DT>-h<DD>
-Print usage message.
-<DT>-l<DD>
-Include tail loss probe attempts (in some cases the kernel may not
-complete the TLP send).
-<DT>-c<DD>
-Count occurring retransmits per flow. 
-</DL>
-<A NAME="lbAG">&nbsp;</A>
-<H2>EXAMPLES</H2>
-
-<DL COMPACT>
-<DT>Trace TCP retransmits:<DD>
-#
-<B>tcpretrans</B>
-
-<DT>Trace TCP retransmits and TLP attempts:<DD>
-#
-<B>tcpretrans -l</B>
-
-</DL>
-<A NAME="lbAH">&nbsp;</A>
-<H2>FIELDS</H2>
-
-<DL COMPACT>
-<DT>TIME<DD>
-Time of the retransmit.
-<DT>PID<DD>
-Process ID that was on-CPU. This is less useful than it might sound, as it
-may usually be 0, for the kernel, for timer-based retransmits.
-<DT>IP<DD>
-IP address family (4 or 6).
-<DT>LADDR<DD>
-Local IP address.
-<DT>LPORT<DD>
-Local port.
-<DT>T&gt;<DD>
-Type of event: R&gt; == retransmit, L&gt; == tail loss probe.
-<DT>RADDR<DD>
-Remote IP address.
-<DT>RPORT<DD>
-Remote port.
-<DT>STATE<DD>
-TCP session state.
-<DT>RETRANSMITS<DD>
-Accumulated occurred retransmits since start.
-</DL>
-<A NAME="lbAI">&nbsp;</A>
-<H2>OVERHEAD</H2>
-
-Should be negligible: TCP retransmit events should be low (&lt;1000/s), and the
-low overhead this tool adds to each event should make the cost negligible.
-<A NAME="lbAJ">&nbsp;</A>
-<H2>SOURCE</H2>
-
-This is from bcc.
-<DL COMPACT>
-<DT><DD>
-<A HREF="https://github.com/iovisor/bcc">https://github.com/iovisor/bcc</A>
-</DL>
-<P>
-
-Also look in the bcc distribution for a companion _examples.txt file containing
-example usage, output, and commentary for this tool.
-<A NAME="lbAK">&nbsp;</A>
-<H2>OS</H2>
-
-Linux
-<A NAME="lbAL">&nbsp;</A>
-<H2>STABILITY</H2>
-
-Unstable - in development.
-<A NAME="lbAM">&nbsp;</A>
-<H2>AUTHOR</H2>
-
-Brendan Gregg
-<A NAME="lbAN">&nbsp;</A>
-<H2>SEE ALSO</H2>
-
-<A HREF="https://iovisor.github.io/bcc?8+tcpconnect">tcpconnect</A>(8), <A HREF="https://iovisor.github.io/bcc?8+tcpaccept">tcpaccept</A>(8)
-<P>
-
-<HR>
-<A NAME="index">&nbsp;</A><H2>Index</H2>
-<DL>
-<DT><A HREF="#lbAB">NAME</A><DD>
-<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
-<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
-<DT><A HREF="#lbAE">REQUIREMENTS</A><DD>
-<DT><A HREF="#lbAF">OPTIONS</A><DD>
-<DT><A HREF="#lbAG">EXAMPLES</A><DD>
-<DT><A HREF="#lbAH">FIELDS</A><DD>
-<DT><A HREF="#lbAI">OVERHEAD</A><DD>
-<DT><A HREF="#lbAJ">SOURCE</A><DD>
-<DT><A HREF="#lbAK">OS</A><DD>
-<DT><A HREF="#lbAL">STABILITY</A><DD>
-<DT><A HREF="#lbAM">AUTHOR</A><DD>
-<DT><A HREF="#lbAN">SEE ALSO</A><DD>
-</DL>
-<HR>
-This document was created by
-<A HREF="https://iovisor.github.io/bcc">man2html</A>,
-using the manual pages.<BR>
-Time: 17:11:49 GMT, February 25, 2020
-</BODY>
-</HTML>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>tcpretrans(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">tcpretrans(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">tcpretrans(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">tcpretrans - Trace or count TCP retransmits and TLPs. Uses Linux
+    eBPF/bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>tcpretrans [-h] [-s] [-l] [-c] [-4 | -6]</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">This traces TCP retransmits, showing address, port, and TCP state
+    information, and sometimes the PID (although usually not, since retransmits
+    are usually sent by the kernel on timeouts). To keep overhead very low, only
+    the TCP retransmit functions are traced. This does not trace every packet
+    (like tcpdump(8) or a packet sniffer). Optionally, it can count retransmits
+    over a user signalled interval to spot potentially dropping network paths
+    the flows are traversing.</p>
+<p class="Pp">This uses dynamic tracing of the kernel tcp_retransmit_skb() and
+    tcp_send_loss_probe() functions, and will need to be updated to match kernel
+    changes to these functions.</p>
+<p class="Pp">Since this uses BPF, only the root user can use this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REQUIREMENTS"><a class="permalink" href="#REQUIREMENTS">REQUIREMENTS</a></h1>
+<p class="Pp">CONFIG_BPF and bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+<dl class="Bl-tag">
+  <dt id="h"><a class="permalink" href="#h">-h</a></dt>
+  <dd>Print usage message.</dd>
+  <dt id="s"><a class="permalink" href="#s">-s</a></dt>
+  <dd>Display TCP sequence numbers.</dd>
+  <dt id="l"><a class="permalink" href="#l">-l</a></dt>
+  <dd>Include tail loss probe attempts (in some cases the kernel may not
+      complete the TLP send).</dd>
+  <dt id="c"><a class="permalink" href="#c">-c</a></dt>
+  <dd>Count occurring retransmits per flow.</dd>
+  <dt>-4</dt>
+  <dd>Trace IPv4 family only.</dd>
+  <dt>-6</dt>
+  <dd>Trace IPv6 family only.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Trace"><a class="permalink" href="#Trace">Trace TCP
+    retransmits:</a></dt>
+  <dd># <b>tcpretrans</b></dd>
+  <dt id="Trace~2"><a class="permalink" href="#Trace~2">Trace TCP retransmits
+    and TLP attempts:</a></dt>
+  <dd># <b>tcpretrans -l</b></dd>
+  <dt id="Trace~3"><a class="permalink" href="#Trace~3">Trace IPv4 family
+    only:</a></dt>
+  <dd># <b>tcpretrans -4</b></dd>
+  <dt id="Trace~4"><a class="permalink" href="#Trace~4">Trace IPv6 family
+    only:</a></dt>
+  <dd># <b>tcpretrans -6</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="FIELDS"><a class="permalink" href="#FIELDS">FIELDS</a></h1>
+<dl class="Bl-tag">
+  <dt id="TIME"><a class="permalink" href="#TIME">TIME</a></dt>
+  <dd>Time of the retransmit.</dd>
+  <dt id="PID"><a class="permalink" href="#PID">PID</a></dt>
+  <dd>Process ID that was on-CPU. This is less useful than it might sound, as it
+      may usually be 0, for the kernel, for timer-based retransmits.</dd>
+  <dt id="IP"><a class="permalink" href="#IP">IP</a></dt>
+  <dd>IP address family (4 or 6).</dd>
+  <dt id="LADDR"><a class="permalink" href="#LADDR">LADDR</a></dt>
+  <dd>Local IP address.</dd>
+  <dt id="LPORT"><a class="permalink" href="#LPORT">LPORT</a></dt>
+  <dd>Local port.</dd>
+  <dt id="T_"><a class="permalink" href="#T_">T&gt;</a></dt>
+  <dd>Type of event: R&gt; == retransmit, L&gt; == tail loss probe.</dd>
+  <dt id="RADDR"><a class="permalink" href="#RADDR">RADDR</a></dt>
+  <dd>Remote IP address.</dd>
+  <dt id="RPORT"><a class="permalink" href="#RPORT">RPORT</a></dt>
+  <dd>Remote port.</dd>
+  <dt id="STATE"><a class="permalink" href="#STATE">STATE</a></dt>
+  <dd>TCP session state.</dd>
+  <dt id="SEQ"><a class="permalink" href="#SEQ">SEQ</a></dt>
+  <dd>TCP sequence.</dd>
+  <dt id="RETRANSMITS"><a class="permalink" href="#RETRANSMITS">RETRANSMITS</a></dt>
+  <dd>Accumulated occurred retransmits since start.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OVERHEAD"><a class="permalink" href="#OVERHEAD">OVERHEAD</a></h1>
+<p class="Pp">Should be negligible: TCP retransmit events should be low
+    (&lt;1000/s), and the low overhead this tool adds to each event should make
+    the cost negligible.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _examples.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Brendan Gregg</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h1>
+<p class="Pp">tcpconnect(8), tcpaccept(8)</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>

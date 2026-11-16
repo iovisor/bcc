@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    table.head, table.foot { width: 100%; }
+    td.head-rtitle, td.foot-os { text-align: right; }
+    td.head-vol { text-align: center; }
+    .Nd, .Bf, .Op { display: inline; }
+    .Pa, .Ad { font-style: italic; }
+    .Ms { font-weight: bold; }
+    .Bl-diag > dt { font-weight: bold; }
+    code.Nm, .Fl, .Cm, .Ic, code.In, .Fd, .Fn, .Cd { font-weight: bold;
+      font-family: inherit; }
+  </style>
+  <title>dirtop(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">dirtop(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">dirtop(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp">dirtop - File reads and writes by directory. Top for
+  directories.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<p class="Pp"><b>dirtop -d directory1,directory2,... [-h] [-C] [-r MAXROWS] [-s
+    {reads,writes,rbytes,wbytes}] [-p PID] [interval] [count]</b></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp">This is top for directories.</p>
+<p class="Pp">This traces file reads and writes, and prints a per-directory
+    summary every interval (by default, 1 second). By default the summary is
+    sorted on the highest read throughput (Kbytes). Sorting order can be changed
+    via -s option.</p>
+<p class="Pp">This uses in-kernel eBPF maps to store per process summaries for
+    efficiency.</p>
+<p class="Pp">This script works by tracing the __vfs_read() and __vfs_write()
+    functions using kernel dynamic tracing, which instruments explicit read and
+    write calls. If files are read or written using another means (eg, via
+    mmap()), then they will not be visible using this tool. Also, this tool will
+    need updating to match any code changes to those vfs functions.</p>
+<p class="Pp">This should be useful for file system workload characterization
+    when analyzing the performance of applications.</p>
+<p class="Pp">Note that tracing VFS level reads and writes can be a frequent
+    activity, and this tool can begin to cost measurable overhead at high I/O
+    rates.</p>
+<p class="Pp">Since this uses BPF, only the root user can use this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="REQUIREMENTS"><a class="permalink" href="#REQUIREMENTS">REQUIREMENTS</a></h1>
+<p class="Pp">CONFIG_BPF and bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+<dl class="Bl-tag">
+  <dt id="d"><a class="permalink" href="#d">-d</a></dt>
+  <dd>Defines a list of directories, comma separated, to observe. Wildcards are
+      allowed if between single bracket.</dd>
+  <dt id="C"><a class="permalink" href="#C">-C</a></dt>
+  <dd>Don't clear the screen.</dd>
+  <dt id="r"><a class="permalink" href="#r">-r MAXROWS</a></dt>
+  <dd>Maximum number of rows to print. Default is 20.</dd>
+  <dt id="s"><a class="permalink" href="#s">-s
+    {reads,writes,rbytes,wbytes}</a></dt>
+  <dd>Sort column. Default is rbytes (read throughput).</dd>
+  <dt id="p"><a class="permalink" href="#p">-p PID</a></dt>
+  <dd>Trace this PID only.</dd>
+  <dt id="interval"><a class="permalink" href="#interval">interval</a></dt>
+  <dd>Interval between updates, seconds.</dd>
+  <dt id="count"><a class="permalink" href="#count">count</a></dt>
+  <dd>Number of interval summaries.
+    <p class="Pp"></p>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<dl class="Bl-tag">
+  <dt id="Summarize"><a class="permalink" href="#Summarize">Summarize block
+    device I/O by directory, 1 second screen refresh:</a></dt>
+  <dd># <b>dirtop -d '/hdfs/uuid/*/yarn'</b></dd>
+  <dt id="Don't"><a class="permalink" href="#Don't">Don't clear the screen, and
+    top 8 rows only:</a></dt>
+  <dd># <b>dirtop -d '/hdfs/uuid/*/yarn' -Cr 8</b></dd>
+  <dt>5 second summaries, 10 times only:</dt>
+  <dd># <b>dirtop -d '/hdfs/uuid/*/yarn' 5 10</b></dd>
+  <dt id="Report"><a class="permalink" href="#Report">Report read &amp; write
+    IOs generated in mutliple yarn and data directories:</a></dt>
+  <dd># <b>dirtop -d '/hdfs/uuid/*/yarn,/hdfs/uuid/*/data'</b></dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="FIELDS"><a class="permalink" href="#FIELDS">FIELDS</a></h1>
+<dl class="Bl-tag">
+  <dt id="loadavg:"><a class="permalink" href="#loadavg:">loadavg:</a></dt>
+  <dd>The contents of /proc/loadavg</dd>
+  <dt id="READS"><a class="permalink" href="#READS">READS</a></dt>
+  <dd>Count of reads during interval.</dd>
+  <dt id="WRITES"><a class="permalink" href="#WRITES">WRITES</a></dt>
+  <dd>Count of writes during interval.</dd>
+  <dt id="R_Kb"><a class="permalink" href="#R_Kb">R_Kb</a></dt>
+  <dd>Total read Kbytes during interval.</dd>
+  <dt id="W_Kb"><a class="permalink" href="#W_Kb">W_Kb</a></dt>
+  <dd>Total write Kbytes during interval.</dd>
+  <dt id="PATH"><a class="permalink" href="#PATH">PATH</a></dt>
+  <dd>The path were the IOs were accounted.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OVERHEAD"><a class="permalink" href="#OVERHEAD">OVERHEAD</a></h1>
+<p class="Pp">Depending on the frequency of application reads and writes,
+    overhead can become significant, in the worst case slowing applications by
+    over 50%. Hopefully for real world workloads the overhead is much less --
+    test before use. The reason for the high overhead is that VFS reads and
+    writes can be a frequent event, and despite the eBPF overhead being very
+    small per event, if you multiply this small overhead by a million events per
+    second, it becomes a million times worse. Literally. You can gauge the
+    number of reads and writes using the vfsstat(8) tool, also from bcc.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SOURCE"><a class="permalink" href="#SOURCE">SOURCE</a></h1>
+<p class="Pp">This is from bcc.</p>
+<dl class="Bl-tag">
+  <dt></dt>
+  <dd>https://github.com/iovisor/bcc</dd>
+</dl>
+<p class="Pp">Also look in the bcc distribution for a companion _examples.txt
+    file containing example usage, output, and commentary for this tool.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="OS"><a class="permalink" href="#OS">OS</a></h1>
+<p class="Pp">Linux</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="STABILITY"><a class="permalink" href="#STABILITY">STABILITY</a></h1>
+<p class="Pp">Unstable - in development.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHOR"><a class="permalink" href="#AUTHOR">AUTHOR</a></h1>
+<p class="Pp">Erwan Velu</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="INSPIRATION"><a class="permalink" href="#INSPIRATION">INSPIRATION</a></h1>
+<p class="Pp">filetop(8) by Brendan Gregg</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h1>
+<p class="Pp">vfsstat(8), vfscount(8), fileslower(8)</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">2026-11-16</td>
+    <td class="foot-os">USER COMMANDS</td>
+  </tr>
+</table>
+</body>
+</html>
