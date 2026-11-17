@@ -1,0 +1,94 @@
+Demonstrations of ulockstat, the Linux eBPF/bcc version.
+
+
+ulockstat summarizes user-space mutex lock contention, by tracing the USDT
+probes that glibc's NPTL provides for pthread mutexes. It shows the time
+threads spent waiting to acquire a mutex (the "wait" time) and the time the
+mutex was held (the "hold" time).
+
+The output below was produced by running a small benchmark with one thread
+holding a mutex for about 2ms at a time while four other threads contend for a
+different, short-held, mutex:
+
+# ulockstat -p 270372 -d 4 -m 5 -s 3
+Tracing user-space mutex events for PID 270372...
+Hit Ctrl-C to end.
+
+     PID      Mutex (hex)   Avg Wait   Count   Max Wait  Total Wait
+  --------------------------------------------------------------------
+  270372     581319f680a0       52.0  212752     3587.4  11062922.8
+  __pthread_mutex_lock@GLIBC_2.2.5+0x75 [libc.so.6]
+  counter_worker+0x28 [lockbench]
+  __GI___clone3+0x2c [libc.so.6]
+  __pthread_mutex_lock@GLIBC_2.2.5+0x75 [libc.so.6]
+  holder_worker+0x4a [lockbench]
+  270372     581319f68060       27.8       8      128.8       222.5
+  __pthread_mutex_lock@GLIBC_2.2.5+0x75 [libc.so.6]
+  holder_worker+0x30 [lockbench]
+  [unknown]
+
+     PID      Mutex (hex)   Avg Hold   Count   Max Hold  Total Hold
+  --------------------------------------------------------------------
+  270372     581319f68060     2089.3    1884     2249.7   3936211.3
+  270372     581319f680a0        3.0  917175      320.5   2791169.5
+
+Times in us. Count is the number of lock acquisitions that had to wait; the stack below a mutex is the call site that blocked.
+
+The first block shows the lock acquisition (wait) time. The -m 5 option keeps
+only acquisitions that waited at least 5us, so the uncontended fast path is
+left out and this block reflects real contention. Two mutexes were seen in
+this process:
+
+- The busy mutex (581319f68060) was acquired by only one thread, so it was
+  never contended: just 8 acquisitions had to wait, 27.8us on average. Having
+  a wait row at all is the useful signal here - a lock that is never contended
+  has no wait time to report.
+
+- The counter mutex (581319f680a0) is the contended one: 212752 acquisitions
+  had to wait, 52.0us on average and 3.6ms in the worst case. The stack printed
+  under the row attributes the contention to the call site that blocked, and
+  both counter_worker+0x28 and holder_worker+0x4a appear, which matches the
+  benchmark: four threads hammering the counter mutex, plus the holder thread
+  taking it once per loop.
+
+The second block shows how long each mutex was held. The counts here are much
+larger than in the wait block because hold times are always recorded, while the
+wait block was filtered by -m 5: the counter mutex was acquired 917175 times
+but only 212752 of those had to wait. The busy mutex held for 2089.3us on
+average, which is the expected ~2ms critical section from the benchmark.
+
+Read the two blocks together:
+
+- High hold time, low wait time: the critical section is doing too much work
+  while holding the lock, so shorten it.
+- Low hold time, high wait time: many threads are contending for a lock that is
+  not held for long, so locking overhead, not the critical section itself,
+  dominates. Reduce the locking frequency or spread the work out.
+
+A mutex held for only microseconds but waited on for tens of microseconds, as
+the counter mutex is here, is the classic signature of that second case.
+
+Some caveats:
+
+- The tool reports contention that happened while it was running. It cannot
+  report contention that happened before it was started.
+- The PID column gives the process the mutex belongs to. The same virtual
+  address in two different processes refers to two different mutexes, so the
+  rows are keyed on (PID, mutex address) rather than the address alone.
+- A "[unknown]" frame in a stack means the address could not be resolved, for
+  example for a stripped binary.
+
+USAGE message:
+
+# ulockstat -h
+usage: ulockstat.py [-h] [-d DURATION | -i INTERVAL] [-n LOCKS] [-s STACKS]
+                    [-m MIN_US] [-p PID] [-t TID]
+                    [--stack-storage-size STACK_STORAGE_SIZE]
+
+    ulockstat                   # trace system wide, 1s refresh
+    ulockstat -d 5              # trace for 5 seconds only
+    ulockstat -i 5              # display stats every 5 seconds
+    ulockstat -p 123            # trace user locks for PID 123
+    ulockstat -t 1234           # trace user locks for TID 1234
+    ulockstat -n 5 -s 3         # display 5 locks, 3 stack frames per lock
+    ulockstat -m 1              # only count acquisitions that waited >= 1us
