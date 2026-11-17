@@ -192,6 +192,7 @@ pair of .c and .py files, and some are directories of files.
 - tools/[filegone](tools/filegone.py): Trace why file gone (deleted or renamed). [Examples](tools/filegone_example.txt).
 - tools/[fileslower](tools/fileslower.py): Trace slow synchronous file reads and writes. [Examples](tools/fileslower_example.txt).
 - tools/[filetop](tools/filetop.py): File reads and writes by filename and process. Top for files. [Examples](tools/filetop_example.txt).
+- tools/[filewatch](tools/filewatch.py): Watch a file or directory tree for VFS access and dump process ancestry. [Examples](tools/filewatch_example.txt).
 - tools/[mdflush](tools/mdflush.py): Trace md flush events. [Examples](tools/mdflush_example.txt).
 - tools/[mountsnoop](tools/mountsnoop.py): Trace mount and umount syscalls system-wide. [Examples](tools/mountsnoop_example.txt).
 - tools/[virtiostat](tools/virtiostat.py): Show VIRTIO device IO statistics. [Examples](tools/virtiostat_example.txt).
