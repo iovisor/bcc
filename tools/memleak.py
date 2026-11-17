@@ -69,6 +69,9 @@ EXAMPLES:
 ./memleak --sort count
         Trace allocations in kernel mode and display a summary of outstanding
         allocations that are sorted in count order
+./memleak -p PID -O /path/to/libjemalloc.so --symbols-prefix=je_ \\
+        --malloc-symbol=je_malloc_default --free-symbol=je_free_default
+        Trace jemalloc allocations with nonstandard malloc/free symbols
 """
 
 description = """
@@ -117,6 +120,10 @@ parser.add_argument("--sort", type=str, default="size",
         help="report sorted in given key; available key list: size, count")
 parser.add_argument("--symbols-prefix", type=str,
         help="memory allocator symbols prefix")
+parser.add_argument("--malloc-symbol", type=str,
+        help="exact malloc symbol to attach to; overrides the symbols prefix")
+parser.add_argument("--free-symbol", type=str,
+        help="exact free symbol to attach to; overrides the symbols prefix")
 
 args = parser.parse_args()
 
@@ -481,14 +488,20 @@ if not kernel_trace:
         def attach_probes(sym, fn_prefix=None, can_fail=False, need_uretprobe=True):
                 if fn_prefix is None:
                         fn_prefix = sym
-                if args.symbols_prefix is not None:
-                        sym = args.symbols_prefix + sym
+                if sym == "malloc" and args.malloc_symbol is not None:
+                        probe_sym = args.malloc_symbol
+                elif sym == "free" and args.free_symbol is not None:
+                        probe_sym = args.free_symbol
+                elif args.symbols_prefix is not None:
+                        probe_sym = args.symbols_prefix + sym
+                else:
+                        probe_sym = sym
                 try:
-                        bpf.attach_uprobe(name=obj, sym=sym,
+                        bpf.attach_uprobe(name=obj, sym=probe_sym,
                                           fn_name=fn_prefix + "_enter",
                                           pid=pid)
                         if need_uretprobe:
-                                bpf.attach_uretprobe(name=obj, sym=sym,
+                                bpf.attach_uretprobe(name=obj, sym=probe_sym,
                                              fn_name=fn_prefix + "_exit",
                                              pid=pid)
                 except Exception:

@@ -177,9 +177,13 @@ Attaching to pid 2623, Ctrl+C to quit.
 		0x0000559b478700b7	main+0x4a7 [redis-server]
 		0x00007fdf47029d90	__libc_start_call_main+0x80 [libc.so.6]
 
-When using the --symbols-prefix argument, memleak can trace the third-party memory
+When using the --symbols-prefix argument, memleak can trace third-party memory
 allocations, such as jemalloc whose symbols are usually identified by the "je_" prefix
-in redis project.
+in the Redis project. For allocator versions with different malloc and free symbol names,
+pass exact names for those probes:
+
+# ./memleak.py -p $(pidof allocs) -O /path/to/libjemalloc.so --symbols-prefix=je_ \
+        --malloc-symbol=je_malloc_default --free-symbol=je_free_default
 
 USAGE message:
 
