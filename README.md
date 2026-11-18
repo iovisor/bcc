@@ -158,6 +158,7 @@ pair of .c and .py files, and some are directories of files.
 - tools/[gethostlatency](tools/gethostlatency.py): Show latency for getaddrinfo/gethostbyname[2] calls. [Examples](tools/gethostlatency_example.txt).
 - tools/[bindsnoop](tools/bindsnoop.py): Trace IPv4 and IPv6 bind() system calls (bind()). [Examples](tools/bindsnoop_example.txt).
 - tools/[netqtop](tools/netqtop.py) tools/[netqtop.c](tools/netqtop.c): Trace and display packets distribution on NIC queues. [Examples](tools/netqtop_example.txt).
+- libbpf-tools/[netstacklat](libbpf-tools/netstacklat.c): Summarize latency in host ingress network stack. [Examples](libbpf-tools/netstacklat_example.txt).
 - tools/[sofdsnoop](tools/sofdsnoop.py): Trace FDs passed through unix sockets. [Examples](tools/sofdsnoop_example.txt).
 - tools/[solisten](tools/solisten.py): Trace TCP socket listen. [Examples](tools/solisten_example.txt).
 - tools/[sslsniff](tools/sslsniff.py): Sniff OpenSSL written and read data. [Examples](tools/sslsniff_example.txt).
