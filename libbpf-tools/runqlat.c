@@ -25,6 +25,7 @@ struct env {
 	bool per_process;
 	bool per_thread;
 	bool per_pidns;
+	bool split;
 	bool timestamp;
 	bool verbose;
 	char *cgroupspath;
@@ -42,7 +43,7 @@ const char *argp_program_bug_address =
 const char argp_program_doc[] =
 "Summarize run queue (scheduler) latency as a histogram.\n"
 "\n"
-"USAGE: runqlat [--help] [-T] [-m] [--pidnss] [-L] [-P] [-p PID] [interval] [count] [-c CG]\n"
+"USAGE: runqlat [--help] [-T] [-m] [--pidnss] [-L] [-P] [-S] [-p PID] [interval] [count] [-c CG]\n"
 "\n"
 "EXAMPLES:\n"
 "    runqlat         # summarize run queue latency as a histogram\n"
@@ -50,6 +51,7 @@ const char argp_program_doc[] =
 "    runqlat -mT 1   # 1s summaries, milliseconds, and timestamps\n"
 "    runqlat -P      # show each PID separately\n"
 "    runqlat -p 185  # trace PID 185 only\n"
+"    runqlat -S      # separate wait after wakeup from wait after preemption\n"
 "    runqlat -c CG   # Trace process under cgroupsPath CG\n";
 
 #define OPT_PIDNSS	1	/* --pidnss */
@@ -61,6 +63,7 @@ static const struct argp_option opts[] = {
 	{ "pids", 'P', NULL, 0, "Print a histogram per process ID", 0 },
 	{ "tids", 'L', NULL, 0, "Print a histogram per thread ID", 0 },
 	{ "pid", 'p', "PID", 0, "Trace this PID only", 0 },
+	{ "split", 'S', NULL, 0, "Separate histograms for wakeup and preemption latency", 0 },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output", 0 },
 	{ "cgroup", 'c', "/sys/fs/cgroup/unified", 0, "Trace process in cgroup path", 0 },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help", 0 },
@@ -97,6 +100,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case OPT_PIDNSS:
 		env.per_pidns = true;
+		break;
+	case 'S':
+		env.split = true;
 		break;
 	case 'T':
 		env.timestamp = true;
@@ -152,17 +158,33 @@ static int print_log2_hists(struct bpf_map *hists)
 	struct hist hist;
 
 	while (!bpf_map_get_next_key(fd, &lookup_key, &next_key)) {
+		const char *cause = "";
+		__u32 id = next_key;
+
 		err = bpf_map_lookup_elem(fd, &next_key, &hist);
 		if (err < 0) {
 			fprintf(stderr, "failed to lookup hist: %d\n", err);
 			return -1;
 		}
+		if (env.split) {
+			bool preempted;
+
+			if (env.per_process || env.per_thread) {
+				preempted = next_key & RUNQLAT_PREEMPT_BIT;
+				id = next_key & ~RUNQLAT_PREEMPT_BIT;
+			} else {
+				preempted = next_key == 1;
+			}
+			cause = preempted ? " [after preemption]" : " [after wakeup]";
+		}
 		if (env.per_process)
-			printf("\npid = %d %s\n", next_key, hist.comm);
+			printf("\npid = %d %s%s\n", id, hist.comm, cause);
 		else if (env.per_thread)
-			printf("\ntid = %d %s\n", next_key, hist.comm);
+			printf("\ntid = %d %s%s\n", id, hist.comm, cause);
 		else if (env.per_pidns)
 			printf("\npidns = %u %s\n", next_key, hist.comm);
+		else if (env.split)
+			printf("\nrun queue latency%s\n", cause);
 		print_log2_hist(hist.slots, MAX_SLOTS, units);
 		lookup_key = next_key;
 	}
@@ -201,6 +223,10 @@ int main(int argc, char **argv)
 		fprintf(stderr, "pidnss, pids, tids cann't be used together.\n");
 		return 1;
 	}
+	if (env.split && env.per_pidns) {
+		fprintf(stderr, "--split cannot be used with --pidnss.\n");
+		return 1;
+	}
 
 	libbpf_set_print(libbpf_print_fn);
 
@@ -215,6 +241,7 @@ int main(int argc, char **argv)
 	obj->rodata->targ_per_thread = env.per_thread;
 	obj->rodata->targ_per_pidns = env.per_pidns;
 	obj->rodata->targ_ms = env.milliseconds;
+	obj->rodata->targ_split = env.split;
 	obj->rodata->targ_tgid = env.pid;
 	obj->rodata->filter_cg = env.cg;
 
