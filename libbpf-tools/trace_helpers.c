@@ -1130,7 +1130,8 @@ static const char *tracefs_available_filter_functions(void)
 bool kprobe_exists(const char *name)
 {
 	char addr_range[256];
-	char sym_name[256];
+	/* KSYM_NAME_LEN, mangled Rust symbols can be longer than 255 chars */
+	char sym_name[512];
 	FILE *f;
 	int ret;
 
@@ -1139,7 +1140,7 @@ bool kprobe_exists(const char *name)
 		goto avail_filter;
 
 	while (true) {
-		ret = fscanf(f, "%s %s%*[^\n]\n", addr_range, sym_name);
+		ret = fscanf(f, "%255s %511s%*[^\n]\n", addr_range, sym_name);
 		if (ret == EOF && feof(f))
 			break;
 		if (ret != 2) {
@@ -1159,7 +1160,7 @@ avail_filter:
 		goto slow_path;
 
 	while (true) {
-		ret = fscanf(f, "%s%*[^\n]\n", sym_name);
+		ret = fscanf(f, "%511s%*[^\n]\n", sym_name);
 		if (ret == EOF && feof(f))
 			break;
 		if (ret != 1) {
@@ -1181,7 +1182,7 @@ slow_path:
 		return false;
 
 	while (true) {
-		ret = fscanf(f, "%*x %*c %s%*[^\n]\n", sym_name);
+		ret = fscanf(f, "%*x %*c %511s%*[^\n]\n", sym_name);
 		if (ret == EOF && feof(f))
 			break;
 		if (ret != 1) {
