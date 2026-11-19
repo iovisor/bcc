@@ -722,7 +722,10 @@ class BPF(object):
             with open(blacklist_file, "rb") as blacklist_f:
                 blacklist = set([line.rstrip().split()[1] for line in blacklist_f])
         except IOError as e:
-            if e.errno != errno.EPERM:
+            # The blacklist lives in debugfs, which may be locked down
+            # (EPERM) or not mounted at all (ENOENT). It is only used to
+            # filter the result, so carry on without it.
+            if e.errno not in (errno.EPERM, errno.ENOENT):
                 raise e
             blacklist = set([])
 
@@ -731,9 +734,10 @@ class BPF(object):
             with open(avail_filter_file, "rb") as avail_filter_f:
                 avail_filter = set([line.rstrip().split()[0] for line in avail_filter_f])
         except IOError as e:
-            if e.errno != errno.EPERM:
+            if e.errno not in (errno.EPERM, errno.ENOENT):
                 raise e
-            avail_filter = set([])
+            # Without the list there is nothing to filter with
+            avail_filter = None
 
         fns = []
 
@@ -787,7 +791,7 @@ class BPF(object):
                     continue
                 if (t.lower() in [b't', b'w']) and re.fullmatch(event_re, fn) \
                     and fn not in blacklist \
-                    and fn in avail_filter:
+                    and (avail_filter is None or fn in avail_filter):
                     fns.append(fn)
         return set(fns)     # Some functions may appear more than once
 
