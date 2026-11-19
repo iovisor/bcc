@@ -224,13 +224,14 @@ else:
                             'events.perf_submit(ctx, data, sizeof(*data));')
 
 bpf_text = bpf_text.replace('PTS', str(pi.st_ino))
+
+bpf_text = bpf_text.replace('USER_DATASIZE', '%s' % args.datasize)
+bpf_text = bpf_text.replace('USER_DATACOUNT', '%s' % args.datacount)
+
 if debug or args.ebpf:
     print(bpf_text)
     if args.ebpf:
         exit()
-
-bpf_text = bpf_text.replace('USER_DATASIZE', '%s' % args.datasize)
-bpf_text = bpf_text.replace('USER_DATACOUNT', '%s' % args.datacount)
 
 # initialize BPF
 b = BPF(text=bpf_text)

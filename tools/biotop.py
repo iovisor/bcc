@@ -251,10 +251,6 @@ TRACEPOINT_PROBE(block, block_io_done)
 }
 """
 
-if args.ebpf:
-    print(bpf_text)
-    exit()
-
 if BPF.kernel_struct_has_field(b'request', b'rq_disk') == 1:
     bpf_text = bpf_text.replace('__RQ_DISK__', 'rq_disk')
 else:
@@ -276,6 +272,10 @@ if BPF.tracepoint_exists("block", "block_io_done"):
     tp_done = True
 else:
     tp_done = False
+
+if args.ebpf:
+    print(bpf_text)
+    exit()
 
 b = BPF(text=bpf_text)
 if not tp_start:

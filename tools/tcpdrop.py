@@ -193,10 +193,6 @@ TRACEPOINT_PROBE(skb, kfree_skb) {
 }
 """
 
-if debug or args.ebpf:
-    print(bpf_text)
-    if args.ebpf:
-        exit()
 if args.ipv4:
     bpf_text = bpf_text.replace('FILTER_FAMILY',
         'if (family != AF_INET) { return 0; }')
@@ -373,6 +369,11 @@ if BPF.tracepoint_exists("skb", "kfree_skb"):
     if BPF.kernel_struct_has_field("trace_event_raw_kfree_skb", "reason") == 1:
         bpf_text += bpf_kfree_skb_text
         kfree_skb_traceable = True
+
+if debug or args.ebpf:
+    print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # initialize BPF
 b = BPF(text=bpf_text)

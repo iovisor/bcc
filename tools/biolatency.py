@@ -254,11 +254,6 @@ else:
     bpf_text = bpf_text.replace('CMD_FLAGS', '')
     bpf_text = bpf_text.replace('SET_FLAGS', '')
 
-if debug or args.ebpf:
-    print(bpf_text)
-    if args.ebpf:
-        exit()
-
 # Which kprobe/tracepoint to attach to.
 # We can attach to two IO start kprobes but only one of the other types.
 kprobe_start = set()
@@ -300,6 +295,11 @@ if tp_start:
     bpf_text += tp_start_text.replace("START_TP", tp_start)
 if tp_done:
     bpf_text += tp_done_text.replace("DONE_TP", tp_done)
+
+if debug or args.ebpf:
+    print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # load BPF program
 b = BPF(text=bpf_text)
