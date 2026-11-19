@@ -13,9 +13,10 @@ import os
 import re
 import sys
 
-from bcc import USDT
+from bcc import USDT, TRACEFS
 
-trace_root = "/sys/kernel/debug/tracing"
+# tracefs is not always reachable through debugfs, see TRACEFS in bcc
+trace_root = TRACEFS
 event_root = os.path.join(trace_root, "events")
 
 parser = argparse.ArgumentParser(

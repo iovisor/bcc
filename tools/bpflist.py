@@ -12,7 +12,7 @@
 #
 # 09-Mar-2017   Sasha Goldshtein   Created this.
 
-from bcc import BPF, USDT
+from bcc import BPF, USDT, TRACEFS
 import argparse
 import re
 import os
@@ -42,7 +42,7 @@ counts = {}
 def parse_probes(typ):
     if args.verbosity > 1:
         print("open %ss:" % typ)
-    for probe in open("/sys/kernel/debug/tracing/%s_events" % typ):
+    for probe in open("%s/%s_events" % (TRACEFS, typ)):
         # Probes opened by bcc have a specific pattern that includes the pid
         # of the requesting process.
         match = re.search('_bcc_(\\d+)\\s', probe)
