@@ -12,7 +12,7 @@
 #
 # 09-Mar-2017   Sasha Goldshtein   Created this.
 
-from bcc import BPF, USDT
+from bcc import BPF, USDT, TRACEFS
 import argparse
 import re
 import os
@@ -40,9 +40,14 @@ def comm_for_pid(pid):
 counts = {}
 
 def parse_probes(typ):
+    path = "%s/%s_events" % (TRACEFS, typ)
+    # The file does not exist if the kernel is built without
+    # CONFIG_KPROBE_EVENTS or CONFIG_UPROBE_EVENTS
+    if not os.path.exists(path):
+        return
     if args.verbosity > 1:
         print("open %ss:" % typ)
-    for probe in open("/sys/kernel/debug/tracing/%s_events" % typ):
+    for probe in open(path):
         # Probes opened by bcc have a specific pattern that includes the pid
         # of the requesting process.
         match = re.search('_bcc_(\\d+)\\s', probe)
