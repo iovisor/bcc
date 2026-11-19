@@ -67,8 +67,39 @@ int trace_pid(struct request *rq)
 	return 0;
 }
 
+static __always_inline
+int handle_blk_account_io_start(struct request *rq)
+{
+	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
+		return 0;
+
+	return trace_pid(rq);
+}
+
 SEC("fentry/blk_account_io_start")
 int BPF_PROG(blk_account_io_start, struct request *rq)
+{
+	return handle_blk_account_io_start(rq);
+}
+
+/*
+ * kprobe fallback for kernels without fentry support (CONFIG_DEBUG_INFO_BTF
+ * is unavailable, e.g. v4.19/v5.4 LTS before BTF-enabled kernels).
+ */
+SEC("kprobe/__blk_account_io_start")
+int BPF_KPROBE(kprobe___blk_account_io_start, struct request *rq)
+{
+	return handle_blk_account_io_start(rq);
+}
+
+SEC("kprobe/blk_account_io_start")
+int BPF_KPROBE(kprobe_blk_account_io_start, struct request *rq)
+{
+	return handle_blk_account_io_start(rq);
+}
+
+static __always_inline
+int handle_block_io_start(struct request *rq)
 {
 	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
 		return 0;
@@ -77,12 +108,19 @@ int BPF_PROG(blk_account_io_start, struct request *rq)
 }
 
 SEC("tp_btf/block_io_start")
+int BPF_PROG(block_io_start_btf, struct request *rq)
+{
+	return handle_block_io_start(rq);
+}
+
+/*
+ * raw_tp fallback: tp_btf needs BTF-enabled tracepoints (kernel >= 5.5), but
+ * block tracepoints themselves are available much earlier.
+ */
+SEC("raw_tp/block_io_start")
 int BPF_PROG(block_io_start, struct request *rq)
 {
-	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
-		return 0;
-
-	return trace_pid(rq);
+	return handle_block_io_start(rq);
 }
 
 SEC("kprobe/blk_account_io_merge_bio")
@@ -119,8 +157,8 @@ int trace_rq_start(struct request *rq, bool insert)
 	return 0;
 }
 
-SEC("tp_btf/block_rq_insert")
-int BPF_PROG(block_rq_insert)
+static __always_inline
+int handle_block_rq_insert(u64 *ctx)
 {
 	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
 		return 0;
@@ -139,29 +177,45 @@ int BPF_PROG(block_rq_insert)
 		return trace_rq_start((void *)ctx[1], true);
 }
 
-SEC("tp_btf/block_rq_issue")
-int BPF_PROG(block_rq_issue)
+static __always_inline
+int handle_block_rq_issue(u64 *ctx)
 {
 	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
 		return 0;
 
-	/**
-	 * commit a54895fa (block: remove the request_queue to argument
-	 * request based tracepoints) changed tracepoint argument list
-	 * from TP_PROTO(struct request_queue *q, struct request *rq)
-	 * to TP_PROTO(struct request *rq)
-	 * see:
-	 *     https://github.com/torvalds/linux/commit/a54895fa
-	 */
 	if (LINUX_KERNEL_VERSION >= KERNEL_VERSION(5, 10, 137))
 		return trace_rq_start((void *)ctx[0], false);
 	else
 		return trace_rq_start((void *)ctx[1], false);
 }
 
-SEC("tp_btf/block_rq_complete")
-int BPF_PROG(block_rq_complete, struct request *rq, int error,
-	     unsigned int nr_bytes)
+SEC("tp_btf/block_rq_insert")
+int block_rq_insert_btf(u64 *ctx)
+{
+	return handle_block_rq_insert(ctx);
+}
+
+SEC("tp_btf/block_rq_issue")
+int block_rq_issue_btf(u64 *ctx)
+{
+	return handle_block_rq_issue(ctx);
+}
+
+SEC("raw_tp/block_rq_insert")
+int BPF_PROG(block_rq_insert)
+{
+	return handle_block_rq_insert(ctx);
+}
+
+SEC("raw_tp/block_rq_issue")
+int BPF_PROG(block_rq_issue)
+{
+	return handle_block_rq_issue(ctx);
+}
+
+static __always_inline
+int handle_block_rq_complete(void *ctx, struct request *rq, int error,
+			     unsigned int nr_bytes)
 {
 	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
 		return 0;
@@ -205,6 +259,20 @@ cleanup:
 	bpf_map_delete_elem(&start, &rq);
 	bpf_map_delete_elem(&infobyreq, &rq);
 	return 0;
+}
+
+SEC("tp_btf/block_rq_complete")
+int BPF_PROG(block_rq_complete_btf, struct request *rq, int error,
+	     unsigned int nr_bytes)
+{
+	return handle_block_rq_complete(ctx, rq, error, nr_bytes);
+}
+
+SEC("raw_tp/block_rq_complete")
+int BPF_PROG(block_rq_complete, struct request *rq, int error,
+	     unsigned int nr_bytes)
+{
+	return handle_block_rq_complete(ctx, rq, error, nr_bytes);
 }
 
 char LICENSE[] SEC("license") = "GPL";

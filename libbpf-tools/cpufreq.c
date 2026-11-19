@@ -225,10 +225,25 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	obj = cpufreq_bpf__open_and_load();
+	obj = cpufreq_bpf__open();
 	if (!obj) {
-		fprintf(stderr, "failed to open and/or load BPF object\n");
+		fprintf(stderr, "failed to open BPF object\n");
 		return 1;
+	}
+
+	/*
+	 * Use tp_btf when available (kernel >= 5.5 with BTF), otherwise fall
+	 * back to raw_tp so the tool also runs on older LTS kernels.
+	 */
+	if (probe_tp_btf("cpu_frequency"))
+		bpf_program__set_autoload(obj->progs.cpu_frequency, false);
+	else
+		bpf_program__set_autoload(obj->progs.cpu_frequency_btf, false);
+
+	err = cpufreq_bpf__load(obj);
+	if (err) {
+		fprintf(stderr, "failed to load BPF object\n");
+		goto cleanup;
 	}
 
 	if (!obj->bss) {
