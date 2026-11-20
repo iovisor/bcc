@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
 // Copyright (c) 2023 Wenbo Zhang
 #include <argp.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -168,7 +169,7 @@ static int handle_event(void *ctx, void *data, size_t data_sz)
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 {
-	fprintf(stderr, "lost %llu events on CPU #%d\n", lost_cnt, cpu);
+	fprintf(stderr, "lost %" PRIu64" events on CPU #%d\n", (uint64_t)lost_cnt, cpu);
 }
 
 int main(int argc, char **argv)
