@@ -41,3 +41,14 @@ perl -e 'while (1) { $a .= "A" x 1024; }'     # eat all memory
 
 WARNING: This exhausts system memory after disabling some overcommit checks.
 Only test in a lab environment.
+
+Passing -s (or --stack) also captures and prints the user-space stack trace of
+the OOM-killed victim process (requires BTF and Linux 5.9+):
+
+# ./oomkill -s
+Tracing oom_kill_process()... Ctrl-C to end.
+21:05:12 Triggered by PID 22610 ("python3"), OOM kill of PID 22610 ("python3"), 3850642 pages, loadavg: 1.05 0.48 0.32 2/284 22610
+  Victim stack trace:
+    0x7f8b2c1a4b20 __GI___memset_avx2_unaligned_erms+0x120 (libc.so.6)
+    0x55a8c13d9412 _PyBytes_Resize+0x92 (python3)
+    0x55a8c141e8c0 _PyEval_EvalFrameDefault+0x2a10 (python3)

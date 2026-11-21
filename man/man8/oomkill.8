@@ -2,7 +2,7 @@
 .SH NAME
 oomkill \- Trace oom_kill_process(). Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B oomkill
+.B oomkill [\-h] [\-s]
 .SH DESCRIPTION
 This traces the kernel out-of-memory killer, and prints basic details,
 including the system load averages at the time of the OOM kill. This can
@@ -16,11 +16,22 @@ This program is also a basic example of eBPF/bcc.
 Since this uses BPF, only the root user can use this tool.
 .SH REQUIREMENTS
 CONFIG_BPF and bcc.
+.SH OPTIONS
+.TP
+\-h, \-\-help
+Print usage message.
+.TP
+\-s, \-\-stack
+Print the user-space stack trace of the OOM-killed victim process (requires BTF and Linux 5.9+).
 .SH EXAMPLES
 .TP
 Trace OOM kill events:
 #
 .B oomkill
+.TP
+Trace OOM kill events and print victim user-space stack traces:
+#
+.B oomkill \-s
 .SH FIELDS
 .TP
 Triggered by ...
