@@ -4,6 +4,7 @@
 // Based on readahead(8) from BPF-Perf-Tools-Book by Brendan Gregg.
 // 8-Jun-2020   Wenbo Zhang   Created this.
 #include <argp.h>
+#include <errno.h>
 #include <signal.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -135,16 +136,18 @@ static int attach_access(struct readahead_bpf *obj)
  * target, so the program has to match the running kernel's signature or it
  * reads the return value from the wrong register.
  */
-static bool filemap_alloc_folio_noprof_takes_policy(void)
+static int filemap_alloc_folio_noprof_nr_args(void)
 {
 	const struct btf_type *t;
 	struct btf *btf;
-	bool takes_policy = false;
+	long err;
 	__s32 id;
+	int nr_args;
 
 	btf = btf__load_vmlinux_btf();
-	if (libbpf_get_error(btf))
-		return false;
+	err = libbpf_get_error(btf);
+	if (err)
+		return (int)err;
 
 	id = btf__find_by_name_kind(btf, "filemap_alloc_folio_noprof",
 				    BTF_KIND_FUNC);
@@ -154,11 +157,14 @@ static bool filemap_alloc_folio_noprof_takes_policy(void)
 	else
 		t = NULL;
 
-	if (t && btf_is_func_proto(t))
-		takes_policy = btf_vlen(t) >= 3;
+	if (!t || !btf_is_func_proto(t)) {
+		btf__free(btf);
+		return -ENOENT;
+	}
 
+	nr_args = btf_vlen(t);
 	btf__free(btf);
-	return takes_policy;
+	return nr_args;
 }
 
 static int attach_alloc_ret(struct readahead_bpf *obj)
@@ -173,7 +179,14 @@ static int attach_alloc_ret(struct readahead_bpf *obj)
 	 * renamed filemap_alloc_folio to filemap_alloc_folio_noprof
 	 */
 	if (fentry_can_attach("filemap_alloc_folio_noprof", NULL)) {
-		if (filemap_alloc_folio_noprof_takes_policy())
+		int nr_args = filemap_alloc_folio_noprof_nr_args();
+
+		if (nr_args < 0) {
+			fprintf(stderr, "failed to read filemap_alloc_folio_noprof BTF: %d\n",
+				nr_args);
+			return nr_args;
+		}
+		if (nr_args >= 3)
 			bpf_program__set_autoload(obj->progs.filemap_alloc_folio_noprof_mpol_ret, true);
 		else
 			bpf_program__set_autoload(obj->progs.filemap_alloc_folio_noprof_ret, true);
