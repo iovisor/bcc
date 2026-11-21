@@ -116,6 +116,7 @@ BPF_PERF_OUTPUT(perf_SSL_rw);
 
 BPF_HASH(start_ns, u32);
 BPF_HASH(bufs, u32, u64);
+BPF_HASH(lens, u32, u64);
 
 __attribute__((always_inline))
 static inline u32 bpf_min(u32 a, u32 b) {
@@ -139,7 +140,24 @@ int probe_SSL_rw_enter(struct pt_regs *ctx, void *ssl, void *buf, int num) {
         return 0;
 }
 
-static int SSL_exit(struct pt_regs *ctx, int rw) {
+int probe_SSL_rw_ex_enter(struct pt_regs *ctx, void *ssl, void *buf,
+                          size_t num, size_t *nbytes) {
+        u64 pid_tgid = bpf_get_current_pid_tgid();
+        u32 pid = pid_tgid >> 32;
+        u32 tid = pid_tgid;
+        u32 uid = bpf_get_current_uid_gid();
+        u64 ts = bpf_ktime_get_ns();
+
+        PID_FILTER
+        UID_FILTER
+
+        bufs.update(&tid, (u64*)&buf);
+        lens.update(&tid, (u64*)&nbytes);
+        start_ns.update(&tid, &ts);
+        return 0;
+}
+
+static int SSL_exit(struct pt_regs *ctx, int rw, int len) {
         int ret;
         u32 zero = 0;
         u64 pid_tgid = bpf_get_current_pid_tgid();
@@ -159,7 +177,6 @@ static int SSL_exit(struct pt_regs *ctx, int rw) {
         if (tsp == 0)
                 return 0;
 
-        int len = PT_REGS_RC(ctx);
         if (len <= 0) // no data
                 return 0;
 
@@ -195,11 +212,38 @@ static int SSL_exit(struct pt_regs *ctx, int rw) {
 }
 
 int probe_SSL_read_exit(struct pt_regs *ctx) {
-        return (SSL_exit(ctx, 0));
+        return (SSL_exit(ctx, 0, PT_REGS_RC(ctx)));
 }
 
 int probe_SSL_write_exit(struct pt_regs *ctx) {
-        return (SSL_exit(ctx, 1));
+        return (SSL_exit(ctx, 1, PT_REGS_RC(ctx)));
+}
+
+/*
+ * SSL_read_ex()/SSL_write_ex() return 1 on success and store the number of
+ * bytes processed through their 4th argument.
+ */
+static int SSL_ex_exit(struct pt_regs *ctx, int rw) {
+        u32 tid = (u32)bpf_get_current_pid_tgid();
+        size_t len = 0;
+
+        u64 *nbytesp = lens.lookup(&tid);
+        if (nbytesp == 0)
+                return 0;
+        lens.delete(&tid);
+
+        if (PT_REGS_RC(ctx) == 1)
+                bpf_probe_read_user(&len, sizeof(len), (void *)*nbytesp);
+
+        return (SSL_exit(ctx, rw, (int)len));
+}
+
+int probe_SSL_read_ex_exit(struct pt_regs *ctx) {
+        return (SSL_ex_exit(ctx, 0));
+}
+
+int probe_SSL_write_ex_exit(struct pt_regs *ctx) {
+        return (SSL_ex_exit(ctx, 1));
 }
 
 BPF_PERF_OUTPUT(perf_SSL_do_handshake);
@@ -278,6 +322,15 @@ if args.debug or args.ebpf:
 
 b = BPF(text=prog)
 
+def lib_has_functions(lib, names):
+    path = BPF.find_library(lib, args.pid or 0)
+    if path is None:
+        return False
+    regex = "^(%s)$" % "|".join(names)
+    found = set(sym for sym, _ in
+                BPF.get_user_functions_and_addresses(path, regex))
+    return all(name.encode() in found for name in names)
+
 # It looks like SSL_read's arguments aren't available in a return probe so you
 # need to stash the buffer address in a map on the function entry and read it
 # on its exit (Mark Drayton)
@@ -291,6 +344,19 @@ def attach_openssl(lib):
                     fn_name="probe_SSL_rw_enter", pid=args.pid or -1)
     b.attach_uretprobe(name=lib, sym="SSL_read",
                        fn_name="probe_SSL_read_exit", pid=args.pid or -1)
+    # SSL_read_ex()/SSL_write_ex() exist since OpenSSL 1.1.1 and are used
+    # instead of SSL_read()/SSL_write() by e.g. CPython's ssl module.
+    if lib_has_functions(lib, ["SSL_read_ex", "SSL_write_ex"]):
+        b.attach_uprobe(name=lib, sym="SSL_write_ex",
+                        fn_name="probe_SSL_rw_ex_enter", pid=args.pid or -1)
+        b.attach_uretprobe(name=lib, sym="SSL_write_ex",
+                           fn_name="probe_SSL_write_ex_exit",
+                           pid=args.pid or -1)
+        b.attach_uprobe(name=lib, sym="SSL_read_ex",
+                        fn_name="probe_SSL_rw_ex_enter", pid=args.pid or -1)
+        b.attach_uretprobe(name=lib, sym="SSL_read_ex",
+                           fn_name="probe_SSL_read_ex_exit",
+                           pid=args.pid or -1)
     if args.latency and args.handshake:
         b.attach_uprobe(name="ssl", sym="SSL_do_handshake",
                         fn_name="probe_SSL_do_handshake_enter", pid=args.pid or -1)
