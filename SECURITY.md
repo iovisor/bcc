@@ -6,7 +6,7 @@ Please do not open a public issue for a suspected vulnerability.
 
 Use GitHub's private vulnerability reporting instead:
 
-https://github.com/iovisor/bcc/security/advisories/new
+https://github.com/iovisor/bcc/security
 
 Include the affected tool or library, the kernel and architecture, a
 reproducer if one exists, and the impact you observed. We will use the
