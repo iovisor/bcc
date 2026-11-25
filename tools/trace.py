@@ -21,6 +21,7 @@ import re
 import ctypes as ct
 import os
 import traceback
+import signal
 import sys
 
 class Probe(object):
@@ -902,6 +903,11 @@ trace -s /lib/x86_64-linux-gnu/libc.so.6,/bin/ping 'p:c:inet_pton' -U
                         self.bpf.perf_buffer_poll()
 
         def run(self):
+                # SIGTERM (kill, timeout) would end the process without
+                # flushing stdout, losing the events still buffered when the
+                # output goes to a file or a pipe. Exit normally instead, as
+                # on Ctrl-C, so that the buffer is written out.
+                signal.signal(signal.SIGTERM, lambda signum, frame: sys.exit(0))
                 try:
                         self._create_probes()
                         self._generate_program()
