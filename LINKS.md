@@ -29,7 +29,7 @@
 - 2016-08-22: [BoF - What Can BPF Do For You?](https://events.static.linuxfound.org/sites/events/files/slides/iovisor-lc-bof-2016.pdf)
 - 2016-07-03: [Linux debugging tools I love](https://jvns.ca/blog/2016/07/03/debugging-tools-i-love)
 - 2016-06-14: [Ubuntu Xenial bcc/BPF](http://www.brendangregg.com/blog/2016-06-14/ubuntu-xenial-bcc-bpf.html)
-- 2016-05-26: [Linux BPF/bcc for Oracle Tracing](https://db-blog.web.cern.ch/blog/luca-canali/2016-05-linux-bpfbcc-oracle-tracing)
+- 2016-05-26: [Linux BPF/bcc for Oracle Tracing](https://web.archive.org/web/20260512124328/https://db-blog.web.cern.ch/blog/luca-canali/2016-05-linux-bpfbcc-oracle-tracing)
 - 2016-03-30: [How to turn any syscall into an event: Introducing eBPF Kernel probes](https://blog.yadutaf.fr/2016/03/30/turn-any-syscall-into-event-introducing-ebpf-kernel-probes)
 - 2016-03-28: [Linux BPF/bcc Road Ahead, March 2016](http://www.brendangregg.com/blog/2016-03-28/linux-bpf-bcc-road-ahead-2016.html)
 - 2016-03-05: [Linux BPF Superpowers](http://www.brendangregg.com/blog/2016-03-05/linux-bpf-superpowers.html)
