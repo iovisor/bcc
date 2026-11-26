@@ -177,6 +177,11 @@ int query_end(struct pt_regs *ctx) {
    .replace("DEFINE_THRESHOLD",
             "#define THRESHOLD %d" % threshold_ns if threshold_ns > 0 else "")
 
+if args.verbose or args.ebpf:
+    print(program)
+    if args.ebpf:
+        exit()
+
 if mode.startswith("MYSQL"):
     # Uprobes mode
     bpf = BPF(text=program)
@@ -202,11 +207,6 @@ else:
         print('\n'.join(map(lambda u: u.get_text(), usdts)))
 
     bpf = BPF(text=program, usdt_contexts=usdts)
-
-if args.verbose or args.ebpf:
-    print(program)
-    if args.ebpf:
-        exit()
 
 start = BPF.monotonic_time()
 

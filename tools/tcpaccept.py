@@ -233,10 +233,6 @@ else:
     bpf_text = bpf_text.replace('##GET_SK_PROTOCOL##', get_sk_protocol_bitfield)
 
 bpf_text = filter_by_containers(args) + bpf_text
-if debug or args.ebpf:
-    print(bpf_text)
-    if args.ebpf:
-        exit()
 
 bpf_text = bpf_text.replace('##FILTER_PORT##', '')
 bpf_text = bpf_text.replace('##FILTER_FAMILY##', '')
@@ -273,6 +269,11 @@ def print_ipv6_event(cpu, data, size):
         event.dport,
         inet_ntop(AF_INET6, event.saddr).encode(),
         event.lport))
+
+if debug or args.ebpf:
+    print(bpf_text)
+    if args.ebpf:
+        exit()
 
 # initialize BPF
 b = BPF(text=bpf_text)
