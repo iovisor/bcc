@@ -177,7 +177,7 @@ jobs:
                    /bin/bash -c \
                    'mkdir -p /bcc/build && cd /bcc/build && \
                     cmake -DCMAKE_BUILD_TYPE=${TYPE} -DENABLE_LLVM_SHARED=ON -DRUN_LUA_TESTS=OFF .. && make -j9'"
-    - name: Run libbpf-tools build
+    - name: Run libbpf-tools build and unit tests
       env: ${{ matrix.env }}
       run: |
         /bin/bash -c \
@@ -190,7 +190,7 @@ jobs:
                    -v /usr/include/linux:/usr/include/linux:ro \
                    bcc-docker \
                    /bin/bash -c \
-                   'cd /bcc/libbpf-tools && make -j9'"
+                   'cd /bcc/libbpf-tools && make -j9 && make -C tests test'"
 
     - name: Run bcc's cc tests
       env: ${{ matrix.env }}
