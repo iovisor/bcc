@@ -204,10 +204,11 @@ class Probe(object):
                         self.library = ':'.join(parts[1:-1])
                         self.function = parts[-1]
 
-                # only x64 syscalls needs checking, no other syscall wrapper yet.
+                # Syscall wrappers like __x64_sys_* or __arm64_sys_* take the
+                # syscall's pt_regs instead of the syscall arguments.
                 self.is_syscall_kprobe = False
                 if self.probe_type == "p" and len(self.library) == 0 and \
-                   self.function[:10] == "__x64_sys_":
+                   self.function.startswith(Probe.syscall_wrappers):
                         self.is_syscall_kprobe = True
 
         def _find_usdt_probe(self):
@@ -259,6 +260,12 @@ class Probe(object):
                         if len(part) > 0:
                                 self.values.append(part)
 
+        # Syscall wrappers that take the syscall's pt_regs, see
+        # BPF._syscall_prefixes. s390x is left out because helpers.h does not
+        # treat it as having a pt_regs syscall wrapper.
+        syscall_wrappers = ("__x64_sys_", "__x32_compat_sys_", "__arm64_sys_",
+                            "__riscv_sys_")
+
         aliases_arg = {
                 "arg1": "PT_REGS_PARM1(ctx)",
                 "arg2": "PT_REGS_PARM2(ctx)",
@@ -268,19 +275,23 @@ class Probe(object):
                 "arg6": "PT_REGS_PARM6(ctx)",
         }
 
+        # Syscall wrappers (__x64_sys_*, __arm64_sys_*, ...) get the
+        # syscall's pt_regs as their only argument. PT_REGS_SYSCALL_CTX()
+        # and PT_REGS_PARMn_SYSCALL() from helpers.h take care of the arch
+        # differences, e.g. that x86_64 passes the 4th argument in r10.
         aliases_indarg = {
-                "arg1": "({u64 _val; struct pt_regs *_ctx = (struct pt_regs *)PT_REGS_PARM1(ctx);"
-                        "  bpf_probe_read_kernel(&_val, sizeof(_val), &(PT_REGS_PARM1(_ctx))); _val;})",
-                "arg2": "({u64 _val; struct pt_regs *_ctx = (struct pt_regs *)PT_REGS_PARM1(ctx);"
-                        "  bpf_probe_read_kernel(&_val, sizeof(_val), &(PT_REGS_PARM2(_ctx))); _val;})",
-                "arg3": "({u64 _val; struct pt_regs *_ctx = (struct pt_regs *)PT_REGS_PARM1(ctx);"
-                        "  bpf_probe_read_kernel(&_val, sizeof(_val), &(PT_REGS_PARM3(_ctx))); _val;})",
-                "arg4": "({u64 _val; struct pt_regs *_ctx = (struct pt_regs *)PT_REGS_PARM1(ctx);"
-                        "  bpf_probe_read_kernel(&_val, sizeof(_val), &(PT_REGS_PARM4(_ctx))); _val;})",
-                "arg5": "({u64 _val; struct pt_regs *_ctx = (struct pt_regs *)PT_REGS_PARM1(ctx);"
-                        "  bpf_probe_read_kernel(&_val, sizeof(_val), &(PT_REGS_PARM5(_ctx))); _val;})",
-                "arg6": "({u64 _val; struct pt_regs *_ctx = (struct pt_regs *)PT_REGS_PARM1(ctx);"
-                        "  bpf_probe_read_kernel(&_val, sizeof(_val), &(PT_REGS_PARM6(_ctx))); _val;})",
+                "arg1": "({u64 _val; struct pt_regs *_ctx = PT_REGS_SYSCALL_CTX(ctx);"
+                        "  bpf_probe_read_kernel(&_val, sizeof(_val), &(PT_REGS_PARM1_SYSCALL(_ctx))); _val;})",
+                "arg2": "({u64 _val; struct pt_regs *_ctx = PT_REGS_SYSCALL_CTX(ctx);"
+                        "  bpf_probe_read_kernel(&_val, sizeof(_val), &(PT_REGS_PARM2_SYSCALL(_ctx))); _val;})",
+                "arg3": "({u64 _val; struct pt_regs *_ctx = PT_REGS_SYSCALL_CTX(ctx);"
+                        "  bpf_probe_read_kernel(&_val, sizeof(_val), &(PT_REGS_PARM3_SYSCALL(_ctx))); _val;})",
+                "arg4": "({u64 _val; struct pt_regs *_ctx = PT_REGS_SYSCALL_CTX(ctx);"
+                        "  bpf_probe_read_kernel(&_val, sizeof(_val), &(PT_REGS_PARM4_SYSCALL(_ctx))); _val;})",
+                "arg5": "({u64 _val; struct pt_regs *_ctx = PT_REGS_SYSCALL_CTX(ctx);"
+                        "  bpf_probe_read_kernel(&_val, sizeof(_val), &(PT_REGS_PARM5_SYSCALL(_ctx))); _val;})",
+                "arg6": "({u64 _val; struct pt_regs *_ctx = PT_REGS_SYSCALL_CTX(ctx);"
+                        "  bpf_probe_read_kernel(&_val, sizeof(_val), &(PT_REGS_PARM6_SYSCALL(_ctx))); _val;})",
         }
 
         aliases_common = {
