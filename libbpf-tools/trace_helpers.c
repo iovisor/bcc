@@ -31,6 +31,8 @@
 
 #define DISK_NAME_LEN	32
 
+#define KSYM_NAME_LEN	512
+
 #define MINORBITS	20
 #define MINORMASK	((1U << MINORBITS) - 1)
 
@@ -97,7 +99,7 @@ static int ksym_cmp(const void *p1, const void *p2)
 
 struct ksyms *ksyms__load(void)
 {
-	char sym_type, sym_name[256];
+	char sym_type, sym_name[KSYM_NAME_LEN];
 	struct ksyms *ksyms;
 	unsigned long sym_addr;
 	int i, ret;
@@ -112,7 +114,7 @@ struct ksyms *ksyms__load(void)
 		goto err_out;
 
 	while (true) {
-		ret = fscanf(f, "%lx %c %s%*[^\n]\n",
+		ret = fscanf(f, "%lx %c %511s%*[^\n]\n",
 			     &sym_addr, &sym_type, sym_name);
 		if (ret == EOF && feof(f))
 			break;
@@ -1130,7 +1132,7 @@ static const char *tracefs_available_filter_functions(void)
 bool kprobe_exists(const char *name)
 {
 	char addr_range[256];
-	char sym_name[256];
+	char sym_name[KSYM_NAME_LEN];
 	FILE *f;
 	int ret;
 
@@ -1139,7 +1141,7 @@ bool kprobe_exists(const char *name)
 		goto avail_filter;
 
 	while (true) {
-		ret = fscanf(f, "%s %s%*[^\n]\n", addr_range, sym_name);
+		ret = fscanf(f, "%255s %511s%*[^\n]\n", addr_range, sym_name);
 		if (ret == EOF && feof(f))
 			break;
 		if (ret != 2) {
@@ -1159,7 +1161,7 @@ avail_filter:
 		goto slow_path;
 
 	while (true) {
-		ret = fscanf(f, "%s%*[^\n]\n", sym_name);
+		ret = fscanf(f, "%511s%*[^\n]\n", sym_name);
 		if (ret == EOF && feof(f))
 			break;
 		if (ret != 1) {
@@ -1181,7 +1183,7 @@ slow_path:
 		return false;
 
 	while (true) {
-		ret = fscanf(f, "%*x %*c %s%*[^\n]\n", sym_name);
+		ret = fscanf(f, "%*x %*c %511s%*[^\n]\n", sym_name);
 		if (ret == EOF && feof(f))
 			break;
 		if (ret != 1) {
