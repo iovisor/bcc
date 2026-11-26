@@ -2036,10 +2036,14 @@ Examples in situ:
 
 Syntax: ```BPF.ring_buffer_poll(timeout=T)```
 
-This polls from all open ringbuf ring buffers, calling the callback function that was provided when calling open_ring_buffer for each entry.
+This polls all open ringbuf ring buffers, calling the callback function that was provided when calling open_ring_buffer for each entry.
 
-The timeout parameter is optional and measured in milliseconds. In its absence, polling continues until
-there is no more data or the callback returns a negative value.
+The `timeout` parameter is optional and measured in milliseconds. A negative
+value (the default, `-1`) blocks until at least one event is available. A value
+of `0` polls without blocking. A positive value waits at most that many
+milliseconds. In all cases, all currently available events are dispatched
+before the call returns, and polling stops early if the callback returns a
+negative value.
 
 Example:
 
