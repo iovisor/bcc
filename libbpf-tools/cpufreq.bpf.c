@@ -33,8 +33,8 @@ struct {
 		: [max]"i"(UMAX)					\
 	)
 
-SEC("tp_btf/cpu_frequency")
-int BPF_PROG(cpu_frequency, unsigned int state, unsigned int cpu_id)
+static __always_inline int handle_cpu_frequency(unsigned int state,
+						 unsigned int cpu_id)
 {
 	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
 		return 0;
@@ -45,6 +45,23 @@ int BPF_PROG(cpu_frequency, unsigned int state, unsigned int cpu_id)
 	clamp_umax(cpu_id, MAX_CPU_NR - 1);
 	freqs_mhz[cpu_id] = state / 1000;
 	return 0;
+}
+
+SEC("tp_btf/cpu_frequency")
+int BPF_PROG(cpu_frequency_btf, unsigned int state, unsigned int cpu_id)
+{
+	return handle_cpu_frequency(state, cpu_id);
+}
+
+/*
+ * raw_tp is used as a fallback for kernels without BTF-enabled raw
+ * tracepoints (tp_btf), which are only available since v5.5. This allows
+ * the tool to run on older LTS kernels such as v4.19 and v5.4.
+ */
+SEC("raw_tp/cpu_frequency")
+int BPF_PROG(cpu_frequency, unsigned int state, unsigned int cpu_id)
+{
+	return handle_cpu_frequency(state, cpu_id);
 }
 
 SEC("perf_event")

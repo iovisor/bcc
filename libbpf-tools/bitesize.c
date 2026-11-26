@@ -192,6 +192,16 @@ int main(int argc, char **argv)
 		obj->rodata->targ_dev = partition->dev;
 	}
 
+	/*
+	 * Use tp_btf when available (kernel >= 5.5 with BTF), otherwise fall
+	 * back to raw_tp so the tool also runs on older LTS kernels.
+	 */
+	if (probe_tp_btf("block_rq_issue")) {
+		bpf_program__set_autoload(obj->progs.block_rq_issue, false);
+	} else {
+		bpf_program__set_autoload(obj->progs.block_rq_issue_btf, false);
+	}
+
 	err = bitesize_bpf__load(obj);
 	if (err) {
 		fprintf(stderr, "failed to load BPF object: %d\n", err);
