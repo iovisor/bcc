@@ -64,6 +64,7 @@ APPS = \
 	funclatency \
 	gethostlatency \
 	hardirqs \
+	iouringsnoop \
 	javagc \
 	klockstat \
 	ksnoop \
