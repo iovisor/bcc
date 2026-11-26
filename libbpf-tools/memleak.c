@@ -51,6 +51,8 @@ static struct env {
 	bool verbose;
 	char command[32];
 	char symbols_prefix[16];
+	char malloc_symbol[128];
+	char free_symbol[128];
 } env = {
 	.interval = 5, // posarg 1
 	.nr_intervals = -1, // posarg 2
@@ -73,6 +75,8 @@ static struct env {
 	.verbose = false,
 	.command = {0}, // -c --command
 	.symbols_prefix = {0},
+	.malloc_symbol = {0},
+	.free_symbol = {0},
 };
 
 struct allocation_node {
@@ -90,11 +94,17 @@ struct allocation {
 
 #define OPT_PERF_MAX_STACK_DEPTH	1 /* --perf-max-stack-depth */
 #define OPT_STACK_STORAGE_SIZE		2 /* --stack-storage-size */
+#define OPT_MALLOC_SYMBOL		3 /* --malloc-symbol */
+#define OPT_FREE_SYMBOL		4 /* --free-symbol */
 
-#define __ATTACH_UPROBE(skel, sym_name, prog_name, is_retprobe) \
+#define __ATTACH_UPROBE_WITH_SYMBOL(skel, sym_name, symbol_override, prog_name, is_retprobe) \
 	do { \
-		char sym[32]; \
-		sprintf(sym, "%s%s", env.symbols_prefix, #sym_name); \
+		char sym[128]; \
+		const char *override = (symbol_override); \
+		if (override && override[0]) \
+			snprintf(sym, sizeof(sym), "%s", override); \
+		else \
+			snprintf(sym, sizeof(sym), "%s%s", env.symbols_prefix, #sym_name); \
 		LIBBPF_OPTS(bpf_uprobe_opts, uprobe_opts, \
 				.func_name = sym, \
 				.retprobe = is_retprobe); \
@@ -105,6 +115,9 @@ struct allocation {
 				0, \
 				&uprobe_opts); \
 	} while (false)
+
+#define __ATTACH_UPROBE(skel, sym_name, prog_name, is_retprobe) \
+	__ATTACH_UPROBE_WITH_SYMBOL(skel, sym_name, "", prog_name, is_retprobe)
 
 #define __CHECK_PROGRAM(skel, prog_name) \
 	do { \
@@ -125,6 +138,16 @@ struct allocation {
 
 #define ATTACH_UPROBE_CHECKED(skel, sym_name, prog_name) __ATTACH_UPROBE_CHECKED(skel, sym_name, prog_name, false)
 #define ATTACH_URETPROBE_CHECKED(skel, sym_name, prog_name) __ATTACH_UPROBE_CHECKED(skel, sym_name, prog_name, true)
+
+#define __ATTACH_UPROBE_CHECKED_SYMBOL(skel, sym_name, symbol_override, prog_name, is_retprobe) \
+	do { \
+		__ATTACH_UPROBE_WITH_SYMBOL(skel, sym_name, symbol_override, prog_name, is_retprobe); \
+		__CHECK_PROGRAM(skel, prog_name); \
+	} while (false)
+#define ATTACH_UPROBE_CHECKED_SYMBOL(skel, sym_name, symbol_override, prog_name) \
+	__ATTACH_UPROBE_CHECKED_SYMBOL(skel, sym_name, symbol_override, prog_name, false)
+#define ATTACH_URETPROBE_CHECKED_SYMBOL(skel, sym_name, symbol_override, prog_name) \
+	__ATTACH_UPROBE_CHECKED_SYMBOL(skel, sym_name, symbol_override, prog_name, true)
 
 /*
  * -EFAULT in get_stackid normally means the stack-trace is not available,
@@ -201,6 +224,9 @@ const char argp_args_doc[] =
 "        Trace roughly every 5th allocation, to reduce overhead\n"
 "./memleak -p $(pidof allocs) -S je_\n"
 "        Trace task who use jemalloc\n"
+"./memleak -p $(pidof allocs) -O /path/to/libjemalloc.so -S je_ "
+"--malloc-symbol je_malloc_default --free-symbol je_free_default\n"
+"        Trace jemalloc allocators with nonstandard malloc/free symbols\n"
 "";
 
 static const struct argp_option argp_options[] = {
@@ -219,6 +245,8 @@ static const struct argp_option argp_options[] = {
 	{"obj", 'O', "OBJECT", 0, "attach to allocator functions in the specified object", 0 },
 	{"percpu", 'P', NULL, 0, "trace percpu allocations", 0 },
 	{"symbols-prefix", 'S', "SYMBOLS_PREFIX", 0, "memory allocator symbols prefix", 0 },
+	{"malloc-symbol", OPT_MALLOC_SYMBOL, "SYMBOL", 0, "exact malloc symbol to attach to (overrides the symbols prefix)", 0 },
+	{"free-symbol", OPT_FREE_SYMBOL, "SYMBOL", 0, "exact free symbol to attach to (overrides the symbols prefix)", 0 },
 	{"stack-storage-size", OPT_STACK_STORAGE_SIZE, "STACK-STORAGE-SIZE", 0,
 	 "the number of unique stack traces that can be stored and displayed (default 10240)", 0 },
 	{"perf-max-stack-depth", OPT_PERF_MAX_STACK_DEPTH,
@@ -580,6 +608,12 @@ error_t argp_parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'S':
 		strncpy(env.symbols_prefix, arg, sizeof(env.symbols_prefix) - 1);
+		break;
+	case OPT_MALLOC_SYMBOL:
+		strncpy(env.malloc_symbol, arg, sizeof(env.malloc_symbol) - 1);
+		break;
+	case OPT_FREE_SYMBOL:
+		strncpy(env.free_symbol, arg, sizeof(env.free_symbol) - 1);
 		break;
 	case 'T':
 		env.top_stacks = argp_parse_long(key, arg, state);
@@ -1135,8 +1169,8 @@ void disable_kernel_tracepoints(struct memleak_bpf *skel)
 
 int attach_uprobes(struct memleak_bpf *skel)
 {
-	ATTACH_UPROBE_CHECKED(skel, malloc, malloc_enter);
-	ATTACH_URETPROBE_CHECKED(skel, malloc, malloc_exit);
+	ATTACH_UPROBE_CHECKED_SYMBOL(skel, malloc, env.malloc_symbol, malloc_enter);
+	ATTACH_URETPROBE_CHECKED_SYMBOL(skel, malloc, env.malloc_symbol, malloc_exit);
 
 	ATTACH_UPROBE_CHECKED(skel, calloc, calloc_enter);
 	ATTACH_URETPROBE_CHECKED(skel, calloc, calloc_exit);
@@ -1165,7 +1199,7 @@ int attach_uprobes(struct memleak_bpf *skel)
 	ATTACH_UPROBE_CHECKED(skel, memalign, memalign_enter);
 	ATTACH_URETPROBE_CHECKED(skel, memalign, memalign_exit);
 
-	ATTACH_UPROBE_CHECKED(skel, free, free_enter);
+	ATTACH_UPROBE_CHECKED_SYMBOL(skel, free, env.free_symbol, free_enter);
 	if (strlen(env.symbols_prefix))
 		ATTACH_UPROBE(skel, munmap, munmap_enter);
 	else
