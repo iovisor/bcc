@@ -5,6 +5,9 @@
 #define TASK_COMM_LEN	16
 #define MAX_SLOTS	26
 
+/* with --split, set in a per-pid/tid hist key when the wait followed a preemption */
+#define RUNQLAT_PREEMPT_BIT	(1U << 31)
+
 struct hist {
 	__u32 slots[MAX_SLOTS];
 	char comm[TASK_COMM_LEN];

@@ -17,6 +17,7 @@ const volatile bool targ_per_process = false;
 const volatile bool targ_per_thread = false;
 const volatile bool targ_per_pidns = false;
 const volatile bool targ_ms = false;
+const volatile bool targ_split = false;
 const volatile pid_t targ_tgid = 0;
 
 struct {
@@ -26,11 +27,17 @@ struct {
 	__uint(max_entries, 1);
 } cgroup_map SEC(".maps");
 
+/* why a task became runnable: woken from sleep, or preempted while running */
+struct enqueue_info {
+	u64 ts;
+	u64 preempted;
+};
+
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, MAX_ENTRIES);
 	__type(key, u32);
-	__type(value, u64);
+	__type(value, struct enqueue_info);
 } start SEC(".maps");
 
 static struct hist zero;
@@ -42,17 +49,18 @@ struct {
 	__type(value, struct hist);
 } hists SEC(".maps");
 
-static int trace_enqueue(u32 tgid, u32 pid)
+static int trace_enqueue(u32 tgid, u32 pid, bool preempted)
 {
-	u64 ts;
+	struct enqueue_info info;
 
 	if (!pid)
 		return 0;
 	if (targ_tgid && targ_tgid != tgid)
 		return 0;
 
-	ts = bpf_ktime_get_ns();
-	bpf_map_update_elem(&start, &pid, &ts, BPF_ANY);
+	info.ts = bpf_ktime_get_ns();
+	info.preempted = preempted;
+	bpf_map_update_elem(&start, &pid, &info, BPF_ANY);
 	return 0;
 }
 
@@ -76,8 +84,10 @@ static unsigned int pid_namespace(struct task_struct *task)
 
 static int handle_switch(bool preempt, struct task_struct *prev, struct task_struct *next)
 {
+	struct enqueue_info *infop;
 	struct hist *histp;
-	u64 *tsp, slot;
+	bool preempted;
+	u64 slot;
 	u32 pid, hkey;
 	s64 delta;
 
@@ -85,14 +95,15 @@ static int handle_switch(bool preempt, struct task_struct *prev, struct task_str
 		return 0;
 
 	if (get_task_state(prev) == TASK_RUNNING)
-		trace_enqueue(BPF_CORE_READ(prev, tgid), BPF_CORE_READ(prev, pid));
+		trace_enqueue(BPF_CORE_READ(prev, tgid), BPF_CORE_READ(prev, pid), true);
 
 	pid = BPF_CORE_READ(next, pid);
 
-	tsp = bpf_map_lookup_elem(&start, &pid);
-	if (!tsp)
+	infop = bpf_map_lookup_elem(&start, &pid);
+	if (!infop)
 		return 0;
-	delta = bpf_ktime_get_ns() - *tsp;
+	delta = bpf_ktime_get_ns() - infop->ts;
+	preempted = infop->preempted;
 	if (delta < 0)
 		goto cleanup;
 
@@ -104,6 +115,12 @@ static int handle_switch(bool preempt, struct task_struct *prev, struct task_str
 		hkey = pid_namespace(next);
 	else
 		hkey = -1;
+	if (targ_split) {
+		if (targ_per_process || targ_per_thread)
+			hkey |= preempted ? RUNQLAT_PREEMPT_BIT : 0;
+		else
+			hkey = preempted;
+	}
 	histp = bpf_map_lookup_or_try_init(&hists, &hkey, &zero);
 	if (!histp)
 		goto cleanup;
@@ -130,7 +147,7 @@ int BPF_PROG(sched_wakeup, struct task_struct *p)
 	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
 		return 0;
 
-	return trace_enqueue(p->tgid, p->pid);
+	return trace_enqueue(p->tgid, p->pid, false);
 }
 
 SEC("tp_btf/sched_wakeup_new")
@@ -139,7 +156,7 @@ int BPF_PROG(sched_wakeup_new, struct task_struct *p)
 	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
 		return 0;
 
-	return trace_enqueue(p->tgid, p->pid);
+	return trace_enqueue(p->tgid, p->pid, false);
 }
 
 SEC("tp_btf/sched_switch")
@@ -154,7 +171,7 @@ int BPF_PROG(handle_sched_wakeup, struct task_struct *p)
 	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
 		return 0;
 
-	return trace_enqueue(BPF_CORE_READ(p, tgid), BPF_CORE_READ(p, pid));
+	return trace_enqueue(BPF_CORE_READ(p, tgid), BPF_CORE_READ(p, pid), false);
 }
 
 SEC("raw_tp/sched_wakeup_new")
@@ -163,7 +180,7 @@ int BPF_PROG(handle_sched_wakeup_new, struct task_struct *p)
 	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
 		return 0;
 
-	return trace_enqueue(BPF_CORE_READ(p, tgid), BPF_CORE_READ(p, pid));
+	return trace_enqueue(BPF_CORE_READ(p, tgid), BPF_CORE_READ(p, pid), false);
 }
 
 SEC("raw_tp/sched_switch")
