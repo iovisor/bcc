@@ -203,6 +203,10 @@ class SmokeTests(TestCase):
     def test_filetop(self):
         self.run_with_duration("filetop.py 1 1")
 
+    @skipUnless(kernel_version_ge(5,12), "requires kernel >= 5.12")
+    def test_filewatch(self):
+        self.run_with_int("filewatch.py /tmp")
+
     def test_funccount(self):
         self.run_with_int("funccount.py __kmalloc_noprof -i 1")
 
