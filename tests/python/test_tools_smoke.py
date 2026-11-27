@@ -402,6 +402,10 @@ class SmokeTests(TestCase):
     def test_ucalls(self):
         self.run_with_int("lib/ucalls.py -l none -S %d" % os.getpid())
 
+    @skipUnless(kernel_version_ge(4,10), "requires kernel >= 4.10")
+    def test_udpsend(self):
+        self.run_with_int("udpsend.py")
+
     @skipUnless(kernel_version_ge(4,4), "requires kernel >= 4.4")
     def test_uflow(self):
         # The Python installed on the Ubuntu buildbot doesn't have USDT

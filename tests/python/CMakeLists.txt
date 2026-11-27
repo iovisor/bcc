@@ -73,6 +73,8 @@ add_test(NAME py_test_tools_smoke WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_test_tools_smoke sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_tools_smoke.py)
 add_test(NAME py_test_tools_memleak WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMAND ${TEST_WRAPPER} py_test_tools_memleak sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_tools_memleak.py)
+add_test(NAME py_test_tools_udpsend WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  COMMAND ${TEST_WRAPPER} py_test_tools_udpsend sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_tools_udpsend.py)
 if(NOT(CMAKE_SYSTEM_PROCESSOR STREQUAL "ppc64le" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "ppc64"))
 	add_test(NAME py_test_usdt WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 	  COMMAND ${TEST_WRAPPER} py_test_usdt sudo ${CMAKE_CURRENT_SOURCE_DIR}/test_usdt.py)
