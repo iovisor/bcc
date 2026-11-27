@@ -26,4 +26,11 @@ endforeach()
 endfunction()
 
 UninstallManifest("@CMAKE_BINARY_DIR@/install_manifest.txt")
-UninstallManifest("@CMAKE_BINARY_DIR@/install_manifest_python_bcc.txt")
+
+if(EXISTS "/etc/debian_version")
+  set(PY_PIP_ARGS "--break-system-packages")
+endif()
+foreach(PY_CMD ${PYTHON_CMD})
+  message(STATUS "Uninstall python-bcc for ${PY_CMD}.")
+  execute_process(COMMAND ${PY_CMD} -m pip uninstall -y ${PY_PIP_ARGS} bcc==${REVISION})
+endforeach()
