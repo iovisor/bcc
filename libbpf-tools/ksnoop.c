@@ -436,14 +436,22 @@ static char *type_id_to_str(struct btf *btf, __s32 type_id, char *str)
 	return str;
 }
 
+static void append_str(char *str, size_t str_sz, const char *suffix)
+{
+	size_t len = strnlen(str, str_sz);
+
+	if (len < str_sz)
+		snprintf(str + len, str_sz - len, "%s", suffix);
+}
+
 static char *value_to_str(struct btf *btf, struct value *val, char *str)
 {
 	str = type_id_to_str(btf, val->type_id, str);
 	if (val->flags & KSNOOP_F_PTR)
-		strncat(str, "*", MAX_STR);
+		append_str(str, MAX_STR, "*");
 	if (strlen(val->name) > 0 &&
 	    strcmp(val->name, KSNOOP_RETURN_NAME) != 0)
-		strncat(str, val->name, MAX_STR);
+		append_str(str, MAX_STR, val->name);
 
 	return str;
 }
@@ -464,7 +472,7 @@ static int get_func_ip_mod(struct func *func)
 	}
 
 	while (true) {
-		ret = fscanf(f, "%llx %c %128s%[^\n]\n",
+		ret = fscanf(f, "%llx %c %128s%255[^\n]\n",
 			     &sym_addr, &sym_type, sym_name, mod_info);
 		if (ret == EOF && feof(f))
 			break;
@@ -479,7 +487,7 @@ static int get_func_ip_mod(struct func *func)
 		func->mod[0] = '\0';
 		/* get module name from [modname] */
 		if (ret == 4) {
-			if (sscanf(mod_info, "%*[\t ][%[^]]", func->mod) < 1) {
+			if (sscanf(mod_info, "%*[\t ][%95[^]]", func->mod) < 1) {
 				p_err("failed to read module name");
 				err = -EINVAL;
 				goto out;
