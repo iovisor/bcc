@@ -1,7 +1,7 @@
 Demonstrations of udpsend, the Linux eBPF/bcc version.
 
 
-This tool traces UDP sendmsg() calls, showing the process name, PID, UID, IP Version, source and destination IP addresses and ports.:
+This tool traces UDP sendmsg() calls, showing the process name, PID, UID, IP Version, source and destination IP addresses and ports:
 
 # ./udpsend.py
 Tracing UDP sendmsg ... Hit Ctrl-C to end
@@ -34,7 +34,6 @@ The -T option prints a time(HH:MM:SS) column:
 Tracing UDP sendmsg ... Hit Ctrl-C to end
 TIME     PID     UID     COMM         IP SADDR            SPORT DADDR            DPORT
 13:20:40 83711   101     isc-net-0000 4  192.168.170.129  46813 192.168.170.2    53
-13:20:40 81670   0       dhclient     4  0.0.0.0          68    0.0.0.0          0
 13:20:42 83727   1000    ping         4  192.168.170.129  56633 192.168.170.2    53
 13:20:42 83727   1000    ping         4  192.168.170.129  56633 192.168.170.2    53
 13:20:42 83727   1000    ping         4  192.168.170.129  47121 192.168.170.2    53
@@ -51,7 +50,8 @@ Trace UDP sends
 
 options:
   -h, --help       show this help message and exit
-  -T, --time       include time column on output (HH:MM:SS)
+  -T, --time       include wall-clock time column when event is read
+                   (HH:MM:SS)
   -t, --timestamp  include seconds since trace start
 
 examples:

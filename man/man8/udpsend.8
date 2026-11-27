@@ -1,0 +1,110 @@
+.TH udpsend 8  "2026-11-27" "USER COMMANDS"
+.SH NAME
+udpsend \- Trace UDP sendmsg() calls. Uses Linux eBPF/bcc.
+.SH SYNOPSIS
+.B udpsend [\-h] [\-T] [\-t]
+.SH DESCRIPTION
+This tool traces UDP sendmsg() calls for both IPv4 and IPv6, showing the
+process name, PID, UID, IP version, source and destination IP addresses and
+ports.
+
+The probes cover sendmsg() attempts that reach udp_sendmsg() or udpv6_sendmsg(),
+including failed calls. Calls rejected earlier in the syscall path (for
+example, by an LSM hook or invalid file descriptor) are not traced. Calls
+forwarded from udpv6_sendmsg() to udp_sendmsg() are reported as IPv4.
+
+The tool tracks in-flight IPv6 calls in an LRU hash map so orphaned entries
+from missed return probes are automatically evicted. Diagnostics are printed
+to standard error if a map update fails, if the same thread re-enters
+udpv6_sendmsg() with a leftover entry, or if an entry is evicted while the
+return probe is reading it (entries evicted before the return probe's lookup
+are silently dropped).
+
+This works by tracing the kernel udp_sendmsg() and udpv6_sendmsg() functions
+using dynamic tracing, and will need updating to match any changes to these
+functions.
+
+Note that for normal userspace sends, the kernel runs inet_autobind() before
+entering udp_sendmsg() or udpv6_sendmsg(), so SPORT is already assigned even on
+a socket's first send. For unbound, unconnected sockets, SADDR will remain
+0.0.0.0 (or ::) on every send because the kernel does not store the
+route-selected source address on the socket.
+
+Since this uses BPF, only the root user can use this tool.
+.SH REQUIREMENTS
+Linux >= 4.10, CONFIG_BPF, and bcc.
+.SH OPTIONS
+.TP
+\-h
+Print usage message.
+.TP
+\-T
+Include a wall-clock time column (HH:MM:SS) when the event is read by the tool.
+.TP
+\-t
+Include a timestamp column (seconds since trace start).
+.SH EXAMPLES
+.TP
+Trace all UDP sendmsg() calls:
+#
+.B udpsend
+.TP
+Trace all UDP sendmsg() calls, and include seconds since trace start:
+#
+.B udpsend \-t
+.TP
+Trace all UDP sendmsg() calls, and include wall-clock time:
+#
+.B udpsend \-T
+.SH FIELDS
+.TP
+TIME
+Wall-clock time (HH:MM:SS) when the event is read by the tool.
+.TP
+TIME(s)
+Time of the call, in seconds since trace start.
+.TP
+PID
+Process ID.
+.TP
+UID
+User ID.
+.TP
+COMM
+Process name.
+.TP
+IP
+IP address family (4 or 6).
+.TP
+SADDR
+Source IP address.
+.TP
+SPORT
+Source port.
+.TP
+DADDR
+Destination IP address.
+.TP
+DPORT
+Destination port.
+.SH OVERHEAD
+This traces the kernel udp_sendmsg() and udpv6_sendmsg() functions and prints
+output for each event. As the rate of UDP sends is generally expected to be
+low, the overhead is also expected to be negligible. If you have an application
+that is calling a high rate of UDP sends, such as a busy DNS server or QUIC
+service, test and understand this overhead before use.
+.SH SOURCE
+This is from bcc.
+.IP
+https://github.com/iovisor/bcc
+.PP
+Also look in the bcc distribution for a companion _example.txt file containing
+example usage, output, and commentary for this tool.
+.SH OS
+Linux
+.SH STABILITY
+Unstable - in development.
+.SH AUTHOR
+Zhixiong Wei
+.SH SEE ALSO
+tcpconnect(8), tcpaccept(8), tcptop(8), tcpdump(8)
