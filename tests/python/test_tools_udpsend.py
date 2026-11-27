@@ -6,7 +6,9 @@ import os
 import select
 import signal
 import socket
+import struct
 import subprocess
+import sys
 import time
 from unittest import main, skipUnless, TestCase
 from utils import kernel_version_ge
@@ -14,7 +16,28 @@ from utils import kernel_version_ge
 TOOLS_DIR = "/bcc/tools/"
 
 if not os.path.exists("/bcc/tools/"):
-    TOOLS_DIR = "../../tools/"
+    TOOLS_DIR = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "../../tools/"
+    )
+
+sys.path.insert(0, os.path.abspath(TOOLS_DIR))
+import udpsend  # noqa: E402
+
+
+def build_dns_query(qname, qtype=1, qclass=1, flags=0x0100, txid=0x1234, edns0=False):
+    arcount = 1 if edns0 else 0
+    pkt = bytearray(struct.pack("!HHHHHH", txid, flags, 1, 0, 0, arcount))
+    if qname and qname != ".":
+        for label in qname.strip(".").split("."):
+            raw = label.encode("ascii")
+            pkt.append(len(raw))
+            pkt.extend(raw)
+    pkt.append(0)
+    pkt.extend(struct.pack("!HH", qtype, qclass))
+    if edns0:
+        # Root name (0), TYPE=OPT (41), UDP payload size (1232), ext RCODE/flags (0), RDLEN (0)
+        pkt.extend(struct.pack("!BHHIH", 0, 41, 1232, 0, 0))
+    return bytes(pkt)
 
 
 def has_ipv6_loopback():
@@ -28,12 +51,13 @@ def has_ipv6_loopback():
         return False
 
 
-def parse_event_line(line):
-    parts = line.split()
-    if len(parts) != 9:
+def parse_event_line(line, with_dns=False):
+    parts = line.split(None, 9) if with_dns else line.split()
+    expected_len = 10 if with_dns else 9
+    if len(parts) != expected_len:
         return None
     try:
-        return {
+        ev = {
             "ts": float(parts[0]),
             "pid": int(parts[1]),
             "uid": int(parts[2]),
@@ -44,15 +68,129 @@ def parse_event_line(line):
             "daddr": parts[7],
             "dport": int(parts[8]),
         }
+        if with_dns:
+            ev["dns"] = parts[9]
+        return ev
     except ValueError:
         return None
 
 
+class UdpsendDnsParserTests(TestCase):
+    def test_valid_queries(self):
+        self.assertEqual(
+            udpsend.parse_dns_query(build_dns_query("example.com", qtype=1)),
+            "query example.com A",
+        )
+        self.assertEqual(
+            udpsend.parse_dns_query(build_dns_query("example.com", qtype=28, flags=0x0120)),
+            "query example.com AAAA",
+        )
+        self.assertEqual(
+            udpsend.parse_dns_query(build_dns_query(".", qtype=2)),
+            "query . NS",
+        )
+        self.assertEqual(
+            udpsend.parse_dns_query(build_dns_query("svc.example.org", qtype=65, edns0=True)),
+            "query svc.example.org HTTPS",
+        )
+        # mDNS unicast-response bit (0x8001)
+        self.assertEqual(
+            udpsend.parse_dns_query(build_dns_query("_http._tcp.local", qtype=12, qclass=0x8001)),
+            "query _http._tcp.local PTR",
+        )
+        self.assertEqual(
+            udpsend.parse_dns_query(build_dns_query("custom.example", qtype=999)),
+            "query custom.example TYPE999",
+        )
+        # > 512-byte EDNS0 query whose question + OPT header fit in the 256B prefix
+        padded_opt = struct.pack("!BHHIH", 0, 41, 1232, 0, 480) + b"\x00" * 480
+        base_q = build_dns_query("padded.example.com", qtype=28)
+        long_edns = base_q[:10] + struct.pack("!H", 1) + base_q[12:] + padded_opt
+        self.assertGreater(len(long_edns), 512)
+        self.assertEqual(
+            udpsend.parse_dns_query(long_edns[:256], msg_len=len(long_edns)),
+            "query padded.example.com AAAA",
+        )
+        # Escaping '.' and '\\' preserves original label boundaries
+        esc_q = (
+            struct.pack("!HHHHHH", 1, 0x0100, 1, 0, 0, 0)
+            + b"\x08lab.node\x07example\x00"
+            + struct.pack("!HH", 1, 1)
+        )
+        self.assertEqual(
+            udpsend.parse_dns_query(esc_q),
+            r"query lab\.node.example A",
+        )
+
+    def test_reject_non_queries_and_malformed(self):
+        # Plain non-DNS payload
+        self.assertIsNone(udpsend.parse_dns_query(b"hello world udp payload"))
+        # DNS response (QR=1)
+        self.assertIsNone(
+            udpsend.parse_dns_query(build_dns_query("example.com", flags=0x8180))
+        )
+        # Trailing garbage when ARCOUNT=0
+        self.assertIsNone(
+            udpsend.parse_dns_query(build_dns_query("example.com") + b"\x00")
+        )
+        # Truncated message where msg_len > captured length with ARCOUNT=0
+        pkt = build_dns_query("example.com")
+        self.assertIsNone(udpsend.parse_dns_query(pkt, msg_len=len(pkt) + 4))
+        # Compression pointer in Q1
+        bad_ptr = struct.pack("!HHHHHH", 1, 0x0100, 1, 0, 0, 0) + b"\xc0\x0c\x00\x01\x00\x01"
+        self.assertIsNone(udpsend.parse_dns_query(bad_ptr))
+        # Non-printable byte in label
+        bad_lbl = struct.pack("!HHHHHH", 1, 0x0100, 1, 0, 0, 0) + b"\x03a\x01b\x00\x00\x01\x00\x01"
+        self.assertIsNone(udpsend.parse_dns_query(bad_lbl))
+        # Invalid additional record when ARCOUNT=1 (not OPT/TSIG/SIG)
+        bad_ar = build_dns_query("example.com")[:-4] + struct.pack("!HH", 1, 1) + b"\x00\x00\x01" + b"\x00" * 8
+        bad_ar = bad_ar[:10] + struct.pack("!H", 1) + bad_ar[12:]
+        self.assertIsNone(udpsend.parse_dns_query(bad_ar))
+        # Missing additional record when ARCOUNT=1 (packet ends right after Question)
+        missing_ar1 = pkt[:10] + struct.pack("!H", 1) + pkt[12:]
+        self.assertIsNone(udpsend.parse_dns_query(missing_ar1))
+        # Missing second additional record when ARCOUNT=2 (only 1 OPT present)
+        one_opt = build_dns_query("example.com", edns0=True)
+        missing_ar2 = one_opt[:10] + struct.pack("!H", 2) + one_opt[12:]
+        self.assertIsNone(udpsend.parse_dns_query(missing_ar2))
+        # Two OPT records (forbidden by RFC 6891)
+        opt_rr = struct.pack("!BHHIH", 0, 41, 1232, 0, 0)
+        two_opts = one_opt[:10] + struct.pack("!H", 2) + one_opt[12:] + opt_rr
+        self.assertIsNone(udpsend.parse_dns_query(two_opts))
+        # Out-of-bounds compression pointer in Additional RR
+        bad_ar_ptr = (
+            pkt[:10] + struct.pack("!H", 1) + pkt[12:]
+            + struct.pack("!HHHIH", 0xc0ff, 250, 255, 0, 0)
+        )
+        self.assertIsNone(udpsend.parse_dns_query(bad_ar_ptr))
+        # Compression pointer landing inside an existing QNAME label (offset 13)
+        mid_label_ptr = (
+            pkt[:10] + struct.pack("!H", 1) + pkt[12:]
+            + struct.pack("!HHHIH", 0xc00d, 250, 255, 0, 0)
+        )
+        self.assertIsNone(udpsend.parse_dns_query(mid_label_ptr))
+        # Self-referential compression pointer targeting current RR's own label
+        self_ptr_offset = len(pkt)
+        self_loop_ptr = (
+            pkt[:10] + struct.pack("!H", 1) + pkt[12:]
+            + b"\x01a" + struct.pack("!HHHIH", 0xc000 | self_ptr_offset, 250, 255, 0, 0)
+        )
+        self.assertIsNone(udpsend.parse_dns_query(self_loop_ptr))
+
+    def test_parse_ports(self):
+        self.assertEqual(udpsend.parse_ports("53"), [53])
+        self.assertEqual(udpsend.parse_ports("53, 5353, 53"), [53, 5353])
+        for bad in ("", "0", "65536", "-1", "abc", "53,", ",53", "53,,80"):
+            with self.assertRaises(ValueError):
+                udpsend.parse_ports(bad)
+
+
 @skipUnless(kernel_version_ge(4, 10), "requires kernel >= 4.10")
 class UdpsendToolTests(TestCase):
-    def _run_udpsend_and_capture(self, send_fn, done_fn):
+    def _run_udpsend_and_capture(self, send_fn, done_fn, extra_args=()):
+        with_dns = ("--dns" in extra_args) or ("-d" in extra_args)
         proc = subprocess.Popen(
-            [TOOLS_DIR + "udpsend.py", "-t"],
+            [TOOLS_DIR + "udpsend.py", "-t"] + list(extra_args),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             bufsize=0,
@@ -83,7 +221,7 @@ class UdpsendToolTests(TestCase):
                 nl = out_buf.index(b"\n")
                 line = bytes(out_buf[:nl]).decode("utf-8", "replace")
                 del out_buf[:nl + 1]
-                ev = parse_event_line(line)
+                ev = parse_event_line(line, with_dns=with_dns)
                 if ev is not None:
                     self.assertGreaterEqual(
                         ev["ts"], 0.0,
@@ -427,6 +565,193 @@ class UdpsendToolTests(TestCase):
                 len(c6b_hits), 0,
                 "unexpected IPv6 event targeting ignored port B: %r" % c6b_hits,
             )
+
+    @skipUnless(kernel_version_ge(4, 18), "requires kernel >= 4.18 for --dns")
+    def test_dns_flag_loopback(self):
+        ipv6_ok = has_ipv6_loopback()
+        my_pid = os.getpid()
+        v4_addrs = ("127.0.0.1", "::ffff:127.0.0.1")
+
+        def match(events, sport, dport, daddrs):
+            return [
+                e for e in events
+                if e["pid"] == my_pid
+                and e["sport"] == sport
+                and e["dport"] == dport
+                and e["daddr"] in daddrs
+            ]
+
+        def all_expected_seen(events, info):
+            if len(match(events, *info["v4_a"], ("127.0.0.1",))) < 1:
+                return False
+            if len(match(events, *info["v4_edns"], ("127.0.0.1",))) < 1:
+                return False
+            if len(match(events, *info["v4_nondns"], ("127.0.0.1",))) < 1:
+                return False
+            if ipv6_ok:
+                if len(match(events, *info["v6_aaaa"], ("::1",))) < 1:
+                    return False
+                if len(match(events, *info["v4mapped_txt"], v4_addrs)) < 1:
+                    return False
+            return True
+
+        def send_probes():
+            info = {}
+            with contextlib.ExitStack() as stack:
+                # 1. IPv4 standard DNS query (non-53 ephemeral port)
+                rx1 = stack.enter_context(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
+                tx1 = stack.enter_context(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
+                rx1.bind(("127.0.0.1", 0))
+                d1 = rx1.getsockname()[1]
+                tx1.sendto(build_dns_query("example.com", qtype=1), ("127.0.0.1", d1))
+                info["v4_a"] = (tx1.getsockname()[1], d1)
+
+                # 2. IPv4 DNS query with EDNS0 OPT record
+                rx2 = stack.enter_context(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
+                tx2 = stack.enter_context(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
+                rx2.bind(("127.0.0.1", 0))
+                d2 = rx2.getsockname()[1]
+                tx2.sendto(
+                    build_dns_query("edns.example.org", qtype=28, edns0=True),
+                    ("127.0.0.1", d2),
+                )
+                info["v4_edns"] = (tx2.getsockname()[1], d2)
+
+                # 3. IPv4 non-DNS UDP payload
+                rx3 = stack.enter_context(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
+                tx3 = stack.enter_context(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
+                rx3.bind(("127.0.0.1", 0))
+                d3 = rx3.getsockname()[1]
+                tx3.sendto(b"not-a-dns-packet", ("127.0.0.1", d3))
+                info["v4_nondns"] = (tx3.getsockname()[1], d3)
+
+                if ipv6_ok:
+                    # 4. Native IPv6 DNS query
+                    rx4 = stack.enter_context(socket.socket(socket.AF_INET6, socket.SOCK_DGRAM))
+                    tx4 = stack.enter_context(socket.socket(socket.AF_INET6, socket.SOCK_DGRAM))
+                    rx4.bind(("::1", 0))
+                    d4 = rx4.getsockname()[1]
+                    tx4.sendto(build_dns_query("v6.example.com", qtype=28), ("::1", d4))
+                    info["v6_aaaa"] = (tx4.getsockname()[1], d4)
+
+                    # 5. Dual-stack IPv4-mapped DNS query
+                    rx5 = stack.enter_context(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
+                    tx5 = stack.enter_context(socket.socket(socket.AF_INET6, socket.SOCK_DGRAM))
+                    rx5.bind(("127.0.0.1", 0))
+                    d5 = rx5.getsockname()[1]
+                    tx5.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+                    tx5.sendto(
+                        build_dns_query("mapped.example.com", qtype=16),
+                        ("::ffff:127.0.0.1", d5),
+                    )
+                    info["v4mapped_txt"] = (tx5.getsockname()[1], d5)
+
+            return info
+
+        events, err, info = self._run_udpsend_and_capture(
+            send_probes, all_expected_seen, extra_args=("--dns",)
+        )
+
+        h1 = match(events, *info["v4_a"], ("127.0.0.1",))
+        self.assertEqual(len(h1), 1, "expected 1 IPv4 A query event, got %r" % h1)
+        self.assertEqual(h1[0]["dns"], "query example.com A")
+
+        h2 = match(events, *info["v4_edns"], ("127.0.0.1",))
+        self.assertEqual(len(h2), 1, "expected 1 IPv4 EDNS0 query event, got %r" % h2)
+        self.assertEqual(h2[0]["dns"], "query edns.example.org AAAA")
+
+        h3 = match(events, *info["v4_nondns"], ("127.0.0.1",))
+        self.assertEqual(len(h3), 1, "expected 1 non-DNS IPv4 event, got %r" % h3)
+        self.assertEqual(h3[0]["dns"], "-")
+
+        if ipv6_ok:
+            self.assertNotIn("tracing IPv4 only", err)
+            h4 = match(events, *info["v6_aaaa"], ("::1",))
+            self.assertEqual(len(h4), 1, "expected 1 IPv6 AAAA query event, got %r" % h4)
+            self.assertEqual(h4[0]["ip"], 6)
+            self.assertEqual(h4[0]["dns"], "query v6.example.com AAAA")
+
+            h5 = match(events, *info["v4mapped_txt"], v4_addrs)
+            self.assertEqual(len(h5), 1, "expected 1 deduplicated mapped TXT event, got %r" % h5)
+            self.assertEqual(h5[0]["ip"], 4)
+            self.assertEqual(h5[0]["daddr"], "127.0.0.1")
+            self.assertEqual(h5[0]["dns"], "query mapped.example.com TXT")
+
+    def test_port_filter_loopback(self):
+        ipv6_ok = has_ipv6_loopback()
+        my_pid = os.getpid()
+
+        def match(events, sport, dport, daddrs):
+            return [
+                e for e in events
+                if e["pid"] == my_pid
+                and e["sport"] == sport
+                and e["dport"] == dport
+                and e["daddr"] in daddrs
+            ]
+
+        with contextlib.ExitStack() as stack:
+            rx_allow4 = stack.enter_context(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
+            rx_drop4 = stack.enter_context(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
+            rx_allow4.bind(("127.0.0.1", 0))
+            rx_drop4.bind(("127.0.0.1", 0))
+            p_allow4 = rx_allow4.getsockname()[1]
+            p_drop4 = rx_drop4.getsockname()[1]
+            filter_ports = [p_allow4]
+
+            p_allow6 = None
+            p_drop6 = None
+            if ipv6_ok:
+                rx_allow6 = stack.enter_context(socket.socket(socket.AF_INET6, socket.SOCK_DGRAM))
+                rx_drop6 = stack.enter_context(socket.socket(socket.AF_INET6, socket.SOCK_DGRAM))
+                rx_allow6.bind(("::1", 0))
+                rx_drop6.bind(("::1", 0))
+                p_allow6 = rx_allow6.getsockname()[1]
+                p_drop6 = rx_drop6.getsockname()[1]
+                if p_allow6 not in filter_ports:
+                    filter_ports.append(p_allow6)
+
+            def all_expected_seen(events, info):
+                if len(match(events, *info["allow4"], ("127.0.0.1",))) < 1:
+                    return False
+                if ipv6_ok and len(match(events, *info["allow6"], ("::1",))) < 1:
+                    return False
+                return True
+
+            def send_probes():
+                info = {}
+                with contextlib.ExitStack() as tx_stack:
+                    tx_d4 = tx_stack.enter_context(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
+                    tx_d4.sendto(b"drop4", ("127.0.0.1", p_drop4))
+                    info["drop4"] = (tx_d4.getsockname()[1], p_drop4)
+
+                    tx_a4 = tx_stack.enter_context(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
+                    tx_a4.sendto(b"allow4", ("127.0.0.1", p_allow4))
+                    info["allow4"] = (tx_a4.getsockname()[1], p_allow4)
+
+                    if ipv6_ok:
+                        tx_d6 = tx_stack.enter_context(socket.socket(socket.AF_INET6, socket.SOCK_DGRAM))
+                        tx_d6.sendto(b"drop6", ("::1", p_drop6))
+                        info["drop6"] = (tx_d6.getsockname()[1], p_drop6)
+
+                        tx_a6 = tx_stack.enter_context(socket.socket(socket.AF_INET6, socket.SOCK_DGRAM))
+                        tx_a6.sendto(b"allow6", ("::1", p_allow6))
+                        info["allow6"] = (tx_a6.getsockname()[1], p_allow6)
+                return info
+
+            port_arg = ",".join(str(p) for p in filter_ports)
+            events, err, info = self._run_udpsend_and_capture(
+                send_probes, all_expected_seen, extra_args=("-P", port_arg)
+            )
+
+        self.assertEqual(len(match(events, *info["allow4"], ("127.0.0.1",))), 1)
+        if p_drop4 not in filter_ports:
+            self.assertEqual(len(match(events, *info["drop4"], ("127.0.0.1",))), 0)
+        if ipv6_ok:
+            self.assertNotIn("tracing IPv4 only", err)
+            self.assertEqual(len(match(events, *info["allow6"], ("::1",))), 1)
+            if p_drop6 not in filter_ports:
+                self.assertEqual(len(match(events, *info["drop6"], ("::1",))), 0)
 
 
 if __name__ == "__main__":

@@ -44,17 +44,21 @@ TIME     PID     UID     COMM         IP SADDR            SPORT DADDR           
 USAGE message:
 
 # ./udpsend.py -h
-usage: udpsend.py [-h] [-T] [-t]
+usage: udpsend.py [-h] [-T] [-t] [-d] [-P PORT]
 
 Trace UDP sends
 
 options:
-  -h, --help       show this help message and exit
-  -T, --time       include wall-clock time column when event is read
-                   (HH:MM:SS)
-  -t, --timestamp  include seconds since trace start
+  -h, --help            show this help message and exit
+  -T, --time            include wall-clock time column when event is read
+                        (HH:MM:SS)
+  -t, --timestamp       include seconds since trace start
+  -d, --dns             decode DNS queries in UDP payloads
+  -P PORT, --port PORT  comma-separated list of destination ports to trace
 
 examples:
     ./udpsend           # trace all UDP sendmsg()s
     ./udpsend -t        # include seconds since trace start
     ./udpsend -T        # include wall-clock time (HH:MM:SS)
+    ./udpsend -P 53     # only trace destination port 53
+    ./udpsend -P 53,5353 --dns  # decode DNS queries on destination ports 53 and 5353
