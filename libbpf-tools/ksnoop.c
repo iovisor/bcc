@@ -633,10 +633,25 @@ static int parse_trace(char *str, struct trace *trace)
 	return 0;
 }
 
-static int parse_traces(int argc, char **argv, struct trace **traces)
+static int parse_traces(int argc, char **argv, struct trace *traces)
 {
 	__u8 i;
 
+	for (i = 0; i < argc; i++) {
+		if (parse_trace(argv[i], &(traces[i])))
+			return -i - 1;
+
+		if (!stack_mode || i == 0)
+			continue;
+		/* tell stack mode trace which function to expect next */
+		traces[i].prev_ip = traces[i-1].func.ip;
+		traces[i-1].next_ip = traces[i].func.ip;
+	}
+	return i;
+}
+
+static int alloc_traces(int argc, struct trace **traces)
+{
 	if (argc == 0)
 		usage();
 
@@ -649,28 +664,39 @@ static int parse_traces(int argc, char **argv, struct trace **traces)
 		p_err("Could not allocate %d traces", argc);
 		return -ENOMEM;
 	}
-	for (i = 0; i < argc; i++) {
-		if (parse_trace(argv[i], &((*traces)[i])))
-			return -EINVAL;
-		if (!stack_mode || i == 0)
-			continue;
-		/* tell stack mode trace which function to expect next */
-		(*traces)[i].prev_ip = (*traces)[i-1].func.ip;
-		(*traces)[i-1].next_ip = (*traces)[i].func.ip;
+
+	return 0;
+}
+
+static void free_traces(struct trace *traces, __u8 num)
+{
+	__u8 i;
+
+	for (i = 0; i < num; ++i) {
+		btf_dump__free(traces[i].dump);
+		if (traces[i].btf != vmlinux_btf)
+			btf__free(traces[i].btf);
 	}
-	return i;
+	btf__free(vmlinux_btf);
+	free(traces);
 }
 
 static int cmd_info(int argc, char **argv)
 {
 	struct trace *traces = NULL;
 	char str[MAX_STR];
-	int nr_traces;
+	int nr_traces, err;
 	__u8 i, j;
 
-	nr_traces = parse_traces(argc, argv, &traces);
-	if (nr_traces < 0)
-		return nr_traces;
+	err = alloc_traces(argc, &traces);
+	if (err < 0)
+		return err;
+
+	nr_traces = parse_traces(argc, argv, traces);
+	if (nr_traces < 0) {
+		free_traces(traces, -nr_traces);
+		return -EINVAL;
+	}
 
 	for (i = 0; i < nr_traces; i++) {
 		struct func *func = &traces[i].func;
@@ -690,7 +716,7 @@ static int cmd_info(int argc, char **argv)
 			       func->nr_args - MAX_ARGS);
 		printf(");\n");
 	}
-	free(traces);
+	free_traces(traces, nr_traces);
 	return 0;
 }
 
@@ -845,18 +871,25 @@ static int cmd_trace(int argc, char **argv)
 	struct bpf_map *perf_map, *func_map;
 	struct perf_buffer *pb = NULL;
 	struct ksnoop_bpf *skel;
-	int i, nr_traces, ret = -1;
+	int i, nr_traces, ret;
 	struct trace *traces = NULL;
 
-	nr_traces = parse_traces(argc, argv, &traces);
-	if (nr_traces < 0)
-		return nr_traces;
+	ret = alloc_traces(argc, &traces);
+	if (ret < 0)
+		return ret;
+	ret = -1;
+
+	nr_traces = parse_traces(argc, argv, traces);
+	if (nr_traces < 0) {
+		free_traces(traces, -nr_traces);
+		return -EINVAL;
+	}
 
 	skel = ksnoop_bpf__open_and_load();
 	if (!skel) {
 		ret = -errno;
 		p_err("Could not load ksnoop BPF: %s", strerror(-ret));
-		return 1;
+		goto cleanup;
 	}
 
 	perf_map = skel->maps.ksnoop_perf_map;
@@ -911,7 +944,7 @@ cleanup:
 		bpf_link__destroy(traces[i].links[0]);
 		bpf_link__destroy(traces[i].links[1]);
 	}
-	free(traces);
+	free_traces(traces, nr_traces);
 	perf_buffer__free(pb);
 	ksnoop_bpf__destroy(skel);
 
