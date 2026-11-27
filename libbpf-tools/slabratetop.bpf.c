@@ -35,7 +35,7 @@ static int probe_entry(struct kmem_cache *cachep)
 		valuep = bpf_map_lookup_elem(&slab_entries, &name);
 		if (!valuep)
 			return 0;
-		bpf_probe_read_kernel(&valuep->name, sizeof(valuep->name), name);
+		bpf_probe_read_kernel_str(&valuep->name, sizeof(valuep->name), name);
 	}
 
 	valuep->count++;

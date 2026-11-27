@@ -787,7 +787,7 @@ int bcc_prog_load_xattr(enum bpf_prog_type prog_type, const char *prog_name,
   int ret = 0, name_offset = 0, expected_attach_type = 0;
   char new_prog_name[BPF_OBJ_NAME_LEN] = {};
   char mod_name[64] = {};
-  char *mod_end;
+  const char *mod_end;
   int mod_len;
   int fd = -1;
 

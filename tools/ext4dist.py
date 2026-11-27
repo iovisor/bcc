@@ -121,6 +121,23 @@ int trace_read_return(struct pt_regs *ctx)
     return trace_return(ctx, op);
 }
 
+// only time synchronous O_DIRECT requests: buffered/async writes complete
+// later than this return, so entry-to-return here isn't real latency (#3719)
+int trace_write_entry(struct pt_regs *ctx, struct kiocb *iocb)
+{
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 pid = pid_tgid >> 32;
+    u32 tid = (u32)pid_tgid;
+
+    if (FILTER_PID)
+        return 0;
+    if (!(iocb->ki_flags & IOCB_DIRECT) || iocb->ki_complete)
+        return 0;
+    u64 ts = bpf_ktime_get_ns();
+    start.update(&tid, &ts);
+    return 0;
+}
+
 int trace_write_return(struct pt_regs *ctx)
 {
     char *op = "write";
@@ -202,7 +219,7 @@ if debug or args.ebpf:
 b = BPF(text=bpf_text)
 
 b.attach_kprobe(event=ext4_read_fn, fn_name=ext4_trace_read_fn)
-b.attach_kprobe(event="ext4_file_write_iter", fn_name="trace_entry")
+b.attach_kprobe(event="ext4_file_write_iter", fn_name="trace_write_entry")
 b.attach_kprobe(event="ext4_file_open", fn_name="trace_entry")
 b.attach_kprobe(event="ext4_sync_file", fn_name="trace_entry")
 b.attach_kretprobe(event=ext4_read_fn, fn_name='trace_read_return')

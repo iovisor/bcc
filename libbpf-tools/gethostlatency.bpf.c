@@ -39,7 +39,7 @@ static int probe_entry(struct pt_regs *ctx)
 	event.time = bpf_ktime_get_ns();
 	event.pid = pid;
 	bpf_get_current_comm(&event.comm, sizeof(event.comm));
-	bpf_probe_read_user(&event.host, sizeof(event.host), (void *)PT_REGS_PARM1(ctx));
+	bpf_probe_read_user_str(&event.host, sizeof(event.host), (void *)PT_REGS_PARM1(ctx));
 	bpf_map_update_elem(&starts, &tid, &event, BPF_ANY);
 	return 0;
 }

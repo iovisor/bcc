@@ -52,6 +52,18 @@ void tracepoint__syscalls__sys_enter_sync_file_range(struct trace_event_raw_sys_
 	__syscall(ctx, SYS_SYNC_FILE_RANGE);
 }
 
+SEC("tracepoint/syscalls/sys_enter_sync_file_range2")
+void tracepoint__syscalls__sys_enter_sync_file_range2(struct trace_event_raw_sys_enter *ctx)
+{
+	__syscall(ctx, SYS_SYNC_FILE_RANGE2);
+}
+
+SEC("tracepoint/syscalls/sys_enter_arm_sync_file_range")
+void tracepoint__syscalls__sys_enter_arm_sync_file_range(struct trace_event_raw_sys_enter *ctx)
+{
+	__syscall(ctx, SYS_ARM_SYNC_FILE_RANGE);
+}
+
 SEC("tracepoint/syscalls/sys_enter_syncfs")
 void tracepoint__syscalls__sys_enter_syncfs(struct trace_event_raw_sys_enter *ctx)
 {

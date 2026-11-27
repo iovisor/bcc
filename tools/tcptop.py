@@ -209,15 +209,16 @@ KFUNC_PROBE(tcp_sendmsg, struct sock *sk, struct msghdr *msg, size_t size)
  * - misses tcp_read_sock() traffic
  * we'd much prefer tracepoints once they are available.
  */
-KRETFUNC_PROBE(tcp_recvmsg, struct sock *sk, struct msghdr *msg, size_t len, int flags, int *addr_len, int ret)
+TCP_RECVMSG_PROBE
 {
+    TCP_RECVMSG_RET
     if (ret > 0)
         return tcp_stat(ret, false);
     else
         return 0;
 }
 
-KFUNC_PROBE(tcp_recvmsg, struct sock *sk, struct msghdr *msg, size_t len, int flags, int *addr_len)
+KFUNC_PROBE(tcp_recvmsg, struct sock *sk)
 {
     if (container_should_be_filtered()) {
         return 0;
@@ -233,6 +234,21 @@ KFUNC_PROBE(tcp_recvmsg, struct sock *sk, struct msghdr *msg, size_t len, int fl
 """
 
 # code substitutions
+# The fexit return slot depends on the kernel's tcp_recvmsg argument count.
+if BPF.kernel_enum_has_val("bpf_func_id", "BPF_FUNC_get_func_ret") == 1:
+    recvmsg_probe = "KRETFUNC_PROBE(tcp_recvmsg)"
+    recvmsg_ret = """
+    u64 retval = 0;
+    if (bpf_get_func_ret(ctx, &retval) < 0)
+        return 0;
+    int ret = (int)retval;
+"""
+else:
+    recvmsg_probe = "int kretprobe__tcp_recvmsg(struct pt_regs *ctx)"
+    recvmsg_ret = "int ret = PT_REGS_RC(ctx);"
+bpf_text = bpf_text.replace('TCP_RECVMSG_PROBE', recvmsg_probe)
+bpf_text = bpf_text.replace('TCP_RECVMSG_RET', recvmsg_ret)
+
 if args.pid:
     bpf_text = bpf_text.replace('FILTER_PID',
         'if (pid != %s) { return 0; }' % args.pid)

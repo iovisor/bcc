@@ -592,6 +592,8 @@ BPF_PERF_OUTPUT(%s);
                     print("%s-->COUNT %d\n\n" % (k, v), end="")
 
         def print_event(self, bpf, cpu, data, size):
+                if Probe.done:
+                       return
                 event = bpf[self.events_name].event(data)
                 if self.name not in event.comm:
                     return

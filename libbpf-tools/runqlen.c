@@ -196,7 +196,7 @@ static void print_runq_occupancy(struct runqlen_bpf__bss *bss)
 				queued += val;
 		}
 		samples = idle + queued;
-		runqocc = queued * 1.0 / max(1ULL, samples);
+		runqocc = queued * 1.0 / max(1ULL, (unsigned long long)samples);
 		if (env.per_cpu)
 			printf("runqocc, CPU %-3d %6.2f%%\n", i,
 				100 * runqocc);

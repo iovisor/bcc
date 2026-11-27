@@ -27,9 +27,9 @@ int print_full_path(struct full_path *path)
 		 *    is printed without the prefix '/'.
 		 */
 		n = printf("%s%s",
-			"/\0" + (fname[0] == '/' ||
-				 ((path->failed || path->depth == MAX_PATH_DEPTH - 1) &&
-				  depth == path->depth)),
+			(fname[0] == '/' ||
+			 ((path->failed || path->depth == MAX_PATH_DEPTH - 1) &&
+			  depth == path->depth)) ? "" : "/",
 			fname);
 	}
 	return n;

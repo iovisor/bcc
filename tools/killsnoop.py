@@ -67,7 +67,8 @@ struct data_t {
 BPF_HASH(infotmp, u32, struct val_t);
 BPF_PERF_OUTPUT(events);
 
-int syscall__kill(struct pt_regs *ctx, int tpid, int sig)
+
+static int probe_entry(u32 tpid, int sig)
 {
     u64 pid_tgid = bpf_get_current_pid_tgid();
     u32 pid = pid_tgid >> 32;
@@ -85,9 +86,24 @@ int syscall__kill(struct pt_regs *ctx, int tpid, int sig)
     }
 
     return 0;
-};
+}
 
-int do_ret_sys_kill(struct pt_regs *ctx)
+TRACEPOINT_PROBE(syscalls, sys_enter_kill)
+{
+    return probe_entry(args->pid, args->sig);
+}
+
+TRACEPOINT_PROBE(syscalls, sys_enter_tkill)
+{
+    return probe_entry(args->pid, args->sig);
+}
+
+TRACEPOINT_PROBE(syscalls, sys_enter_tgkill)
+{
+    return probe_entry(args->pid, args->sig);
+}
+
+static int probe_exit(void *ctx, int ret)
 {
     struct data_t data = {};
     struct val_t *valp;
@@ -104,7 +120,7 @@ int do_ret_sys_kill(struct pt_regs *ctx)
     bpf_probe_read_kernel(&data.comm, sizeof(data.comm), valp->comm);
     data.pid = pid;
     data.tpid = valp->tpid;
-    data.ret = PT_REGS_RC(ctx);
+    data.ret = ret;
     data.sig = valp->sig;
 
     events.perf_submit(ctx, &data, sizeof(data));
@@ -112,6 +128,22 @@ int do_ret_sys_kill(struct pt_regs *ctx)
 
     return 0;
 }
+
+TRACEPOINT_PROBE(syscalls, sys_exit_kill)
+{
+    return probe_exit(args, args->ret);
+}
+
+TRACEPOINT_PROBE(syscalls, sys_exit_tkill)
+{
+    return probe_exit(args, args->ret);
+}
+
+TRACEPOINT_PROBE(syscalls, sys_exit_tgkill)
+{
+    return probe_exit(args, args->ret);
+}
+
 """
 
 if args.tpid:
@@ -141,9 +173,6 @@ if debug or args.ebpf:
 
 # initialize BPF
 b = BPF(text=bpf_text)
-kill_fnname = b.get_syscall_fnname("kill")
-b.attach_kprobe(event=kill_fnname, fn_name="syscall__kill")
-b.attach_kretprobe(event=kill_fnname, fn_name="do_ret_sys_kill")
 
 # detect the length of PID column
 pid_bytes = 6

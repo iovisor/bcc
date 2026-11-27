@@ -186,7 +186,7 @@ int kprobe__kmem_cache_alloc(struct pt_regs *ctx, struct kmem_cache *cachep)
 {
     struct info_t info = {};
     const char *name = cachep->name;
-    bpf_probe_read_kernel(&info.name, sizeof(info.name), name);
+    bpf_probe_read_kernel_str(&info.name, sizeof(info.name), name);
 
     struct val_t *valp, zero = {};
     valp = counts.lookup_or_try_init(&info, &zero);

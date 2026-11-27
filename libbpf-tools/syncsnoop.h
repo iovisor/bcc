@@ -11,6 +11,8 @@ enum sync_syscalls {
 	SYS_FDATASYNC,
 	SYS_MSYNC,
 	SYS_SYNC_FILE_RANGE,
+	SYS_SYNC_FILE_RANGE2,
+	SYS_ARM_SYNC_FILE_RANGE,
 	SYS_SYNCFS,
 	SYS_T_MAX,
 };
@@ -28,6 +30,8 @@ static const char *sys_names[] = {
 	"fdatasync",
 	"msync",
 	"sync_file_range",
+	"sync_file_range2",
+	"arm_sync_file_range",
 	"syncfs",
 	"N/A",
 };

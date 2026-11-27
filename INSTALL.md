@@ -410,6 +410,9 @@ sudo apt-get -y install zip bison build-essential cmake flex git libedit-dev \
 
 # For Lua support
 sudo apt-get -y install luajit luajit-5.1-dev
+
+# Additional dependencies for libbpf-tools
+sudo apt-get -y install llvm clang
 ```
 
 ### Install and compile BCC

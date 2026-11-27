@@ -48,6 +48,10 @@ prog = """
 #include <uapi/linux/in.h>
 #include <linux/string.h>
 
+#ifndef SOCK_TYPE_MASK
+#define SOCK_TYPE_MASK 0xf
+#endif
+
 struct app_name {
     char name[TASK_COMM_LEN];
 };
@@ -63,7 +67,7 @@ KMOD_RET(update_socket_protocol, int family, int type, int protocol, int ret)
     bpf_get_current_comm(&target.name, TASK_COMM_LEN);
 
     if ((family == AF_INET || family == AF_INET6) &&
-        type == SOCK_STREAM &&
+        (type & SOCK_TYPE_MASK) == SOCK_STREAM &&
         (!protocol || protocol == IPPROTO_TCP) &&
         (mode && *mode == 0 || support_apps.lookup(&target)))
         return IPPROTO_MPTCP;

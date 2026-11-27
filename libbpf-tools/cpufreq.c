@@ -148,8 +148,9 @@ static int init_freqs_mhz(__u32 *freqs_mhz, struct bpf_link *links[])
 
 		f = fopen(path, "r");
 		if (!f) {
-			fprintf(stderr, "failed to open '%s': %s\n", path,
-				strerror(errno));
+			fprintf(stderr, "failed to open '%s': %s\n"
+				"This tool depends on CPU Frequency Scaling\n",
+				path, strerror(errno));
 			return -1;
 		}
 		if (fscanf(f, "%u\n", &freqs_mhz[i]) != 1) {

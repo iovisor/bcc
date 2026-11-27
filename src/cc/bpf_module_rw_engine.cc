@@ -286,7 +286,7 @@ string BPFModule::make_reader(Module *mod, Type *type) {
 
   string name = "reader" + std::to_string(readers_.size());
 #if LLVM_VERSION_MAJOR >= 18
-  vector<Type *> fn_args({B.getPtrTy(), PointerType::getUnqual(type)});
+  vector<Type *> fn_args({B.getPtrTy(), PointerType::getUnqual(type->getContext())});
 #else
   vector<Type *> fn_args({B.getInt8PtrTy(), PointerType::getUnqual(type)});
 #endif
@@ -354,7 +354,7 @@ string BPFModule::make_writer(Module *mod, Type *type) {
 
   string name = "writer" + std::to_string(writers_.size());
 #if LLVM_VERSION_MAJOR >= 18
-  vector<Type *> fn_args({B.getPtrTy(), B.getInt64Ty(), PointerType::getUnqual(type)});
+  vector<Type *> fn_args({B.getPtrTy(), B.getInt64Ty(), PointerType::getUnqual(type->getContext())});
 #else
   vector<Type *> fn_args({B.getInt8PtrTy(), B.getInt64Ty(), PointerType::getUnqual(type)});
 #endif

@@ -65,7 +65,7 @@ class USDTProbeArgument(object):
         if self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_OFFSET != 0 and \
            self.valid & BCC_USDT_ARGUMENT_FLAGS.DEREF_IDENT != 0 and \
            self.valid & BCC_USDT_ARGUMENT_FLAGS.BASE_REGISTER_NAME != 0 and \
-           self.base_register_name == "ip":
+           self.base_register_name == b"ip":
             sign = '+' if self.deref_offset >= 0 else '-'
             return "*(&%s %s %d)" % (self.deref_ident.decode(),
                                      sign, abs(self.deref_offset))

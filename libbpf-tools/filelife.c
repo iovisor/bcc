@@ -150,6 +150,13 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	buf = bpf_buffer__new(obj->maps.events, obj->maps.heap);
+	if (!buf) {
+		err = -errno;
+		fprintf(stderr, "failed to create ring/perf buffer: %d", err);
+		goto cleanup;
+	}
+
 	/* initialize global data (filtering options) */
 	obj->rodata->targ_tgid = env.pid;
 	obj->rodata->full_path = env.full_path;
@@ -169,16 +176,6 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	printf("Tracing the lifespan of short-lived files ... Hit Ctrl-C to end.\n");
-	printf("%-8s %-6s %-16s %-7s %s\n", "TIME", "PID", "COMM", "AGE(s)", "FILE");
-
-	buf = bpf_buffer__new(obj->maps.events, obj->maps.heap);
-	if (!buf) {
-		err = -errno;
-		fprintf(stderr, "failed to create ring/perf buffer: %d", err);
-		goto cleanup;
-	}
-
 	err = bpf_buffer__open(buf, handle_event, handle_lost_events, NULL);
 	if (err) {
 		err = -errno;
@@ -191,6 +188,9 @@ int main(int argc, char **argv)
 		err = 1;
 		goto cleanup;
 	}
+
+	printf("Tracing the lifespan of short-lived files ... Hit Ctrl-C to end.\n");
+	printf("%-8s %-6s %-16s %-7s %s\n", "TIME", "PID", "COMM", "AGE(s)", "FILE");
 
 	while (!exiting) {
 		err = bpf_buffer__poll(buf, POLL_TIMEOUT_MS);

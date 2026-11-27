@@ -59,7 +59,7 @@ int trace_start(void *ctx, struct request *rq, bool merge_bio)
 		bpf_get_stack(ctx, i_rqinfop->rqinfo.kern_stack,
 			sizeof(i_rqinfop->rqinfo.kern_stack), 0);
 	bpf_get_current_comm(&i_rqinfop->rqinfo.comm,
-			sizeof(&i_rqinfop->rqinfo.comm));
+			sizeof(i_rqinfop->rqinfo.comm));
 	i_rqinfop->rqinfo.dev = dev;
 
 	if (i_rqinfop == &i_rqinfo)

@@ -25,7 +25,7 @@ static void get_file_path(struct file *file, char *buf, size_t size)
 	struct qstr dname;
 
 	dname = BPF_CORE_READ(file, f_path.dentry, d_name);
-	bpf_probe_read_kernel(buf, size, dname.name);
+	bpf_probe_read_kernel_str(buf, size, dname.name);
 }
 
 static int probe_entry(struct pt_regs *ctx, struct file *file, size_t count, enum op op)

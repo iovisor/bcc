@@ -35,15 +35,13 @@ static __always_inline bool valid_uid(uid_t uid) {
 	return uid != INVALID_UID;
 }
 
-SEC("tracepoint/syscalls/sys_enter_execve")
-int tracepoint__syscalls__sys_enter_execve(struct syscall_trace_enter* ctx)
+static __always_inline int enter_exec(const char *filename, const char **args)
 {
 	u64 id;
 	pid_t pid, tgid;
 	int ret;
 	struct event *event;
 	struct task_struct *task;
-	const char **args = (const char **)(ctx->args[1]);
 	const char *argp;
 
 	if (filter_cg && !bpf_current_task_under_cgroup(&cgroup_map, 0))
@@ -72,7 +70,7 @@ int tracepoint__syscalls__sys_enter_execve(struct syscall_trace_enter* ctx)
 	event->args_count = 0;
 	event->args_size = 0;
 
-	ret = bpf_probe_read_user_str(event->args, ARGSIZE, (const char*)ctx->args[0]);
+	ret = bpf_probe_read_user_str(event->args, ARGSIZE, filename);
 	if (ret < 0) {
 		return 0;
 	}
@@ -111,8 +109,19 @@ int tracepoint__syscalls__sys_enter_execve(struct syscall_trace_enter* ctx)
 	return 0;
 }
 
-SEC("tracepoint/syscalls/sys_exit_execve")
-int tracepoint__syscalls__sys_exit_execve(struct syscall_trace_exit* ctx)
+SEC("tracepoint/syscalls/sys_enter_execve")
+int tracepoint__syscalls__sys_enter_execve(struct syscall_trace_enter* ctx)
+{
+	return enter_exec((const char*)ctx->args[0], (const char **)(ctx->args[1]));
+}
+
+SEC("tracepoint/syscalls/sys_enter_execveat")
+int tracepoint__syscalls__sys_enter_execveat(struct syscall_trace_enter* ctx)
+{
+	return enter_exec((const char*)ctx->args[1], (const char **)(ctx->args[2]));
+}
+
+static __always_inline int exit_exec(struct syscall_trace_exit* ctx)
 {
 	u64 id;
 	pid_t pid;
@@ -143,6 +152,18 @@ int tracepoint__syscalls__sys_exit_execve(struct syscall_trace_exit* ctx)
 cleanup:
 	bpf_map_delete_elem(&execs, &pid);
 	return 0;
+}
+
+SEC("tracepoint/syscalls/sys_exit_execve")
+int tracepoint__syscalls__sys_exit_execve(struct syscall_trace_exit* ctx)
+{
+	return exit_exec(ctx);
+}
+
+SEC("tracepoint/syscalls/sys_exit_execveat")
+int tracepoint__syscalls__sys_exit_execveat(struct syscall_trace_exit* ctx)
+{
+	return exit_exec(ctx);
 }
 
 char LICENSE[] SEC("license") = "GPL";

@@ -88,6 +88,8 @@ static void exit(void)
 	if (slot >= MAX_SLOTS)
 		slot = MAX_SLOTS - 1;
 	__sync_fetch_and_add(&hist[slot], 1);
+
+	bpf_map_delete_elem(&starts, &pid);
 }
 
 SEC("fexit/dummy_fexit")

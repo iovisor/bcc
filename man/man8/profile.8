@@ -2,7 +2,7 @@
 .SH NAME
 profile \- Profile CPU usage by sampling stack traces. Uses Linux eBPF/bcc.
 .SH SYNOPSIS
-.B profile [\-adfh] [\-p PID | \-L TID] [\-U | \-K] [\-F FREQUENCY | \-c COUNT]
+.B profile [\-adfhA] [\-p PID | \-L TID] [\-U | \-K] [\-F FREQUENCY | \-c COUNT]
 .B [\-\-stack\-storage\-size COUNT] [\-C CPU] [\-\-cgroupmap CGROUPMAP] [\-\-mntnsmap MAPPATH] [duration]
 .SH DESCRIPTION
 This is a CPU profiler. It works by taking samples of stack traces at timed
@@ -41,6 +41,12 @@ Sample stacks every one in this many events.
 .TP
 \-f
 Print output in folded stack format.
+.TP
+\-a
+Add _[k] annotations to kernel frames.
+.TP
+\-A
+Show raw addresses.
 .TP
 \-d
 Include an output delimiter between kernel and user stacks (either "--", or,
