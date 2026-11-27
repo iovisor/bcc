@@ -39,27 +39,118 @@ PID     COMM             LADDR           LPORT RADDR           RPORT MS
 ^C
 
 
+The -H option can be used to show latency as a histogram, grouped by PID.
+
+# tcppktlat -H
+Summarize TCP packet latency as a histogram. Hit Ctrl-C to end.
+^C
+
+pid = 2333671 sshd-session
+     usecs               : count    distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 1        |*                                       |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 10       |***********                             |
+        16 -> 31         : 15       |****************                        |
+        32 -> 63         : 36       |****************************************|
+        64 -> 127        : 2        |**                                      |
+
+pid = 1357503 verge-mihomo
+     usecs               : count    distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 2        |*************                           |
+        16 -> 31         : 2        |*************                           |
+        32 -> 63         : 1        |******                                  |
+        64 -> 127        : 6        |****************************************|
+       128 -> 255        : 1        |******                                  |
+^C
+
+
+The -H option can also take an interval argument to print histograms periodically.
+
+# tcppktlat -H 5
+Summarize TCP packet latency as a histogram. Hit Ctrl-C to end.
+
+pid = 1357503 verge-mihomo
+     usecs               : count    distribution
+         0 -> 1          : 1        |***                                     |
+         2 -> 3          : 1        |***                                     |
+         4 -> 7          : 4        |*************                           |
+         8 -> 15         : 4        |*************                           |
+        16 -> 31         : 7        |***********************                 |
+        32 -> 63         : 12       |****************************************|
+        64 -> 127        : 9        |******************************          |
+       128 -> 255        : 1        |***                                     |
+
+pid = 1357503 verge-mihomo
+     usecs               : count    distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 2        |*************                           |
+        16 -> 31         : 2        |*************                           |
+        32 -> 63         : 1        |******                                  |
+        64 -> 127        : 6        |****************************************|
+       128 -> 255        : 1        |******                                  |
+^C
+
+
+The -p option can be combined with -H to show histogram for a specific PID only.
+
+# tcppktlat -p 1357503 -H
+Summarize TCP packet latency as a histogram. Hit Ctrl-C to end.
+^C
+
+pid = 1357503 verge-mihomo
+     usecs               : count    distribution
+         0 -> 1          : 1        |***                                     |
+         2 -> 3          : 1        |***                                     |
+         4 -> 7          : 4        |*************                           |
+         8 -> 15         : 4        |*************                           |
+        16 -> 31         : 7        |***********************                 |
+        32 -> 63         : 12       |****************************************|
+        64 -> 127        : 9        |******************************          |
+       128 -> 255        : 1        |***                                     |
+^C
+
+
 # tcppktlat --help
 Usage: tcppktlat [OPTION...]
 Trace latency between TCP received pkt and picked up by userspace thread.
 
-USAGE: tcppktlat [--help] [-T] [-p PID] [-t TID] [-l LPORT] [-r RPORT] [-v]
+USAGE: tcppktlat [--help] [-T] [-H] [-L] [-p PID] [-t TID] [-l LPORT] [-r RPORT] [-w] [-v]
+                [min_us | interval [count]]
+
+Positional args:
+    min_us             Minimum latency filter (microseconds) when not using -H
+    interval [count]   With -H, interval is the histogram print interval (seconds)
+                       and count limits how many times histograms are printed
 
 EXAMPLES:
     tcppktlat             # Trace all TCP packet picked up latency
     tcppktlat -T          # summarize with timestamps
+    tcppktlat -H          # show latency histogram
+    tcppktlat -H 5        # show latency histogram, print every 5 seconds
+    tcppktlat -H 1 5      # show latency histogram, print every 1 second, 5 times
+    tcppktlat -H -L       # show latency histogram per thread
     tcppktlat -p          # filter for pid
     tcppktlat -t          # filter for tid
     tcppktlat -l          # filter for local port
     tcppktlat -r          # filter for remote port
     tcppktlat 1000        # filter for latency higher than 1000us
 
+  -H, --histogram          Show latency histogram. Positional args
+                           become interval/count
+  -L, --threads            Print a histogram per thread ID
   -l, --lport=LPORT          filter for local port
   -p, --pid=PID              Process PID to trace
   -r, --rport=RPORT          filter for remote port
   -t, --tid=TID              Thread TID to trace
   -T, --timestamp            include timestamp on output
   -v, --verbose              Verbose debug output
+  -w, --wide                 Wide column output (fits IPv6 addresses)
   -?, --help                 Give this help list
       --usage                Give a short usage message
   -V, --version              Print program version
