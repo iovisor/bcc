@@ -1,0 +1,160 @@
+Demonstrations of biohint, the Linux eBPF/bcc version.
+
+
+biohint traces block device I/O with FDP feature, and records the distribution
+of hint usage.
+For example:
+
+#python3 biohint.py
+the program is being configured!
+
+    0: NOT_SET
+    1: NONE
+    2: SHORT
+    3: MEDIUM
+    4: LONG
+    5: EXTREME
+
+configure complete! the program is running!
+^C     hint          : count     distribution
+        2          : 2366712  |*************************************** |
+        3          : 2368218  |****************************************|
+        4          : 2365956  |*************************************** |
+        5          : 1673268  |****************************            |
+
+The integer from 0 to 5 of hint represent the NOT_SET, NONE, SHORT, MEDIUM,
+LONG, EXTREME as shown above.
+
+This example output shows the hint count distribution. You can find the definition
+about the hint in include/linux/rw_hint.h
+
+In the following example, the option -t is used to print timestamps with the
+output, and to print 1 second summaries 5 times:
+
+#python3 biohint.py -t 1 5
+the program is being configured!
+
+    0: NOT_SET
+    1: NONE
+    2: SHORT
+    3: MEDIUM
+    4: LONG
+    5: EXTREME
+
+configure complete! the program is running!
+15:14:04
+     hint          : count     distribution
+        2          : 112977   |*************************************** |
+        3          : 115540   |****************************************|
+        4          : 114868   |*************************************** |
+        5          : 115111   |*************************************** |
+15:14:05
+     hint          : count     distribution
+        2          : 114007   |*************************************** |
+        3          : 114716   |*************************************** |
+        4          : 114291   |*************************************** |
+        5          : 115320   |****************************************|
+15:14:06
+     hint          : count     distribution
+        2          : 114235   |*************************************** |
+        3          : 115257   |*************************************** |
+        4          : 114750   |*************************************** |
+        5          : 115523   |****************************************|
+15:14:07
+     hint          : count     distribution
+        2          : 114082   |*************************************** |
+        3          : 115068   |*************************************** |
+        4          : 114739   |*************************************** |
+        5          : 115638   |****************************************|
+15:14:08
+     hint          : count     distribution
+        2          : 114122   |*************************************** |
+        3          : 115307   |*************************************** |
+        4          : 114738   |*************************************** |
+        5          : 115752   |****************************************|
+
+How the hint count distribution changes over time can be seen.
+
+The -s option will print a histogram per disk. Eg:
+
+#python3 biohint.py -s
+the program is being configured!
+
+    0: NOT_SET
+    1: NONE
+    2: SHORT
+    3: MEDIUM
+    4: LONG
+    5: EXTREME
+
+configure complete! the program is running!
+^C
+disk = nvme0n1
+     hint          : count     distribution
+        0          : 10       |                                        |
+        2          : 1557181  |*************************************** |
+        3          : 1562215  |****************************************|
+        4          : 1547968  |*************************************** |
+        5          : 1560136  |*************************************** |
+
+disk = sda3
+     hint          : count     distribution
+        0          : 16       |                                        |
+        1          : 921      |                                        |
+        2          : 285812   |****************************************|
+        3          : 285691   |*************************************** |
+        4          : 285417   |*************************************** |
+        5          : 285790   |*************************************** |
+
+disk = dm-0
+     hint          : count     distribution
+        0          : 13       |                                        |
+        1          : 921      |                                        |
+        2          : 285812   |****************************************|
+        3          : 285691   |*************************************** |
+        4          : 285417   |*************************************** |
+        5          : 285790   |*************************************** |
+
+
+The -d option trace the disk which is mounted on the followed dir
+For example:
+#python3 biohint.py -d /mnt/fdp
+the program is being configured!
+
+    0: NOT_SET
+    1: NONE
+    2: SHORT
+    3: MEDIUM
+    4: LONG
+    5: EXTREME
+
+configure complete! the program is running!
+^C     hint          : count     distribution
+        0          : 308      |                                        |
+        2          : 684855   |*************************************** |
+        3          : 682569   |*************************************** |
+        4          : 689318   |*************************************** |
+        5          : 690660   |****************************************|
+
+
+#python3 biohint.py -h
+usage: biohint.py [-h] [-t] [-s] [-d <dir>] [interval] [count]
+
+Summarize write hint in block of FDP SSDs
+
+positional arguments:
+    interval                    Specify the amount of time in seconds between each report
+    count                       Limit the number of report, the default is ....
+
+options:
+    -h, --help                  Show this help
+    -t, --ts                    Print histogram with timestamp
+    -s, --devices               Print histograms of every device separately
+    -d <dir>, --dir             Trace the device which has been mounted on specific directory
+
+examples:
+    ./biohint                   # Summarize block I/O hint in histogram.
+    ./biohint 1 10              # Print 10 reports at 1 second intervals.
+    ./biohint -t 1              # Print summary with timestamp at 1 second intervals.
+    ./biohint -s                # Show histograms of every device separately.
+    ./biohint -d /mnt/data      # Trace the device which has been mounted on '/mnt/data'.
