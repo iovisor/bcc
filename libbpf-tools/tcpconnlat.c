@@ -5,6 +5,7 @@
 // 11-Jul-2020   Wenbo Zhang   Created this.
 #include <argp.h>
 #include <arpa/inet.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -151,7 +152,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 
 void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
 {
-	fprintf(stderr, "lost %llu events on CPU #%d\n", lost_cnt, cpu);
+	fprintf(stderr, "lost %" PRIu64" events on CPU #%d\n", (uint64_t)lost_cnt, cpu);
 }
 
 int main(int argc, char **argv)
