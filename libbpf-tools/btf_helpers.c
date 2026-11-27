@@ -72,7 +72,6 @@ static int
 inflate_gz(unsigned char *src, int src_size, unsigned char **dst, int *dst_size)
 {
 	size_t size = INITIAL_BUF_SIZE;
-	size_t next_size = size;
 	z_stream strm;
 	void *tmp;
 	int ret;
@@ -97,13 +96,12 @@ inflate_gz(unsigned char *src, int src_size, unsigned char **dst, int *dst_size)
 	/* run inflate() on input until it returns Z_STREAM_END */
 	do {
 		strm.next_out = *dst + strm.total_out;
-		strm.avail_out = next_size;
+		strm.avail_out = size - strm.total_out;
 		ret = inflate(&strm, Z_NO_FLUSH);
 		if (ret != Z_OK && ret != Z_STREAM_END)
 			goto out_err;
 		/* we need more space */
 		if (strm.avail_out == 0) {
-			next_size = size;
 			size *= 2;
 			tmp = realloc(*dst, size);
 			if (!tmp) {
