@@ -73,6 +73,7 @@ static int handle_tcp_rcv_space_adjust(void *ctx, struct sock *sk)
 	eventp = reserve_buf(sizeof(*eventp));
 	if (!eventp)
 		goto cleanup;
+	zero_buf(eventp, sizeof(*eventp));
 
 	eventp->pid = pid;
 	eventp->tid = tid;
