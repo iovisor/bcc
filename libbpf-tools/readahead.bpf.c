@@ -64,11 +64,21 @@ int BPF_PROG(filemap_alloc_folio_ret, gfp_t gfp, unsigned int order,
 	return alloc_done(&ret->page);
 }
 
+/*
+ * 7f3779a3ac3e ("mm/filemap: Add NUMA mempolicy support to
+ * filemap_alloc_folio()") in v6.19 added a struct mempolicy * argument to
+ * filemap_alloc_folio_noprof(). Read the return value with bpf_get_func_ret()
+ * instead of declaring the arguments, so the program does not have to track
+ * the target's signature.
+ */
 SEC("fexit/filemap_alloc_folio_noprof")
-int BPF_PROG(filemap_alloc_folio_noprof_ret, gfp_t gfp, unsigned int order,
-	struct folio *ret)
+int BPF_PROG(filemap_alloc_folio_noprof_ret)
 {
-	return alloc_done(&ret->page);
+	u64 ret;
+
+	if (bpf_get_func_ret(ctx, &ret) || !ret)
+		return 0;
+	return alloc_done(&((struct folio *)ret)->page);
 }
 
 SEC("fexit/do_page_cache_ra")
