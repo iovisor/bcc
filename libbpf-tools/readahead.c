@@ -4,13 +4,11 @@
 // Based on readahead(8) from BPF-Perf-Tools-Book by Brendan Gregg.
 // 8-Jun-2020   Wenbo Zhang   Created this.
 #include <argp.h>
-#include <errno.h>
 #include <signal.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
-#include <bpf/btf.h>
 #include "readahead.h"
 #include "readahead.skel.h"
 #include "trace_helpers.h"
@@ -127,71 +125,18 @@ static int attach_access(struct readahead_bpf *obj)
 	return -1;
 }
 
-/*
- * filemap_alloc_folio_noprof() gained a struct mempolicy * argument in
- * 7f3779a3ac3e ("mm/filemap: Add NUMA mempolicy support to
- * filemap_alloc_folio()") in v6.19. A fexit program is handed the return value
- * in the register following the arguments declared by the kernel BTF, and the
- * kernel does not check that a program declares as many arguments as its
- * target, so the program has to match the running kernel's signature or it
- * reads the return value from the wrong register.
- */
-static int filemap_alloc_folio_noprof_nr_args(void)
-{
-	const struct btf_type *t;
-	struct btf *btf;
-	long err;
-	__s32 id;
-	int nr_args;
-
-	btf = btf__load_vmlinux_btf();
-	err = libbpf_get_error(btf);
-	if (err)
-		return (int)err;
-
-	id = btf__find_by_name_kind(btf, "filemap_alloc_folio_noprof",
-				    BTF_KIND_FUNC);
-	t = id > 0 ? btf__type_by_id(btf, id) : NULL;
-	if (t && btf_is_func(t))
-		t = btf__type_by_id(btf, t->type);
-	else
-		t = NULL;
-
-	if (!t || !btf_is_func_proto(t)) {
-		btf__free(btf);
-		return -ENOENT;
-	}
-
-	nr_args = btf_vlen(t);
-	btf__free(btf);
-	return nr_args;
-}
-
 static int attach_alloc_ret(struct readahead_bpf *obj)
 {
 	bpf_program__set_autoload(obj->progs.page_cache_alloc_ret, false);
 	bpf_program__set_autoload(obj->progs.filemap_alloc_folio_ret, false);
 	bpf_program__set_autoload(obj->progs.filemap_alloc_folio_noprof_ret, false);
-	bpf_program__set_autoload(obj->progs.filemap_alloc_folio_noprof_mpol_ret, false);
 
 	/*
 	 * b951aaff5035 ("mm: enable page allocation tagging") in v6.10
 	 * renamed filemap_alloc_folio to filemap_alloc_folio_noprof
 	 */
-	if (fentry_can_attach("filemap_alloc_folio_noprof", NULL)) {
-		int nr_args = filemap_alloc_folio_noprof_nr_args();
-
-		if (nr_args < 0) {
-			fprintf(stderr, "failed to read filemap_alloc_folio_noprof BTF: %d\n",
-				nr_args);
-			return nr_args;
-		}
-		if (nr_args >= 3)
-			bpf_program__set_autoload(obj->progs.filemap_alloc_folio_noprof_mpol_ret, true);
-		else
-			bpf_program__set_autoload(obj->progs.filemap_alloc_folio_noprof_ret, true);
-		return 0;
-	}
+	if (fentry_can_attach("filemap_alloc_folio_noprof", NULL))
+		return bpf_program__set_autoload(obj->progs.filemap_alloc_folio_noprof_ret, true);
 
 	/*
 	 * bb3c579e25e5 ("mm/filemap: Add filemap_alloc_folio") in v5.16
